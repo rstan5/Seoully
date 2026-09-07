@@ -9,7 +9,8 @@ import type { RoomTheme } from "@/domain/types";
  * highlights, contact shadows — without a single component knowing about it.
  * This is the mechanism behind "different collectors have different worlds".
  */
-export function themeVars(theme: RoomTheme): CSSProperties {
+export function themeVars(theme: RoomTheme, lightScale = 1): CSSProperties {
+  const intensity = theme.light.intensity * lightScale;
   return {
     "--room-wall": theme.wall,
     "--room-wall-accent": theme.wallAccent,
@@ -24,7 +25,7 @@ export function themeVars(theme: RoomTheme): CSSProperties {
     "--room-light-color": theme.light.color,
     "--room-light-x": theme.light.x,
     "--room-light-y": theme.light.y,
-    "--room-light-intensity": theme.light.intensity,
+    "--room-light-intensity": intensity,
     "--room-fill": theme.light.fill,
 
     // Materials read these. Deriving the key-light angle from the light's
@@ -32,7 +33,7 @@ export function themeVars(theme: RoomTheme): CSSProperties {
     // the shadow under the shelf across the room.
     "--lit-angle": `${lightAngle(theme.light.x, theme.light.y)}deg`,
     "--lit-color": theme.light.color,
-    "--lit-strength": theme.light.intensity,
+    "--lit-strength": intensity,
     "--fill-color": theme.light.fill,
   } as CSSProperties;
 }

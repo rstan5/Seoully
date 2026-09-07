@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { HoldingView, RoomZone } from "@/domain/types";
+import type { InspectTarget } from "@/world/store/worldStore";
 import { WorldNode } from "@/world/stage/WorldNode";
 import { FigureStand, Lightstick, Plushie } from "@/world/objects/CaseObjects";
 
@@ -12,7 +13,7 @@ interface DisplayCaseZoneProps {
   zone: RoomZone;
   items: HoldingView[];
   interactive: boolean;
-  onSelect: (view: HoldingView) => void;
+  onSelect: (view: HoldingView, at: InspectTarget) => void;
 }
 
 /**
@@ -118,7 +119,7 @@ export function DisplayCaseZone({ zone, items, interactive, onSelect }: DisplayC
                 interactive,
                 onHover: (hovering: boolean) =>
                   setHoveredId(hovering ? view.holding.id : null),
-                onSelect: () => onSelect(view),
+                onSelect: () => onSelect(view, zone.transform),
               };
               switch (view.template.kind) {
                 case "lightstick":

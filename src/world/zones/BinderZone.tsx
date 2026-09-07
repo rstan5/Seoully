@@ -5,7 +5,7 @@ import type { RoomZone, SetProgress } from "@/domain/types";
 import { objectSpring } from "@/design/motion";
 import { WorldNode } from "@/world/stage/WorldNode";
 
-const SPINE = 34;
+const SPINE = 22;
 
 interface BinderZoneProps {
   zone: RoomZone;
@@ -95,8 +95,8 @@ export function BinderZone({
               transform: "translate(-50%,-50%) rotate(180deg)",
               writingMode: "vertical-rl",
               fontFamily: "var(--font-sans)",
-              fontSize: 9,
-              letterSpacing: "0.2em",
+              fontSize: 6.5,
+              letterSpacing: "0.18em",
               textTransform: "uppercase",
               color: "color-mix(in oklab, var(--color-bone) 80%, transparent)",
               whiteSpace: "nowrap",
@@ -112,9 +112,9 @@ export function BinderZone({
           style={{
             position: "absolute",
             right: 3,
-            top: 6,
-            width: 16,
-            height: h - 12,
+            top: 4,
+            width: 11,
+            height: h - 8,
             transformOrigin: "100% 50%",
             transform: "rotateY(-90deg) translateZ(-2px)",
             background:
@@ -143,21 +143,21 @@ export function BinderZone({
           <div
             style={{
               position: "absolute",
-              inset: 14,
+              inset: 8,
               border: "1px solid color-mix(in oklab, var(--color-bone) 20%, transparent)",
               boxShadow: "inset 0 1px 0 rgba(0,0,0,0.4)",
             }}
           />
-          <div style={{ position: "absolute", left: 26, top: 34, right: 26 }}>
+          <div style={{ position: "absolute", left: 16, top: 20, right: 16 }}>
             <div
               className="u-eyebrow"
-              style={{ fontSize: 7.5, color: "var(--color-bone)", opacity: 0.55 }}
+              style={{ fontSize: 5, color: "var(--color-bone)", opacity: 0.55 }}
             >
               {headline?.set.groupId === "skz" ? "Stray Kids" : "Collection"}
             </div>
             <div
               className="u-display"
-              style={{ fontSize: 26, marginTop: 8, color: "var(--color-paper)" }}
+              style={{ fontSize: 16, marginTop: 4, color: "var(--color-paper)" }}
             >
               {headline?.set.name.split("—")[0]?.trim() ?? "Photocards"}
             </div>
@@ -167,11 +167,11 @@ export function BinderZone({
               place in the room where progress is stated as a number, and it
               earns it by being physically part of the object. */}
           {headline && (
-            <div style={{ position: "absolute", left: 26, bottom: 30 }}>
+            <div style={{ position: "absolute", left: 16, bottom: 16 }}>
               <div
                 className="u-stat"
                 style={{
-                  fontSize: 15,
+                  fontSize: 11,
                   color: headline.complete ? "#e8c46a" : "color-mix(in oklab, var(--color-bone) 62%, transparent)",
                   letterSpacing: "0.04em",
                 }}
@@ -186,10 +186,10 @@ export function BinderZone({
           <div
             style={{
               position: "absolute",
-              right: 30,
-              top: -6,
-              bottom: -6,
-              width: 9,
+              right: 20,
+              top: -4,
+              bottom: -4,
+              width: 6,
               background:
                 "linear-gradient(90deg, rgba(0,0,0,0.5), color-mix(in oklab, #1c1620 88%, #000), rgba(0,0,0,0.5))",
               boxShadow: "0 0 8px rgba(0,0,0,0.5)",

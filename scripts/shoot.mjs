@@ -55,7 +55,9 @@ try {
   await new Promise((r) => setTimeout(r, wait));
 
   if (act) {
-    await page.evaluate(act);
+    // `act` arrives as the source of an arrow function, so it has to be
+    // invoked. Evaluating the bare expression only constructs the function.
+    await page.evaluate(`(${act})()`);
     await new Promise((r) => setTimeout(r, Number(flag("settle", 1800))));
   }
 

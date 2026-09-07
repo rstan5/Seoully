@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import type { HoldingView, RoomZone } from "@/domain/types";
 import { objectSpring } from "@/design/motion";
+import type { InspectTarget } from "@/world/store/worldStore";
 import { WorldNode } from "@/world/stage/WorldNode";
 
 const DESK_DEPTH = 250;
@@ -13,7 +14,7 @@ interface DeskZoneProps {
   zone: RoomZone;
   items: HoldingView[];
   interactive: boolean;
-  onSelect: (view: HoldingView) => void;
+  onSelect: (view: HoldingView, at: InspectTarget) => void;
 }
 
 /**
@@ -94,9 +95,14 @@ export function DeskZone({ zone, items, interactive, onSelect }: DeskZoneProps) 
         ))}
       </div>
 
-      {/* Desktop surface, folded forward toward the viewer. */}
+      {/* Desktop surface, folded forward toward the viewer.
+          Wood rather than the room's furniture colour: this is the one plane
+          the lamp actually falls on, and a matched-to-everything-else surface
+          swallowed the light and read as a painted plank. */}
       <div
+        className="m-warm-wood"
         style={{
+          ["--base" as string]: "#6b4a35",
           position: "absolute",
           left: 0,
           top: 0,
@@ -105,9 +111,6 @@ export function DeskZone({ zone, items, interactive, onSelect }: DeskZoneProps) 
           transformOrigin: "50% 0%",
           transform: "rotateX(90deg)",
           transformStyle: "preserve-3d",
-          background: `linear-gradient(180deg,
-            color-mix(in oklab, var(--room-furniture-edge) 30%, var(--room-furniture)),
-            color-mix(in oklab, var(--room-furniture) 82%, #000))`,
         }}
       >
         {/* Objects lying flat on the desk. Rotated back upright so they sit on
@@ -122,7 +125,7 @@ export function DeskZone({ zone, items, interactive, onSelect }: DeskZoneProps) 
             hovered={hoveredId === view.holding.id}
             interactive={interactive}
             onHover={(hovering) => setHoveredId(hovering ? view.holding.id : null)}
-            onSelect={() => onSelect(view)}
+            onSelect={() => onSelect(view, zone.transform)}
           />
         ))}
       </div>

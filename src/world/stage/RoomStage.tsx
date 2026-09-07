@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useRef } from "react";
-import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
+import { motion, useSpring, useTransform } from "motion/react";
 import type { Room } from "@/domain/types";
 import { spring } from "@/design/motion";
 import { useWorld } from "@/world/store/worldStore";
@@ -28,15 +28,20 @@ export function RoomStage({ room, children }: { room: Room; children: ReactNode 
   const target = poseForView(view, room, viewport);
   const transition = reduced ? { duration: 0.2 } : spring.camera;
 
-  // Pose channels. Springing each independently rather than interpolating a
-  // transform string keeps the motion physical when a move is interrupted
-  // mid-flight, which happens constantly as people click around.
-  const x = useSpring(useMotionValue(target.x), transition);
-  const y = useSpring(useMotionValue(target.y), transition);
-  const z = useSpring(useMotionValue(target.z), transition);
-  const dolly = useSpring(useMotionValue(target.dolly), transition);
-  const rotateX = useSpring(useMotionValue(target.rotateX), transition);
-  const rotateY = useSpring(useMotionValue(target.rotateY), transition);
+  // Pose channels, each its own spring seeded with a plain number.
+  //
+  // Springing the channels independently rather than interpolating a transform
+  // string keeps the motion physical when a move is interrupted mid-flight,
+  // which happens constantly as people click around. Seeded with numbers rather
+  // than with source motion values on purpose: a spring driven by a source
+  // follows the source, and `.set()` on the output is then a jump rather than
+  // an animation, which silently produces a camera that never travels.
+  const x = useSpring(target.x, transition);
+  const y = useSpring(target.y, transition);
+  const z = useSpring(target.z, transition);
+  const dolly = useSpring(target.dolly, transition);
+  const rotateX = useSpring(target.rotateX, transition);
+  const rotateY = useSpring(target.rotateY, transition);
 
   useEffect(() => {
     x.set(target.x);
@@ -49,8 +54,8 @@ export function RoomStage({ room, children }: { room: Room; children: ReactNode 
 
   // Pointer parallax. Softly sprung so the room has inertia rather than
   // sticking to the cursor like a hover effect.
-  const pointerX = useSpring(useMotionValue(0), { stiffness: 60, damping: 20, mass: 0.9 });
-  const pointerY = useSpring(useMotionValue(0), { stiffness: 60, damping: 20, mass: 0.9 });
+  const pointerX = useSpring(0, { stiffness: 60, damping: 20, mass: 0.9 });
+  const pointerY = useSpring(0, { stiffness: 60, damping: 20, mass: 0.9 });
 
   useEffect(() => {
     if (reduced) return;

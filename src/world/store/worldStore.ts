@@ -16,6 +16,24 @@ import type { HoldingId, RoomId, TemplateId, UserId, ZoneId } from "@/domain/typ
  * render. The store only holds things that change on *user intent*.
  */
 
+/** A point in room coordinates. */
+export interface WorldPoint {
+  x: number;
+  y: number;
+  z: number;
+}
+
+/**
+ * Where an object comes to rest when picked up, plus how big it is.
+ *
+ * The height is what lets the camera stop at a distance that makes *this*
+ * object a comfortable size, so a photocard and a vinyl box both fill the frame
+ * rather than sharing one compromise distance that suits neither.
+ */
+export interface InspectTarget extends WorldPoint {
+  height?: number;
+}
+
 export type WorldView =
   /** Cold open. The room is dark and resolving. */
   | { kind: "arrival" }
@@ -23,8 +41,15 @@ export type WorldView =
   | { kind: "room" }
   /** Camera docked at a zone. */
   | { kind: "zone"; zoneId: ZoneId }
-  /** An object pulled forward and being examined. */
-  | { kind: "inspect"; zoneId: ZoneId; holdingId: HoldingId }
+  /**
+   * An object pulled forward and being examined.
+   *
+   * Carries the object's own world position rather than just its zone, so the
+   * camera frames *that object* instead of the middle of the shelf it came
+   * from. Without this, inspecting the leftmost album leaves it off to the side
+   * of frame and the move stops feeling like you picked that one up.
+   */
+  | { kind: "inspect"; zoneId: ZoneId; holdingId: HoldingId; at: InspectTarget }
   /** The binder is open, camera close, page spread visible. */
   | { kind: "binder"; zoneId: ZoneId; page: number }
   /** A collector's identity page, floating over their darkened room. */
@@ -53,7 +78,7 @@ interface WorldState {
   enterRoom: (roomId: RoomId) => void;
   finishArrival: () => void;
   focusZone: (zoneId: ZoneId) => void;
-  inspect: (zoneId: ZoneId, holdingId: HoldingId) => void;
+  inspect: (zoneId: ZoneId, holdingId: HoldingId, at: InspectTarget) => void;
   openBinder: (zoneId: ZoneId, page?: number) => void;
   turnPage: (page: number) => void;
   showProfile: (userId: UserId) => void;
@@ -76,7 +101,7 @@ export const useWorld = create<WorldState>((set, get) => ({
   enterRoom: (roomId) => set({ roomId, view: { kind: "room" }, traversal: "entering" }),
   finishArrival: () => set({ arrived: true, view: { kind: "room" } }),
   focusZone: (zoneId) => set({ view: { kind: "zone", zoneId } }),
-  inspect: (zoneId, holdingId) => set({ view: { kind: "inspect", zoneId, holdingId } }),
+  inspect: (zoneId, holdingId, at) => set({ view: { kind: "inspect", zoneId, holdingId, at } }),
   openBinder: (zoneId, page = 0) => set({ view: { kind: "binder", zoneId, page } }),
   turnPage: (page) => {
     const view = get().view;
@@ -117,6 +142,12 @@ export const useWorld = create<WorldState>((set, get) => ({
   markCelebrated: (setId) =>
     set((s) => (s.celebrated.includes(setId) ? s : { celebrated: [...s.celebrated, setId] })),
 }));
+
+// Handle for the screenshot harness, which needs to park the world in a
+// specific state before capturing it. Development only.
+if (process.env.NODE_ENV !== "production" && typeof window !== "undefined") {
+  (window as unknown as { __world?: typeof useWorld }).__world = useWorld;
+}
 
 /** Zone currently in focus, if any. Used for progressive scene fidelity. */
 export function activeZoneId(view: WorldView): ZoneId | null {

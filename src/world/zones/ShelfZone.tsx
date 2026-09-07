@@ -3,8 +3,14 @@
 import { useState } from "react";
 import type { HoldingView, RoomZone } from "@/domain/types";
 import { neighborResponse } from "@/design/motion";
+import type { InspectTarget } from "@/world/store/worldStore";
 import { WorldNode } from "@/world/stage/WorldNode";
-import { AlbumSpine, spineWidth } from "@/world/objects/AlbumSpine";
+import {
+  ALBUM_HEIGHT,
+  ALBUM_INSPECT_LIFT,
+  AlbumSpine,
+  spineWidth,
+} from "@/world/objects/AlbumSpine";
 import { FaceOutRecord, LeaningBook } from "@/world/objects/ShelfExtras";
 
 const DEPTH = 168;
@@ -17,7 +23,8 @@ interface ShelfZoneProps {
   items: HoldingView[];
   interactive: boolean;
   selectedId?: string | null;
-  onSelect: (view: HoldingView) => void;
+  /** Receives the object's resolved world position so the camera can frame it. */
+  onSelect: (view: HoldingView, at: InspectTarget) => void;
 }
 
 /**
@@ -96,7 +103,21 @@ export function ShelfZone({ zone, items, interactive, selectedId, onSelect }: Sh
           selectedId={selectedId ?? null}
           interactive={interactive}
           onHover={setHoveredId}
-          onSelect={onSelect}
+          onSelect={(view, localX, localWidth) => {
+            // Resolve the album's own world position from the zone's transform
+            // plus its offset within the bay, then add where the album swings
+            // to once it's pulled out. Computing this analytically rather than
+            // measuring the DOM keeps it exact through parallax and mid-flight
+            // camera moves, when a getBoundingClientRect would be reading a
+            // moving target.
+            const lift = ALBUM_INSPECT_LIFT;
+            onSelect(view, {
+              x: zone.transform.x - w / 2 + FRAME + localX + localWidth / 2 + lift.x,
+              y: zone.transform.y - h / 2 + bayTop(0) + bayH - ALBUM_HEIGHT / 2 + lift.y,
+              z: zone.transform.z + lift.z,
+              height: ALBUM_HEIGHT,
+            });
+          }}
         />
       </ShelfBay>
 
@@ -110,7 +131,13 @@ export function ShelfZone({ zone, items, interactive, selectedId, onSelect }: Sh
             hovered={hoveredId === record.holding.id}
             interactive={interactive}
             onHover={(hovering) => setHoveredId(hovering ? record.holding.id : null)}
-            onSelect={() => onSelect(record)}
+            onSelect={() =>
+              onSelect(record, {
+                x: zone.transform.x - w / 2 + FRAME + 8 + i * 200 + 95,
+                y: zone.transform.y - h / 2 + bayTop(1) + bayH / 2,
+                z: zone.transform.z,
+              })
+            }
           />
         ))}
         {books.map((book, i) => (
@@ -122,7 +149,13 @@ export function ShelfZone({ zone, items, interactive, selectedId, onSelect }: Sh
             hovered={hoveredId === book.holding.id}
             interactive={interactive}
             onHover={(hovering) => setHoveredId(hovering ? book.holding.id : null)}
-            onSelect={() => onSelect(book)}
+            onSelect={() =>
+              onSelect(book, {
+                x: zone.transform.x - w / 2 + FRAME + interiorW - 130 - i * 60 + 52,
+                y: zone.transform.y - h / 2 + bayTop(1) + bayH / 2,
+                z: zone.transform.z,
+              })
+            }
           />
         ))}
       </ShelfBay>
@@ -234,16 +267,18 @@ function SpineRun({
   selectedId: string | null;
   interactive: boolean;
   onHover: (id: string | null) => void;
-  onSelect: (view: HoldingView) => void;
+  onSelect: (view: HoldingView, localX: number, localWidth: number) => void;
 }) {
   let cursor = 6;
   const placed = items.map((view) => {
+    const width = spineWidth(view);
     const x = cursor;
-    cursor += spineWidth(view) + 1.5;
-    return { view, x };
+    cursor += width + 1.5;
+    return { view, x, width };
   });
 
   const hoveredIndex = placed.findIndex((p) => p.view.holding.id === hoveredId);
+  const selectedIndex = placed.findIndex((p) => p.view.holding.id === selectedId);
   const slack = usableWidth - cursor;
 
   return (
@@ -263,18 +298,29 @@ function SpineRun({
           ? Math.sign(distance) * response.falloff * 3.6 + restLean * (1 - response.falloff)
           : restLean;
 
+        // When an album is drawn out for inspection, the row closes the gap it
+        // left behind. This is the single most convincing detail in the whole
+        // shelf: it proves the albums are occupying space rather than sitting
+        // in fixed slots.
+        let displaced = 0;
+        if (selectedIndex >= 0 && !isSelected) {
+          const gap = placed[selectedIndex]!.width + 1.5;
+          displaced = index > selectedIndex ? -gap * 0.55 : gap * 0.2;
+        }
+
         return (
           <AlbumSpine
             key={entry.view.holding.id}
             view={entry.view}
             offsetX={entry.x}
             lean={lean}
-            hovered={isHovered}
-            dimmed={isSelected}
+            hovered={isHovered && selectedIndex < 0}
+            inspecting={isSelected}
+            displaced={displaced}
             interactive={interactive}
             showSide={isLast}
             onHover={(hovering) => onHover(hovering ? entry.view.holding.id : null)}
-            onSelect={() => onSelect(entry.view)}
+            onSelect={() => onSelect(entry.view, entry.x, entry.width)}
           />
         );
       })}

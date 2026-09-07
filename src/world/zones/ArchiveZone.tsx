@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import type { HoldingView, RoomZone } from "@/domain/types";
 import { objectSpring } from "@/design/motion";
+import type { InspectTarget } from "@/world/store/worldStore";
 import { WorldNode } from "@/world/stage/WorldNode";
 
 const CRATE_DEPTH = 190;
@@ -12,7 +13,7 @@ interface ArchiveZoneProps {
   zone: RoomZone;
   items: HoldingView[];
   interactive: boolean;
-  onSelect: (view: HoldingView) => void;
+  onSelect: (view: HoldingView, at: InspectTarget) => void;
 }
 
 /**
@@ -58,7 +59,7 @@ export function ArchiveZone({ zone, items, interactive, onSelect }: ArchiveZoneP
             transition={objectSpring("furniture")}
             onHoverStart={interactive ? () => setHoveredId(view.holding.id) : undefined}
             onHoverEnd={interactive ? () => setHoveredId(null) : undefined}
-            onClick={interactive ? () => onSelect(view) : undefined}
+            onClick={interactive ? () => onSelect(view, zone.transform) : undefined}
             role={interactive ? "button" : undefined}
             tabIndex={interactive ? 0 : -1}
             aria-label={interactive ? `${view.template.name}. Inspect.` : undefined}

@@ -3,13 +3,14 @@
 import { motion } from "motion/react";
 import type { HoldingView } from "@/domain/types";
 import { objectSpring } from "@/design/motion";
+import { useSurfaceLight } from "./useSurfaceLight";
 
 export const ALBUM_HEIGHT = 176;
 export const ALBUM_DEPTH = 150;
 /**
  * World px per physical mm. Keeps relative thickness honest between formats —
- * a 22mm photobook album genuinely is nearly twice a 12mm single, and the
- * shelf reads as a real collection because of it.
+ * a 22mm photobook album genuinely is nearly twice a 12mm single, and the shelf
+ * reads as a real collection because of it.
  */
 export const MM = 1.9;
 
@@ -17,43 +18,63 @@ export function spineWidth(view: HoldingView): number {
   return Math.max(18, (view.version?.thicknessMm ?? 16) * MM);
 }
 
+/** Lift and swing-out applied while an album is being examined. */
+const LIFT_Y = -70;
+const LIFT_Z = 300;
+
+/**
+ * Where the album's cover ends up relative to where the album was shelved.
+ *
+ * Only the lift matters to a caller: turning the album 90° about its own base
+ * swings the cover half a depth sideways, and the object cancels that out with
+ * an equal counter-translation (see below), so the cover lands centred on the
+ * gap the album left. The camera consumes this so that "frame the thing I
+ * picked up" means where it came to rest rather than where it used to be.
+ */
+export const ALBUM_INSPECT_LIFT = { x: 0, y: LIFT_Y, z: LIFT_Z };
+
 interface AlbumSpineProps {
   view: HoldingView;
-  /** Horizontal position of the album's left edge within the shelf row. */
   offsetX: number;
-  /** Lean angle in degrees, for albums at the end of a run. */
   lean?: number;
   hovered: boolean;
-  dimmed: boolean;
+  /** This album is the one currently being inspected. */
+  inspecting: boolean;
+  /** Another album is being inspected, so this one should get out of the way. */
+  displaced: number;
   onHover: (hovering: boolean) => void;
   onSelect: () => void;
   interactive: boolean;
-  /** Only the last album in a run needs its side face; the rest are occluded. */
   showSide?: boolean;
 }
 
 /**
  * An album standing spine-out on a shelf.
  *
- * Built as real geometry — spine face plus a top face folded back into the
- * shelf — rather than a rectangle with a drop shadow. The top face is what
- * makes it read as an object with depth when the camera parallaxes: you
- * actually see the top of the case, and it occludes its neighbors correctly.
+ * Modeled as an actual box: the spine faces the viewer, and the *cover* is the
+ * broad face pointing sideways into its neighbor — which is how albums sit on a
+ * real shelf. That geometry is what makes inspection work without any sleight
+ * of hand: pulling the album forward and rotating it 90° reveals a cover that
+ * was physically there the whole time, rather than swapping in a different
+ * element.
  */
 export function AlbumSpine({
   view,
   offsetX,
   lean = 0,
   hovered,
-  dimmed,
+  inspecting,
+  displaced,
   onHover,
   onSelect,
   interactive,
   showSide = false,
 }: AlbumSpineProps) {
+  const light = useSurfaceLight<HTMLDivElement>();
   const width = spineWidth(view);
   const { version, template } = view;
   const spineColor = version?.spineColor ?? template.colorway.base;
+  const coverColor = version?.coverColor ?? template.colorway.base;
   const accent = version?.coverAccent ?? template.colorway.accent;
   const isVinyl = template.kind === "vinyl";
 
@@ -62,6 +83,7 @@ export function AlbumSpine({
 
   return (
     <motion.div
+      ref={light.ref}
       className="zone-hotspot"
       style={{
         position: "absolute",
@@ -71,24 +93,49 @@ export function AlbumSpine({
         height,
         transformStyle: "preserve-3d",
         transformOrigin: "50% 100%",
-        // Lean is applied as a base rotation the hover animation composes with.
-        rotate: lean,
       }}
-      animate={{
-        // Hovered albums ease *out* of the shelf toward the viewer, and rise a
-        // little as though lifted over the lip of the board.
-        z: hovered ? 46 : 0,
-        y: hovered ? -10 : 0,
-        rotateY: hovered ? -7 : 0,
-        opacity: dimmed ? 0.55 : 1,
-      }}
+      animate={
+        inspecting
+          ? {
+              // Out of the shelf, turned to present the cover, lifted to eye
+              // level. The pivot stays at the album's base so it reads as being
+              // drawn out and tipped up, not teleported.
+              //
+              // The depth-wide translation cancels the sideways swing that
+              // turning about the base produces, so the cover finishes centred
+              // over the slot it came out of instead of drifting a hand's width
+              // to one side of it.
+              x: depth,
+              y: ALBUM_INSPECT_LIFT.y,
+              z: ALBUM_INSPECT_LIFT.z,
+              rotateY: -90,
+              rotate: 0,
+              opacity: 1,
+            }
+          : {
+              x: displaced,
+              y: hovered ? -12 : 0,
+              z: hovered ? 52 : 0,
+              rotateY: hovered ? -8 : 0,
+              rotate: lean,
+              opacity: 1,
+            }
+      }
       transition={objectSpring(isVinyl ? "vinyl" : "album")}
-      onHoverStart={interactive ? () => onHover(true) : undefined}
-      onHoverEnd={interactive ? () => onHover(false) : undefined}
+      onPointerMove={light.onPointerMove}
+      onPointerLeave={() => {
+        light.onPointerLeave();
+        onHover(false);
+      }}
+      onPointerEnter={interactive ? () => onHover(true) : undefined}
       onClick={interactive ? onSelect : undefined}
       role={interactive ? "button" : undefined}
       tabIndex={interactive ? 0 : -1}
-      aria-label={interactive ? `${view.template.name}. Pull from shelf.` : undefined}
+      aria-label={
+        interactive
+          ? `${view.release?.title ?? template.name}, ${version?.name ?? ""}. Pull from shelf.`
+          : undefined
+      }
       onKeyDown={
         interactive
           ? (e) => {
@@ -100,7 +147,7 @@ export function AlbumSpine({
           : undefined
       }
     >
-      {/* Spine face */}
+      {/* --- Spine (faces the viewer when shelved) ------------------------ */}
       <div
         className={isVinyl ? "world-face m-vinyl" : "world-face m-matte-card"}
         style={{
@@ -112,13 +159,12 @@ export function AlbumSpine({
           overflow: "hidden",
         }}
       >
-        {/* Title runs bottom-to-top along the spine, the way it does in life. */}
         <span
           style={{
             writingMode: "vertical-rl",
             transform: "rotate(180deg)",
             fontFamily: "var(--font-sans)",
-            fontSize: width > 20 ? 10 : 8.5,
+            fontSize: width > 30 ? 10 : 8.5,
             letterSpacing: "0.16em",
             textTransform: "uppercase",
             fontWeight: 600,
@@ -128,11 +174,8 @@ export function AlbumSpine({
             textShadow: "0 1px 2px rgba(0,0,0,0.5)",
           }}
         >
-          {view.release?.title ?? view.template.name}
+          {view.release?.title ?? template.name}
         </span>
-
-        {/* Foil band near the base — the detail that makes spines look printed
-            rather than filled. */}
         <div
           style={{
             position: "absolute",
@@ -146,7 +189,33 @@ export function AlbumSpine({
         />
       </div>
 
-      {/* Top face, folded back into the shelf. */}
+      {/* --- Cover: the broad face, pointing sideways into the neighbor --- */}
+      <div
+        className="m-photo-print"
+        style={{
+          ["--base" as string]: coverColor,
+          ["--accent" as string]: accent,
+          position: "absolute",
+          top: 0,
+          right: 0,
+          width: depth,
+          height,
+          transformOrigin: "100% 50%",
+          transform: "rotateY(90deg)",
+          overflow: "hidden",
+          boxShadow: "inset 0 0 0 1px color-mix(in oklab, #fff 10%, transparent)",
+        }}
+      >
+        <CoverArt
+          title={view.release?.title ?? template.name}
+          edition={version?.name ?? ""}
+          group={view.group.name}
+          accent={accent}
+          visible={inspecting || hovered || showSide}
+        />
+      </div>
+
+      {/* --- Top edge, folded back into the shelf ------------------------- */}
       <div
         style={{
           position: "absolute",
@@ -155,28 +224,88 @@ export function AlbumSpine({
           width,
           height: depth,
           transformOrigin: "50% 0%",
-          transform: "rotateX(-90deg)",
+          transform: "rotateX(90deg)",
           background: `linear-gradient(180deg, color-mix(in oklab, ${spineColor} 82%, #fff 10%), color-mix(in oklab, ${spineColor} 60%, #000))`,
           boxShadow: "inset 0 0 12px rgba(0,0,0,0.5)",
         }}
       />
-
-      {/* Right face, so the album at the end of a run doesn't look like paper.
-          Rendered only when nothing is standing next to it to hide it. */}
-      {(showSide || hovered) && (
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            right: 0,
-            width: depth,
-            height,
-            transformOrigin: "100% 50%",
-            transform: "rotateY(90deg)",
-            background: `linear-gradient(90deg, color-mix(in oklab, ${spineColor} 40%, #000), color-mix(in oklab, ${spineColor} 66%, #000))`,
-          }}
-        />
-      )}
     </motion.div>
+  );
+}
+
+/**
+ * Generated cover art.
+ *
+ * The heavy layers only paint when the cover can actually be seen. A shelf of
+ * twenty albums each compositing four gradients on a face that's edge-on to the
+ * camera is pure waste, and it's the first thing that costs frames.
+ */
+function CoverArt({
+  title,
+  edition,
+  group,
+  accent,
+  visible,
+}: {
+  title: string;
+  edition: string;
+  group: string;
+  accent: string;
+  visible: boolean;
+}) {
+  if (!visible) return null;
+  return (
+    <>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: `radial-gradient(74% 58% at 34% 22%, color-mix(in oklab, ${accent} 42%, transparent), transparent 74%)`,
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          left: "22%",
+          top: "16%",
+          width: "56%",
+          height: "58%",
+          borderRadius: "46% 46% 34% 34%",
+          background: `linear-gradient(172deg, color-mix(in oklab, ${accent} 58%, transparent), transparent 76%)`,
+        }}
+      />
+      <div style={{ position: "absolute", left: 16, right: 16, bottom: 18 }}>
+        <div className="u-eyebrow" style={{ fontSize: 7.5, color: accent, opacity: 0.9 }}>
+          {group}
+        </div>
+        <div
+          className="u-display"
+          style={{
+            fontSize: 26,
+            marginTop: 5,
+            color: "#fff",
+            textShadow: "0 2px 8px rgba(0,0,0,0.55)",
+          }}
+        >
+          {title}
+        </div>
+        <div
+          className="u-eyebrow"
+          style={{ fontSize: 7, marginTop: 5, color: "#fff", opacity: 0.62 }}
+        >
+          {edition}
+        </div>
+      </div>
+      <div
+        style={{
+          position: "absolute",
+          left: 16,
+          top: 16,
+          width: 24,
+          height: 2,
+          background: accent,
+        }}
+      />
+    </>
   );
 }

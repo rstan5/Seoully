@@ -15,6 +15,28 @@
         the inverse transform on .world-camera.
    ========================================================================== */
 
+/* Registering these makes them animatable. Custom properties are otherwise
+   untransitionable, and "the lights coming on" has to be a change to the
+   room's actual lighting values — every material reads them — rather than an
+   overlay faded on top. */
+@property --room-light-intensity {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+@property --lit-strength {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+.room-lighting {
+  transition:
+    --room-light-intensity 2600ms var(--ease-dawn),
+    --lit-strength 2600ms var(--ease-dawn);
+}
+
 /* --- Stage: owns the perspective, i.e. the lens ------------------------- */
 
 /* The stage must NOT set `transform-style: preserve-3d` or paint a background.

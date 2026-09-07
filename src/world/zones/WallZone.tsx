@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { HoldingView, RoomZone } from "@/domain/types";
+import type { InspectTarget } from "@/world/store/worldStore";
 import { WorldNode } from "@/world/stage/WorldNode";
 import { PosterSheet } from "@/world/objects/PosterSheet";
 
@@ -9,7 +10,7 @@ interface WallZoneProps {
   zone: RoomZone;
   items: HoldingView[];
   interactive: boolean;
-  onSelect: (view: HoldingView) => void;
+  onSelect: (view: HoldingView, at: InspectTarget) => void;
 }
 
 /**
@@ -56,7 +57,13 @@ export function WallZone({ zone, items, interactive, onSelect }: WallZoneProps) 
               hovered={hoveredId === view.holding.id}
               interactive={interactive}
               onHover={(hovering) => setHoveredId(hovering ? view.holding.id : null)}
-              onSelect={() => onSelect(view)}
+              onSelect={() =>
+                onSelect(view, {
+                  x: zone.transform.x - w / 2 + slot.x + slot.w / 2,
+                  y: zone.transform.y - h / 2 + slot.y + slot.h / 2,
+                  z: zone.transform.z,
+                })
+              }
             />
           </div>
         );

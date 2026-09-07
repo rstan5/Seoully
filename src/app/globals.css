@@ -1,0 +1,151 @@
+@import "tailwindcss";
+
+@import "../design/materials.css";
+@import "../design/world.css";
+
+/* ==========================================================================
+   Seoully design tokens
+   --------------------------------------------------------------------------
+   Tailwind is used for layout, spacing, and typography only. Everything that
+   describes a *surface* lives in the material system, because the whole point
+   is that objects in this product are made of something.
+   ========================================================================== */
+
+@theme {
+  /* --- Type ------------------------------------------------------------- */
+  --font-display: var(--font-instrument), "Times New Roman", serif;
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono-stack), ui-monospace, "SF Mono", monospace;
+
+  /* Editorial scale. Large sizes are for the world; small sizes are for
+     labels that sit *on* objects, so they stay tight and legible. */
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1.1;
+  --text-micro--letter-spacing: 0.14em;
+  --text-label: 0.75rem;
+  --text-label--line-height: 1.2;
+  --text-label--letter-spacing: 0.1em;
+
+  /* --- Neutral ground --------------------------------------------------- */
+  /* Not pure black. A room is never pure black; it has a color of darkness. */
+  --color-void: #08070b;
+  --color-dusk: #14121b;
+  --color-slate: #221f2c;
+  --color-ash: #3a3547;
+  --color-bone: #e8e1d6;
+  --color-paper: #f4efe4;
+  --color-ink: #1a1720;
+
+  /* --- Room aesthetics -------------------------------------------------- */
+  /* These are seeds. A Room's theme overrides them per-room at runtime via
+     custom properties on the room root, which is how two collectors' rooms
+     end up genuinely different rather than reskinned. */
+  --color-warm-wall: #b8927a;
+  --color-warm-light: #ffd9a8;
+  --color-nocturne-wall: #1b1a24;
+  --color-nocturne-light: #ff3b52;
+  --color-maximalist-wall: #f2b6cd;
+  --color-maximalist-light: #fff0f6;
+
+  /* --- Depth ------------------------------------------------------------ */
+  /* The scene's perspective depth. Tuned so the far wall reads as ~4m away
+     without the wide-angle distortion you get from a shorter perspective. */
+  --world-perspective: 2400px;
+
+  --ease-physical: cubic-bezier(0.32, 0.72, 0.24, 1);
+  --ease-dawn: cubic-bezier(0.16, 0.84, 0.3, 1);
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--color-void);
+  color: var(--color-bone);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+}
+
+body {
+  /* The world is a fixed stage; the page itself never scrolls. */
+  overflow: hidden;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-bone) 26%, transparent);
+  color: var(--color-paper);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* Focus rings must remain visible inside a dark spatial scene. */
+:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--color-bone) 70%, transparent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* ==========================================================================
+   Typographic utilities used throughout the world
+   ========================================================================== */
+
+.u-eyebrow {
+  font-family: var(--font-sans);
+  font-size: var(--text-micro);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.u-stat {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.u-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  line-height: 0.95;
+}
+
+/* Optical balance for the serif at large sizes. */
+.u-display-xl {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  line-height: 0.88;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

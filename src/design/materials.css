@@ -1,0 +1,385 @@
+/* ==========================================================================
+   MATERIAL SYSTEM
+   --------------------------------------------------------------------------
+   A conventional design system has colors and radii. This one has materials.
+
+   Every object in a Seoully room is made of something, and that something
+   determines how it catches the room's light. This is the single biggest
+   defense against the "everything is a rounded rectangle" failure mode: a
+   photocard, an album spine, and an acrylic display case are visually
+   different because they are *materially* different, not because they have
+   different border-radius values.
+
+   Contract
+   --------
+   Every material reads these custom properties, inherited from the room root:
+
+     --lit-angle      direction the key light arrives from, in deg
+     --lit-color      color of the key light
+     --lit-strength   0..1 overall intensity
+     --fill-color     colored bounce/fill light (LED strip, window, lamp)
+
+   And these, set per-object:
+
+     --base           the object's own local color
+     --accent         its secondary color
+     --ink            text/print color on its surface
+
+   Interactive materials additionally read --px / --py (pointer position over
+   the element, 0..1), set by useSurfaceLight(). They degrade to a static
+   highlight when those are absent.
+   ========================================================================== */
+
+@layer components {
+  /* --- Shared substrate ------------------------------------------------- */
+
+  [class*="m-"] {
+    --lit-angle: 145deg;
+    --lit-color: #ffffff;
+    --lit-strength: 1;
+    --fill-color: transparent;
+    --base: #cbc4b8;
+    --accent: #8f8a7e;
+    --ink: #1a1720;
+    position: relative;
+    background-color: var(--base);
+  }
+
+  /* Fine grain. Applied by materials that should not look digitally flat.
+     A single repeating SVG turbulence is cheaper than a raster and scales. */
+  .m-grain::after,
+  .m-paper::after,
+  .m-matte-card::after,
+  .m-velvet::after,
+  .m-photo-print::after,
+  .m-warm-wood::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.32;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    background-size: 140px 140px;
+    border-radius: inherit;
+  }
+
+  /* ======================================================================
+     PAPER — soft, fibrous, absorbs light. Notebook pages, inserts, tags.
+     ====================================================================== */
+
+  .m-paper {
+    --base: #f2ece0;
+    background-image:
+      linear-gradient(
+        var(--lit-angle),
+        color-mix(in oklab, var(--lit-color) calc(14% * var(--lit-strength)), transparent),
+        transparent 62%
+      ),
+      linear-gradient(180deg, color-mix(in oklab, #000 3%, transparent), transparent 30%);
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklab, #fff 55%, transparent),
+      inset 0 -1px 0 color-mix(in oklab, #000 8%, transparent);
+  }
+
+  /* Ruled notebook paper — used for the collector's desk notes. */
+  .m-notebook {
+    --base: #f4efe2;
+    background-color: var(--base);
+    background-image:
+      linear-gradient(
+        var(--lit-angle),
+        color-mix(in oklab, var(--lit-color) calc(12% * var(--lit-strength)), transparent),
+        transparent 60%
+      ),
+      repeating-linear-gradient(
+        180deg,
+        transparent,
+        transparent 21px,
+        color-mix(in oklab, #5b7ba8 22%, transparent) 21px,
+        color-mix(in oklab, #5b7ba8 22%, transparent) 22px
+      );
+  }
+
+  /* ======================================================================
+     MATTE CARD — uncoated cardstock. The default photocard back.
+     ====================================================================== */
+
+  .m-matte-card {
+    background-image:
+      linear-gradient(
+        var(--lit-angle),
+        color-mix(in oklab, var(--lit-color) calc(11% * var(--lit-strength)), transparent),
+        transparent 55%
+      ),
+      linear-gradient(160deg, var(--base), color-mix(in oklab, var(--base) 82%, #000));
+    box-shadow:
+      inset 0 0 0 1px color-mix(in oklab, #fff 10%, transparent),
+      inset 0 -2px 3px color-mix(in oklab, #000 14%, transparent);
+  }
+
+  /* ======================================================================
+     GLOSSY CARD — coated stock with a specular sweep that tracks the pointer.
+     ====================================================================== */
+
+  .m-glossy-card {
+    background-image:
+      radial-gradient(
+        120% 80% at calc(var(--px, 0.5) * 100%) calc(var(--py, 0.3) * 100%),
+        color-mix(in oklab, #fff calc(34% * var(--lit-strength)), transparent),
+        transparent 58%
+      ),
+      linear-gradient(160deg, var(--base), color-mix(in oklab, var(--base) 78%, #000));
+    box-shadow:
+      inset 0 0 0 1px color-mix(in oklab, #fff 22%, transparent),
+      inset 0 -3px 6px color-mix(in oklab, #000 20%, transparent);
+  }
+
+  /* ======================================================================
+     HOLO FOIL — the one that has to be perfect.
+
+     Real holographic stock works by diffraction: the hue you see depends on
+     the angle between the light, the surface, and your eye. We approximate
+     that with a repeating hue ramp whose phase is driven by pointer position,
+     so moving across the card sweeps the spectrum rather than just brightening
+     it. Two overlaid gradients at different frequencies produce the
+     interference texture that makes real foil look "deep" instead of painted.
+     ====================================================================== */
+
+  .m-holo-foil {
+    --holo-phase: calc(var(--px, 0.5) * 360deg);
+    background-image:
+      /* Specular hotspot riding the pointer. */
+      radial-gradient(
+        60% 45% at calc(var(--px, 0.5) * 100%) calc(var(--py, 0.5) * 100%),
+        color-mix(in oklab, #fff 60%, transparent),
+        transparent 60%
+      ),
+      /* High-frequency diffraction lines. */
+      repeating-linear-gradient(
+        calc(var(--lit-angle) + 22deg),
+        hsl(calc(var(--holo-phase) + 0deg) 92% 72% / 0.55) 0px,
+        hsl(calc(var(--holo-phase) + 60deg) 92% 70% / 0.55) 7px,
+        hsl(calc(var(--holo-phase) + 140deg) 92% 74% / 0.55) 14px,
+        hsl(calc(var(--holo-phase) + 220deg) 92% 70% / 0.55) 21px,
+        hsl(calc(var(--holo-phase) + 300deg) 92% 72% / 0.55) 28px
+      ),
+      /* Low-frequency sheen that breaks up the regularity. */
+      linear-gradient(
+        calc(var(--lit-angle) - 40deg),
+        hsl(calc(var(--holo-phase) + 180deg) 88% 66% / 0.7),
+        hsl(calc(var(--holo-phase) + 40deg) 88% 60% / 0.35) 45%,
+        hsl(calc(var(--holo-phase) + 260deg) 88% 68% / 0.7)
+      ),
+      linear-gradient(160deg, var(--base), color-mix(in oklab, var(--base) 70%, #000));
+    background-blend-mode: screen, color-dodge, overlay, normal;
+    box-shadow:
+      inset 0 0 0 1px color-mix(in oklab, #fff 30%, transparent),
+      inset 0 -3px 8px color-mix(in oklab, #000 24%, transparent);
+  }
+
+  /* Rarity halo for grails. Sits behind the object, never on it. */
+  .m-grail-halo::before {
+    content: "";
+    position: absolute;
+    inset: -18%;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(
+      closest-side,
+      color-mix(in oklab, var(--accent) 45%, transparent),
+      transparent 72%
+    );
+    filter: blur(10px);
+  }
+
+  /* ======================================================================
+     PLASTIC SLEEVE — the binder pocket the card sits inside.
+     Slightly cloudy, with a hard specular streak across the top-left.
+     ====================================================================== */
+
+  .m-plastic-sleeve {
+    background-image: linear-gradient(
+      calc(var(--lit-angle) - 10deg),
+      color-mix(in oklab, #fff 26%, transparent) 0%,
+      color-mix(in oklab, #fff 5%, transparent) 18%,
+      transparent 42%,
+      color-mix(in oklab, #fff 8%, transparent) 74%,
+      transparent 100%
+    );
+    box-shadow:
+      inset 0 0 0 1px color-mix(in oklab, #fff 16%, transparent),
+      inset 0 0 14px color-mix(in oklab, #fff 6%, transparent);
+    backdrop-filter: saturate(0.94) brightness(1.03);
+  }
+
+  /* ======================================================================
+     VINYL — deep gloss with concentric groove diffraction.
+     ====================================================================== */
+
+  .m-vinyl {
+    --base: #0d0c10;
+    background-image:
+      radial-gradient(
+        circle at calc(var(--px, 0.35) * 100%) calc(var(--py, 0.3) * 100%),
+        color-mix(in oklab, var(--lit-color) 40%, transparent),
+        transparent 42%
+      ),
+      repeating-radial-gradient(
+        circle at 50% 50%,
+        rgba(255, 255, 255, 0.055) 0px,
+        rgba(255, 255, 255, 0) 1.4px,
+        rgba(255, 255, 255, 0.045) 2.6px
+      ),
+      radial-gradient(circle at 50% 50%, #17151c 0%, #08070b 70%);
+  }
+
+  /* ======================================================================
+     ACRYLIC — display case glazing. Refractive edges, faint interior fog.
+     ====================================================================== */
+
+  .m-acrylic {
+    background-image: linear-gradient(
+      calc(var(--lit-angle) + 8deg),
+      color-mix(in oklab, #fff 14%, transparent),
+      transparent 34%,
+      transparent 66%,
+      color-mix(in oklab, var(--fill-color) 22%, transparent)
+    );
+    box-shadow:
+      inset 0 0 0 1px color-mix(in oklab, #fff 26%, transparent),
+      inset 0 0 30px color-mix(in oklab, #fff 5%, transparent),
+      0 0 0 1px color-mix(in oklab, #fff 8%, transparent);
+    backdrop-filter: blur(0.5px) saturate(1.08);
+  }
+
+  /* ======================================================================
+     BRUSHED METAL — anisotropic. Highlight stretches along the grain.
+     ====================================================================== */
+
+  .m-brushed-metal {
+    --base: #8d8f96;
+    background-image:
+      linear-gradient(
+        calc(var(--lit-angle)),
+        color-mix(in oklab, #fff 38%, transparent),
+        transparent 30%,
+        transparent 70%,
+        color-mix(in oklab, #fff 18%, transparent)
+      ),
+      repeating-linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.05) 0px,
+        rgba(0, 0, 0, 0.05) 1px,
+        rgba(255, 255, 255, 0.04) 2px
+      ),
+      linear-gradient(180deg, #a4a6ad, #6f7178);
+  }
+
+  /* ======================================================================
+     VELVET — light scatters at grazing angles, so edges are *brighter*
+     than the center. Inverting the usual highlight is what sells it.
+     ====================================================================== */
+
+  .m-velvet {
+    --base: #4a1e33;
+    background-image:
+      radial-gradient(
+        120% 100% at 50% 50%,
+        color-mix(in oklab, #000 34%, transparent),
+        transparent 62%
+      ),
+      linear-gradient(
+        var(--lit-angle),
+        color-mix(in oklab, var(--lit-color) 20%, transparent),
+        transparent 40%,
+        color-mix(in oklab, var(--lit-color) 14%, transparent)
+      ),
+      linear-gradient(180deg, var(--base), color-mix(in oklab, var(--base) 74%, #000));
+  }
+
+  .m-velvet::after {
+    opacity: 0.5;
+    mix-blend-mode: soft-light;
+  }
+
+  /* ======================================================================
+     PHOTO PRINT — slight warm cast, visible paper texture, soft borders.
+     ====================================================================== */
+
+  .m-photo-print {
+    background-image:
+      linear-gradient(
+        var(--lit-angle),
+        color-mix(in oklab, var(--lit-color) calc(16% * var(--lit-strength)), transparent),
+        transparent 50%
+      ),
+      linear-gradient(200deg, var(--base), color-mix(in oklab, var(--base) 76%, #2a1c0f));
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, #fff 12%, transparent);
+  }
+
+  /* ======================================================================
+     WARM WOOD — shelving. Grain runs along the board's length.
+     ====================================================================== */
+
+  .m-warm-wood {
+    --base: #7a5236;
+    background-image:
+      linear-gradient(
+        var(--lit-angle),
+        color-mix(in oklab, var(--lit-color) calc(22% * var(--lit-strength)), transparent),
+        transparent 58%
+      ),
+      repeating-linear-gradient(
+        88deg,
+        rgba(0, 0, 0, 0.055) 0px,
+        rgba(255, 255, 255, 0.028) 3px,
+        rgba(0, 0, 0, 0.04) 7px,
+        rgba(255, 255, 255, 0.02) 11px
+      ),
+      linear-gradient(180deg, var(--base), color-mix(in oklab, var(--base) 78%, #000));
+  }
+
+  .m-warm-wood::after {
+    opacity: 0.22;
+  }
+
+  /* ======================================================================
+     PLUSH — no specular at all, only a soft wide falloff and fuzzy rim.
+     ====================================================================== */
+
+  .m-plush {
+    background-image:
+      radial-gradient(
+        90% 90% at calc(var(--px, 0.36) * 100%) 24%,
+        color-mix(in oklab, #fff 24%, transparent),
+        transparent 68%
+      ),
+      linear-gradient(180deg, var(--base), color-mix(in oklab, var(--base) 72%, #000));
+    box-shadow:
+      inset 0 -6px 14px color-mix(in oklab, #000 22%, transparent),
+      0 0 10px color-mix(in oklab, var(--base) 40%, transparent);
+  }
+
+  /* ======================================================================
+     Edges & thickness
+     ----------------------------------------------------------------------
+     Physical objects have measurable thickness. These give an element a real
+     extruded edge in the 3D scene rather than faking depth with a shadow.
+     ====================================================================== */
+
+  .m-edge-card {
+    box-shadow:
+      inset 0 0 0 0.5px color-mix(in oklab, #fff 18%, transparent),
+      1px 1px 0 color-mix(in oklab, #000 30%, transparent),
+      2px 2px 0 color-mix(in oklab, #000 18%, transparent);
+  }
+
+  .m-edge-thick {
+    box-shadow:
+      inset 0 0 0 1px color-mix(in oklab, #fff 14%, transparent),
+      2px 3px 0 color-mix(in oklab, #000 34%, transparent),
+      4px 6px 0 color-mix(in oklab, #000 22%, transparent),
+      6px 9px 12px color-mix(in oklab, #000 30%, transparent);
+  }
+}

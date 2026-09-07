@@ -1,0 +1,238 @@
+/* ==========================================================================
+   WORLD / SCENE GRAPH
+   --------------------------------------------------------------------------
+   The room is one continuous 3D scene with a single camera. Navigation moves
+   the camera; it never swaps screens. Everything here exists to protect that
+   invariant, because `preserve-3d` is fragile and breaks silently.
+
+   Structural rules, learned the hard way:
+     1. Nothing between .world-stage and a leaf object may set `overflow`,
+        `filter`, `opacity < 1`, `mask`, or `contain` — any of these flatten
+        the 3D context and collapse the scene to 2D.
+     2. Atmosphere that needs blur or opacity lives in sibling overlay layers
+        outside the preserve-3d chain, never inside it.
+     3. Objects are positioned with translate3d in world units. The camera is
+        the inverse transform on .world-camera.
+   ========================================================================== */
+
+/* --- Stage: owns the perspective, i.e. the lens ------------------------- */
+
+.world-stage {
+  position: fixed;
+  inset: 0;
+  perspective: var(--world-perspective);
+  perspective-origin: 50% 46%;
+  transform-style: preserve-3d;
+  background: var(--room-void, #08070b);
+}
+
+/* --- Camera: the single element every navigation animates --------------- */
+
+.world-camera {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+/* --- World: holds zones in world coordinates ---------------------------- */
+
+.world-root {
+  position: absolute;
+  transform-style: preserve-3d;
+}
+
+/* A positioned node in world space. Objects and zones both use this. */
+.world-node {
+  position: absolute;
+  transform-style: preserve-3d;
+  /* Centered on its own origin so world coordinates mean the object's center. */
+  translate: -50% -50%;
+}
+
+/* Leaf surfaces that must not create a new 3D context. */
+.world-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  transform-style: flat;
+}
+
+/* ==========================================================================
+   Room shell — walls and floor, built from geometry rather than art assets.
+   Themeable, weightless, and infinitely re-colorable per collector.
+   ========================================================================== */
+
+.room-wall {
+  position: absolute;
+  transform-style: preserve-3d;
+  background-color: var(--room-wall);
+  background-image:
+    /* Key light falloff across the surface. */
+    radial-gradient(
+      var(--room-light-spread, 140% 120%) at calc(var(--room-light-x) * 100%)
+        calc(var(--room-light-y) * 100%),
+      color-mix(in oklab, var(--room-light-color) calc(38% * var(--room-light-intensity)), transparent),
+      transparent 68%
+    ),
+    /* Colored fill from the opposite side. */
+    radial-gradient(
+      120% 100% at calc((1 - var(--room-light-x)) * 100%) 80%,
+      color-mix(in oklab, var(--room-fill) 26%, transparent),
+      transparent 60%
+    ),
+    /* Ambient occlusion where wall meets floor and corners. */
+    linear-gradient(180deg, transparent 58%, color-mix(in oklab, #000 42%, transparent));
+}
+
+.room-wall::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.4;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23w)' opacity='0.42'/%3E%3C/svg%3E");
+}
+
+.room-floor {
+  position: absolute;
+  transform-style: preserve-3d;
+  background-color: var(--room-floor);
+  background-image:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, #000 46%, transparent),
+      transparent 40%
+    ),
+    radial-gradient(
+      100% 80% at calc(var(--room-light-x) * 100%) 0%,
+      color-mix(in oklab, var(--room-light-color) calc(26% * var(--room-light-intensity)), transparent),
+      transparent 62%
+    );
+}
+
+/* ==========================================================================
+   Contact shadows
+   --------------------------------------------------------------------------
+   An object without a contact shadow floats, no matter how good its material
+   is. These are separate elements laid on the supporting surface rather than
+   box-shadows, so they stay correct as the camera moves around them.
+   ========================================================================== */
+
+.contact-shadow {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, #000 62%, transparent),
+    transparent 78%
+  );
+  filter: blur(var(--shadow-blur, 6px));
+  transform-style: flat;
+}
+
+/* ==========================================================================
+   Atmosphere overlays — outside the 3D chain by design.
+   ========================================================================== */
+
+.atmo {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Volumetric shaft from the room's light source. */
+.atmo-lightshaft {
+  background: radial-gradient(
+    58% 78% at calc(var(--room-light-x) * 100%) calc(var(--room-light-y) * 100%),
+    color-mix(in oklab, var(--room-light-color) 16%, transparent),
+    transparent 70%
+  );
+  mix-blend-mode: screen;
+}
+
+/* Lens vignette. Sells "camera in a room" rather than "div on a page". */
+.atmo-vignette {
+  background: radial-gradient(
+    118% 96% at 50% 46%,
+    transparent 38%,
+    color-mix(in oklab, var(--room-void, #08070b) 78%, transparent) 100%
+  );
+}
+
+/* Global color grade for the room's mood. */
+.atmo-grade {
+  mix-blend-mode: soft-light;
+  background: var(--room-grade);
+}
+
+/* Film grain over the whole scene, at a fixed screen scale so it reads as
+   camera noise rather than a texture painted on the objects. */
+.atmo-grain {
+  opacity: 0.055;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.78' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+/* ==========================================================================
+   Dust
+   --------------------------------------------------------------------------
+   Motes drifting in the light shaft. This is the single cheapest thing that
+   makes a static room read as inhabited air rather than a flat picture.
+   Pure CSS animation so it costs no React renders.
+   ========================================================================== */
+
+.dust-mote {
+  position: absolute;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--room-light-color) 88%, #fff);
+  will-change: transform, opacity;
+  animation: dust-drift var(--dur) linear var(--delay) infinite;
+}
+
+@keyframes dust-drift {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  12% {
+    opacity: var(--peak, 0.5);
+  }
+  88% {
+    opacity: var(--peak, 0.5);
+  }
+  100% {
+    transform: translate3d(var(--dx), var(--dy), 0);
+    opacity: 0;
+  }
+}
+
+/* ==========================================================================
+   Interaction affordances
+   ========================================================================== */
+
+/* Objects the camera can focus on. Kept extremely subtle — a spatial scene
+   should invite exploration, not label every hotspot like a museum kiosk. */
+.zone-hotspot {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.zone-hotspot:focus-visible {
+  outline: none;
+}
+
+/* Distant zones render at reduced fidelity: no grain, no pointer materials,
+   no interactive children mounted. Applied by the scene fidelity system. */
+.fidelity-far [class*="m-"]::after {
+  display: none;
+}
+
+.fidelity-far {
+  pointer-events: none;
+}

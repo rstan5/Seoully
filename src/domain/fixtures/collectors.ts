@@ -113,7 +113,7 @@ const SOO_ZONES = buildZones("room-soo", [
   { kind: "wall", label: "Wall", x: 430, y: -390, z: -885, w: 640, h: 400, dolly: 430 },
   { kind: "display-case", label: "Display Case", x: 820, y: 380, z: -770, w: 360, h: 640, dolly: 440 },
   { kind: "desk", label: "Desk", x: 140, y: 445, z: -620, w: 640, h: 510, dolly: 340 },
-  { kind: "binder", label: "Binder", x: 232, y: 103, z: -560, w: 158, h: 174, dolly: 250 },
+  { kind: "binder", label: "Binder", x: 236, y: 83, z: -560, w: 178, h: 214, dolly: 250 },
   { kind: "archive", label: "Archive", x: -380, y: 585, z: -320, w: 380, h: 230, dolly: 300 },
 ]);
 
@@ -123,7 +123,7 @@ const MINJI_ZONES = buildZones("room-minji", [
   { kind: "wall", label: "Wall", x: -420, y: -400, z: -885, w: 660, h: 400, dolly: 430 },
   { kind: "display-case", label: "Display Case", x: -810, y: 390, z: -770, w: 350, h: 620, dolly: 440 },
   { kind: "desk", label: "Desk", x: -120, y: 445, z: -620, w: 620, h: 510, dolly: 340 },
-  { kind: "binder", label: "Binder", x: -212, y: 103, z: -560, w: 158, h: 174, dolly: 250 },
+  { kind: "binder", label: "Binder", x: -216, y: 83, z: -560, w: 178, h: 214, dolly: 250 },
   { kind: "archive", label: "Archive", x: 420, y: 590, z: -320, w: 360, h: 220, dolly: 300 },
 ]);
 

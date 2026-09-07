@@ -148,10 +148,28 @@ export const ease = {
  * Duration for an object flying across the room, scaled by distance so that a
  * short hop and a cross-room throw both read as the same physical speed.
  */
-export function flightDuration(distancePx: number, kind: MassKind = "photocard"): number {
+export function flightDuration(
+  distancePx: number,
+  kind: MassKind = "photocard",
+  pacing: number = pace.physical,
+): number {
   const speed = 1400 / Math.sqrt(MASS[kind]); // px/sec
-  return clamp(distancePx / speed, 0.55, 1.6);
+  return clamp((distancePx / speed) * pacing, 0.55, 3.2);
 }
+
+/**
+ * Pacing multipliers for flights that are narrative beats rather than just
+ * objects moving.
+ *
+ * Honest physics puts a tossed photocard across the room in about half a
+ * second, which is correct and useless: the single most important animation in
+ * the product would be over before it registered. `hero` slows it to the speed
+ * of a thing being *placed*, which is also what it is.
+ */
+export const pace = {
+  physical: 1,
+  hero: 2.4,
+} as const;
 
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));

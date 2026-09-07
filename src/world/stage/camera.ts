@@ -1,5 +1,6 @@
 import { ROOM_FOCUS_PLANE, ROOM_HEIGHT, ROOM_WIDTH } from "@/domain/fixtures/collectors";
 import type { CameraDock, Room, ZoneId } from "@/domain/types";
+import { OPEN_LIFT, PAGE_H } from "@/world/objects/binderGeometry";
 import type { WorldView } from "@/world/store/worldStore";
 
 /**
@@ -199,11 +200,18 @@ export function poseForView(
     case "binder": {
       const zone = zoneById(view.zoneId);
       if (!zone) return overview;
-      const dock = dockToPose(zone.dock);
-      // An open binder is a wide spread, so the camera squares up to it and
-      // backs off enough to hold both pages in frame.
+      // The binder leaves the desk when it opens, so the camera frames where
+      // it ends up rather than where it was standing, and holds the whole
+      // spread with a little air around it.
       return frameInsideRoom(
-        { ...dock, y: dock.y - 10, dolly: dock.dolly + 120, rotateX: 2.5 },
+        {
+          x: zone.dock.x,
+          y: zone.dock.y + OPEN_LIFT.y,
+          z: zone.dock.z + OPEN_LIFT.z,
+          dolly: dollyToFill(PAGE_H, viewport.height, 0.66),
+          rotateX: 2,
+          rotateY: -1.5,
+        },
         viewport,
       );
     }

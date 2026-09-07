@@ -155,24 +155,26 @@
         color-mix(in oklab, #fff 60%, transparent),
         transparent 60%
       ),
-      /* High-frequency diffraction lines. */
+      /* Diffraction lines. Fine pitch and low alpha on purpose: real foil
+         reads as a sheen over the print, and a bold rainbow at card size
+         swamps the portrait it's supposed to be sitting on top of. */
       repeating-linear-gradient(
         calc(var(--lit-angle) + 22deg),
-        hsl(calc(var(--holo-phase) + 0deg) 92% 72% / 0.55) 0px,
-        hsl(calc(var(--holo-phase) + 60deg) 92% 70% / 0.55) 7px,
-        hsl(calc(var(--holo-phase) + 140deg) 92% 74% / 0.55) 14px,
-        hsl(calc(var(--holo-phase) + 220deg) 92% 70% / 0.55) 21px,
-        hsl(calc(var(--holo-phase) + 300deg) 92% 72% / 0.55) 28px
+        hsl(calc(var(--holo-phase) + 0deg) 88% 74% / 0.26) 0px,
+        hsl(calc(var(--holo-phase) + 60deg) 88% 72% / 0.26) 4px,
+        hsl(calc(var(--holo-phase) + 140deg) 88% 76% / 0.26) 8px,
+        hsl(calc(var(--holo-phase) + 220deg) 88% 72% / 0.26) 12px,
+        hsl(calc(var(--holo-phase) + 300deg) 88% 74% / 0.26) 16px
       ),
       /* Low-frequency sheen that breaks up the regularity. */
       linear-gradient(
         calc(var(--lit-angle) - 40deg),
-        hsl(calc(var(--holo-phase) + 180deg) 88% 66% / 0.7),
-        hsl(calc(var(--holo-phase) + 40deg) 88% 60% / 0.35) 45%,
-        hsl(calc(var(--holo-phase) + 260deg) 88% 68% / 0.7)
+        hsl(calc(var(--holo-phase) + 180deg) 82% 68% / 0.4),
+        hsl(calc(var(--holo-phase) + 40deg) 82% 62% / 0.16) 45%,
+        hsl(calc(var(--holo-phase) + 260deg) 82% 70% / 0.4)
       ),
       linear-gradient(160deg, var(--base), color-mix(in oklab, var(--base) 70%, #000));
-    background-blend-mode: screen, color-dodge, overlay, normal;
+    background-blend-mode: screen, soft-light, overlay, normal;
     box-shadow:
       inset 0 0 0 1px color-mix(in oklab, #fff 30%, transparent),
       inset 0 -3px 8px color-mix(in oklab, #000 24%, transparent);
@@ -207,17 +209,24 @@
   }
 
   .m-plastic-sleeve {
-    background-image: linear-gradient(
-      calc(var(--lit-angle) - 10deg),
-      color-mix(in oklab, #fff 26%, transparent) 0%,
-      color-mix(in oklab, #fff 5%, transparent) 18%,
-      transparent 42%,
-      color-mix(in oklab, #fff 8%, transparent) 74%,
-      transparent 100%
-    );
+    background-image:
+      /* A single hard-edged gloss band. Polypropylene doesn't have a soft
+         gradient sheen; it has a bright streak with a visible edge, and that
+         streak is the only reason a viewer knows the card is behind plastic. */
+      linear-gradient(
+        calc(var(--lit-angle) - 14deg),
+        transparent 8%,
+        color-mix(in oklab, #fff calc(30% * var(--lit-strength)), transparent) 15%,
+        color-mix(in oklab, #fff calc(6% * var(--lit-strength)), transparent) 27%,
+        transparent 34%,
+        transparent 72%,
+        color-mix(in oklab, #fff calc(11% * var(--lit-strength)), transparent) 80%,
+        transparent 88%
+      );
     box-shadow:
-      inset 0 0 0 1px color-mix(in oklab, #fff 16%, transparent),
-      inset 0 0 14px color-mix(in oklab, #fff 6%, transparent);
+      inset 0 0 0 1px color-mix(in oklab, #fff 24%, transparent),
+      inset 0 0 10px color-mix(in oklab, #fff 8%, transparent),
+      0 1px 3px color-mix(in oklab, #000 28%, transparent);
     backdrop-filter: saturate(0.94) brightness(1.03);
   }
 

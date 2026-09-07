@@ -51,9 +51,10 @@ export const Photocard = forwardRef<HTMLDivElement, PhotocardProps>(function Pho
           borderRadius: 4,
           // A missing card is drawn as an empty sleeve, not as a grey box. The
           // absence should feel like a gap in a collection, not a loading state.
-          border: "1px dashed color-mix(in oklab, var(--room-ink) 26%, transparent)",
+          border: "1px dashed color-mix(in oklab, #5a4a38 40%, transparent)",
           background:
-            "linear-gradient(160deg, color-mix(in oklab, #000 26%, transparent), transparent 70%)",
+            "linear-gradient(160deg, color-mix(in oklab, #2b2118 16%, transparent), transparent 72%)",
+          boxShadow: "inset 0 2px 7px color-mix(in oklab, #2b2118 22%, transparent)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -63,8 +64,8 @@ export const Photocard = forwardRef<HTMLDivElement, PhotocardProps>(function Pho
         <span
           className="u-stat"
           style={{
-            fontSize: 15,
-            color: "color-mix(in oklab, var(--room-ink) 40%, transparent)",
+            fontSize: height * 0.16,
+            color: "color-mix(in oklab, #5a4a38 46%, transparent)",
           }}
         >
           {template.setIndex ?? "?"}
@@ -154,78 +155,143 @@ function CardArt({
   const accent = member?.color ?? template.colorway.accent;
   const label = member?.stageName ?? template.name;
   const pose = template.name.split("—")[1]?.trim();
+  // Deterministic per-card framing, so a page of cards doesn't read as one
+  // portrait stamped six times. Real sets vary the crop card to card.
+  const seed = hashString(template.id);
+  const shift = ((seed % 100) / 100 - 0.5) * 16; // horizontal crop offset, %
+  const scale = 1 + ((seed >> 7) % 100) / 100 * 0.22;
+  const warm = (seed >> 13) % 2 === 0;
 
   return (
     <>
-      {/* Backdrop wash */}
+      {/* Studio backdrop: a lit sweep behind the figure, darker at the edges,
+          which is what makes the crop read as a photograph rather than as a
+          shape on a colored rectangle. */}
       <div
         style={{
           position: "absolute",
           inset: 0,
-          background: `linear-gradient(168deg, color-mix(in oklab, ${accent} 46%, transparent), transparent 62%)`,
+          background: `
+            radial-gradient(76% 58% at ${50 + shift}% 24%,
+              color-mix(in oklab, ${accent} 42%, #fff 46%),
+              color-mix(in oklab, ${accent} 44%, #201826) 74%),
+            linear-gradient(${warm ? 168 : 196}deg,
+              transparent,
+              color-mix(in oklab, #0d0a12 34%, transparent) 92%)`,
         }}
       />
-      {/* Figure: shoulders and head silhouette, cropped like a real photocard. */}
+
+      {/* Figure. Shoulders, neck and head, cropped tight and off-centre the
+          way a photocard crop actually sits. */}
       <div
         style={{
           position: "absolute",
-          left: "50%",
-          bottom: "-14%",
-          width: "88%",
-          height: "72%",
-          marginLeft: "-44%",
-          borderRadius: "48% 48% 0 0",
-          background: `linear-gradient(180deg, color-mix(in oklab, ${accent} 80%, #fff 12%), color-mix(in oklab, ${accent} 42%, #000))`,
+          left: `${50 + shift}%`,
+          bottom: "-16%",
+          width: `${74 * scale}%`,
+          height: `${68 * scale}%`,
+          marginLeft: `${(-74 * scale) / 2}%`,
+          borderRadius: "44% 44% 0 0",
+          background: `linear-gradient(174deg,
+            color-mix(in oklab, ${accent} 88%, #fff 6%),
+            color-mix(in oklab, ${accent} 52%, #140f1a))`,
+          boxShadow: `inset ${warm ? "" : "-"}6px 4px 12px color-mix(in oklab, #000 34%, transparent)`,
         }}
       />
       <div
         style={{
           position: "absolute",
-          left: "50%",
-          top: "14%",
-          width: "42%",
-          height: "34%",
-          marginLeft: "-21%",
-          borderRadius: "50% 50% 44% 44%",
-          background: `linear-gradient(170deg, color-mix(in oklab, ${accent} 92%, #fff 22%), color-mix(in oklab, ${accent} 55%, #000))`,
+          left: `${50 + shift * 1.4}%`,
+          top: `${13 + (seed % 5)}%`,
+          width: `${34 * scale}%`,
+          height: `${31 * scale}%`,
+          marginLeft: `${(-34 * scale) / 2}%`,
+          borderRadius: "50% 50% 46% 46%",
+          background: `linear-gradient(${warm ? 156 : 204}deg,
+            color-mix(in oklab, ${accent} 62%, #fff 44%),
+            color-mix(in oklab, ${accent} 72%, #171020))`,
         }}
       />
-      {/* Name plate */}
+      {/* Rim light down one side of the figure. */}
       <div
         style={{
           position: "absolute",
-          left: 5,
-          right: 5,
-          bottom: 5,
+          inset: 0,
+          background: `linear-gradient(${warm ? 100 : 260}deg,
+            color-mix(in oklab, #fff 26%, transparent),
+            transparent 34%)`,
+          mixBlendMode: "soft-light",
         }}
-      >
+      />
+
+      {/* Scrim so the name plate has something to sit on. */}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: "38%",
+          background: "linear-gradient(0deg, rgba(8,6,12,0.66), transparent)",
+        }}
+      />
+
+      <div style={{ position: "absolute", left: "7%", right: "7%", bottom: "5%" }}>
         <div
           style={{
             fontFamily: "var(--font-display)",
-            fontSize: Math.max(9, height * 0.085),
+            fontSize: height * 0.12,
             lineHeight: 1,
             color: "#fff",
-            textShadow: "0 1px 4px rgba(0,0,0,0.7)",
+            letterSpacing: "0.005em",
+            textShadow: "0 1px 5px rgba(0,0,0,0.6)",
           }}
         >
           {label}
         </div>
-        {pose && height > 90 && (
+        {pose && (
           <div
             className="u-eyebrow"
             style={{
-              fontSize: Math.max(5.5, height * 0.042),
+              fontSize: height * 0.055,
               color: "#fff",
-              opacity: 0.72,
-              marginTop: 2,
+              opacity: 0.6,
+              marginTop: height * 0.022,
             }}
           >
             {pose}
           </div>
         )}
       </div>
+
+      {/* Set number, printed small in the corner as they are in real sets. */}
+      {template.setIndex && (
+        <div
+          className="u-stat"
+          style={{
+            position: "absolute",
+            right: "7%",
+            top: "5%",
+            fontSize: height * 0.06,
+            color: "#fff",
+            opacity: 0.5,
+          }}
+        >
+          {String(template.setIndex).padStart(2, "0")}
+        </div>
+      )}
     </>
   );
+}
+
+/** Stable per-template seed, so generated framing never changes between renders. */
+function hashString(value: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) % 1_000_000;
 }
 
 function mergeRefs<T>(...refs: Array<React.Ref<T> | undefined>) {

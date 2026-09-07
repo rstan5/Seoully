@@ -198,6 +198,14 @@
      Slightly cloudy, with a hard specular streak across the top-left.
      ====================================================================== */
 
+  /* Transparent materials must clear the shared substrate's background-color,
+     or they paint an opaque slab over whatever they're supposed to be
+     protecting. */
+  .m-plastic-sleeve,
+  .m-acrylic {
+    background-color: transparent;
+  }
+
   .m-plastic-sleeve {
     background-image: linear-gradient(
       calc(var(--lit-angle) - 10deg),

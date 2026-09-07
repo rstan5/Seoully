@@ -17,12 +17,24 @@
 
 /* --- Stage: owns the perspective, i.e. the lens ------------------------- */
 
+/* The stage must NOT set `transform-style: preserve-3d` or paint a background.
+   `perspective` alone establishes the 3D rendering context for its children.
+   Adding preserve-3d makes the stage's own background box participate in depth
+   sorting at z = 0 — and since the entire room lives at negative z, the stage
+   would render the room and then paint straight over it. The symptom is a
+   scene that is provably present in the DOM, has correct geometry, and is
+   completely invisible. */
 .world-stage {
   position: fixed;
   inset: 0;
   perspective: var(--world-perspective);
   perspective-origin: 50% 46%;
-  transform-style: preserve-3d;
+}
+
+/* The void behind the room, as a separate layer outside the 3D context. */
+.world-backdrop {
+  position: fixed;
+  inset: 0;
   background: var(--room-void, #08070b);
 }
 
@@ -45,12 +57,17 @@
   transform-style: preserve-3d;
 }
 
-/* A positioned node in world space. Objects and zones both use this. */
+/* A positioned node in world space. Objects and zones both use this.
+   Centering is done with negative margins rather than a `translate: -50%`,
+   because the individual `translate` property composes *outside* `transform`.
+   That would apply the centering offset after rotation, in screen space, and
+   silently mis-place every rotated node. Margins are layout, so they resolve
+   before any transform and stay correct. */
 .world-node {
   position: absolute;
+  top: 0;
+  left: 0;
   transform-style: preserve-3d;
-  /* Centered on its own origin so world coordinates mean the object's center. */
-  translate: -50% -50%;
 }
 
 /* Leaf surfaces that must not create a new 3D context. */
@@ -71,21 +88,29 @@
   transform-style: preserve-3d;
   background-color: var(--room-wall);
   background-image:
-    /* Key light falloff across the surface. */
+    /* Key light — a bright, tight core inside a wide soft falloff. Two stops
+       rather than one, because a single radial reads as a flat wash while a
+       real lamp has a visible hotspot. */
     radial-gradient(
-      var(--room-light-spread, 140% 120%) at calc(var(--room-light-x) * 100%)
-        calc(var(--room-light-y) * 100%),
-      color-mix(in oklab, var(--room-light-color) calc(38% * var(--room-light-intensity)), transparent),
-      transparent 68%
+      50% 46% at calc(var(--room-light-x) * 100%) calc(var(--room-light-y) * 100%),
+      color-mix(in oklab, var(--room-light-color) calc(62% * var(--room-light-intensity)), transparent),
+      transparent 74%
     ),
-    /* Colored fill from the opposite side. */
     radial-gradient(
-      120% 100% at calc((1 - var(--room-light-x)) * 100%) 80%,
-      color-mix(in oklab, var(--room-fill) 26%, transparent),
-      transparent 60%
+      124% 104% at calc(var(--room-light-x) * 100%) calc(var(--room-light-y) * 100%),
+      color-mix(in oklab, var(--room-light-color) calc(30% * var(--room-light-intensity)), transparent),
+      transparent 78%
     ),
-    /* Ambient occlusion where wall meets floor and corners. */
-    linear-gradient(180deg, transparent 58%, color-mix(in oklab, #000 42%, transparent));
+    /* Colored fill washing in from the opposite side. Kept tight and low —
+       a fill light that covers the whole wall stops reading as a second light
+       source and just looks like the wall is painted that color. */
+    radial-gradient(
+      72% 58% at calc((1 - var(--room-light-x)) * 100%) 84%,
+      color-mix(in oklab, var(--room-fill) 30%, transparent),
+      transparent 72%
+    ),
+    /* Ambient occlusion where wall meets floor. */
+    linear-gradient(180deg, transparent 62%, color-mix(in oklab, #000 38%, transparent));
 }
 
 .room-wall::after {
@@ -159,9 +184,9 @@
 /* Lens vignette. Sells "camera in a room" rather than "div on a page". */
 .atmo-vignette {
   background: radial-gradient(
-    118% 96% at 50% 46%,
-    transparent 38%,
-    color-mix(in oklab, var(--room-void, #08070b) 78%, transparent) 100%
+    124% 104% at 50% 44%,
+    transparent 46%,
+    color-mix(in oklab, var(--room-void, #08070b) 52%, transparent) 100%
   );
 }
 

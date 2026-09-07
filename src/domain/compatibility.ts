@@ -116,7 +116,6 @@ export function computeCompatibility(
   const sharedBiasIds = intersect(aBias, bBias);
   const sharedMemberIds = intersect(aShown.members, bShown.members);
   const sharedTemplateIds = intersect(aOwned, bOwned);
-  const sharedEraIds = intersect(aEras, bEras);
 
   const theyOwnYourWants = intersect(aWants, bOwned);
   const youOwnTheirWants = intersect(bWants, aOwned);

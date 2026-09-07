@@ -56,9 +56,19 @@ export const USERS: User[] = [
  * is most of why they read as different physical spaces rather than themes.
  */
 
+/**
+ * Room box dimensions in world units.
+ *
+ * Sized so the whole room can be framed at a natural-looking focal length. Go
+ * much wider and the overview either clips or forces the camera so far back
+ * that perspective flattens and the space stops reading as a room.
+ */
 export const ROOM_DEPTH = 900;
-export const ROOM_WIDTH = 3000;
-export const ROOM_HEIGHT = 1800;
+export const ROOM_WIDTH = 2200;
+export const ROOM_HEIGHT = 1400;
+
+/** The depth most zone content sits at. Used to compute overview framing. */
+export const ROOM_FOCUS_PLANE = -760;
 
 interface ZoneSeed {
   kind: ZoneKind;
@@ -87,54 +97,74 @@ function buildZones(roomId: string, seeds: ZoneSeed[]): RoomZone[] {
   });
 }
 
-/** SOOMIN — a dense, dark, completionist's room. Objects packed tight. */
+/** Height of the desktop surface. The binder stands on this. */
+export const DESK_SURFACE_Y = 190;
+
+/** Floor plane. Freestanding furniture is sized so its base lands here. */
+export const FLOOR_Y = ROOM_HEIGHT / 2;
+
+/**
+ * SOOMIN — dense, dark, completionist. Furniture reaches the floor and the
+ * archive crates sit well forward of everything else, so the room has real
+ * front-to-back depth rather than being a single wall of objects.
+ */
 const SOO_ZONES = buildZones("room-soo", [
-  { kind: "shelf", label: "Shelf", x: -660, y: -70, z: -800, w: 760, h: 560, dolly: 470 },
-  { kind: "wall", label: "Wall", x: 520, y: -420, z: -885, w: 880, h: 520, dolly: 420 },
-  { kind: "display-case", label: "Display Case", x: 800, y: 170, z: -790, w: 520, h: 640, dolly: 440 },
-  { kind: "desk", label: "Desk", x: 60, y: 350, z: -570, w: 940, h: 300, dolly: 300 },
-  { kind: "binder", label: "Binder", x: 20, y: 150, z: -505, w: 400, h: 470, dolly: 330 },
-  { kind: "archive", label: "Archive", x: -900, y: 450, z: -470, w: 640, h: 400, dolly: 290 },
+  { kind: "shelf", label: "Shelf", x: -700, y: 310, z: -800, w: 470, h: 780, dolly: 470 },
+  { kind: "wall", label: "Wall", x: 430, y: -390, z: -885, w: 640, h: 400, dolly: 430 },
+  { kind: "display-case", label: "Display Case", x: 820, y: 380, z: -770, w: 360, h: 640, dolly: 440 },
+  { kind: "desk", label: "Desk", x: 140, y: 445, z: -620, w: 640, h: 510, dolly: 340 },
+  { kind: "binder", label: "Binder", x: 120, y: 35, z: -540, w: 240, h: 310, dolly: 330 },
+  { kind: "archive", label: "Archive", x: -380, y: 585, z: -320, w: 380, h: 230, dolly: 300 },
 ]);
 
 /** MINJI — mirrored layout, airier spacing. Reads as a different apartment. */
 const MINJI_ZONES = buildZones("room-minji", [
-  { kind: "shelf", label: "Shelf", x: 700, y: -50, z: -810, w: 700, h: 540, dolly: 470 },
-  { kind: "wall", label: "Wall", x: -500, y: -430, z: -885, w: 900, h: 540, dolly: 420 },
-  { kind: "display-case", label: "Display Case", x: -830, y: 190, z: -780, w: 500, h: 620, dolly: 440 },
-  { kind: "desk", label: "Desk", x: 40, y: 360, z: -570, w: 900, h: 300, dolly: 300 },
-  { kind: "binder", label: "Binder", x: -30, y: 160, z: -505, w: 400, h: 470, dolly: 330 },
-  { kind: "archive", label: "Archive", x: 920, y: 460, z: -460, w: 600, h: 400, dolly: 290 },
+  { kind: "shelf", label: "Shelf", x: 700, y: 320, z: -805, w: 450, h: 760, dolly: 470 },
+  { kind: "wall", label: "Wall", x: -420, y: -400, z: -885, w: 660, h: 400, dolly: 430 },
+  { kind: "display-case", label: "Display Case", x: -810, y: 390, z: -770, w: 350, h: 620, dolly: 440 },
+  { kind: "desk", label: "Desk", x: -120, y: 445, z: -620, w: 620, h: 510, dolly: 340 },
+  { kind: "binder", label: "Binder", x: -100, y: 35, z: -540, w: 240, h: 310, dolly: 330 },
+  { kind: "archive", label: "Archive", x: 420, y: 590, z: -320, w: 360, h: 220, dolly: 300 },
 ]);
 
 // ---------------------------------------------------------------------------
 // Room themes — the full visual identity of each space
 // ---------------------------------------------------------------------------
 
+/**
+ * SOOMIN's room: a bedroom at night. Warm desk lamp as the key light, red LED
+ * strip as the fill.
+ *
+ * The wall base is deliberately mid-tone rather than near-black. A genuinely
+ * dark room renders as an unreadable void — real night photography holds a
+ * wide tonal range and gets its darkness from contrast and grade, not from
+ * crushing every value to zero.
+ */
 const NOCTURNE: RoomTheme = {
   name: "Nocturne",
-  wall: "#171520",
-  wallAccent: "#221f2c",
-  floor: "#0e0d13",
-  light: { color: "#ff3b52", x: 0.74, y: 0.16, intensity: 0.9, fill: "#43121f" },
-  furniture: "#1c1a25",
-  furnitureEdge: "#332f40",
-  ink: "#e8e1d6",
-  inkSoft: "#8b8496",
-  grade: "linear-gradient(165deg, rgba(72,12,26,0.55), rgba(6,6,12,0.7))",
+  wall: "#2e2740",
+  wallAccent: "#453a5e",
+  floor: "#1d1828",
+  light: { color: "#ffc48a", x: 0.36, y: 0.2, intensity: 1.15, fill: "#ff2f52" },
+  furniture: "#241e30",
+  furnitureEdge: "#655a80",
+  ink: "#f2ebe0",
+  inkSoft: "#a99fbc",
+  grade: "linear-gradient(165deg, rgba(88,20,44,0.32), rgba(10,8,20,0.42))",
 };
 
+/** MINJI's room: full daylight, pastel, saturated. The opposite pole. */
 const CONFETTI: RoomTheme = {
   name: "Confetti",
-  wall: "#f2c2d6",
-  wallAccent: "#ffdcea",
-  floor: "#dfa6bf",
-  light: { color: "#fff4f8", x: 0.24, y: 0.12, intensity: 1, fill: "#ffc9de" },
-  furniture: "#fbe9f0",
+  wall: "#f4c6d9",
+  wallAccent: "#ffe1ee",
+  floor: "#e0a8c0",
+  light: { color: "#fffaf2", x: 0.24, y: 0.1, intensity: 1.25, fill: "#ffb8d8" },
+  furniture: "#fdeef4",
   furnitureEdge: "#ffffff",
   ink: "#54203a",
-  inkSoft: "#9c6580",
-  grade: "linear-gradient(200deg, rgba(255,214,232,0.5), rgba(238,160,192,0.45))",
+  inkSoft: "#a06f88",
+  grade: "linear-gradient(200deg, rgba(255,226,240,0.35), rgba(244,178,206,0.3))",
 };
 
 export const ROOMS: Room[] = [

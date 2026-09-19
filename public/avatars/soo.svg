@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 300" role="img" aria-label="Soomin">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2a2238"/>
+      <stop offset="100%" stop-color="#15121c"/>
+    </linearGradient>
+    <linearGradient id="hair" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a1418"/>
+      <stop offset="100%" stop-color="#0c0a0e"/>
+    </linearGradient>
+  </defs>
+  <rect width="240" height="300" fill="url(#bg)"/>
+  <rect x="0" y="246" width="240" height="54" fill="#c1121f"/>
+  <ellipse cx="122" cy="168" rx="58" ry="72" fill="#d7b7a4"/>
+  <path d="M52 148 C58 48 186 36 192 150 C176 78 64 86 52 148Z" fill="url(#hair)"/>
+  <path d="M48 132 C40 210 74 262 122 268 C168 262 198 214 190 140 C176 188 68 196 48 132Z" fill="url(#hair)"/>
+  <path d="M70 118 C96 92 128 86 164 108" fill="none" stroke="#c1121f" stroke-width="7"/>
+  <ellipse cx="102" cy="164" rx="6" ry="5" fill="#1a1720"/>
+  <ellipse cx="140" cy="162" rx="6" ry="5" fill="#1a1720"/>
+  <path d="M108 192 C120 198 132 196 138 190" fill="none" stroke="#8c5a4a" stroke-width="2.2"/>
+  <rect x="0" y="0" width="240" height="300" fill="none" stroke="#f4efe4" stroke-width="10" opacity="0.12"/>
+</svg>

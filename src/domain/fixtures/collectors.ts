@@ -142,29 +142,29 @@ const MINJI_ZONES = buildZones("room-minji", [
  */
 const NOCTURNE: RoomTheme = {
   name: "Nocturne",
-  wall: "#2e2740",
-  wallAccent: "#453a5e",
-  floor: "#1d1828",
-  light: { color: "#ffc48a", x: 0.42, y: 0.42, intensity: 1.15, fill: "#ff2f52" },
-  furniture: "#241e30",
-  furnitureEdge: "#655a80",
+  wall: "#2a2438",
+  wallAccent: "#403656",
+  floor: "#1a1624",
+  light: { color: "#ffb86e", x: 0.46, y: 0.38, intensity: 1.02, fill: "#c1121f" },
+  furniture: "#221c2c",
+  furnitureEdge: "#6a5c82",
   ink: "#f2ebe0",
-  inkSoft: "#a99fbc",
-  grade: "linear-gradient(165deg, rgba(88,20,44,0.32), rgba(10,8,20,0.42))",
+  inkSoft: "#9a90ae",
+  grade: "linear-gradient(165deg, rgba(72,16,36,0.28), rgba(8,6,16,0.42))",
 };
 
 /** MINJI's room: full daylight, pastel, saturated. The opposite pole. */
 const CONFETTI: RoomTheme = {
   name: "Confetti",
-  wall: "#f4c6d9",
-  wallAccent: "#ffe1ee",
-  floor: "#e0a8c0",
-  light: { color: "#fffaf2", x: 0.24, y: 0.1, intensity: 1.25, fill: "#ffb8d8" },
-  furniture: "#fdeef4",
+  wall: "#f7d0e2",
+  wallAccent: "#fff0f6",
+  floor: "#e8b4c6",
+  light: { color: "#fff6e8", x: 0.1, y: 0.16, intensity: 1.38, fill: "#ff9ec8" },
+  furniture: "#fff4f8",
   furnitureEdge: "#ffffff",
   ink: "#54203a",
   inkSoft: "#a06f88",
-  grade: "linear-gradient(200deg, rgba(255,226,240,0.35), rgba(244,178,206,0.3))",
+  grade: "linear-gradient(200deg, rgba(255,236,246,0.22), rgba(255,196,220,0.18))",
 };
 
 export const ROOMS: Room[] = [
@@ -199,7 +199,9 @@ export const PROFILES: Profile[] = [
     favoriteEraIds: ["skz-ate", "skz-rockstar", "ive-lovedive"].map(id<EraId>),
     collectorType: "Completionist · era-focused",
     avatarColor: "#c1121f",
+    avatarUrl: "/avatars/soo.png",
     roomId: id<RoomId>("room-soo"),
+    appearance: { mode: "room-sync" },
   },
   {
     userId: MINJI,
@@ -211,12 +213,20 @@ export const PROFILES: Profile[] = [
     favoriteEraIds: ["ive-switch", "ive-mine", "skz-ate"].map(id<EraId>),
     collectorType: "Bias-focused · aesthetic curator",
     avatarColor: "#e8567f",
+    avatarUrl: "/avatars/minji.png",
     roomId: id<RoomId>("room-minji"),
+    appearance: {
+      mode: "custom",
+      background: "warm-cream",
+      primary: "powder-pink",
+      secondary: "lavender",
+      tint: "warm-cream",
+    },
   },
 ];
 
 export const FOLLOWS: Follow[] = [
-  { followerId: SOO, followeeId: MINJI, createdAt: "2024-11-02" },
+  { followerId: MINJI, followeeId: SOO, createdAt: "2024-11-02" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -470,5 +480,31 @@ export const ACTIVITY: Activity[] = [
     "is hunting",
     ["set-ate-pc-12"],
     "One card from completing ATE",
+  ),
+  activity(
+    "a-6",
+    MINJI,
+    "followed",
+    "2024-11-02",
+    "followed SOOMIN",
+    [],
+  ),
+  activity(
+    "a-7",
+    SOO,
+    "wishlist-updated",
+    "2025-01-12",
+    "updated their wishlist",
+    ["set-ate-pc-12"],
+    "Last card. Twelve of twelve.",
+  ),
+  activity(
+    "a-8",
+    MINJI,
+    "furniture-added",
+    "2025-01-28",
+    "added furniture to their room",
+    ["t-poster-wonyoung"],
+    "Chair under the window, rug, photo string",
   ),
 ];

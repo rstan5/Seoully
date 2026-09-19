@@ -14,7 +14,7 @@ import {
   pocketWorldPoint,
   sideOfPocket,
 } from "@/world/objects/binderGeometry";
-import { DROP_POINT } from "@/world/room/PendingCardDrop";
+import { DROP_POINT, dropPointFor } from "@/world/room/PendingCardDrop";
 import type { FlightPath } from "./CardFlight";
 
 export type ArrivalPhase = "waiting" | "flying" | "landed";
@@ -33,12 +33,14 @@ export function useCardArrival({
   ownerId,
   progress,
   binderZone,
+  archiveZone,
   onOpenBinder,
   onCollectionChanged,
 }: {
   ownerId: UserId;
   progress: SetProgress[];
   binderZone: RoomZone | undefined;
+  archiveZone?: RoomZone | undefined;
   onOpenBinder: (spreadHint: string) => void;
   onCollectionChanged: () => void;
 }) {
@@ -77,17 +79,22 @@ export function useCardArrival({
 
   const inFlight = sent ?? candidate;
 
+  const origin = useMemo(
+    () => (archiveZone ? dropPointFor(archiveZone) : DROP_POINT),
+    [archiveZone],
+  );
+
   const path: FlightPath | null = useMemo(() => {
     if (!inFlight || !binderZone) return null;
     return {
-      from: DROP_POINT,
+      from: origin,
       to: pocketWorldPoint(
         binderZone.transform,
         sideOfPocket(inFlight.pocketIndex),
         inFlight.pocketIndex % POCKETS_PER_PAGE,
       ),
     };
-  }, [inFlight, binderZone]);
+  }, [inFlight, binderZone, origin]);
 
   const send = useCallback(() => {
     if (!candidate || phase !== "waiting") return;
@@ -115,6 +122,7 @@ export function useCardArrival({
     phase,
     /** Shown in the room before the flight; null once it's been sent. */
     candidate: phase === "waiting" ? candidate : null,
+    origin,
     inFlight,
     path,
     send,

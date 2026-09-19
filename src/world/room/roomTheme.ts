@@ -15,7 +15,7 @@ export function themeVars(theme: RoomTheme, lightScale = 1): CSSProperties {
     "--room-wall": theme.wall,
     "--room-wall-accent": theme.wallAccent,
     "--room-floor": theme.floor,
-    "--room-void": mixToward(theme.wall, "#05050a", 0.82),
+    "--room-void": mixToward(theme.wall, darkWall(theme.wall) ? "#05050a" : "#f3d4e2", darkWall(theme.wall) ? 0.82 : 0.38),
     "--room-furniture": theme.furniture,
     "--room-furniture-edge": theme.furnitureEdge,
     "--room-ink": theme.ink,
@@ -27,6 +27,8 @@ export function themeVars(theme: RoomTheme, lightScale = 1): CSSProperties {
     "--room-light-y": theme.light.y,
     "--room-light-intensity": intensity,
     "--room-fill": theme.light.fill,
+    "--shadow-ox": `${Math.round((theme.light.x - 0.5) * 18)}px`,
+    "--shadow-oy": `${Math.round((theme.light.y - 0.35) * 10)}px`,
 
     // Materials read these. Deriving the key-light angle from the light's
     // actual position is what keeps highlights on a photocard consistent with
@@ -48,6 +50,12 @@ function lightAngle(x: number, y: number): number {
   const dy = y - 0.5;
   const deg = (Math.atan2(dx, -dy) * 180) / Math.PI;
   return Math.round(((deg + 180) % 360) * 10) / 10;
+}
+
+function darkWall(hex: string): boolean {
+  const rgb = parseHex(hex);
+  if (!rgb) return true;
+  return (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000 < 140;
 }
 
 /** Cheap hex blend, used to derive the void color behind the room. */

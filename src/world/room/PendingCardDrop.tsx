@@ -18,6 +18,15 @@ import { CARD_RATIO, Photocard } from "@/world/objects/Photocard";
  * room instead of a hop along one wall.
  */
 export const DROP_POINT = { x: -320, y: 446, z: -250 };
+
+/** Place the mailer on a given archive zone instead of Soomin's leftover coords. */
+export function dropPointFor(archive: { transform: { x: number; y: number; z: number } }) {
+  return {
+    x: archive.transform.x + 60,
+    y: archive.transform.y - 140,
+    z: archive.transform.z + 70,
+  };
+}
 const CARD_H = 116;
 
 /**
@@ -37,6 +46,7 @@ export function PendingCardDrop({
   remaining,
   interactive,
   onSend,
+  origin = DROP_POINT,
 }: {
   template: CollectibleTemplate;
   member?: Member | undefined;
@@ -45,14 +55,15 @@ export function PendingCardDrop({
   remaining: number;
   interactive: boolean;
   onSend: () => void;
+  origin?: { x: number; y: number; z: number };
 }) {
   const [hovered, setHovered] = useState(false);
 
   return (
     <WorldNode
-      x={DROP_POINT.x}
-      y={DROP_POINT.y}
-      z={DROP_POINT.z}
+      x={origin.x}
+      y={origin.y}
+      z={origin.z}
       w={230}
       h={150}
       className="zone-hotspot"
@@ -105,7 +116,21 @@ export function PendingCardDrop({
             letterSpacing: "0.24em",
           }}
         >
-          {setName.split("—")[0]?.trim()} · {remaining} to go
+          {setName.split("—")[0]?.trim()}
+        </div>
+        <div
+          className="u-display"
+          style={{
+            position: "absolute",
+            left: 14,
+            bottom: 28,
+            fontSize: 15,
+            fontStyle: "italic",
+            color: "#3d2e1c",
+            opacity: 0.7,
+          }}
+        >
+          for the binder
         </div>
       </div>
 
@@ -123,10 +148,10 @@ export function PendingCardDrop({
           cursor: interactive ? "pointer" : "default",
         }}
         animate={{
-          rotateX: hovered ? -6 : -13,
-          rotateZ: hovered ? -2 : -6,
-          y: hovered ? -14 : 0,
-          z: hovered ? 34 : 0,
+          rotateX: hovered ? -8 : -16,
+          rotateZ: hovered ? -1 : -5,
+          y: hovered ? -18 : 0,
+          z: hovered ? 42 : 8,
         }}
         transition={objectSpring("photocard")}
         onPointerEnter={interactive ? () => setHovered(true) : undefined}
@@ -152,33 +177,25 @@ export function PendingCardDrop({
         style={{
           position: "absolute",
           left: "50%",
-          top: -58,
-          marginLeft: -90,
-          width: 180,
+          top: -28,
+          marginLeft: -70,
+          width: 140,
           textAlign: "center",
           pointerEvents: "none",
         }}
-        animate={{ opacity: hovered ? 1 : 0.62, y: hovered ? -4 : 0 }}
+        animate={{ opacity: hovered ? 0.9 : 0, y: hovered ? -2 : 6 }}
+        transition={objectSpring("photocard")}
       >
         <div
           className="u-eyebrow"
           style={{
-            fontSize: 15,
+            fontSize: 8,
             color: "var(--room-ink)",
-            textShadow: "0 2px 12px rgba(0,0,0,0.85)",
+            textShadow: "0 2px 10px rgba(0,0,0,0.7)",
           }}
         >
-          Put it in the binder
+          {remaining} to go
         </div>
-        <div
-          style={{
-            width: 1,
-            height: 26,
-            margin: "8px auto 0",
-            background:
-              "linear-gradient(180deg, color-mix(in oklab, var(--room-ink) 55%, transparent), transparent)",
-          }}
-        />
       </motion.div>
     </WorldNode>
   );

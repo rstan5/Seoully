@@ -9,6 +9,7 @@ interface WorldNodeProps {
   rotateX?: number;
   rotateY?: number;
   rotateZ?: number;
+  scale?: number;
   className?: string;
   style?: CSSProperties;
   children?: ReactNode;
@@ -31,6 +32,7 @@ export function WorldNode({
   rotateX = 0,
   rotateY = 0,
   rotateZ = 0,
+  scale = 1,
   className,
   style,
   children,
@@ -39,6 +41,7 @@ export function WorldNode({
     (rotateX ? ` rotateX(${rotateX}deg)` : "") +
     (rotateY ? ` rotateY(${rotateY}deg)` : "") +
     (rotateZ ? ` rotateZ(${rotateZ}deg)` : "");
+  const sized = scale !== 1 ? ` scale(${scale})` : "";
 
   return (
     <div
@@ -48,7 +51,7 @@ export function WorldNode({
         height: h,
         marginLeft: -w / 2,
         marginTop: -h / 2,
-        transform: `translate3d(${x}px, ${y}px, ${z}px)${rotation}`,
+        transform: `translate3d(${x}px, ${y}px, ${z}px)${rotation}${sized}`,
         ...style,
       }}
     >

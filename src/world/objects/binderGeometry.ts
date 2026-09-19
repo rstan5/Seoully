@@ -131,6 +131,12 @@ export function spreadOfSet(pages: BinderPage[], setId: string): number {
   return index < 0 ? 0 : Math.floor(index / 2);
 }
 
+/** Spread that actually holds this card, not just the set's first page. */
+export function spreadOfTemplate(pages: BinderPage[], templateId: TemplateId): number {
+  const index = pages.findIndex((page) => page.pockets.some((pocket) => pocket.template?.id === templateId));
+  return index < 0 ? 0 : Math.floor(index / 2);
+}
+
 /**
  * The spread a collector would have the binder open to.
  *

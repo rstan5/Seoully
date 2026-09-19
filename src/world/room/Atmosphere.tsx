@@ -9,14 +9,20 @@ import { useMemo } from "react";
  * blur, opacity, and blend modes, any one of which would flatten the 3D
  * context and collapse the scene if applied inside it.
  */
-export function Atmosphere({ dust = 26 }: { dust?: number }) {
+export function Atmosphere({
+  dust = 26,
+  mood = "night",
+}: {
+  dust?: number;
+  mood?: "night" | "day";
+}) {
   return (
     <>
-      <div className="atmo atmo-lightshaft" />
+      <div className={`atmo atmo-lightshaft${mood === "day" ? " is-day" : ""}`} />
       <DustField count={dust} />
       <div className="atmo atmo-grade" />
-      <div className="atmo atmo-vignette" />
-      <div className="atmo atmo-grain" />
+      <div className={`atmo atmo-vignette${mood === "day" ? " is-day" : ""}`} />
+      <div className={`atmo atmo-grain${mood === "day" ? " is-day" : ""}`} />
     </>
   );
 }

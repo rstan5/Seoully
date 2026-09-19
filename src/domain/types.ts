@@ -31,6 +31,13 @@ export type UserId = string & { readonly __brand: "UserId" };
 export type RoomId = string & { readonly __brand: "RoomId" };
 export type ZoneId = string & { readonly __brand: "ZoneId" };
 export type ActivityId = string & { readonly __brand: "ActivityId" };
+export type PostId = string & { readonly __brand: "PostId" };
+export type CommentId = string & { readonly __brand: "CommentId" };
+export type MessageId = string & { readonly __brand: "MessageId" };
+export type ThreadId = string & { readonly __brand: "ThreadId" };
+export type NoticeId = string & { readonly __brand: "NoticeId" };
+export type DecorId = string & { readonly __brand: "DecorId" };
+export type RoomObjectId = string & { readonly __brand: "RoomObjectId" };
 
 /** ISO-8601 date string. */
 export type IsoDate = string;
@@ -137,6 +144,16 @@ export interface CollectibleTemplate {
   material: MaterialName;
   /** Dominant colors, used to generate artwork procedurally for the prototype. */
   colorway: { base: string; accent: string; ink: string };
+  /**
+   * Local photo from add-collectible. Existing fixture art stays procedural.
+   * Cloud storage can replace this URL later without changing callers.
+   */
+  imageUrl?: string;
+  /**
+   * Optional catalog estimate. Never shown as a hard fact — ownership and
+   * value stay separate, and this remains fixture data until a real source exists.
+   */
+  estimatedValue?: { amount: number; currency: "USD"; asOf: IsoDate };
 }
 
 /** A numbered set a collector can complete — the emotional core of the product. */
@@ -177,6 +194,10 @@ export interface Holding {
   acquisition: Acquisition;
   /** Owner marked this as personally significant. Rendered differently. */
   treasured?: boolean;
+  notes?: string;
+  acquisitionPrice?: number;
+  createdAt?: IsoDate;
+  updatedAt?: IsoDate;
 }
 
 export interface WishlistItem {
@@ -245,14 +266,89 @@ export interface RoomZone {
   size: { w: number; h: number };
 }
 
-/** Binds a holding to a physical slot inside a zone. */
+/** Binds a holding to a physical slot inside a zone — or frees it into the room. */
 export interface Placement {
   holdingId: HoldingId;
   zoneId: ZoneId;
   /** Ordinal slot within the zone (shelf position, binder pocket, wall cell). */
   slot: number;
-  /** Per-object offset from the slot's default, for hand-arranged rooms. */
+  /** Per-object offset from the slot's default, used until the item is freed. */
   offset?: Partial<Transform3D>;
+  /**
+   * World-space pose. When set, the holding is no longer packed into a zone —
+   * it lives on the room canvas like furniture.
+   */
+  transform?: Transform3D;
+  /** Nearby landing plane at last settle. Context, not a lock. */
+  surfaceId?: string;
+}
+
+/**
+ * Where a room object can sit. Collection zones plus the floor plane —
+ * rugs, chairs, plants, and lamps live on the floor, not in a collection bay.
+ */
+export type RoomMount = ZoneKind | "floor";
+
+export type DecorCategory =
+  | "lighting"
+  | "furniture"
+  | "plant"
+  | "wall"
+  | "floor"
+  | "audio"
+  | "storage"
+  | "display";
+
+export type DecorMount = "floor" | "wall" | "surface";
+
+/**
+ * A catalog asset that can live in a room.
+ *
+ * Shop-shaped on purpose: rarity, price, and owned are here so a store can
+ * attach later without a second object model. The prototype treats every
+ * asset as owned.
+ */
+export interface DecorAsset {
+  id: DecorId;
+  name: string;
+  category: DecorCategory;
+  material: MaterialName;
+  mount: DecorMount;
+  size: { w: number; h: number; d?: number };
+  rarity: Rarity;
+  /** Starter catalog vs future themed/premium packs. */
+  tier: "foundation" | "premium";
+  /** Optional collection key for future themed packs. */
+  theme?: string;
+  /** Future shop. Unused in this phase. */
+  price?: number;
+  currency?: "coin";
+  owned: boolean;
+}
+
+/**
+ * One placed (or stored) instance of a decor asset in a specific room.
+ *
+ * Distinct from Placement: a holding is a collectible that happens to occupy
+ * space; a RoomObject is furniture. Storing either removes it from the room
+ * without destroying ownership.
+ */
+export interface RoomObject {
+  id: RoomObjectId;
+  roomId: RoomId;
+  assetId: DecorId;
+  zone: RoomMount;
+  transform: Transform3D;
+  layer?: number;
+  stored?: boolean;
+  /** Nearby landing plane at last settle. Context, not a lock. */
+  surfaceId?: string;
+}
+
+/** Serializable room arrangement — placements + decor. Shareable later. */
+export interface RoomLayout {
+  placements: Placement[];
+  objects: RoomObject[];
 }
 
 export type RoomAesthetic = "warm-analog" | "editorial-gallery" | "maximalist" | "nocturne";
@@ -326,6 +422,55 @@ export interface User {
   joinedAt: IsoDate;
 }
 
+export type CollectorInterest =
+  | "albums"
+  | "photocards"
+  | "merch"
+  | "vinyl"
+  | "posters"
+  | "lightsticks"
+  | "everything";
+
+export type ProfileThemeMode = "default" | "custom" | "room-sync";
+
+export type ProfileBackgroundPreset =
+  | "paper"
+  | "warm-cream"
+  | "soft-lavender"
+  | "powder-pink"
+  | "baby-blue"
+  | "mint"
+  | "peach"
+  | "soft-gray"
+  | "deep-navy"
+  | "midnight-purple"
+  | "dark-plum"
+  | "charcoal";
+
+export type ProfileAccentPreset =
+  | "lavender"
+  | "lilac"
+  | "powder-pink"
+  | "baby-blue"
+  | "mint"
+  | "peach"
+  | "rose"
+  | "periwinkle"
+  | "plum"
+  | "deep-blue"
+  | "warm-cream"
+  | "soft-lilac";
+
+/** Saved appearance. Missing means Seoully Default. */
+export interface ProfileThemeChoice {
+  mode: ProfileThemeMode;
+  background?: ProfileBackgroundPreset;
+  primary?: ProfileAccentPreset;
+  secondary?: ProfileAccentPreset;
+  /** @deprecated Prefer `background`. Still read for older live snapshots. */
+  tint?: ProfileAccentPreset;
+}
+
 export interface Profile {
   userId: UserId;
   /** One-line self-description shown under the name. */
@@ -335,10 +480,17 @@ export interface Profile {
   favoriteGroupIds: GroupId[];
   biasMemberIds: MemberId[];
   favoriteEraIds: EraId[];
+  collectorInterests?: CollectorInterest[];
   /** Editorial descriptor of collecting style, e.g. "completionist, era-focused". */
   collectorType: string;
   avatarColor: string;
+  /**
+   * Portrait. A URL now (fixture, local blob, or later CDN). The profile never
+   * generates this itself, so swapping storage is a data change only.
+   */
+  avatarUrl?: string;
   roomId: RoomId;
+  appearance?: ProfileThemeChoice;
 }
 
 export interface Follow {
@@ -353,7 +505,10 @@ export type ActivityKind =
   | "room-redesigned"
   | "grail-acquired"
   | "hunting"
-  | "joined";
+  | "joined"
+  | "followed"
+  | "wishlist-updated"
+  | "furniture-added";
 
 /**
  * Feed entries are derived from holding/placement events rather than authored
@@ -378,12 +533,28 @@ export interface CollectionCompatibility {
   /** 0..100 */
   score: number;
   sharedGroupIds: GroupId[];
+  /** Declared biases both collectors named. */
+  sharedBiasIds: MemberId[];
+  /** Members both actually own. Not the same as a declared bias. */
   sharedMemberIds: MemberId[];
+  sharedInterestIds: CollectorInterest[];
   sharedTemplateIds: TemplateId[];
   /** They own these, A wants them. */
   theyOwnYourWants: TemplateId[];
   /** A owns these, they want them. */
   youOwnTheirWants: TemplateId[];
+  /** Same as theyOwnYourWants — they own something on your wishlist. */
+  wishlistMatches: TemplateId[];
+  /** Same as youOwnTheirWants — you own something they want. */
+  reciprocalMatches: TemplateId[];
+  sharedEraIds: EraId[];
+  /**
+   * Collectibles involved when both directions are true.
+   * Not created by trade status or room placement.
+   */
+  potentialTradeMatches: TemplateId[];
+  /** Alias of potentialTradeMatches for existing callers. */
+  potentialTrades: TemplateId[];
   /** Short human-readable reasons, ordered by strength. */
   reasons: string[];
 }
@@ -422,4 +593,147 @@ export interface CollectionStats {
   grails: number;
   completedSets: number;
   trackedSets: number;
+}
+
+export type PostKind =
+  | "note"
+  | "haul"
+  | "completion"
+  | "room"
+  | "hunt"
+  | "life"
+  | "concert"
+  | "travel"
+  | "event";
+
+export type PostMediaKind = "photo" | "video";
+
+/** A photo or video on a post. URLs are local fixtures now, CDN later. */
+export interface PostMedia {
+  kind: PostMediaKind;
+  url: string;
+  /** Poster frame for video posts. */
+  poster?: string;
+  alt?: string;
+  duration?: string;
+}
+
+/**
+ * Authored expression, as opposed to Activity which is derived from collection
+ * events. A post can still *show* objects — that's what keeps it from becoming
+ * a caption under a selfie.
+ */
+export interface Post {
+  id: PostId;
+  authorId: UserId;
+  kind: PostKind;
+  createdAt: IsoDate;
+  body: string;
+  templateIds: TemplateId[];
+  media?: PostMedia[];
+  location?: string;
+  taggedUserIds?: UserId[];
+  /** Shared catalog references mentioned in the post; independent of holdings. */
+  taggedTemplateIds?: TemplateId[];
+  /** Present when this post is a repost of someone else's. */
+  repostOf?: PostId;
+}
+
+export interface PostLike {
+  postId: PostId;
+  userId: UserId;
+}
+
+export interface PostComment {
+  id: CommentId;
+  postId: PostId;
+  authorId: UserId;
+  body: string;
+  createdAt: IsoDate;
+}
+
+export type NoticeKind = "like" | "comment" | "follow" | "trade" | "activity" | "repost";
+
+/** Local, in-app notices — not a push-notification product. */
+export interface Notice {
+  id: NoticeId;
+  recipientId: UserId;
+  kind: NoticeKind;
+  actorId: UserId;
+  createdAt: IsoDate;
+  headline: string;
+  postId?: PostId;
+  templateIds?: TemplateId[];
+  read?: boolean;
+}
+
+export type SearchKind = "collector" | "group" | "member" | "album" | "photocard" | "room";
+
+export interface SearchHit {
+  kind: SearchKind;
+  id: string;
+  title: string;
+  subtitle?: string;
+  userId?: UserId;
+  templateId?: TemplateId;
+}
+
+export interface GroupCollectionSlice {
+  groupId: GroupId;
+  name: string;
+  count: number;
+  sampleIds: TemplateId[];
+}
+
+export interface Message {
+  id: MessageId;
+  threadId: ThreadId;
+  senderId: UserId;
+  createdAt: IsoDate;
+  body: string;
+  templateIds?: TemplateId[];
+  postId?: PostId;
+}
+
+export interface Thread {
+  id: ThreadId;
+  participantIds: [UserId, UserId];
+  /** Collectibles the composer should attach until the conversation changes. */
+  pendingTemplateIds?: TemplateId[];
+}
+
+// ---------------------------------------------------------------------------
+// Session, media, identification — product foundation
+// ---------------------------------------------------------------------------
+
+/** Auth sessions are resolved server-side; only demo fixture identity is persisted locally. */
+export type Session =
+  | { kind: "none" }
+  | { kind: "demo"; userId: UserId }
+  | { kind: "local"; userId: UserId }
+  | { kind: "auth"; userId: UserId };
+
+export interface MediaRef {
+  id: string;
+  kind: "image" | "video";
+  url: string;
+  source: "fixture" | "local" | "remote";
+}
+
+export interface IdentificationCandidate {
+  templateId: TemplateId;
+  confidence: number;
+  groupId: GroupId;
+  memberId?: MemberId;
+  eraId?: EraId;
+  releaseId?: ReleaseId;
+  releaseVersionId?: ReleaseVersionId;
+  kind: CollectibleKind;
+  reason: string;
+}
+
+export interface IdentificationInput {
+  image?: MediaRef;
+  filename?: string;
+  favoriteGroupIds?: GroupId[];
 }

@@ -3,6 +3,7 @@
 import { motion } from "motion/react";
 import type { HoldingView } from "@/domain/types";
 import { objectSpring } from "@/design/motion";
+import { grabHandlers, mergeArrange, type ArrangeTarget } from "@/world/edit/arrange";
 import { useSurfaceLight } from "./useSurfaceLight";
 
 interface PosterSheetProps {
@@ -15,9 +16,11 @@ interface PosterSheetProps {
   tilt: number;
   mount: "tape" | "pins" | "frame";
   hovered: boolean;
+  inspecting?: boolean;
   interactive: boolean;
   onHover: (hovering: boolean) => void;
   onSelect: () => void;
+  arrange?: ArrangeTarget;
 }
 
 /**
@@ -36,18 +39,22 @@ export function PosterSheet({
   tilt,
   mount,
   hovered,
+  inspecting = false,
   interactive,
   onHover,
   onSelect,
+  arrange,
 }: PosterSheetProps) {
   const light = useSurfaceLight<HTMLDivElement>();
   const { template, member, era } = view;
   const framed = mount === "frame";
 
+  const grab = grabHandlers(arrange, interactive, onSelect);
+
   return (
     <motion.div
       ref={light.ref}
-      className="zone-hotspot"
+      className={`zone-hotspot${arrange?.editing ? " editing-grab" : ""}`}
       style={{
         position: "absolute",
         left: x,
@@ -55,22 +62,47 @@ export function PosterSheet({
         width: w,
         height: h,
         transformStyle: "preserve-3d",
-        // Pinned along the top edge, so that's where it pivots.
         transformOrigin: "50% 0%",
-        rotate: tilt,
+        touchAction: arrange?.editing ? "none" : undefined,
       }}
-      animate={{ rotateX: hovered ? -7 : 0, z: hovered ? 16 : 0 }}
+      animate={
+        inspecting
+          ? { rotateX: -18, z: 86, y: 18 }
+          : mergeArrange(
+              {
+                rotateX: hovered ? -7 : 0,
+                z: hovered ? 16 : 0,
+                y: 0,
+                rotate: tilt,
+              } as {
+                x?: number;
+                y?: number;
+                z?: number;
+                rotate?: number;
+                scale?: number;
+                rotateX?: number;
+              },
+              arrange,
+            )
+      }
       transition={objectSpring("poster")}
       onPointerMove={light.onPointerMove}
       onPointerLeave={() => {
         light.onPointerLeave();
         onHover(false);
       }}
-      onPointerEnter={interactive ? () => onHover(true) : undefined}
-      onClick={interactive ? onSelect : undefined}
-      role={interactive ? "button" : undefined}
-      tabIndex={interactive ? 0 : -1}
-      aria-label={interactive ? `${template.name}. Inspect.` : undefined}
+      onPointerEnter={interactive || arrange?.editing ? () => onHover(true) : undefined}
+      onPointerDown={grab.onPointerDown}
+      onClick={grab.onClick}
+      role={grab.role}
+      tabIndex={grab.tabIndex}
+      aria-label={
+        arrange?.editing
+          ? `${template.name}. Move.`
+          : interactive
+            ? `${template.name}. Inspect.`
+            : undefined
+      }
     >
       {framed && (
         <div
@@ -85,6 +117,19 @@ export function PosterSheet({
       )}
 
       <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          top: 0,
+          right: 0,
+          width: 3,
+          height: h,
+          transformOrigin: "100% 50%",
+          transform: "rotateY(-90deg)",
+          background: "linear-gradient(180deg, #f2eadc, #cbb89a)",
+        }}
+      />
+      <div
         className="world-face m-photo-print"
         style={{
           ["--base" as string]: template.colorway.base,
@@ -93,6 +138,7 @@ export function PosterSheet({
           boxShadow: framed
             ? "inset 0 0 24px color-mix(in oklab, #000 40%, transparent)"
             : "6px 10px 24px color-mix(in oklab, #000 52%, transparent)",
+          clipPath: framed ? undefined : "polygon(0.4% 0.2%, 99.6% 0%, 100% 99.4%, 0% 100%)",
         }}
       >
         <PosterArt

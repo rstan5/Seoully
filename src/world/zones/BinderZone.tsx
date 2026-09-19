@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
+import { repository } from "@/domain/memory-repository";
 import type { RoomZone, SetProgress } from "@/domain/types";
 import { objectSpring } from "@/design/motion";
 import { WorldNode } from "@/world/stage/WorldNode";
@@ -13,6 +14,7 @@ interface BinderZoneProps {
   progress: SetProgress[];
   hovered: boolean;
   interactive: boolean;
+  cover?: string;
   onHover: (hovering: boolean) => void;
   onOpen: () => void;
 }
@@ -30,12 +32,14 @@ export function BinderZone({
   progress,
   hovered,
   interactive,
+  cover = "#4a1c2c",
   onHover,
   onOpen,
 }: BinderZoneProps) {
   const { w, h } = zone.size;
   const coverW = w - SPINE;
   const headline = progress[0];
+  const groupName = headline ? repository.getGroup(headline.set.groupId)?.name : undefined;
 
   return (
     <WorldNode x={zone.transform.x} y={zone.transform.y} z={zone.transform.z} w={w} h={h}>
@@ -76,7 +80,7 @@ export function BinderZone({
         <div
           className="m-velvet"
           style={{
-            ["--base" as string]: "#3a1420",
+            ["--base" as string]: cover,
             position: "absolute",
             left: 0,
             top: 0,
@@ -127,7 +131,7 @@ export function BinderZone({
         <div
           className="m-velvet"
           style={{
-            ["--base" as string]: "#4a1c2c",
+            ["--base" as string]: cover,
             position: "absolute",
             left: SPINE,
             top: 0,
@@ -153,7 +157,7 @@ export function BinderZone({
               className="u-eyebrow"
               style={{ fontSize: 5, color: "var(--color-bone)", opacity: 0.55 }}
             >
-              {headline?.set.groupId === "skz" ? "Stray Kids" : "Collection"}
+              {groupName ?? "Collection"}
             </div>
             <div
               className="u-display"

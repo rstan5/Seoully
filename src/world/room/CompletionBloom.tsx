@@ -21,7 +21,7 @@ export function CompletionBloom({ active }: { active: boolean }) {
             zIndex: 22,
             mixBlendMode: "screen",
             background:
-              "radial-gradient(46% 42% at 50% 46%, rgba(255,206,132,0.5), rgba(255,158,72,0.13) 52%, transparent 76%)",
+              "radial-gradient(46% 42% at 50% 46%, color-mix(in oklab, var(--room-light-color, #ffce84) 55%, transparent), color-mix(in oklab, var(--fill-color, #ff9e48) 16%, transparent) 52%, transparent 76%)",
           }}
           initial={{ opacity: 0 }}
           animate={{ opacity: [0, 1, 0.34] }}

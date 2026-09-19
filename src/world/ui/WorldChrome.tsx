@@ -4,7 +4,14 @@ import { useEffect } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ease } from "@/design/motion";
 import type { CollectionStats, HoldingView, Profile, Room, User } from "@/domain/types";
-import { useWorld } from "@/world/store/worldStore";
+import { useSession } from "@/world/store/sessionStore";
+import { isSocialView, useWorld } from "@/world/store/worldStore";
+import { useViewport } from "@/world/stage/useViewport";
+import { useTraversal } from "@/world/useTraversal";
+import { localizeError } from "@/locale/copy";
+import { useT } from "@/locale/store";
+import { LanguageToggle } from "@/world/ui/LanguageToggle";
+import { Portrait } from "@/world/ui/Portrait";
 
 /**
  * The interface layer that sits over the room.
@@ -32,6 +39,23 @@ export function WorldChrome({
 }) {
   const view = useWorld((s) => s.view);
   const back = useWorld((s) => s.back);
+  const viewerId = useWorld((s) => s.viewerId);
+  const showFeed = useWorld((s) => s.showFeed);
+  const enterEdit = useWorld((s) => s.enterEdit);
+  const { travelToRoomOf } = useTraversal();
+  const visiting = room.ownerId !== viewerId;
+  const compact = useViewport().width < 800;
+  const placementHint = useSession((s) => s.placementHint);
+  const added = useSession((s) => s.error === "catalog.added");
+  const clearError = useSession((s) => s.clearError);
+  const finishRoomIntro = useSession((s) => s.finishRoomIntro);
+  const t = useT();
+
+  useEffect(() => {
+    if (!added) return;
+    const timer = window.setTimeout(clearError, 3200);
+    return () => window.clearTimeout(timer);
+  }, [added, clearError]);
 
   // Escape is the universal "step back out" in a spatial interface. Bound
   // globally rather than on a focused element, because the thing you want to
@@ -44,14 +68,14 @@ export function WorldChrome({
     return () => window.removeEventListener("keydown", onKey);
   }, [back]);
 
-  if (view.kind === "arrival" || view.kind === "profile" || view.kind === "feed") return null;
+  if (view.kind === "arrival" || isSocialView(view)) return null;
 
   const zone =
     view.kind === "zone" || view.kind === "inspect" || view.kind === "binder"
       ? room.zones.find((z) => z.id === view.zoneId)
       : undefined;
 
-  const canGoBack = view.kind !== "room";
+  const canGoBack = view.kind !== "room" && view.kind !== "edit";
 
   return (
     <div
@@ -59,21 +83,12 @@ export function WorldChrome({
       style={{ zIndex: 40, color: "var(--room-ink)", pointerEvents: "none" }}
     >
       {/* --- Whose room this is ---------------------------------------- */}
-      <div style={{ position: "absolute", left: 34, top: 30, pointerEvents: "auto" }}>
+      <div className="world-chrome-name">
         <button
           onClick={onOpenProfile}
           style={{ display: "flex", alignItems: "center", gap: 12, textAlign: "left" }}
         >
-          <span
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: "50%",
-              background: `linear-gradient(150deg, ${profile.avatarColor}, color-mix(in oklab, ${profile.avatarColor} 40%, #000))`,
-              boxShadow: `0 0 16px color-mix(in oklab, ${profile.avatarColor} 45%, transparent)`,
-              flexShrink: 0,
-            }}
-          />
+          <Portrait user={user} profile={profile} size={28} />
           <span>
             <span
               className="u-display"
@@ -85,7 +100,9 @@ export function WorldChrome({
               className="u-eyebrow"
               style={{ display: "block", fontSize: 8.5, color: "var(--room-ink-soft)", marginTop: 3 }}
             >
-              {room.theme.name} · {stats.totalItems} items
+              @{user.handle}
+              {!compact && (profile.tagline ? ` · ${profile.tagline}` : ` · ${room.theme.name}`)}
+              {` · ${t("room.collected", { count: stats.totalItems })}`}
             </span>
           </span>
         </button>
@@ -93,23 +110,70 @@ export function WorldChrome({
 
       {/* --- What you're looking at ------------------------------------- */}
       <AnimatePresence mode="wait">
-        {(zone || inspected) && (
+        {zone && !inspected && (
           <motion.div
-            key={inspected?.holding.id ?? zone?.id ?? "none"}
+            key={zone.id}
             style={{ position: "absolute", left: 34, bottom: 34, maxWidth: 340 }}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={ease.ui}
           >
-            {inspected ? <ObjectCaption view={inspected} /> : (
-              <div className="u-eyebrow" style={{ color: "var(--room-ink-soft)" }}>
-                {zone?.label}
-              </div>
-            )}
+            <div className="u-eyebrow" style={{ color: "var(--room-ink-soft)" }}>
+              {zone.label}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {placementHint && !visiting && (
+        <div className="world-first-hint">
+          <p>{t("room.yourCollectible")}</p>
+          <button type="button" className="u-eyebrow" onClick={finishRoomIntro}>
+            {t("room.continue")}
+          </button>
+        </div>
+      )}
+
+      {added && !visiting && (
+        <div className="world-first-hint" role="status">
+          <p>{localizeError("catalog.added", t)}</p>
+        </div>
+      )}
+
+      {/* --- Discovery, and the way home when you're visiting ---------- */}
+      {view.kind === "room" && (
+        <div className="world-chrome-nav">
+          {visiting && (
+            <button
+              className="u-eyebrow"
+              style={{ fontSize: 8.5, color: "var(--room-ink-soft)" }}
+              onClick={() => travelToRoomOf(viewerId)}
+            >
+              {t("room.yourRoom")}
+            </button>
+          )}
+          {!visiting && (
+            <button
+              className="u-eyebrow"
+              style={{ fontSize: 8.5, color: "var(--room-ink-soft)" }}
+              onClick={enterEdit}
+            >
+              {t("room.editRoom")}
+            </button>
+          )}
+          <LanguageToggle />
+          <button
+            type="button"
+            className="u-eyebrow"
+            aria-label={t("nav.discover")}
+            style={{ fontSize: 8.5, color: "var(--room-ink-soft)", padding: "10px 2px" }}
+            onClick={showFeed}
+          >
+            {t("room.discover")}
+          </button>
+        </div>
+      )}
 
       {/* --- Getting back out ------------------------------------------- */}
       <AnimatePresence>
@@ -134,7 +198,7 @@ export function WorldChrome({
               className="u-eyebrow"
               style={{ fontSize: 8.5, color: "var(--room-ink-soft)" }}
             >
-              Step back
+              {t("room.stepBack")}
             </span>
             <span
               style={{
@@ -155,86 +219,4 @@ export function WorldChrome({
       </AnimatePresence>
     </div>
   );
-}
-
-/**
- * The caption for an object under inspection.
- *
- * Reads as a museum label — eyebrow, name, then the provenance details a
- * collector actually cares about. Condition and acquisition are surfaced
- * because they're what makes it *this* copy rather than a catalog entry.
- */
-function ObjectCaption({ view }: { view: HoldingView }) {
-  const { template, holding, member, era, version } = view;
-  const accent = member?.color ?? template.colorway.accent;
-
-  return (
-    <div>
-      <div className="u-eyebrow" style={{ color: accent, fontSize: 8.5 }}>
-        {view.group.name}
-        {era ? ` · ${era.name}` : ""}
-      </div>
-      <div className="u-display" style={{ fontSize: 34, marginTop: 8 }}>
-        {view.release?.title ?? template.name}
-      </div>
-      {version && (
-        <div
-          className="u-eyebrow"
-          style={{ fontSize: 8, color: "var(--room-ink-soft)", marginTop: 6 }}
-        >
-          {version.name}
-        </div>
-      )}
-
-      <div
-        style={{
-          display: "flex",
-          gap: 22,
-          marginTop: 18,
-          paddingTop: 14,
-          borderTop: "1px solid color-mix(in oklab, var(--room-ink) 16%, transparent)",
-        }}
-      >
-        <Detail label="Condition" value={holding.condition.replace("-", " ")} />
-        <Detail label="Acquired" value={formatDate(holding.acquisition.acquiredAt)} />
-        {template.rarity !== "common" && <Detail label="Rarity" value={template.rarity} />}
-      </div>
-
-      {holding.acquisition.source && (
-        <div
-          style={{
-            marginTop: 14,
-            fontFamily: "var(--font-display)",
-            fontStyle: "italic",
-            fontSize: 15,
-            color: "var(--room-ink-soft)",
-          }}
-        >
-          {holding.acquisition.source}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="u-eyebrow" style={{ fontSize: 7.5, color: "var(--room-ink-soft)" }}>
-        {label}
-      </div>
-      <div
-        className="u-stat"
-        style={{ fontSize: 12, marginTop: 5, textTransform: "capitalize" }}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function formatDate(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
 }

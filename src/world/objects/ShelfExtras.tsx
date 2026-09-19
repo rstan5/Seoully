@@ -3,6 +3,7 @@
 import { motion } from "motion/react";
 import type { HoldingView } from "@/domain/types";
 import { objectSpring } from "@/design/motion";
+import { grabHandlers, mergeArrange, type ArrangeTarget } from "@/world/edit/arrange";
 import { useSurfaceLight } from "./useSurfaceLight";
 
 interface ShelfObjectProps {
@@ -13,6 +14,7 @@ interface ShelfObjectProps {
   interactive: boolean;
   onHover: (hovering: boolean) => void;
   onSelect: () => void;
+  arrange?: ArrangeTarget;
 }
 
 /**
@@ -30,17 +32,19 @@ export function FaceOutRecord({
   interactive,
   onHover,
   onSelect,
+  arrange,
 }: ShelfObjectProps) {
   const light = useSurfaceLight<HTMLDivElement>();
   const size = Math.min(height, 190);
   const { template, version } = view;
   const cover = version?.coverColor ?? template.colorway.base;
   const accent = version?.coverAccent ?? template.colorway.accent;
+  const grab = grabHandlers(arrange, interactive, onSelect);
 
   return (
     <motion.div
       ref={light.ref}
-      className="zone-hotspot"
+      className={`zone-hotspot${arrange?.editing ? " editing-grab" : ""}`}
       style={{
         position: "absolute",
         left: offsetX,
@@ -49,20 +53,37 @@ export function FaceOutRecord({
         height: size,
         transformStyle: "preserve-3d",
         transformOrigin: "50% 100%",
+        touchAction: arrange?.editing ? "none" : undefined,
       }}
-      // Leaned back against the bay wall, the way a propped sleeve actually sits.
-      animate={{ rotateX: hovered ? -4 : -9, z: hovered ? 30 : 0, y: hovered ? -6 : 0 }}
+      animate={mergeArrange(
+        { rotateX: hovered ? -4 : -9, z: hovered ? 30 : 0, y: hovered ? -6 : 0 } as {
+          x?: number;
+          y?: number;
+          z?: number;
+          rotate?: number;
+          scale?: number;
+          rotateX?: number;
+        },
+        arrange,
+      )}
       transition={objectSpring("vinyl")}
       onPointerMove={light.onPointerMove}
       onPointerLeave={() => {
         light.onPointerLeave();
         onHover(false);
       }}
-      onPointerEnter={interactive ? () => onHover(true) : undefined}
-      onClick={interactive ? onSelect : undefined}
-      role={interactive ? "button" : undefined}
-      tabIndex={interactive ? 0 : -1}
-      aria-label={interactive ? `${template.name}. Inspect.` : undefined}
+      onPointerEnter={interactive || arrange?.editing ? () => onHover(true) : undefined}
+      onPointerDown={grab.onPointerDown}
+      onClick={grab.onClick}
+      role={grab.role}
+      tabIndex={grab.tabIndex}
+      aria-label={
+        arrange?.editing
+          ? `${template.name}. Move.`
+          : interactive
+            ? `${template.name}. Inspect.`
+            : undefined
+      }
     >
       {/* The record itself, peeking out of the top of the sleeve. */}
       <div
@@ -152,13 +173,15 @@ export function LeaningBook({
   interactive,
   onHover,
   onSelect,
+  arrange,
 }: ShelfObjectProps) {
   const { template } = view;
   const width = 104;
+  const grab = grabHandlers(arrange, interactive, onSelect);
 
   return (
     <motion.div
-      className="zone-hotspot"
+      className={`zone-hotspot${arrange?.editing ? " editing-grab" : ""}`}
       style={{
         position: "absolute",
         left: offsetX,
@@ -167,15 +190,23 @@ export function LeaningBook({
         height,
         transformStyle: "preserve-3d",
         transformOrigin: "100% 100%",
+        touchAction: arrange?.editing ? "none" : undefined,
       }}
-      animate={{ rotate: hovered ? -14 : -11, z: hovered ? 24 : 0 }}
+      animate={mergeArrange({ rotate: hovered ? -14 : -11, z: hovered ? 24 : 0 }, arrange)}
       transition={objectSpring("book")}
-      onHoverStart={interactive ? () => onHover(true) : undefined}
-      onHoverEnd={interactive ? () => onHover(false) : undefined}
-      onClick={interactive ? onSelect : undefined}
-      role={interactive ? "button" : undefined}
-      tabIndex={interactive ? 0 : -1}
-      aria-label={interactive ? `${template.name}. Inspect.` : undefined}
+      onHoverStart={interactive || arrange?.editing ? () => onHover(true) : undefined}
+      onHoverEnd={interactive || arrange?.editing ? () => onHover(false) : undefined}
+      onPointerDown={grab.onPointerDown}
+      onClick={grab.onClick}
+      role={grab.role}
+      tabIndex={grab.tabIndex}
+      aria-label={
+        arrange?.editing
+          ? `${template.name}. Move.`
+          : interactive
+            ? `${template.name}. Inspect.`
+            : undefined
+      }
     >
       <div
         className="world-face m-paper"

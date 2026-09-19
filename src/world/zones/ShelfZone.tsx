@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { HoldingView, RoomZone } from "@/domain/types";
+import type { HoldingView, RoomZone, Transform3D } from "@/domain/types";
 import { neighborResponse } from "@/design/motion";
 import type { InspectTarget } from "@/world/store/worldStore";
 import { WorldNode } from "@/world/stage/WorldNode";
@@ -12,6 +12,7 @@ import {
   spineWidth,
 } from "@/world/objects/AlbumSpine";
 import { FaceOutRecord, LeaningBook } from "@/world/objects/ShelfExtras";
+import { targetFor, type ArrangeContext } from "@/world/edit/arrange";
 
 const DEPTH = 168;
 /** Thickness of the carcass timber. Real shelving is chunky; thin reads as CG. */
@@ -23,6 +24,9 @@ interface ShelfZoneProps {
   items: HoldingView[];
   interactive: boolean;
   selectedId?: string | null;
+  far?: boolean;
+  personality?: "neat" | "overflow";
+  arrange?: ArrangeContext;
   /** Receives the object's resolved world position so the camera can frame it. */
   onSelect: (view: HoldingView, at: InspectTarget) => void;
 }
@@ -41,7 +45,7 @@ interface ShelfZoneProps {
  * books lean, and CD-format releases pack spine-out. A shelf where a vinyl box
  * is filed like a jewel case immediately looks wrong to anyone who owns either.
  */
-export function ShelfZone({ zone, items, interactive, selectedId, onSelect }: ShelfZoneProps) {
+export function ShelfZone({ zone, items, interactive, selectedId, far = false, personality = "neat", arrange, onSelect }: ShelfZoneProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const { w, h } = zone.size;
 
@@ -58,14 +62,14 @@ export function ShelfZone({ zone, items, interactive, selectedId, onSelect }: Sh
   const bayTop = (index: number) => FRAME + index * (bayH + BOARD);
 
   return (
-    <WorldNode x={zone.transform.x} y={zone.transform.y} z={zone.transform.z} w={w} h={h}>
+    <WorldNode x={zone.transform.x} y={zone.transform.y} z={zone.transform.z} w={w} h={h} className={far ? "fidelity-far" : undefined}>
       {/* --- Interior back panel, recessed and in shadow ------------------ */}
       <div
         className="world-face m-warm-wood"
         style={{
           ["--base" as string]: "var(--room-furniture)",
           transform: `translateZ(${-DEPTH}px)`,
-          filter: "brightness(0.5)",
+          background: "color-mix(in oklab, var(--room-furniture) 52%, #000)",
         }}
       />
 
@@ -83,7 +87,7 @@ export function ShelfZone({ zone, items, interactive, selectedId, onSelect }: Sh
             height: h,
             transformOrigin: side === "left" ? "0% 50%" : "100% 50%",
             transform: `rotateY(${side === "left" ? -90 : 90}deg)`,
-            filter: `brightness(${side === "left" ? 0.78 : 0.52})`,
+            background: `color-mix(in oklab, var(--room-furniture) ${side === "left" ? 78 : 52}%, #000)`,
           }}
         />
       ))}
@@ -101,7 +105,14 @@ export function ShelfZone({ zone, items, interactive, selectedId, onSelect }: Sh
           usableWidth={interiorW - 10}
           hoveredId={hoveredId}
           selectedId={selectedId ?? null}
+          personality={personality}
           interactive={interactive}
+          arrange={arrange}
+          worldAt={(localX, localWidth, itemH) => ({
+            x: zone.transform.x - w / 2 + FRAME + localX + localWidth / 2,
+            y: zone.transform.y - h / 2 + bayTop(0) + bayH - itemH / 2,
+            z: zone.transform.z - 48,
+          })}
           onHover={setHoveredId}
           onSelect={(view, localX, localWidth) => {
             // Resolve the album's own world position from the zone's transform
@@ -130,6 +141,11 @@ export function ShelfZone({ zone, items, interactive, selectedId, onSelect }: Sh
             height={bayH - 18}
             hovered={hoveredId === record.holding.id}
             interactive={interactive}
+            arrange={targetFor(arrange, record.holding.id, {
+              x: zone.transform.x - w / 2 + FRAME + 8 + i * 200 + 95,
+              y: zone.transform.y - h / 2 + bayTop(1) + bayH - (bayH - 18) / 2,
+              z: zone.transform.z - 48,
+            })}
             onHover={(hovering) => setHoveredId(hovering ? record.holding.id : null)}
             onSelect={() =>
               onSelect(record, {
@@ -148,6 +164,11 @@ export function ShelfZone({ zone, items, interactive, selectedId, onSelect }: Sh
             height={bayH - 34}
             hovered={hoveredId === book.holding.id}
             interactive={interactive}
+            arrange={targetFor(arrange, book.holding.id, {
+              x: zone.transform.x - w / 2 + FRAME + interiorW - 130 - i * 60 + 52,
+              y: zone.transform.y - h / 2 + bayTop(1) + bayH / 2,
+              z: zone.transform.z - 48,
+            })}
             onHover={(hovering) => setHoveredId(hovering ? book.holding.id : null)}
             onSelect={() =>
               onSelect(book, {
@@ -181,8 +202,9 @@ export function ShelfZone({ zone, items, interactive, selectedId, onSelect }: Sh
             top: bayTop(i) + bayH,
             width: interiorW,
             height: BOARD,
-            filter: "brightness(1.18)",
             boxShadow: "0 -12px 22px color-mix(in oklab, #000 46%, transparent)",
+            background:
+              "linear-gradient(180deg, color-mix(in oklab, var(--room-furniture-edge) 55%, var(--room-furniture)), var(--room-furniture))",
           }}
         />
       ))}
@@ -257,7 +279,10 @@ function SpineRun({
   usableWidth,
   hoveredId,
   selectedId,
+  personality,
   interactive,
+  arrange,
+  worldAt,
   onHover,
   onSelect,
 }: {
@@ -265,7 +290,10 @@ function SpineRun({
   usableWidth: number;
   hoveredId: string | null;
   selectedId: string | null;
+  personality: "neat" | "overflow";
   interactive: boolean;
+  arrange?: ArrangeContext;
+  worldAt?: (localX: number, localWidth: number, height: number) => Transform3D;
   onHover: (id: string | null) => void;
   onSelect: (view: HoldingView, localX: number, localWidth: number) => void;
 }) {
@@ -293,7 +321,18 @@ function SpineRun({
         // leans into the empty end of the row when nothing is hovered, because
         // a partly-filled shelf always has one album tipping over.
         const isLast = index === placed.length - 1;
-        const restLean = isLast && slack > 40 ? 8 : 0;
+        const lastLean = isLast && slack > 40 ? 8 : 0;
+        const personalityLean =
+          personality === "overflow"
+            ? index % 3 === 1
+              ? -3.4
+              : index % 4 === 2
+                ? 2.8
+                : 0
+            : index % 5 === 2
+              ? -1.6
+              : 0;
+        const restLean = lastLean + personalityLean;
         const lean = response
           ? Math.sign(distance) * response.falloff * 3.6 + restLean * (1 - response.falloff)
           : restLean;
@@ -319,6 +358,15 @@ function SpineRun({
             displaced={displaced}
             interactive={interactive}
             showSide={isLast}
+            arrange={targetFor(
+              arrange,
+              entry.view.holding.id,
+              worldAt?.(
+                entry.x,
+                entry.width,
+                entry.view.template.kind === "vinyl" ? ALBUM_HEIGHT + 34 : ALBUM_HEIGHT,
+              ),
+            )}
             onHover={(hovering) => onHover(hovering ? entry.view.holding.id : null)}
             onSelect={() => onSelect(entry.view, entry.x, entry.width)}
           />

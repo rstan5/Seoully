@@ -1,12 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
-import { repository } from "@/domain/memory-repository";
-import type { HoldingView, Room, RoomId, ZoneKind } from "@/domain/types";
+import { useEffect, useMemo } from "react";
+import { hydrateRoomLayouts, repository } from "@/domain/memory-repository";
+import { useRepoRevision } from "@/domain/use-repository";
+import type { HoldingView, Placement, Room, RoomId, RoomObject, Transform3D, ZoneKind } from "@/domain/types";
 
 export interface ZoneContents {
-  /** Items placed in each zone, in slot order. */
+  /** Items packed into each zone. Freed placements are omitted. */
   byKind: Record<ZoneKind, HoldingView[]>;
+  offsets: Record<string, Partial<Transform3D>>;
+  objects: RoomObject[];
+  freeHoldings: { view: HoldingView; placement: Placement }[];
 }
 
 /**
@@ -28,6 +32,10 @@ export function useRoomData(
    */
   version = 0,
 ): { room: Room | undefined; contents: ZoneContents } {
+  const revision = useRepoRevision();
+  useEffect(() => {
+    hydrateRoomLayouts();
+  }, []);
   return useMemo(() => {
     const room = repository.getRoom(roomId);
     const byKind: Record<ZoneKind, HoldingView[]> = {
@@ -38,8 +46,19 @@ export function useRoomData(
       desk: [],
       archive: [],
     };
+    const offsets: Record<string, Partial<Transform3D>> = {};
+    const objects = room ? repository.listRoomObjects(room.id) : [];
+    const freeHoldings: { view: HoldingView; placement: Placement }[] = [];
 
     if (room) {
+      for (const placement of repository.listPlacements(room.id)) {
+        if (placement.transform) {
+          const view = repository.getHoldingView(placement.holdingId);
+          if (view) freeHoldings.push({ view, placement });
+          continue;
+        }
+        if (placement.offset) offsets[placement.holdingId] = placement.offset;
+      }
       for (const zone of room.zones) {
         byKind[zone.kind] = repository
           .listPlacementsInZone(room.id, zone.id)
@@ -48,6 +67,6 @@ export function useRoomData(
       }
     }
 
-    return { room, contents: { byKind } };
-  }, [roomId, version]);
+    return { room, contents: { byKind, offsets, objects, freeHoldings } };
+  }, [roomId, version, revision]);
 }

@@ -1,0 +1,203 @@
+/* Room editing chrome. Kept physically quiet — paper tray, not a dashboard. */
+
+.editing-grab {
+  touch-action: none;
+  cursor: grab;
+}
+
+.editing-grab:active {
+  cursor: grabbing;
+}
+
+.edit-chrome {
+  position: fixed;
+  inset: 0;
+  z-index: 41;
+  pointer-events: none;
+}
+
+.edit-chrome-top {
+  position: absolute;
+  right: 34px;
+  top: 32px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  pointer-events: auto;
+}
+
+.edit-chrome-history {
+  display: flex;
+  gap: 14px;
+}
+
+.edit-quiet:disabled {
+  pointer-events: none;
+}
+
+.edit-context {
+  position: absolute;
+  left: 50%;
+  bottom: 148px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  pointer-events: auto;
+  padding: 10px 16px;
+  background: color-mix(in oklab, var(--room-furniture) 72%, transparent);
+  box-shadow: 0 10px 28px color-mix(in oklab, #000 36%, transparent);
+}
+
+.edit-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--room-ink) 40%, transparent);
+}
+
+.edit-tray {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 18px;
+  pointer-events: none;
+  padding: 14px 16px 16px;
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--room-furniture-edge) 18%, transparent), transparent 18%),
+    color-mix(in oklab, var(--room-furniture) 82%, #0a0810 10%);
+  box-shadow:
+    0 -8px 0 color-mix(in oklab, var(--room-furniture-edge) 22%, transparent),
+    0 18px 42px color-mix(in oklab, #000 44%, transparent),
+    inset 0 1px 0 color-mix(in oklab, #fff 12%, transparent);
+}
+
+.edit-tray-label,
+.edit-tray-row,
+.edit-chip {
+  pointer-events: auto;
+}
+
+.edit-tray-label {
+  font-size: 8px;
+  color: var(--room-ink-soft);
+  margin-bottom: 8px;
+}
+
+.edit-tray-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.edit-tray-row::-webkit-scrollbar {
+  display: none;
+}
+
+.edit-chip {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 76px;
+  padding: 8px 9px 7px;
+  text-align: left;
+  background: color-mix(in oklab, var(--room-wall) 35%, transparent);
+  touch-action: none;
+  transition: transform 180ms var(--ease-physical);
+}
+
+.edit-chip:hover {
+  transform: translateY(-7px);
+}
+
+.edit-chip:hover .edit-mini {
+  transform: translateY(-5px);
+}
+
+.edit-chip:active {
+  transform: translateY(-11px);
+}
+
+.edit-mini {
+  position: relative;
+  width: 100%;
+  height: 40px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--room-wall) 28%, #0c0a12 10%);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, #000 22%, transparent);
+}
+
+.edit-mini-stage {
+  position: absolute;
+  left: 50%;
+  top: 88%;
+  transform-origin: 50% 100%;
+  transform-style: preserve-3d;
+  pointer-events: none;
+}
+
+.edit-chip-swatch {
+  width: 100%;
+  height: 28px;
+  background: color-mix(in oklab, var(--room-furniture-edge) 40%, var(--room-furniture));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, #000 25%, transparent);
+}
+
+.edit-chip-swatch[data-cat="lighting"] {
+  background: linear-gradient(180deg, var(--room-light-color), color-mix(in oklab, var(--room-furniture) 50%, #000));
+}
+
+.edit-chip-swatch[data-cat="plant"] {
+  background: linear-gradient(180deg, #4a9a68, #2a5c3e);
+}
+
+.edit-chip-swatch[data-cat="audio"] {
+  background: linear-gradient(180deg, #6a5240, #2a1e18);
+}
+
+.edit-chip-swatch[data-cat="storage"] {
+  background: #cbb896;
+}
+
+.edit-chip-swatch[data-cat="furniture"] {
+  background: color-mix(in oklab, var(--room-furniture) 40%, #6a3048);
+}
+
+.edit-chip-swatch[data-cat="floor"] {
+  background: color-mix(in oklab, var(--fill-color) 40%, var(--room-furniture));
+}
+
+.edit-chip-swatch[data-cat="wall"] {
+  background: linear-gradient(145deg, #d8e4f0, #6a7a90);
+}
+
+.edit-chip-swatch[data-cat="display"] {
+  background: linear-gradient(180deg, color-mix(in oklab, #fff 50%, transparent), #9ab);
+}
+
+@media (max-width: 800px) {
+  .edit-chrome-top {
+    right: 18px;
+    top: 72px;
+    gap: 12px;
+  }
+
+  .edit-context {
+    bottom: 168px;
+  }
+
+  .edit-tray {
+    left: 12px;
+    right: 12px;
+    bottom: 10px;
+    padding: 10px 10px 12px;
+  }
+
+  .edit-chip {
+    min-width: 64px;
+  }
+}

@@ -1,0 +1,447 @@
+/* ==========================================================================
+   DISCOVERY FEED
+   The social layer in front of the room.
+
+   Same two rules as the profile: the room stays visible, and nothing here
+   becomes a card in a card. Entries are type, hairlines, and the actual
+   objects that moved — a completed set is shown as photocards, not as a
+   notification badge.
+   ========================================================================== */
+
+.feed-sheet {
+  color: var(--room-ink, var(--color-paper));
+}
+
+.feed-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      90% 70% at 80% 8%,
+      color-mix(in oklab, var(--room-fill, #ff2f52) 14%, transparent),
+      transparent 58%
+    ),
+    linear-gradient(
+      168deg,
+      color-mix(in oklab, #07060b 58%, transparent) 0%,
+      color-mix(in oklab, #07060b 90%, transparent) 52%,
+      color-mix(in oklab, #05040a 96%, transparent) 100%
+    );
+  backdrop-filter: blur(16px) saturate(0.88);
+}
+
+.feed-scroll {
+  position: relative;
+  height: 100%;
+  overflow-y: auto;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 28px 56px 96px;
+}
+
+.feed-masthead {
+  max-width: 34em;
+}
+
+.feed-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.feed-muted {
+  color: var(--room-ink-soft, #a49aa8);
+}
+
+.feed-title {
+  font-family: var(--font-display);
+  font-size: clamp(42px, 6vw, 72px);
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  margin: 18px 0 0;
+}
+
+.feed-lede {
+  font-size: 15px;
+  line-height: 1.58;
+  color: var(--room-ink-soft, #a49aa8);
+  margin: 18px 0 0;
+  max-width: 42ch;
+}
+
+.feed-rule {
+  font-family: var(--font-sans);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--room-ink-soft, #a49aa8);
+  padding-bottom: 9px;
+  margin: 48px 0 18px;
+  border-bottom: 1px solid color-mix(in oklab, var(--room-ink, var(--color-paper)) 14%, transparent);
+}
+
+.feed-compat {
+  margin-top: 8px;
+}
+
+.feed-person {
+  display: grid;
+  grid-template-columns: 42px 1fr auto auto;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  padding: 16px 0;
+  text-align: left;
+  border-bottom: 1px solid color-mix(in oklab, var(--room-ink, var(--color-paper)) 9%, transparent);
+  transition: opacity 180ms var(--ease-physical);
+}
+
+.feed-person:hover {
+  opacity: 0.72;
+}
+
+.feed-person-dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  box-shadow: 0 0 14px currentColor;
+}
+
+.feed-person-dot-sm {
+  width: 8px;
+  height: 8px;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.feed-person-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.feed-person-name {
+  font-family: var(--font-display);
+  font-size: 26px;
+}
+
+.feed-person-reason {
+  font-size: 12px;
+  color: var(--room-ink-soft, #a49aa8);
+}
+
+.feed-person-score {
+  font-size: 28px;
+}
+
+.feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.feed-entry {
+  padding: 28px 0 26px;
+  border-bottom: 1px solid color-mix(in oklab, var(--room-ink, var(--color-paper)) 10%, transparent);
+}
+
+.feed-entry.is-featured {
+  padding-top: 34px;
+}
+
+.feed-entry-who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
+.feed-entry-name {
+  font-family: var(--font-display);
+  font-size: 18px;
+}
+
+.feed-entry-headline {
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 1.15;
+  margin: 12px 0 0;
+}
+
+.feed-entry-headline button {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+.feed-entry-detail {
+  font-size: 13.5px;
+  color: var(--room-ink-soft, #a49aa8);
+  margin: 10px 0 0;
+}
+
+.feed-objects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.feed-footer {
+  margin-top: 56px;
+}
+
+.feed-close {
+  color: var(--room-ink-soft, #a49aa8);
+}
+
+.feed-stream-item {
+  padding: 8px 0 18px;
+  border-bottom: 1px solid color-mix(in oklab, var(--room-ink, var(--color-paper)) 10%, transparent);
+}
+
+.social-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 4px;
+  margin: 0 0 28px;
+}
+
+.social-nav-tab {
+  position: relative;
+  padding: 8px 10px 10px;
+  color: var(--room-ink-soft, #a49aa8);
+}
+
+.social-nav-tab.is-on {
+  color: var(--room-ink, var(--color-paper));
+}
+
+.social-nav-tab.is-on .u-eyebrow {
+  text-decoration: underline;
+  text-underline-offset: 5px;
+  text-decoration-thickness: 1px;
+}
+
+.social-nav-badge,
+.chrome-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 14px;
+  height: 14px;
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--room-fill, #ff2f52) 82%, #fff 8%);
+  color: #14080c;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0;
+  vertical-align: 1px;
+}
+
+.post-card {
+  padding: 8px 0 4px;
+}
+
+.post-who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
+.post-who-name {
+  font-family: var(--font-display);
+  font-size: 18px;
+}
+
+.post-muted {
+  color: var(--room-ink-soft, #a49aa8);
+}
+
+.post-body {
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 1.2;
+  margin: 12px 0 0;
+  max-width: 36ch;
+}
+
+.post-body button {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+.post-objects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.post-actions {
+  display: flex;
+  gap: 18px;
+  margin-top: 16px;
+}
+
+.post-action {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--room-ink-soft, #a49aa8);
+}
+
+.post-action.is-on {
+  color: var(--room-ink, var(--color-paper));
+}
+
+.post-comments {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed color-mix(in oklab, var(--room-ink, var(--color-paper)) 14%, transparent);
+}
+
+.post-comments p {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.45;
+  max-width: 42ch;
+}
+
+.post-comments button {
+  font-weight: 600;
+}
+
+.post-comment-form {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.post-comment-form input,
+.search-input {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--room-ink, var(--color-paper)) 22%, transparent);
+  background: transparent;
+  color: var(--room-ink, var(--color-paper));
+  font-family: var(--font-display);
+  font-size: 20px;
+  padding: 8px 0 10px;
+  outline: none;
+}
+
+.search-input {
+  margin-top: 28px;
+}
+
+.post-comment-form input::placeholder,
+.search-input::placeholder {
+  color: color-mix(in oklab, var(--room-ink, var(--color-paper)) 38%, transparent);
+}
+
+.search-list,
+.inbox-list,
+.notice-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.search-row,
+.inbox-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 16px;
+  align-items: center;
+  width: 100%;
+  padding: 14px 0;
+  text-align: left;
+  border-bottom: 1px solid color-mix(in oklab, var(--room-ink, var(--color-paper)) 9%, transparent);
+}
+
+.search-row-copy,
+.inbox-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.search-row-title,
+.inbox-name {
+  font-family: var(--font-display);
+  font-size: 22px;
+}
+
+.search-row-sub,
+.inbox-preview {
+  font-size: 12px;
+  color: var(--room-ink-soft, #a49aa8);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-kind {
+  min-width: 72px;
+}
+
+.notice-row {
+  padding: 18px 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--room-ink, var(--color-paper)) 9%, transparent);
+}
+
+.notice-who {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  align-items: center;
+  text-align: left;
+  width: 100%;
+}
+
+.notice-who strong {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 20px;
+  margin-right: 6px;
+}
+
+.notice-when {
+  display: block;
+  margin-top: 4px;
+}
+
+.notice-objects {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 0 50px;
+}
+
+.notice-message {
+  margin: 12px 0 0 50px;
+  color: var(--room-ink, var(--color-paper));
+}
+
+@media (max-width: 900px) {
+  .feed-scroll {
+    padding: 22px 26px 72px;
+  }
+
+  .feed-person {
+    grid-template-columns: 42px 1fr auto;
+  }
+
+  .feed-person .u-eyebrow {
+    display: none;
+  }
+}

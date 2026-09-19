@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { repository } from "@/domain/memory-repository";
-import type { HoldingView, RoomId, ZoneId, ZoneKind } from "@/domain/types";
-import { useWorld, type InspectTarget } from "@/world/store/worldStore";
+import type { HoldingId, HoldingView, RoomId, RoomObjectId, TemplateId, Transform3D, UserId, ZoneId, ZoneKind } from "@/domain/types";
+import { useSession } from "@/world/store/sessionStore";
+import { isSocialView, useWorld, type InspectTarget } from "@/world/store/worldStore";
 import { RoomStage } from "@/world/stage/RoomStage";
 import { RoomShell } from "@/world/room/RoomShell";
 import { RoomDressing } from "@/world/room/RoomDressing";
@@ -14,6 +15,13 @@ import { ArrivalSequence, useArrivalLight } from "@/world/room/ArrivalSequence";
 import { themeVars } from "@/world/room/roomTheme";
 import { useRoomData } from "@/world/useRoomData";
 import { WorldChrome } from "@/world/ui/WorldChrome";
+import { InspectPlate } from "@/world/ui/InspectPlate";
+import { EditChrome } from "@/world/ui/EditChrome";
+import { DecorLayer } from "@/world/edit/DecorLayer";
+import { FreeLayer, type FreeHolding } from "@/world/edit/FreeLayer";
+import { SurfaceHint } from "@/world/edit/Grounding";
+import { useRoomEdit } from "@/world/edit/useRoomEdit";
+import type { ArrangeContext } from "@/world/edit/arrange";
 import { ShelfZone } from "@/world/zones/ShelfZone";
 import { WallZone } from "@/world/zones/WallZone";
 import { DisplayCaseZone } from "@/world/zones/DisplayCaseZone";
@@ -31,6 +39,7 @@ import { CardFlight } from "@/world/flight/CardFlight";
 import { useCardArrival } from "@/world/flight/useCardArrival";
 import { PendingCardDrop } from "@/world/room/PendingCardDrop";
 import { pace } from "@/design/motion";
+import { useViewport } from "@/world/stage/useViewport";
 
 /**
  * Assembles a collector's room.
@@ -42,7 +51,13 @@ import { pace } from "@/design/motion";
  * and doubles as the progressive-fidelity mechanism — unfocused zones stop
  * mounting pointer behavior entirely.
  */
-export function Room({ roomId }: { roomId: RoomId }) {
+export function Room({
+  roomId,
+  onMessage,
+}: {
+  roomId: RoomId;
+  onMessage?: (peerId: UserId, opts?: { templateIds?: TemplateId[] }) => void;
+}) {
   const [collectionVersion, setCollectionVersion] = useState(0);
   const { room, contents } = useRoomData(roomId, collectionVersion);
   const view = useWorld((s) => s.view);
@@ -50,7 +65,15 @@ export function Room({ roomId }: { roomId: RoomId }) {
   const openBinder = useWorld((s) => s.openBinder);
   const focusZone = useWorld((s) => s.focusZone);
   const showProfile = useWorld((s) => s.showProfile);
+  const viewerId = useWorld((s) => s.viewerId);
   const turnPage = useWorld((s) => s.turnPage);
+  const exitEdit = useWorld((s) => s.exitEdit);
+  const finishRoomIntro = () => {
+    useSession.getState().finishRoomIntro();
+    exitEdit();
+  };
+  const editing = view.kind === "edit";
+  const edit = useRoomEdit(room, editing);
   const [binderHovered, setBinderHovered] = useState(false);
   // A card taken out of its sleeve. Local to the room rather than in the world
   // store: it's a transient physical gesture inside one object, not a place the
@@ -58,6 +81,9 @@ export function Room({ roomId }: { roomId: RoomId }) {
   // would make "step back" ambiguous.
   const [heldCard, setHeldCard] = useState<HoldingView | null>(null);
   const lightScale = useArrivalLight();
+  const viewport = useViewport();
+  const compact = viewport.width < 800;
+  const daylight = room?.aesthetic === "maximalist";
 
   const owner = room ? repository.getUser(room.ownerId) : undefined;
   const profile = room ? repository.getProfile(room.ownerId) : undefined;
@@ -83,10 +109,13 @@ export function Room({ roomId }: { roomId: RoomId }) {
 
   const binderZone = room?.zones.find((z) => z.kind === "binder");
 
+  const archiveZone = room?.zones.find((z) => z.kind === "archive");
+
   const arrival = useCardArrival({
     ownerId: room?.ownerId ?? ("" as never),
     progress,
     binderZone,
+    archiveZone,
     onOpenBinder: (setId) => {
       if (binderZone) openBinder(binderZone.id, spreadOfSet(pages, setId));
     },
@@ -97,6 +126,37 @@ export function Room({ roomId }: { roomId: RoomId }) {
   useEffect(() => {
     if (view.kind !== "binder" && heldCard) setHeldCard(null);
   }, [view.kind, heldCard]);
+
+  useEffect(() => {
+    if (!editing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopImmediatePropagation();
+      if (edit.dragging) {
+        edit.cancelDrag();
+        return;
+      }
+      if (edit.selected) {
+        edit.clear();
+        return;
+      }
+      finishRoomIntro();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [editing, edit, exitEdit]);
+
+  // Escape returns a held card before the chrome steps the camera back. Capture
+  // so the first press is "put the card away", not "leave the binder".
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || !heldCard) return;
+      e.stopImmediatePropagation();
+      setHeldCard(null);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [heldCard]);
 
   if (!room || !owner || !profile || !stats) return null;
 
@@ -125,16 +185,43 @@ export function Room({ roomId }: { roomId: RoomId }) {
   const archive = zone("archive");
   const binder = zone("binder");
 
+  const overlay = isSocialView(view);
+  const examiningCard = Boolean(heldCard) || inspected?.template.kind === "photocard";
+  const far = (zoneId: ZoneId) => !editing && focusedZoneId !== null && focusedZoneId !== zoneId;
+  const binderCover = daylight ? "#8f3558" : "#4a1c2c";
+
+  const holdingOffsets = contents.offsets;
+  const draggingHoldingId = edit.dragging && edit.holdingLive ? edit.holdingLive.id : null;
+  const hideFromZones = (items: HoldingView[]) =>
+    draggingHoldingId ? items.filter((item) => item.holding.id !== draggingHoldingId) : items;
+
+  const arrange: ArrangeContext = {
+    editing,
+    selectedId: edit.selected?.kind === "holding" ? edit.selected.id : null,
+    draggingId: draggingHoldingId,
+    offsets: holdingOffsets,
+    onGrab: (id, event, world) => {
+      const placement = repository.listPlacements(room.id).find((p) => p.holdingId === id);
+      const pose = placement?.transform ?? world;
+      if (!pose) return;
+      edit.beginGrab({ kind: "holding", id: id as HoldingId }, event, pose);
+    },
+  };
+
+  const freeItems = mergeFreeHoldings(contents.freeHoldings, edit.holdingLive, room.zones[0]?.id);
+
   return (
     <div
-      className="room-lighting"
-      // The room brightens slightly when a set completes. It's the least
-      // literal celebration available and the most convincing one: the space
-      // itself responds, so the achievement belongs to the room rather than to
-      // a notification drawn on top of it.
-      style={themeVars(room.theme, lightScale * (arrival.celebratingSetId ? 1.16 : 1))}
+      className={`room-lighting${examiningCard ? " is-examining" : ""}`}
+      data-mood={daylight ? "day" : "night"}
+      style={themeVars(
+        room.theme,
+        lightScale *
+          (overlay ? 0.52 : examiningCard ? 0.68 : 1) *
+          (arrival.celebratingSetId ? 1.16 : 1),
+      )}
     >
-      <RoomStage room={room}>
+      <RoomStage room={room} examining={!!heldCard}>
         <div className="world-root">
           <RoomShell />
           <RoomDressing room={room} />
@@ -148,8 +235,11 @@ export function Room({ roomId }: { roomId: RoomId }) {
           {wall && (
             <WallZone
               zone={wall}
-              items={contents.byKind.wall}
-              interactive={interactive(wall.id)}
+              items={hideFromZones(contents.byKind.wall)}
+              interactive={!editing && interactive(wall.id)}
+              far={far(wall.id)}
+              selectedId={selectedHoldingId}
+              arrange={arrange}
               onSelect={select(wall.id)}
             />
           )}
@@ -157,9 +247,12 @@ export function Room({ roomId }: { roomId: RoomId }) {
           {shelf && (
             <ShelfZone
               zone={shelf}
-              items={contents.byKind.shelf}
-              interactive={interactive(shelf.id)}
+              items={hideFromZones(contents.byKind.shelf)}
+              interactive={!editing && interactive(shelf.id)}
+              far={far(shelf.id)}
               selectedId={selectedHoldingId}
+              personality={daylight ? "overflow" : "neat"}
+              arrange={arrange}
               onSelect={select(shelf.id)}
             />
           )}
@@ -167,8 +260,11 @@ export function Room({ roomId }: { roomId: RoomId }) {
           {displayCase && (
             <DisplayCaseZone
               zone={displayCase}
-              items={contents.byKind["display-case"]}
-              interactive={interactive(displayCase.id)}
+              items={hideFromZones(contents.byKind["display-case"])}
+              interactive={!editing && interactive(displayCase.id)}
+              far={far(displayCase.id)}
+              selectedId={selectedHoldingId}
+              arrange={arrange}
               onSelect={select(displayCase.id)}
             />
           )}
@@ -176,8 +272,12 @@ export function Room({ roomId }: { roomId: RoomId }) {
           {desk && (
             <DeskZone
               zone={desk}
-              items={contents.byKind.desk}
-              interactive={interactive(desk.id)}
+              items={hideFromZones(contents.byKind.desk)}
+              interactive={!editing && interactive(desk.id)}
+              far={far(desk.id)}
+              lamp={!daylight}
+              selectedId={selectedHoldingId}
+              arrange={arrange}
               onSelect={select(desk.id)}
             />
           )}
@@ -187,7 +287,8 @@ export function Room({ roomId }: { roomId: RoomId }) {
               zone={binder}
               progress={progress}
               hovered={binderHovered}
-              interactive={interactive(binder.id)}
+              interactive={!editing && interactive(binder.id)}
+              cover={binderCover}
               onHover={setBinderHovered}
               onOpen={() => openBinder(binder.id, spreadOfInterest(pages, progress))}
             />
@@ -201,13 +302,14 @@ export function Room({ roomId }: { roomId: RoomId }) {
               heldTemplateId={heldCard?.template.id ?? null}
               arrivedTemplateId={arrival.landedTemplateId}
               celebratingSetId={arrival.celebratingSetId}
+              cover={binderCover}
               onHold={setHeldCard}
               onTurn={turnPage}
             />
           )}
 
           {/* The last card of a set, waiting on the floor where it arrived. */}
-          {arrival.candidate && view.kind === "room" && (
+          {arrival.candidate && view.kind === "room" && room.ownerId === viewerId && (
             <PendingCardDrop
               template={arrival.candidate.template}
               member={arrival.candidate.member}
@@ -215,6 +317,7 @@ export function Room({ roomId }: { roomId: RoomId }) {
               remaining={arrival.candidate.remaining}
               interactive={view.kind === "room"}
               onSend={arrival.send}
+              origin={arrival.origin}
             />
           )}
 
@@ -233,15 +336,52 @@ export function Room({ roomId }: { roomId: RoomId }) {
           {archive && (
             <ArchiveZone
               zone={archive}
-              items={contents.byKind.archive}
-              interactive={interactive(archive.id)}
+              items={hideFromZones(contents.byKind.archive)}
+              interactive={!editing && interactive(archive.id)}
+              far={far(archive.id)}
+              selectedId={selectedHoldingId}
+              arrange={arrange}
               onSelect={select(archive.id)}
             />
           )}
+
+          <DecorLayer
+            room={room}
+            objects={contents.objects}
+            editing={editing}
+            selectedId={edit.selected?.kind === "decor" ? edit.selected.id : null}
+            draggingId={
+              edit.dragging && edit.selected?.kind === "decor" ? edit.selected.id : null
+            }
+            live={edit.decorLive}
+            spawn={edit.spawnDecor}
+            far={focusedZoneId !== null}
+            onGrab={(object, event) =>
+              edit.beginGrab({ kind: "decor", id: object.id as RoomObjectId }, event, object.transform)
+            }
+          />
+
+          <FreeLayer
+            items={freeItems}
+            live={edit.holdingLive}
+            editing={editing}
+            arrange={arrange}
+            far={focusedZoneId !== null}
+            onSelect={(item, at) => {
+              const home = room.zones[0];
+              if (!home) return;
+              inspect(home.id, item.holding.id, at);
+            }}
+          />
+
+          {editing && edit.hotSurface && <SurfaceHint surface={edit.hotSurface} />}
         </div>
       </RoomStage>
 
-      <Atmosphere />
+      <Atmosphere
+        mood={daylight ? "day" : "night"}
+        dust={compact ? 8 : daylight ? 14 : 26}
+      />
       <CompletionBloom active={arrival.celebratingSetId !== null} />
 
       <WorldChrome
@@ -252,8 +392,53 @@ export function Room({ roomId }: { roomId: RoomId }) {
         inspected={inspected ?? heldCard}
         onOpenProfile={() => showProfile(room.ownerId)}
       />
+      {editing && (
+        <EditChrome
+          room={room}
+          selected={edit.selected}
+          canUndo={repository.canUndoRoom(room.id)}
+          canRedo={repository.canRedoRoom(room.id)}
+          onUndo={() => repository.undoRoom(room.id)}
+          onRedo={() => repository.redoRoom(room.id)}
+          onStore={edit.storeSelected}
+          onDone={finishRoomIntro}
+          onPlaceDecor={(asset, event) => edit.placeDecor(asset.id, event)}
+          onRestoreHolding={(view, event) => edit.restoreHolding(view.holding.id, event)}
+          onRestoreDecor={(object, event) => edit.restoreDecor(object, event)}
+        />
+      )}
+      <InspectPlate view={heldCard ?? inspected} onMessage={onMessage} />
 
       <ArrivalSequence user={owner} profile={profile} theme={room.theme} />
     </div>
   );
+}
+
+function mergeFreeHoldings(
+  items: FreeHolding[],
+  live: { id: string; transform: Transform3D } | null,
+  fallbackZone?: ZoneId,
+): FreeHolding[] {
+  if (!live) return items;
+  if (items.some((item) => item.view.holding.id === live.id)) {
+    return items.map((item) =>
+      item.view.holding.id === live.id
+        ? { ...item, placement: { ...item.placement, transform: live.transform } }
+        : item,
+    );
+  }
+  const view = repository.getHoldingView(live.id as HoldingId);
+  if (!view || !fallbackZone) return items;
+  return [
+    ...items,
+    {
+      view,
+      placement: {
+        holdingId: view.holding.id,
+        zoneId: fallbackZone,
+        slot: 0,
+        transform: live.transform,
+      },
+    },
+  ];
 }

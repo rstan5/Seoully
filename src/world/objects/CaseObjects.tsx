@@ -3,6 +3,7 @@
 import { motion } from "motion/react";
 import type { HoldingView } from "@/domain/types";
 import { objectSpring } from "@/design/motion";
+import { grabHandlers, mergeArrange, type ArrangeTarget } from "@/world/edit/arrange";
 import { useSurfaceLight } from "./useSurfaceLight";
 
 interface CaseObjectProps {
@@ -11,9 +12,11 @@ interface CaseObjectProps {
   bottom: number;
   size: number;
   hovered: boolean;
+  inspecting?: boolean;
   interactive: boolean;
   onHover: (hovering: boolean) => void;
   onSelect: () => void;
+  arrange?: ArrangeTarget;
 }
 
 /**
@@ -26,7 +29,7 @@ interface CaseObjectProps {
  * lightstick feel like one collection rather than a sticker sheet.
  */
 
-export function Plushie({ view, x, bottom, size, hovered, interactive, onHover, onSelect }: CaseObjectProps) {
+export function Plushie({ view, x, bottom, size, hovered, inspecting, interactive, onHover, onSelect, arrange }: CaseObjectProps) {
   const { template } = view;
   const w = size;
   const h = size * 1.16;
@@ -38,9 +41,11 @@ export function Plushie({ view, x, bottom, size, hovered, interactive, onHover, 
       w={w}
       h={h}
       hovered={hovered}
+      inspecting={inspecting}
       interactive={interactive}
       label={template.name}
       mass="plushie"
+      arrange={arrange}
       onHover={onHover}
       onSelect={onSelect}
     >
@@ -103,7 +108,7 @@ export function Plushie({ view, x, bottom, size, hovered, interactive, onHover, 
   );
 }
 
-export function Lightstick({ view, x, bottom, size, hovered, interactive, onHover, onSelect }: CaseObjectProps) {
+export function Lightstick({ view, x, bottom, size, hovered, inspecting, interactive, onHover, onSelect, arrange }: CaseObjectProps) {
   const { template } = view;
   const w = size * 0.52;
   const h = size * 1.9;
@@ -116,9 +121,11 @@ export function Lightstick({ view, x, bottom, size, hovered, interactive, onHove
       w={w}
       h={h}
       hovered={hovered}
+      inspecting={inspecting}
       interactive={interactive}
       label={template.name}
       mass="lightstick"
+      arrange={arrange}
       onHover={onHover}
       onSelect={onSelect}
     >
@@ -128,12 +135,23 @@ export function Lightstick({ view, x, bottom, size, hovered, interactive, onHove
         style={{
           position: "absolute",
           left: "50%",
-          marginLeft: -w * 0.28,
+          marginLeft: -w * 0.22,
           bottom: 0,
-          width: w * 0.56,
-          height: h * 0.52,
-          borderRadius: w * 0.3,
-          filter: "brightness(0.62)",
+          width: w * 0.44,
+          height: h * 0.58,
+          borderRadius: w * 0.22,
+        }}
+      />
+      <div
+        className="m-brushed-metal"
+        style={{
+          position: "absolute",
+          left: "50%",
+          marginLeft: -w * 0.42,
+          top: bulb * 0.86,
+          width: w * 0.84,
+          height: w * 0.22,
+          borderRadius: 999,
         }}
       />
       {/* Illuminated head. The one genuinely emissive object in the room, so it
@@ -146,7 +164,7 @@ export function Lightstick({ view, x, bottom, size, hovered, interactive, onHove
           top: 0,
           width: bulb,
           height: bulb,
-          borderRadius: "50%",
+          borderRadius: "46% 46% 42% 42%",
           background: `radial-gradient(circle at 38% 32%, #fff, ${template.colorway.accent} 46%, color-mix(in oklab, ${template.colorway.accent} 60%, #000) 100%)`,
           boxShadow: `0 0 ${bulb * 0.7}px ${template.colorway.accent}, 0 0 ${bulb * 1.6}px color-mix(in oklab, ${template.colorway.accent} 55%, transparent)`,
         }}
@@ -155,7 +173,7 @@ export function Lightstick({ view, x, bottom, size, hovered, interactive, onHove
   );
 }
 
-export function FigureStand({ view, x, bottom, size, hovered, interactive, onHover, onSelect }: CaseObjectProps) {
+export function FigureStand({ view, x, bottom, size, hovered, inspecting, interactive, onHover, onSelect, arrange }: CaseObjectProps) {
   const light = useSurfaceLight<HTMLDivElement>();
   const { template } = view;
   const w = size * 0.62;
@@ -168,9 +186,11 @@ export function FigureStand({ view, x, bottom, size, hovered, interactive, onHov
       w={w}
       h={h}
       hovered={hovered}
+      inspecting={inspecting}
       interactive={interactive}
       label={template.name}
       mass="figure"
+      arrange={arrange}
       onHover={onHover}
       onSelect={onSelect}
     >
@@ -227,11 +247,13 @@ function CaseObjectShell({
   w,
   h,
   hovered,
+  inspecting = false,
   interactive,
   label,
   mass,
   onHover,
   onSelect,
+  arrange,
   children,
 }: {
   x: number;
@@ -239,13 +261,16 @@ function CaseObjectShell({
   w: number;
   h: number;
   hovered: boolean;
+  inspecting?: boolean;
   interactive: boolean;
   label: string;
   mass: "plushie" | "figure" | "lightstick";
   onHover: (hovering: boolean) => void;
   onSelect: () => void;
+  arrange?: ArrangeTarget;
   children: React.ReactNode;
 }) {
+  const grab = grabHandlers(arrange, interactive, onSelect);
   return (
     <>
       <div
@@ -256,12 +281,12 @@ function CaseObjectShell({
           width: w * 1.28,
           height: 15,
           ["--shadow-blur" as string]: "7px",
-          opacity: hovered ? 0.55 : 0.9,
+          opacity: inspecting ? 0.42 : hovered || arrange?.selected ? 0.55 : 0.9,
           transition: "opacity 200ms var(--ease-physical)",
         }}
       />
       <motion.div
-        className="zone-hotspot"
+        className={`zone-hotspot${arrange?.editing ? " editing-grab" : ""}`}
         style={{
           position: "absolute",
           left: x,
@@ -270,15 +295,38 @@ function CaseObjectShell({
           height: h,
           transformStyle: "preserve-3d",
           transformOrigin: "50% 100%",
+          touchAction: arrange?.editing ? "none" : undefined,
         }}
-        animate={{ y: hovered ? -9 : 0, rotateY: hovered ? 9 : 0, z: hovered ? 22 : 0 }}
+        animate={
+          inspecting
+            ? { y: -42, rotateY: 18, rotateX: -8, z: 110, scale: 1.18 }
+            : mergeArrange(
+                {
+                  y: hovered ? -9 : 0,
+                  rotateY: hovered ? 9 : 0,
+                  z: hovered ? 22 : 0,
+                  scale: 1,
+                } as {
+                  x?: number;
+                  y?: number;
+                  z?: number;
+                  rotate?: number;
+                  scale?: number;
+                  rotateY?: number;
+                },
+                arrange,
+              )
+        }
         transition={objectSpring(mass)}
-        onHoverStart={interactive ? () => onHover(true) : undefined}
-        onHoverEnd={interactive ? () => onHover(false) : undefined}
-        onClick={interactive ? onSelect : undefined}
-        role={interactive ? "button" : undefined}
-        tabIndex={interactive ? 0 : -1}
-        aria-label={interactive ? `${label}. Inspect.` : undefined}
+        onHoverStart={interactive || arrange?.editing ? () => onHover(true) : undefined}
+        onHoverEnd={interactive || arrange?.editing ? () => onHover(false) : undefined}
+        onPointerDown={grab.onPointerDown}
+        onClick={grab.onClick}
+        role={grab.role}
+        tabIndex={grab.tabIndex}
+        aria-label={
+          arrange?.editing ? `${label}. Move.` : interactive ? `${label}. Inspect.` : undefined
+        }
       >
         {children}
       </motion.div>

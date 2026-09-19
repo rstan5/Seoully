@@ -80,14 +80,14 @@ export function CardFlight({
           scale: 1,
         }}
         animate={{
-          x: [from.x, apex.x, to.x],
+          x: [from.x, apex.x, to.x, to.x],
           y: FLOOR_Y - 2,
-          z: [from.z, apex.z, to.z],
+          z: [from.z, apex.z, to.z, to.z],
           rotateX: 90,
-          opacity: [0.42, 0.08, 0.3],
-          scale: [1, 2.1, 1.1],
+          opacity: [0.42, 0.08, 0.28, 0.22],
+          scale: [1, 2.1, 1.15, 1],
         }}
-        transition={{ duration, times: [0, 0.45, 1], ease: ["easeOut", "easeInOut"] }}
+        transition={{ duration, times: [0, 0.42, 0.82, 1], ease: ["easeOut", "easeInOut", "easeOut"] }}
       />
 
       <motion.div
@@ -113,18 +113,18 @@ export function CardFlight({
           scale: 0.9,
         }}
         animate={{
-          x: [from.x, apex.x, to.x],
-          y: [from.y, apex.y, to.y],
-          z: [from.z, apex.z, to.z],
+          x: [from.x, apex.x, to.x, to.x],
+          y: [from.y, apex.y, to.y, to.y],
+          z: [from.z, apex.z, to.z, to.z],
           // Rights itself over the flight, squaring up to the page it's
           // arriving at. The rotation resolving *as* it lands is what makes the
           // landing feel like a landing.
-          rotateX: [68, 16, 0],
-          rotateY: [24, -22, 0],
-          rotateZ: [-12, 14, 0],
-          scale: [0.9, 1.5, 1],
+          rotateX: [68, 14, 4, 0],
+          rotateY: [24, -18, 6, 0],
+          rotateZ: [-12, 12, -4, 0],
+          scale: [0.9, 1.52, 1.08, 1],
         }}
-        transition={{ duration, times: [0, 0.45, 1], ease: ["easeOut", "easeInOut"] }}
+        transition={{ duration, times: [0, 0.42, 0.82, 1], ease: ["easeOut", "easeInOut", "easeOut"] }}
         onAnimationComplete={onArrive}
       >
         <Photocard template={template} member={member} height={height} />

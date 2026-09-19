@@ -1,0 +1,324 @@
+/* ==========================================================================
+   Object inspection annotation
+   Sits beside a physically held object. The object is the interface; this is
+   the collector's note in the margin.
+   ========================================================================== */
+
+.inspect-plate {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  padding: 0 48px 0 0;
+  color: var(--room-ink, var(--color-paper));
+  pointer-events: none;
+  z-index: 45;
+}
+
+.inspect-plate-kicker {
+  font-size: 8.5px;
+}
+
+.inspect-plate-name {
+  font-family: var(--font-display);
+  font-size: clamp(36px, 4.4vw, 64px);
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  margin: 10px 0 0;
+  text-align: right;
+  max-width: 9ch;
+}
+
+.inspect-plate-sub {
+  margin: 10px 0 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 16px;
+  color: var(--room-ink-soft, #a49aa8);
+  text-align: right;
+}
+
+.inspect-plate-fields {
+  margin: 22px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid color-mix(in oklab, var(--room-ink, var(--color-paper)) 16%, transparent);
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 10px 26px;
+  justify-content: end;
+}
+
+.inspect-plate-field {
+  text-align: right;
+}
+
+.inspect-plate-field dt {
+  font-size: 7.5px;
+  color: var(--room-ink-soft, #a49aa8);
+}
+
+.inspect-plate-field dd {
+  margin: 5px 0 0;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: capitalize;
+}
+
+.inspect-plate-source {
+  margin: 18px 0 0;
+  max-width: 28ch;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--room-ink-soft, #a49aa8);
+  text-align: right;
+}
+
+.inspect-plate-match {
+  margin: 16px 0 0;
+  pointer-events: auto;
+  text-align: right;
+}
+
+.inspect-plate-match p {
+  margin: 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--room-ink-soft, #a49aa8);
+}
+
+.inspect-plate-match button {
+  margin-top: 8px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--room-ink, var(--color-paper));
+}
+
+/* ==========================================================================
+   Portrait print
+   ========================================================================== */
+
+.portrait {
+  display: inline-block;
+  position: relative;
+  flex: none;
+  transform: rotate(-2.4deg);
+}
+
+.portrait-paper {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 6%;
+  background:
+    linear-gradient(180deg, #f7f1e6, #e8dcc8);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, #fff 55%, transparent),
+    6px 10px 22px color-mix(in oklab, #000 42%, transparent);
+}
+
+.portrait-paper img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: var(--portrait-color, #888);
+}
+
+/* ==========================================================================
+   Conversation sheet
+   Paper laid over the current context, not a chat product.
+   ========================================================================== */
+
+.thread-sheet {
+  color: var(--room-ink, var(--color-paper));
+}
+
+.thread-dismiss {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: color-mix(in oklab, #07060b 42%, transparent);
+  cursor: pointer;
+}
+
+.thread-paper {
+  position: absolute;
+  right: 36px;
+  top: 36px;
+  bottom: 36px;
+  width: min(520px, calc(100vw - 48px));
+  display: flex;
+  flex-direction: column;
+  padding: 28px 32px 22px;
+  background:
+    linear-gradient(
+      165deg,
+      #f4efe4,
+      #e8dcc8
+    );
+  color: var(--color-ink);
+  box-shadow:
+    -18px 0 60px color-mix(in oklab, #000 48%, transparent),
+    inset 0 1px 0 color-mix(in oklab, #fff 55%, transparent);
+  pointer-events: auto;
+}
+
+.thread-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 16px;
+  align-items: end;
+  padding-bottom: 18px;
+  border-bottom: 1px solid color-mix(in oklab, var(--color-ink) 12%, transparent);
+}
+
+.thread-head-copy h2 {
+  font-family: var(--font-display);
+  font-size: 32px;
+  line-height: 0.9;
+  margin: 6px 0 0;
+}
+
+.thread-head-copy p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: color-mix(in oklab, var(--color-ink) 55%, transparent);
+}
+
+.thread-close {
+  font-size: 8px;
+  color: color-mix(in oklab, var(--color-ink) 55%, transparent);
+}
+
+.thread-about {
+  margin: 18px 0 0;
+  padding-bottom: 16px;
+  border-bottom: 1px dashed color-mix(in oklab, var(--color-ink) 16%, transparent);
+}
+
+.thread-about-split {
+  display: flex;
+  gap: 16px;
+  margin: 8px 0 12px;
+  font-size: 12px;
+  color: color-mix(in oklab, var(--color-ink) 55%, transparent);
+}
+
+.thread-trade {
+  margin: 18px 0 0;
+  padding-bottom: 16px;
+  border-bottom: 1px dashed color-mix(in oklab, var(--color-ink) 16%, transparent);
+}
+
+.thread-trade p {
+  margin: 8px 0 14px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.thread-trade-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.thread-objects {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.thread-log {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.thread-log li {
+  max-width: 86%;
+}
+
+.thread-log li.is-mine {
+  align-self: flex-end;
+  text-align: right;
+}
+
+.thread-log li p {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.thread-log li.is-mine p {
+  font-style: italic;
+}
+
+.thread-log li.is-theirs .thread-objects {
+  justify-content: flex-start;
+}
+
+.thread-log li.is-mine .thread-objects {
+  justify-content: flex-end;
+}
+
+.thread-compose {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in oklab, var(--color-ink) 12%, transparent);
+}
+
+.thread-compose input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--color-ink);
+  outline: none;
+}
+
+.thread-compose input::placeholder {
+  color: color-mix(in oklab, var(--color-ink) 38%, transparent);
+}
+
+.thread-compose button {
+  font-size: 8.5px;
+  letter-spacing: 0.2em;
+}
+
+.thread-compose button:disabled {
+  opacity: 0.35;
+}
+
+@media (max-width: 700px) {
+  .thread-paper {
+    right: 0;
+    top: 12vh;
+    bottom: 0;
+    width: 100%;
+  }
+
+  .inspect-plate {
+    padding: 0 22px 72px 0;
+    justify-content: flex-end;
+  }
+
+  .inspect-plate-name {
+    font-size: 32px;
+  }
+}

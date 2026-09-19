@@ -20,6 +20,10 @@ export interface PhotocardProps {
   ghost?: boolean;
   className?: string;
   style?: React.CSSProperties;
+  /** Pointer-driven foil. Off when the card is distant or in a static strip. */
+  reactive?: boolean;
+  /** Held up to the light — stronger specular, slightly thicker edge. */
+  examining?: boolean;
 }
 
 /**
@@ -32,7 +36,7 @@ export interface PhotocardProps {
  * chase card across a room because of how it catches light.
  */
 export const Photocard = forwardRef<HTMLDivElement, PhotocardProps>(function Photocard(
-  { template, member, height = CARD_HEIGHT, flipped = false, ghost = false, className, style },
+  { template, member, height = CARD_HEIGHT, flipped = false, ghost = false, className, style, reactive = true, examining = false },
   forwardedRef,
 ) {
   const light = useSurfaceLight<HTMLDivElement>();
@@ -85,9 +89,23 @@ export const Photocard = forwardRef<HTMLDivElement, PhotocardProps>(function Pho
         transformStyle: "preserve-3d",
         ...style,
       }}
-      onPointerMove={light.onPointerMove}
-      onPointerLeave={light.onPointerLeave}
+      onPointerMove={reactive ? light.onPointerMove : undefined}
+      onPointerLeave={reactive ? light.onPointerLeave : undefined}
     >
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          top: 0,
+          right: 0,
+          width: examining ? 4 : 2.5,
+          height,
+          transformOrigin: "100% 50%",
+          transform: "rotateY(-90deg)",
+          background: "linear-gradient(180deg, #f3ead8, #c8b89a 48%, #8a7a62)",
+          borderRadius: 1,
+        }}
+      />
       {/* Front */}
       <div
         className={`world-face ${foil ? "m-holo-foil" : "m-glossy-card"} m-edge-card${
@@ -104,6 +122,24 @@ export const Photocard = forwardRef<HTMLDivElement, PhotocardProps>(function Pho
         }}
       >
         <CardArt template={template} member={member} height={height} />
+        {examining && (
+          <div
+            aria-hidden
+            style={{
+              position: "absolute",
+              inset: 0,
+              pointerEvents: "none",
+              background: `linear-gradient(
+                calc(var(--lit-angle, 145deg)),
+                color-mix(in oklab, #fff 28%, transparent),
+                transparent 36%,
+                transparent 62%,
+                color-mix(in oklab, var(--lit-color, #fff) 10%, transparent)
+              )`,
+              mixBlendMode: "soft-light",
+            }}
+          />
+        )}
       </div>
 
       {/* Back: printed card stock with the set number, as they actually are. */}

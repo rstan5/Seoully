@@ -1,0 +1,988 @@
+/* Seoully heart: onboarding character scene + quiet corner companion.
+   Slides use `left`, idle uses `top` — never transform on the PNG. */
+
+.heart-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.heart-scene-veil {
+  position: absolute;
+  inset: 0;
+  background: var(--s-mist, #fff1f4);
+  opacity: 0;
+  transition: opacity 320ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.heart-scene-veil.is-on {
+  opacity: 1;
+}
+
+.heart-scene-stage {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 430px);
+  height: 100%;
+  background: var(--s-paper, #fffafb);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 320ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.heart-scene-stage.is-on {
+  opacity: 1;
+}
+
+.heart-scene-actor {
+  position: absolute;
+  top: 42%;
+  left: 108%;
+  width: min(168px, 46vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.heart-scene.is-finale .heart-scene-actor {
+  width: min(188px, 52vw);
+}
+
+.heart-scene-actor.is-enter {
+  animation: heart-scene-enter-x 860ms linear forwards;
+}
+
+.heart-scene-actor.is-enter .heart-scene-float {
+  animation: heart-scene-enter-hop 860ms linear forwards;
+}
+
+.heart-scene-actor.is-enter .heart-scene-shadow {
+  animation: heart-scene-enter-shadow 860ms linear forwards;
+}
+
+.heart-scene-actor.is-talk {
+  left: calc(50% - min(84px, 23vw));
+  top: 42%;
+}
+
+.heart-scene.is-finale .heart-scene-actor.is-talk {
+  left: calc(50% - min(94px, 26vw));
+}
+
+.heart-scene-actor.is-exit {
+  animation: heart-scene-exit-x 640ms linear forwards;
+}
+
+.heart-scene-actor.is-exit .heart-scene-float {
+  animation: heart-scene-exit-hop 640ms linear forwards;
+}
+
+.heart-scene-actor.is-exit .heart-scene-shadow {
+  animation: heart-scene-exit-shadow 640ms linear forwards;
+}
+
+.heart-scene-float {
+  position: relative;
+  top: 0;
+  background: transparent;
+}
+
+.heart-scene-actor.is-talk .heart-scene-float {
+  animation: heart-scene-idle 5.2s ease-in-out infinite;
+}
+
+.heart-scene-art {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: transparent;
+  user-select: none;
+  pointer-events: none;
+}
+
+.heart-scene-shadow {
+  width: 44%;
+  height: 10px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(36, 30, 43, 0.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.heart-scene-actor.is-talk .heart-scene-shadow {
+  animation: heart-scene-shadow 5.2s ease-in-out infinite;
+}
+
+.heart-scene-bubble {
+  position: absolute;
+  left: 50%;
+  right: auto;
+  top: auto;
+  bottom: calc(100% - 42% + 12px);
+  width: max-content;
+  max-width: calc(100% - 32px);
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 12px 16px;
+  background: var(--s-paper, #fffafb);
+  color: var(--s-ink, #2c2e4c);
+  border: 1.5px solid var(--s-line, #f3e4e9);
+  border-radius: 18px 18px 18px 10px;
+  box-shadow: 0 1px 0 rgba(255, 255, 251, 0.85), 0 8px 18px rgba(44, 46, 76, 0.07);
+  font-family: var(--font-social), ui-sans-serif, system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+  animation: heart-scene-bubble-in 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.heart-scene-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  background: var(--s-paper, #fffafb);
+  border-right: 1.5px solid var(--s-line, #f3e4e9);
+  border-bottom: 1.5px solid var(--s-line, #f3e4e9);
+  transform: rotate(45deg);
+}
+
+.heart-scene.is-finale .heart-scene-bubble {
+  font-size: 16px;
+}
+
+.heart-scene-caret {
+  display: inline-block;
+  width: 0.55em;
+  height: 0.12em;
+  margin-left: 1px;
+  background: var(--s-lilac-deep, #c45374);
+  vertical-align: baseline;
+  animation: heart-scene-caret 0.7s steps(1) infinite;
+}
+
+@keyframes heart-scene-enter-x {
+  0% {
+    left: 112%;
+  }
+  16% {
+    left: 90%;
+  }
+  40% {
+    left: 66%;
+  }
+  70% {
+    left: calc(50% - min(84px, 23vw) - 10px);
+  }
+  82% {
+    left: calc(50% - min(84px, 23vw) + 5px);
+  }
+  92% {
+    left: calc(50% - min(84px, 23vw) - 2px);
+  }
+  100% {
+    left: calc(50% - min(84px, 23vw));
+  }
+}
+
+.heart-scene.is-finale .heart-scene-actor.is-enter {
+  animation-name: heart-scene-enter-x-finale;
+}
+
+@keyframes heart-scene-enter-x-finale {
+  0% {
+    left: 112%;
+  }
+  16% {
+    left: 90%;
+  }
+  40% {
+    left: 66%;
+  }
+  70% {
+    left: calc(50% - min(94px, 26vw) - 12px);
+  }
+  82% {
+    left: calc(50% - min(94px, 26vw) + 5px);
+  }
+  92% {
+    left: calc(50% - min(94px, 26vw) - 2px);
+  }
+  100% {
+    left: calc(50% - min(94px, 26vw));
+  }
+}
+
+/* Arc lives on the float so the shadow stays on the floor. */
+@keyframes heart-scene-enter-hop {
+  0% {
+    top: 6px;
+  }
+  8% {
+    top: 18px;
+  }
+  14% {
+    top: 10px;
+  }
+  24% {
+    top: -20px;
+  }
+  32% {
+    top: -48px;
+  }
+  40% {
+    top: -72px;
+  }
+  46% {
+    top: -70px;
+  }
+  56% {
+    top: -42px;
+  }
+  66% {
+    top: -8px;
+  }
+  72% {
+    top: 6px;
+  }
+  80% {
+    top: -8px;
+  }
+  88% {
+    top: 3px;
+  }
+  94% {
+    top: -2px;
+  }
+  100% {
+    top: 0;
+  }
+}
+
+@keyframes heart-scene-enter-shadow {
+  0% {
+    width: 42%;
+    opacity: 0.36;
+  }
+  8% {
+    width: 50%;
+    opacity: 0.44;
+  }
+  40% {
+    width: 18%;
+    opacity: 0.1;
+  }
+  72% {
+    width: 50%;
+    opacity: 0.42;
+  }
+  80% {
+    width: 34%;
+    opacity: 0.22;
+  }
+  100% {
+    width: 44%;
+    opacity: 0.35;
+  }
+}
+
+@keyframes heart-scene-exit-x {
+  0% {
+    left: calc(50% - min(84px, 23vw));
+  }
+  14% {
+    left: calc(50% - min(84px, 23vw) + 7px);
+  }
+  28% {
+    left: calc(50% - min(84px, 23vw) + 2px);
+  }
+  100% {
+    left: -58%;
+  }
+}
+
+.heart-scene.is-finale .heart-scene-actor.is-exit {
+  animation-name: heart-scene-exit-x-finale;
+}
+
+@keyframes heart-scene-exit-x-finale {
+  0% {
+    left: calc(50% - min(94px, 26vw));
+  }
+  14% {
+    left: calc(50% - min(94px, 26vw) + 7px);
+  }
+  28% {
+    left: calc(50% - min(94px, 26vw) + 2px);
+  }
+  100% {
+    left: -62%;
+  }
+}
+
+@keyframes heart-scene-exit-hop {
+  0% {
+    top: 0;
+  }
+  10% {
+    top: 12px;
+  }
+  18% {
+    top: 6px;
+  }
+  40% {
+    top: -62px;
+  }
+  48% {
+    top: -58px;
+  }
+  100% {
+    top: 32px;
+  }
+}
+
+@keyframes heart-scene-exit-shadow {
+  0% {
+    width: 44%;
+    opacity: 0.35;
+  }
+  16% {
+    width: 52%;
+    opacity: 0.46;
+  }
+  42% {
+    width: 16%;
+    opacity: 0.08;
+  }
+  100% {
+    width: 28%;
+    opacity: 0.12;
+  }
+}
+
+@keyframes heart-scene-idle {
+  0%,
+  100% {
+    top: 3px;
+  }
+  50% {
+    top: -7px;
+  }
+}
+
+@keyframes heart-scene-shadow {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.16;
+  }
+}
+
+@keyframes heart-scene-bubble-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes heart-scene-caret {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.heart-scene.is-still .heart-scene-veil,
+.heart-scene.is-still .heart-scene-stage {
+  transition-duration: 180ms;
+}
+
+.heart-scene.is-still .heart-scene-actor.is-enter,
+.heart-scene.is-still .heart-scene-actor.is-talk {
+  left: calc(50% - min(84px, 23vw));
+  top: 42%;
+}
+
+.heart-scene.is-still.is-finale .heart-scene-actor.is-enter,
+.heart-scene.is-still.is-finale .heart-scene-actor.is-talk {
+  left: calc(50% - min(94px, 26vw));
+}
+
+.heart-scene.is-still .heart-scene-actor.is-exit {
+  left: -52%;
+}
+
+.heart-scene.is-still .heart-scene-actor.is-enter,
+.heart-scene.is-still .heart-scene-actor.is-exit,
+.heart-scene.is-still .heart-scene-float,
+.heart-scene.is-still .heart-scene-shadow,
+.heart-scene.is-still .heart-scene-bubble,
+.heart-scene.is-still .heart-scene-caret {
+  animation: none;
+}
+
+@media (max-width: 390px) {
+  .heart-scene-actor {
+    top: 32%;
+    width: min(132px, 42vw);
+  }
+
+  .heart-scene.is-finale .heart-scene-actor {
+    width: min(148px, 46vw);
+  }
+
+  .heart-scene-bubble {
+    left: 50%;
+    right: auto;
+    bottom: calc(100% - 32% + 8px);
+    max-width: calc(100% - 28px);
+    font-size: 14px;
+  }
+
+  .heart-scene-actor.is-talk {
+    left: calc(50% - min(66px, 21vw));
+    top: 32%;
+  }
+
+  .heart-scene.is-finale .heart-scene-actor.is-talk {
+    left: calc(50% - min(74px, 23vw));
+  }
+
+  @keyframes heart-scene-enter-x {
+    0% {
+      left: 112%;
+    }
+    16% {
+      left: 88%;
+    }
+    40% {
+      left: 64%;
+    }
+    70% {
+      left: calc(50% - min(66px, 21vw) - 8px);
+    }
+    82% {
+      left: calc(50% - min(66px, 21vw) + 4px);
+    }
+    92% {
+      left: calc(50% - min(66px, 21vw) - 1px);
+    }
+    100% {
+      left: calc(50% - min(66px, 21vw));
+    }
+  }
+
+  @keyframes heart-scene-enter-x-finale {
+    0% {
+      left: 112%;
+    }
+    16% {
+      left: 88%;
+    }
+    40% {
+      left: 64%;
+    }
+    70% {
+      left: calc(50% - min(74px, 23vw) - 9px);
+    }
+    82% {
+      left: calc(50% - min(74px, 23vw) + 4px);
+    }
+    92% {
+      left: calc(50% - min(74px, 23vw) - 1px);
+    }
+    100% {
+      left: calc(50% - min(74px, 23vw));
+    }
+  }
+
+  @keyframes heart-scene-enter-hop {
+    0% {
+      top: 4px;
+    }
+    8% {
+      top: 14px;
+    }
+    14% {
+      top: 8px;
+    }
+    24% {
+      top: -16px;
+    }
+    32% {
+      top: -36px;
+    }
+    40% {
+      top: -56px;
+    }
+    46% {
+      top: -54px;
+    }
+    56% {
+      top: -32px;
+    }
+    66% {
+      top: -6px;
+    }
+    72% {
+      top: 5px;
+    }
+    80% {
+      top: -6px;
+    }
+    88% {
+      top: 2px;
+    }
+    94% {
+      top: -1px;
+    }
+    100% {
+      top: 0;
+    }
+  }
+
+  @keyframes heart-scene-exit-x {
+    0% {
+      left: calc(50% - min(66px, 21vw));
+    }
+    14% {
+      left: calc(50% - min(66px, 21vw) + 6px);
+    }
+    28% {
+      left: calc(50% - min(66px, 21vw) + 2px);
+    }
+    100% {
+      left: -62%;
+    }
+  }
+
+  @keyframes heart-scene-exit-x-finale {
+    0% {
+      left: calc(50% - min(74px, 23vw));
+    }
+    14% {
+      left: calc(50% - min(74px, 23vw) + 6px);
+    }
+    28% {
+      left: calc(50% - min(74px, 23vw) + 2px);
+    }
+    100% {
+      left: -64%;
+    }
+  }
+
+  @keyframes heart-scene-exit-hop {
+    0% {
+      top: 0;
+    }
+    10% {
+      top: 10px;
+    }
+    18% {
+      top: 5px;
+    }
+    40% {
+      top: -48px;
+    }
+    48% {
+      top: -44px;
+    }
+    100% {
+      top: 24px;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heart-scene-veil,
+  .heart-scene-stage {
+    transition-duration: 180ms;
+  }
+
+  .heart-scene-actor.is-enter,
+  .heart-scene-actor.is-exit,
+  .heart-scene-actor.is-enter .heart-scene-float,
+  .heart-scene-actor.is-exit .heart-scene-float,
+  .heart-scene-actor.is-enter .heart-scene-shadow,
+  .heart-scene-actor.is-exit .heart-scene-shadow,
+  .heart-scene-float,
+  .heart-scene-shadow,
+  .heart-scene-bubble,
+  .heart-scene-caret {
+    animation: none;
+  }
+
+  .heart-scene-actor.is-enter,
+  .heart-scene-actor.is-talk {
+    left: calc(50% - min(84px, 23vw));
+    top: 42%;
+  }
+
+  .heart-scene-actor.is-exit {
+    left: -52%;
+  }
+}
+
+/* Corner companion after onboarding. */
+.heart-companion {
+  position: fixed;
+  z-index: 70;
+  display: flex;
+  pointer-events: none;
+  font-family: var(--font-social, ui-sans-serif, system-ui, sans-serif);
+  --heart-size: 44px;
+}
+
+.heart-companion.is-corner {
+  left: auto;
+  right: 12px;
+  bottom: calc(58px + env(safe-area-inset-bottom) + 8px);
+}
+
+.heart-companion.is-social {
+  right: max(10px, calc((100vw - 430px) / 2 + 10px));
+}
+
+.heart-companion.is-room,
+.heart-companion.is-no-nav {
+  bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+.heart-companion-body {
+  display: flex;
+  align-items: flex-end;
+}
+
+.heart-companion-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: transparent;
+}
+
+.heart-companion-float {
+  position: relative;
+  top: 0;
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  animation: heart-companion-idle 5.4s ease-in-out infinite;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.heart-companion-float.is-reacting {
+  animation: heart-companion-idle 5.4s ease-in-out infinite, heart-companion-tap 520ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@keyframes heart-companion-tap {
+  0% { transform: scale(1); }
+  38% { transform: scale(1.16); }
+  72% { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+
+.heart-companion-art {
+  width: var(--heart-size);
+  height: auto;
+  display: block;
+  background: transparent;
+  user-select: none;
+  pointer-events: none;
+}
+
+.heart-companion-shadow {
+  width: 42%;
+  height: 6px;
+  margin-top: -2px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(36, 30, 43, 0.18) 0%, transparent 70%);
+  animation: heart-companion-shadow 5.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.ask-seoully-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 12px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: min(360px, calc(100vw - 24px));
+  height: min(470px, calc(100dvh - 170px));
+  min-height: 300px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--s-lilac) 22%, white);
+  border-radius: 20px;
+  background: var(--s-browse-paper, #fff7fa);
+  color: var(--s-ink, #302b36);
+  box-shadow: 0 12px 36px rgba(44, 46, 76, 0.2);
+  pointer-events: auto;
+}
+
+.ask-seoully-header {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 16px 12px;
+  border-bottom: 1px solid var(--s-line, rgba(74, 61, 82, 0.12));
+}
+
+.ask-seoully-header > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ask-seoully-header strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ask-seoully-header span {
+  color: var(--s-mute, #817784);
+  font-size: 12px;
+}
+
+.ask-seoully-header button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: -5px -6px 0 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--s-ink, #302b36);
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.ask-seoully-thread {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 12px;
+}
+
+.ask-seoully-starters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: auto 0;
+}
+
+.ask-seoully-starters button {
+  min-height: 44px;
+  padding: 8px 11px;
+  border: 1px solid color-mix(in srgb, var(--s-lilac) 25%, white);
+  border-radius: 999px;
+  background: white;
+  color: var(--s-lilac-deep, #665078);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ask-seoully-message {
+  max-width: 95%;
+}
+
+.ask-seoully-message > p {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: white;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.ask-seoully-message.is-user {
+  align-self: flex-end;
+  max-width: 88%;
+}
+
+.ask-seoully-message.is-user > p {
+  background: var(--s-lilac-soft, #eee8f4);
+}
+
+.ask-seoully-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.ask-seoully-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--s-lilac) 15%, white);
+  border-radius: 12px;
+  background: white;
+}
+
+.ask-seoully-result > div {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ask-seoully-result strong,
+.ask-seoully-result span,
+.ask-seoully-result small {
+  overflow-wrap: anywhere;
+}
+
+.ask-seoully-result strong {
+  font-size: 12px;
+}
+
+.ask-seoully-result span,
+.ask-seoully-result small {
+  color: var(--s-mute, #817784);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.ask-seoully-result button {
+  flex: none;
+  min-height: 44px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--s-lilac-soft, #eee8f4);
+  color: var(--s-lilac-deep, #665078);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ask-seoully-pending {
+  margin: 0;
+  color: var(--s-mute, #817784);
+  font-size: 12px;
+}
+
+.ask-seoully-compose {
+  display: flex;
+  flex: none;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid var(--s-line, rgba(74, 61, 82, 0.12));
+  background: var(--s-browse-paper, #fff7fa);
+}
+
+.ask-seoully-compose input {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--s-line, rgba(74, 61, 82, 0.16));
+  border-radius: 12px;
+  outline: none;
+  background: white;
+  color: var(--s-ink, #302b36);
+  font: inherit;
+  font-size: 16px;
+}
+
+.ask-seoully-compose input:focus {
+  border-color: var(--s-lilac, #b4a2c8);
+}
+
+.ask-seoully-compose button {
+  flex: none;
+  min-width: 48px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--s-lilac-soft, #eee8f4);
+  color: var(--s-lilac-deep, #665078);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ask-seoully-compose button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@keyframes heart-companion-idle {
+  0%,
+  100% {
+    top: 3px;
+  }
+  50% {
+    top: -5px;
+  }
+}
+
+@keyframes heart-companion-shadow {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.18;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heart-companion-float,
+  .heart-companion-float.is-reacting,
+  .heart-companion-shadow {
+    animation: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .ask-seoully-panel {
+    position: fixed;
+    right: 12px;
+    bottom: calc(74px + env(safe-area-inset-bottom));
+    width: calc(100vw - 24px);
+    min-height: 220px;
+    height: min(520px, calc(100dvh - 110px - env(safe-area-inset-bottom)));
+    max-height: calc(100dvh - 110px - env(safe-area-inset-bottom));
+  }
+
+  .heart-companion.is-no-nav .ask-seoully-panel {
+    bottom: max(12px, env(safe-area-inset-bottom));
+    height: min(520px, calc(100dvh - 24px - env(safe-area-inset-bottom)));
+    max-height: calc(100dvh - 24px - env(safe-area-inset-bottom));
+  }
+}

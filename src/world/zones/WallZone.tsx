@@ -5,11 +5,15 @@ import type { HoldingView, RoomZone } from "@/domain/types";
 import type { InspectTarget } from "@/world/store/worldStore";
 import { WorldNode } from "@/world/stage/WorldNode";
 import { PosterSheet } from "@/world/objects/PosterSheet";
+import { targetFor, type ArrangeContext } from "@/world/edit/arrange";
 
 interface WallZoneProps {
   zone: RoomZone;
   items: HoldingView[];
   interactive: boolean;
+  far?: boolean;
+  selectedId?: string | null;
+  arrange?: ArrangeContext;
   onSelect: (view: HoldingView, at: InspectTarget) => void;
 }
 
@@ -22,14 +26,14 @@ interface WallZoneProps {
  * composition with intentional overlap, varied scale, and mixed mounting —
  * treasured pieces get framed, everything else gets taped or pinned.
  */
-export function WallZone({ zone, items, interactive, onSelect }: WallZoneProps) {
+export function WallZone({ zone, items, interactive, far = false, selectedId, arrange, onSelect }: WallZoneProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const { w, h } = zone.size;
 
   const slots = composeWall(items.length, w, h);
 
   return (
-    <WorldNode x={zone.transform.x} y={zone.transform.y} z={zone.transform.z} w={w} h={h}>
+    <WorldNode x={zone.transform.x} y={zone.transform.y} z={zone.transform.z} w={w} h={h} className={far ? "fidelity-far" : undefined}>
       {items.map((view, index) => {
         const slot = slots[index];
         if (!slot) return null;
@@ -55,7 +59,13 @@ export function WallZone({ zone, items, interactive, onSelect }: WallZoneProps) 
               tilt={slot.tilt}
               mount={treasured ? "frame" : index % 2 === 0 ? "tape" : "pins"}
               hovered={hoveredId === view.holding.id}
+              inspecting={selectedId === view.holding.id}
               interactive={interactive}
+              arrange={targetFor(arrange, view.holding.id, {
+                x: zone.transform.x - w / 2 + slot.x + slot.w / 2,
+                y: zone.transform.y - h / 2 + slot.y + slot.h / 2,
+                z: zone.transform.z,
+              })}
               onHover={(hovering) => setHoveredId(hovering ? view.holding.id : null)}
               onSelect={() =>
                 onSelect(view, {

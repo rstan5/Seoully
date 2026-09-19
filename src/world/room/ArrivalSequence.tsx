@@ -35,9 +35,11 @@ export function ArrivalSequence({
   theme: RoomTheme;
 }) {
   const view = useWorld((s) => s.view);
+  const viewerId = useWorld((s) => s.viewerId);
   const finishArrival = useWorld((s) => s.finishArrival);
   const reduced = useReducedMotion();
   const arriving = view.kind === "arrival";
+  const home = user.id === viewerId;
 
   useEffect(() => {
     if (!arriving) return;
@@ -45,16 +47,19 @@ export function ArrivalSequence({
     return () => clearTimeout(timer);
   }, [arriving, finishArrival, reduced]);
 
-  // Let people skip it. A cinematic open is a gift the first time and a tax
-  // every time after.
+  // Skip in capture so the same click doesn't also pull an album off the shelf.
+  // A cinematic open is a gift the first time and a tax every time after.
   useEffect(() => {
     if (!arriving) return;
-    const skip = () => finishArrival();
-    window.addEventListener("pointerdown", skip);
-    window.addEventListener("keydown", skip);
+    const skip = (event: Event) => {
+      event.stopPropagation();
+      finishArrival();
+    };
+    window.addEventListener("pointerdown", skip, { capture: true });
+    window.addEventListener("keydown", skip, { capture: true });
     return () => {
-      window.removeEventListener("pointerdown", skip);
-      window.removeEventListener("keydown", skip);
+      window.removeEventListener("pointerdown", skip, { capture: true });
+      window.removeEventListener("keydown", skip, { capture: true });
     };
   }, [arriving, finishArrival]);
 
@@ -64,7 +69,7 @@ export function ArrivalSequence({
         <>
           <motion.div
             className="atmo"
-            style={{ background: "#05050a", zIndex: 60 }}
+            style={{ background: "#05050a", zIndex: 50 }}
             initial={{ opacity: 1 }}
             animate={{ opacity: 0 }}
             exit={{ opacity: 0 }}
@@ -76,7 +81,7 @@ export function ArrivalSequence({
           <motion.div
             className="atmo"
             style={{
-              zIndex: 61,
+              zIndex: 51,
               display: "flex",
               flexDirection: "column",
               justifyContent: "center",
@@ -85,7 +90,7 @@ export function ArrivalSequence({
             }}
             initial={{ opacity: 0 }}
             animate={{ opacity: [0, 1, 1, 0] }}
-            exit={{ opacity: 0 }}
+            exit={{ opacity: 0, transition: { duration: 0.28 } }}
             transition={{
               duration: reduced ? 0.4 : 3.2,
               times: [0, 0.16, 0.62, 1],
@@ -99,7 +104,7 @@ export function ArrivalSequence({
               animate={{ y: 0 }}
               transition={ease.text}
             >
-              Entering
+              {home ? "Your room" : "Entering"}
             </motion.div>
             <motion.div
               className="u-display-xl"

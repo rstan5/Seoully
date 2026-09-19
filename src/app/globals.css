@@ -2,6 +2,13 @@
 
 @import "../design/materials.css";
 @import "../design/world.css";
+@import "../design/profile.css";
+@import "../design/feed.css";
+@import "../design/social.css";
+@import "../design/edit.css";
+@import "../design/social-app.css";
+@import "../design/onboard.css";
+@import "../design/heart-companion.css";
 
 /* ==========================================================================
    Seoully design tokens
@@ -13,9 +20,10 @@
 
 @theme {
   /* --- Type ------------------------------------------------------------- */
-  --font-display: var(--font-instrument), "Times New Roman", serif;
-  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-mono-stack), ui-monospace, "SF Mono", monospace;
+  --font-display: var(--font-baloo), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-baloo), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-baloo), ui-sans-serif, system-ui, sans-serif;
+  --font-social: var(--font-baloo);
 
   /* Editorial scale. Large sizes are for the world; small sizes are for
      labels that sit *on* objects, so they stay tight and legible. */
@@ -132,7 +140,6 @@ button {
   line-height: 0.95;
 }
 
-/* Optical balance for the serif at large sizes. */
 .u-display-xl {
   font-family: var(--font-display);
   font-weight: 400;

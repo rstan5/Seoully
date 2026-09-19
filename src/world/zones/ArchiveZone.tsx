@@ -6,6 +6,7 @@ import type { HoldingView, RoomZone } from "@/domain/types";
 import { objectSpring } from "@/design/motion";
 import type { InspectTarget } from "@/world/store/worldStore";
 import { WorldNode } from "@/world/stage/WorldNode";
+import { grabHandlers, mergeArrange, targetFor, type ArrangeContext } from "@/world/edit/arrange";
 
 const CRATE_DEPTH = 190;
 
@@ -13,6 +14,9 @@ interface ArchiveZoneProps {
   zone: RoomZone;
   items: HoldingView[];
   interactive: boolean;
+  far?: boolean;
+  selectedId?: string | null;
+  arrange?: ArrangeContext;
   onSelect: (view: HoldingView, at: InspectTarget) => void;
 }
 
@@ -24,24 +28,37 @@ interface ArchiveZoneProps {
  * a flat backdrop. Putting the least glamorous objects closest to the camera is
  * also just true to life — the overflow boxes are always the thing you trip on.
  */
-export function ArchiveZone({ zone, items, interactive, onSelect }: ArchiveZoneProps) {
+export function ArchiveZone({ zone, items, interactive, far = false, selectedId, arrange, onSelect }: ArchiveZoneProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const { w, h } = zone.size;
   const crateW = Math.min(180, w / Math.max(1, items.length) - 12);
 
   return (
-    <WorldNode x={zone.transform.x} y={zone.transform.y} z={zone.transform.z} w={w} h={h}>
+    <WorldNode x={zone.transform.x} y={zone.transform.y} z={zone.transform.z} w={w} h={h} className={far ? "fidelity-far" : undefined}>
       {items.map((view, index) => {
         const hovered = hoveredId === view.holding.id;
-        // Stagger depth as well as position, so the crates form a small pile
-        // rather than a row.
+        const inspecting = selectedId === view.holding.id;
         const zOffset = index * 34;
         const yOffset = index * -18;
+        const grab = grabHandlers(
+          targetFor(arrange, view.holding.id, {
+            x: zone.transform.x - w / 2 + index * (crateW + 14) + crateW / 2,
+            y: zone.transform.y + h / 2 - h * 0.39 + index * -18,
+            z: zone.transform.z + index * 34,
+          }),
+          interactive,
+          () => onSelect(view, zone.transform),
+        );
+        const arranged = targetFor(arrange, view.holding.id, {
+          x: zone.transform.x - w / 2 + index * (crateW + 14) + crateW / 2,
+          y: zone.transform.y + h / 2 - h * 0.39 + index * -18,
+          z: zone.transform.z + index * 34,
+        });
 
         return (
           <motion.div
             key={view.holding.id}
-            className="zone-hotspot"
+            className={`zone-hotspot${arranged?.editing ? " editing-grab" : ""}`}
             style={{
               position: "absolute",
               left: index * (crateW + 14),
@@ -50,19 +67,36 @@ export function ArchiveZone({ zone, items, interactive, onSelect }: ArchiveZoneP
               height: h * 0.78,
               transformStyle: "preserve-3d",
               transformOrigin: "50% 100%",
+              touchAction: arranged?.editing ? "none" : undefined,
             }}
-            animate={{
-              z: hovered ? zOffset + 26 : zOffset,
-              y: hovered ? yOffset - 10 : yOffset,
-              rotateY: hovered ? -8 : -3 + index * 5,
-            }}
+            animate={
+              inspecting
+                ? { z: zOffset + 92, y: yOffset - 36, rotateY: -18, rotateX: -8 }
+                : {
+                    ...mergeArrange(
+                      {
+                        z: hovered ? zOffset + 26 : zOffset,
+                        y: hovered ? yOffset - 10 : yOffset,
+                      },
+                      arranged,
+                    ),
+                    rotateY: hovered ? -8 : -3 + index * 5,
+                  }
+            }
             transition={objectSpring("furniture")}
-            onHoverStart={interactive ? () => setHoveredId(view.holding.id) : undefined}
-            onHoverEnd={interactive ? () => setHoveredId(null) : undefined}
-            onClick={interactive ? () => onSelect(view, zone.transform) : undefined}
-            role={interactive ? "button" : undefined}
-            tabIndex={interactive ? 0 : -1}
-            aria-label={interactive ? `${view.template.name}. Inspect.` : undefined}
+            onHoverStart={interactive || arranged?.editing ? () => setHoveredId(view.holding.id) : undefined}
+            onHoverEnd={interactive || arranged?.editing ? () => setHoveredId(null) : undefined}
+            onPointerDown={grab.onPointerDown}
+            onClick={grab.onClick}
+            role={grab.role}
+            tabIndex={grab.tabIndex}
+            aria-label={
+              arranged?.editing
+                ? `${view.template.name}. Move.`
+                : interactive
+                  ? `${view.template.name}. Inspect.`
+                  : undefined
+            }
           >
             {/* Lid, folded back to give the crate a real top surface. */}
             <div

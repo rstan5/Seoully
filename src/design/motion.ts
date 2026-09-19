@@ -140,6 +140,21 @@ export const ease = {
   dawn: { duration: 2.6, ease: [0.16, 0.84, 0.3, 1] },
 } satisfies Record<string, Transition>;
 
+/** Character interstitial for the Seoully heart. Durations are seconds except *Ms. */
+export const heartScene = {
+  coverMs: 320,
+  enterMs: 900,
+  bubbleMs: 240,
+  typeMs: 42,
+  typeReducedMs: 10,
+  readMinMs: 2100,
+  readPerCharMs: 26,
+  exitMs: 640,
+  coverReducedMs: 180,
+  enterReducedMs: 220,
+  exitReducedMs: 220,
+} as const;
+
 // ---------------------------------------------------------------------------
 // Flight paths
 // ---------------------------------------------------------------------------

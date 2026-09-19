@@ -3,6 +3,7 @@
 import { motion } from "motion/react";
 import type { HoldingView } from "@/domain/types";
 import { objectSpring } from "@/design/motion";
+import { grabHandlers, mergeArrange, type ArrangeTarget } from "@/world/edit/arrange";
 import { useSurfaceLight } from "./useSurfaceLight";
 
 export const ALBUM_HEIGHT = 176;
@@ -46,6 +47,7 @@ interface AlbumSpineProps {
   onSelect: () => void;
   interactive: boolean;
   showSide?: boolean;
+  arrange?: ArrangeTarget;
 }
 
 /**
@@ -69,6 +71,7 @@ export function AlbumSpine({
   onSelect,
   interactive,
   showSide = false,
+  arrange,
 }: AlbumSpineProps) {
   const light = useSurfaceLight<HTMLDivElement>();
   const width = spineWidth(view);
@@ -81,10 +84,12 @@ export function AlbumSpine({
   const height = isVinyl ? ALBUM_HEIGHT + 34 : ALBUM_HEIGHT;
   const depth = isVinyl ? ALBUM_DEPTH + 40 : ALBUM_DEPTH;
 
+  const grab = grabHandlers(arrange, interactive, onSelect);
+
   return (
     <motion.div
       ref={light.ref}
-      className="zone-hotspot"
+      className={`zone-hotspot${arrange?.editing ? " editing-grab" : ""}`}
       style={{
         position: "absolute",
         left: offsetX,
@@ -93,51 +98,54 @@ export function AlbumSpine({
         height,
         transformStyle: "preserve-3d",
         transformOrigin: "50% 100%",
+        touchAction: arrange?.editing ? "none" : undefined,
       }}
       animate={
         inspecting
           ? {
-              // Out of the shelf, turned to present the cover, lifted to eye
-              // level. The pivot stays at the album's base so it reads as being
-              // drawn out and tipped up, not teleported.
-              //
-              // The depth-wide translation cancels the sideways swing that
-              // turning about the base produces, so the cover finishes centred
-              // over the slot it came out of instead of drifting a hand's width
-              // to one side of it.
               x: depth,
               y: ALBUM_INSPECT_LIFT.y,
               z: ALBUM_INSPECT_LIFT.z,
               rotateY: -90,
-              rotate: 0,
+              rotateX: -6,
+              rotate: -2,
               opacity: 1,
             }
           : {
-              x: displaced,
-              y: hovered ? -12 : 0,
-              z: hovered ? 52 : 0,
-              rotateY: hovered ? -8 : 0,
-              rotate: lean,
+              ...mergeArrange(
+                {
+                  x: displaced,
+                  y: hovered ? -12 : 0,
+                  z: hovered ? 52 : 0,
+                  rotate: lean,
+                },
+                arrange,
+              ),
+              rotateY: hovered && !arrange?.editing ? -8 : 0,
+              rotateX: 0,
               opacity: 1,
             }
       }
       transition={objectSpring(isVinyl ? "vinyl" : "album")}
-      onPointerMove={light.onPointerMove}
+      onPointerMove={interactive || arrange?.editing ? light.onPointerMove : undefined}
       onPointerLeave={() => {
-        light.onPointerLeave();
+        if (interactive || arrange?.editing) light.onPointerLeave();
         onHover(false);
       }}
-      onPointerEnter={interactive ? () => onHover(true) : undefined}
-      onClick={interactive ? onSelect : undefined}
-      role={interactive ? "button" : undefined}
-      tabIndex={interactive ? 0 : -1}
+      onPointerEnter={interactive || arrange?.editing ? () => onHover(true) : undefined}
+      onPointerDown={grab.onPointerDown}
+      onClick={grab.onClick}
+      role={grab.role}
+      tabIndex={grab.tabIndex}
       aria-label={
-        interactive
-          ? `${view.release?.title ?? template.name}, ${version?.name ?? ""}. Pull from shelf.`
-          : undefined
+        arrange?.editing
+          ? `${view.release?.title ?? template.name}. Move.`
+          : interactive
+            ? `${view.release?.title ?? template.name}, ${version?.name ?? ""}. Pull from shelf.`
+            : undefined
       }
       onKeyDown={
-        interactive
+        interactive && !arrange?.editing
           ? (e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();

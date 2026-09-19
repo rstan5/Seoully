@@ -43,13 +43,15 @@ export function RoomShell() {
         className="room-wall"
       />
 
-      {/* Floor */}
+      {/* Floor. Slightly proud of the back wall so the near edge sits in
+          the foreground and the boards recede, instead of reading as a
+          painted rectangle behind the furniture. */}
       <WorldNode
         x={0}
         y={floorY}
-        z={backZ / 2}
+        z={backZ / 2 + 36}
         w={ROOM_WIDTH}
-        h={ROOM_DEPTH}
+        h={ROOM_DEPTH + 72}
         rotateX={90}
         className="room-floor"
       />

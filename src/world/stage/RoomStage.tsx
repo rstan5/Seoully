@@ -19,14 +19,24 @@ import { useReducedMotion, useViewport } from "./useViewport";
  * Per-frame values (pose springs, pointer parallax) are motion values, never
  * React state — the camera animates entirely off the render path.
  */
-export function RoomStage({ room, children }: { room: Room; children: ReactNode }) {
+export function RoomStage({
+  room,
+  children,
+  examining = false,
+}: {
+  room: Room;
+  children: ReactNode;
+  examining?: boolean;
+}) {
   const view = useWorld((s) => s.view);
+  const traversal = useWorld((s) => s.traversal);
   const viewport = useViewport();
   const reduced = useReducedMotion();
   const stageRef = useRef<HTMLDivElement>(null);
 
-  const target = poseForView(view, room, viewport);
-  const transition = reduced ? { duration: 0.2 } : spring.camera;
+  const target = poseForView(view, room, viewport, examining);
+  const leaving = traversal === "leaving";
+  const transition = reduced ? { duration: 0.2 } : leaving ? spring.traverse : spring.camera;
 
   // Pose channels, each its own spring seeded with a plain number.
   //
@@ -47,10 +57,13 @@ export function RoomStage({ room, children }: { room: Room; children: ReactNode 
     x.set(target.x);
     y.set(target.y);
     z.set(target.z);
-    dolly.set(target.dolly);
-    rotateX.set(target.rotateX);
+    // Walking into the doorway: the camera pushes forward into the wall while
+    // the light wipe covers the swap. Same continuous transform as every other
+    // move — the doorway is a light, not a cut.
+    dolly.set(target.dolly + (leaving ? 640 : 0));
+    rotateX.set(target.rotateX + (leaving ? -6 : 0));
     rotateY.set(target.rotateY);
-  }, [target.x, target.y, target.z, target.dolly, target.rotateX, target.rotateY, x, y, z, dolly, rotateX, rotateY]);
+  }, [target.x, target.y, target.z, target.dolly, target.rotateX, target.rotateY, leaving, x, y, z, dolly, rotateX, rotateY]);
 
   // Pointer parallax. Softly sprung so the room has inertia rather than
   // sticking to the cursor like a hover effect.
@@ -68,6 +81,8 @@ export function RoomStage({ room, children }: { room: Room; children: ReactNode 
   }, [pointerX, pointerY, reduced]);
 
   const amount = parallaxFor(view);
+  const compact = viewport.width < 800;
+  const parallaxScale = compact ? 0.45 : 1;
 
   const transform = useTransform(
     [x, y, z, dolly, rotateX, rotateY, pointerX, pointerY],
@@ -79,8 +94,8 @@ export function RoomStage({ room, children }: { room: Room; children: ReactNode 
         dolly: cd ?? 0,
         // Parallax is inverted: moving the pointer right should swing the room
         // as though you leaned right, revealing the left-hand surfaces.
-        rotateX: (rx ?? 0) + (py ?? 0) * -amount.rotateX,
-        rotateY: (ry ?? 0) + (px ?? 0) * amount.rotateY,
+        rotateX: (rx ?? 0) + (py ?? 0) * -amount.rotateX * parallaxScale,
+        rotateY: (ry ?? 0) + (px ?? 0) * amount.rotateY * parallaxScale,
       }),
   );
 

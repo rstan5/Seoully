@@ -6,6 +6,7 @@ import type { HoldingView, RoomZone } from "@/domain/types";
 import { objectSpring } from "@/design/motion";
 import type { InspectTarget } from "@/world/store/worldStore";
 import { WorldNode } from "@/world/stage/WorldNode";
+import { grabHandlers, mergeArrange, targetFor, type ArrangeContext } from "@/world/edit/arrange";
 
 const DESK_DEPTH = 250;
 const TOP_THICKNESS = 18;
@@ -14,6 +15,10 @@ interface DeskZoneProps {
   zone: RoomZone;
   items: HoldingView[];
   interactive: boolean;
+  far?: boolean;
+  lamp?: boolean;
+  selectedId?: string | null;
+  arrange?: ArrangeContext;
   onSelect: (view: HoldingView, at: InspectTarget) => void;
 }
 
@@ -26,13 +31,13 @@ interface DeskZoneProps {
  * everything is filed reads as a showroom; the desk is what makes it look
  * inhabited.
  */
-export function DeskZone({ zone, items, interactive, onSelect }: DeskZoneProps) {
+export function DeskZone({ zone, items, interactive, far = false, lamp = true, selectedId, arrange, onSelect }: DeskZoneProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const { w, h } = zone.size;
   const legInset = 26;
 
   return (
-    <WorldNode x={zone.transform.x} y={zone.transform.y} z={zone.transform.z} w={w} h={h}>
+    <WorldNode x={zone.transform.x} y={zone.transform.y} z={zone.transform.z} w={w} h={h} className={far ? "fidelity-far" : undefined}>
       {/* Legs, set back and inboard so the top appears to float slightly. */}
       {[legInset, w - legInset - 22].map((left, i) => (
         <div
@@ -44,7 +49,7 @@ export function DeskZone({ zone, items, interactive, onSelect }: DeskZoneProps) 
             top: TOP_THICKNESS,
             width: 22,
             height: h - TOP_THICKNESS,
-            filter: "brightness(0.42)",
+            background: "color-mix(in oklab, var(--room-furniture-edge) 40%, #1c1824)",
             transform: `translateZ(${-DESK_DEPTH * 0.35}px)`,
           }}
         />
@@ -102,7 +107,7 @@ export function DeskZone({ zone, items, interactive, onSelect }: DeskZoneProps) 
       <div
         className="m-warm-wood"
         style={{
-          ["--base" as string]: "#6b4a35",
+          ["--base" as string]: "color-mix(in oklab, var(--room-furniture) 42%, #7a5236)",
           position: "absolute",
           left: 0,
           top: 0,
@@ -123,14 +128,20 @@ export function DeskZone({ zone, items, interactive, onSelect }: DeskZoneProps) 
             top={80 + (index % 2) * 42}
             rotate={index % 2 === 0 ? -7 : 5}
             hovered={hoveredId === view.holding.id}
+            inspecting={selectedId === view.holding.id}
             interactive={interactive}
+            arrange={targetFor(arrange, view.holding.id, {
+              x: zone.transform.x - w / 2 + 40 + index * 150 + 58,
+              y: zone.transform.y - h / 2 + TOP_THICKNESS,
+              z: zone.transform.z - (80 + (index % 2) * 42),
+            })}
             onHover={(hovering) => setHoveredId(hovering ? view.holding.id : null)}
             onSelect={() => onSelect(view, zone.transform)}
           />
         ))}
       </div>
 
-      <DeskLamp left={26} baseTop={-4} />
+      {lamp && <DeskLamp left={26} baseTop={-4} />}
 
       {/* Front edge of the desktop. */}
       <div
@@ -185,7 +196,7 @@ function DeskLamp({ left, baseTop }: { left: number; baseTop: number }) {
           bottom: 0,
           width: 7,
           height: armH,
-          filter: "brightness(0.55)",
+          background: "color-mix(in oklab, var(--room-furniture-edge) 55%, #2a2432)",
         }}
       />
       {/* Arm, angled out over the desk. */}
@@ -199,7 +210,7 @@ function DeskLamp({ left, baseTop }: { left: number; baseTop: number }) {
           height: 6,
           transformOrigin: "0% 50%",
           transform: "rotate(14deg)",
-          filter: "brightness(0.6)",
+          background: "color-mix(in oklab, var(--room-furniture-edge) 60%, #2a2432)",
         }}
       />
       {/* Shade */}
@@ -241,16 +252,20 @@ function FlatObject({
   top,
   rotate,
   hovered,
+  inspecting = false,
   interactive,
   onHover,
   onSelect,
+  arrange,
 }: {
   view: HoldingView;
   left: number;
   top: number;
   rotate: number;
   hovered: boolean;
+  inspecting?: boolean;
   interactive: boolean;
+  arrange?: ReturnType<typeof targetFor>;
   onHover: (hovering: boolean) => void;
   onSelect: () => void;
 }) {
@@ -258,10 +273,11 @@ function FlatObject({
   const isBand = template.material === "velvet";
   const w = isBand ? 128 : 116;
   const h = isBand ? 26 : 48;
+  const grab = grabHandlers(arrange, interactive, onSelect);
 
   return (
     <motion.div
-      className={`zone-hotspot ${isBand ? "m-velvet" : "m-paper"}`}
+      className={`zone-hotspot ${isBand ? "m-velvet" : "m-paper"}${arrange?.editing ? " editing-grab" : ""}`}
       style={{
         ["--base" as string]: template.colorway.base,
         position: "absolute",
@@ -269,20 +285,31 @@ function FlatObject({
         top,
         width: w,
         height: h,
-        rotate,
         borderRadius: isBand ? 13 : 2,
         transformStyle: "preserve-3d",
         boxShadow: "2px 4px 10px color-mix(in oklab, #000 44%, transparent)",
         overflow: "hidden",
+        touchAction: arrange?.editing ? "none" : undefined,
       }}
-      animate={{ z: hovered ? 14 : 0 }}
+      animate={
+        inspecting
+          ? { z: 90, y: -28, rotateX: -28, scale: 1.55, rotate }
+          : mergeArrange({ z: hovered ? 14 : 0, y: 0, rotate }, arrange)
+      }
       transition={objectSpring("photocard")}
-      onHoverStart={interactive ? () => onHover(true) : undefined}
-      onHoverEnd={interactive ? () => onHover(false) : undefined}
-      onClick={interactive ? onSelect : undefined}
-      role={interactive ? "button" : undefined}
-      tabIndex={interactive ? 0 : -1}
-      aria-label={interactive ? `${template.name}. Inspect.` : undefined}
+      onHoverStart={interactive || arrange?.editing ? () => onHover(true) : undefined}
+      onHoverEnd={interactive || arrange?.editing ? () => onHover(false) : undefined}
+      onPointerDown={grab.onPointerDown}
+      onClick={grab.onClick}
+      role={grab.role}
+      tabIndex={grab.tabIndex}
+      aria-label={
+        arrange?.editing
+          ? `${template.name}. Move.`
+          : interactive
+            ? `${template.name}. Inspect.`
+            : undefined
+      }
     >
       {!isBand && (
         <>

@@ -1,44 +1,27 @@
 import type { Metadata, Viewport } from "next";
-import { Archivo, Instrument_Serif, JetBrains_Mono } from "next/font/google";
+import { Baloo_2, Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
 
 /**
- * Type is doing a lot of work in this product. The pairing is deliberate:
- *
- *   Instrument Serif — editorial display. High contrast, slightly literary.
- *     Used for collector names and room titles so identity reads as a magazine
- *     masthead rather than a dashboard header.
- *
- *   Archivo — a grotesque that holds up at tiny sizes with wide tracking,
- *     which is what all the uppercase object labels need.
- *
- *   JetBrains Mono — every number. Collection counts, completion ratios, and
- *     compatibility scores are the product's vital signs, and tabular figures
- *     make them feel measured rather than decorative.
+ * Baloo 2 is the product typeface — room, social, and onboarding.
+ * Noto Sans KR covers Hangul glyphs Baloo 2 does not include (서울리).
  */
 
-const instrument = Instrument_Serif({
-  subsets: ["latin"],
-  weight: "400",
-  style: ["normal", "italic"],
-  variable: "--font-instrument",
+const baloo = Baloo_2({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-baloo",
   display: "swap",
 });
 
-const archivo = Archivo({
+const korean = Noto_Sans_KR({
   subsets: ["latin"],
-  variable: "--font-archivo",
-  display: "swap",
-});
-
-const mono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono-stack",
+  weight: ["600", "700"],
+  variable: "--font-korean",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Seoully",
+  title: "Seoully 서울리",
   description: "The digital home of K-pop fandom.",
 };
 
@@ -53,10 +36,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html
-      lang="en"
-      className={`${instrument.variable} ${archivo.variable} ${mono.variable}`}
-    >
+    <html lang="en" className={`${baloo.variable} ${korean.variable} ${baloo.className}`}>
       <body>{children}</body>
     </html>
   );

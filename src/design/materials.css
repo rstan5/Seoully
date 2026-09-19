@@ -73,13 +73,15 @@
     background-image:
       linear-gradient(
         var(--lit-angle),
-        color-mix(in oklab, var(--lit-color) calc(14% * var(--lit-strength)), transparent),
-        transparent 62%
+        color-mix(in oklab, var(--lit-color) calc(16% * var(--lit-strength)), transparent),
+        transparent 58%
       ),
-      linear-gradient(180deg, color-mix(in oklab, #000 3%, transparent), transparent 30%);
+      linear-gradient(180deg, color-mix(in oklab, #fff 18%, transparent), transparent 22%),
+      linear-gradient(180deg, color-mix(in oklab, #000 4%, transparent), transparent 30%);
     box-shadow:
-      inset 0 1px 0 color-mix(in oklab, #fff 55%, transparent),
-      inset 0 -1px 0 color-mix(in oklab, #000 8%, transparent);
+      inset 0 1px 0 color-mix(in oklab, #fff 58%, transparent),
+      inset 0 -1px 0 color-mix(in oklab, #000 10%, transparent),
+      1px 2px 0 color-mix(in oklab, #000 8%, transparent);
   }
 
   /* Ruled notebook paper — used for the collector's desk notes. */
@@ -125,14 +127,19 @@
   .m-glossy-card {
     background-image:
       radial-gradient(
-        120% 80% at calc(var(--px, 0.5) * 100%) calc(var(--py, 0.3) * 100%),
-        color-mix(in oklab, #fff calc(34% * var(--lit-strength)), transparent),
-        transparent 58%
+        88% 62% at calc(var(--px, 0.5) * 100%) calc(var(--py, 0.28) * 100%),
+        color-mix(in oklab, #fff calc(46% * var(--lit-strength)), transparent),
+        transparent 46%
       ),
-      linear-gradient(160deg, var(--base), color-mix(in oklab, var(--base) 78%, #000));
+      linear-gradient(
+        calc(var(--lit-angle)),
+        color-mix(in oklab, var(--lit-color) calc(18% * var(--lit-strength)), transparent),
+        transparent 52%
+      ),
+      linear-gradient(160deg, var(--base), color-mix(in oklab, var(--base) 80%, #000));
     box-shadow:
-      inset 0 0 0 1px color-mix(in oklab, #fff 22%, transparent),
-      inset 0 -3px 6px color-mix(in oklab, #000 20%, transparent);
+      inset 0 0 0 1px color-mix(in oklab, #fff 26%, transparent),
+      inset 0 -3px 6px color-mix(in oklab, #000 18%, transparent);
   }
 
   /* ======================================================================
@@ -209,6 +216,7 @@
   }
 
   .m-plastic-sleeve {
+    pointer-events: none;
     background-image:
       /* A single hard-edged gloss band. Polypropylene doesn't have a soft
          gradient sheen; it has a bright streak with a visible edge, and that
@@ -258,16 +266,17 @@
   .m-acrylic {
     background-image: linear-gradient(
       calc(var(--lit-angle) + 8deg),
-      color-mix(in oklab, #fff 14%, transparent),
-      transparent 34%,
-      transparent 66%,
-      color-mix(in oklab, var(--fill-color) 22%, transparent)
+      color-mix(in oklab, #fff 22%, transparent),
+      transparent 28%,
+      transparent 62%,
+      color-mix(in oklab, var(--fill-color) 18%, transparent)
     );
     box-shadow:
-      inset 0 0 0 1px color-mix(in oklab, #fff 26%, transparent),
-      inset 0 0 30px color-mix(in oklab, #fff 5%, transparent),
-      0 0 0 1px color-mix(in oklab, #fff 8%, transparent);
-    backdrop-filter: blur(0.5px) saturate(1.08);
+      inset 0 0 0 1px color-mix(in oklab, #fff 42%, transparent),
+      inset 1px 0 0 color-mix(in oklab, #fff 55%, transparent),
+      inset 0 0 28px color-mix(in oklab, #fff 6%, transparent),
+      0 0 0 1px color-mix(in oklab, #fff 10%, transparent);
+    backdrop-filter: blur(0.4px) saturate(1.06);
   }
 
   /* ======================================================================
@@ -279,18 +288,18 @@
     background-image:
       linear-gradient(
         calc(var(--lit-angle)),
-        color-mix(in oklab, #fff 38%, transparent),
-        transparent 30%,
-        transparent 70%,
-        color-mix(in oklab, #fff 18%, transparent)
+        color-mix(in oklab, #fff 22%, transparent),
+        transparent 26%,
+        transparent 74%,
+        color-mix(in oklab, #fff 10%, transparent)
       ),
       repeating-linear-gradient(
         90deg,
-        rgba(255, 255, 255, 0.05) 0px,
-        rgba(0, 0, 0, 0.05) 1px,
-        rgba(255, 255, 255, 0.04) 2px
+        rgba(255, 255, 255, 0.04) 0px,
+        rgba(0, 0, 0, 0.045) 1px,
+        rgba(255, 255, 255, 0.03) 2px
       ),
-      linear-gradient(180deg, #a4a6ad, #6f7178);
+      linear-gradient(180deg, #9a9ca4, #6a6c74);
   }
 
   /* ======================================================================
@@ -302,17 +311,17 @@
     --base: #4a1e33;
     background-image:
       radial-gradient(
-        120% 100% at 50% 50%,
-        color-mix(in oklab, #000 34%, transparent),
-        transparent 62%
+        110% 90% at 50% 42%,
+        color-mix(in oklab, #000 28%, transparent),
+        transparent 68%
       ),
       linear-gradient(
         var(--lit-angle),
-        color-mix(in oklab, var(--lit-color) 20%, transparent),
-        transparent 40%,
-        color-mix(in oklab, var(--lit-color) 14%, transparent)
+        color-mix(in oklab, var(--lit-color) 16%, transparent),
+        transparent 38%,
+        color-mix(in oklab, var(--lit-color) 22%, transparent)
       ),
-      linear-gradient(180deg, var(--base), color-mix(in oklab, var(--base) 74%, #000));
+      linear-gradient(180deg, color-mix(in oklab, var(--base) 88%, #fff), color-mix(in oklab, var(--base) 70%, #000));
   }
 
   .m-velvet::after {
@@ -344,21 +353,23 @@
     background-image:
       linear-gradient(
         var(--lit-angle),
-        color-mix(in oklab, var(--lit-color) calc(22% * var(--lit-strength)), transparent),
-        transparent 58%
+        color-mix(in oklab, var(--lit-color) calc(18% * var(--lit-strength)), transparent),
+        transparent 42%,
+        color-mix(in oklab, #000 10%, transparent)
       ),
       repeating-linear-gradient(
-        88deg,
-        rgba(0, 0, 0, 0.055) 0px,
-        rgba(255, 255, 255, 0.028) 3px,
-        rgba(0, 0, 0, 0.04) 7px,
-        rgba(255, 255, 255, 0.02) 11px
+        86deg,
+        rgba(0, 0, 0, 0.07) 0px,
+        rgba(255, 255, 255, 0.03) 2px,
+        rgba(0, 0, 0, 0.035) 5px,
+        rgba(90, 48, 22, 0.12) 8px,
+        rgba(255, 255, 255, 0.02) 12px
       ),
-      linear-gradient(180deg, var(--base), color-mix(in oklab, var(--base) 78%, #000));
+      linear-gradient(180deg, color-mix(in oklab, var(--base) 88%, #fff), color-mix(in oklab, var(--base) 74%, #000));
   }
 
   .m-warm-wood::after {
-    opacity: 0.22;
+    opacity: 0.28;
   }
 
   /* ======================================================================
@@ -368,14 +379,19 @@
   .m-plush {
     background-image:
       radial-gradient(
-        90% 90% at calc(var(--px, 0.36) * 100%) 24%,
-        color-mix(in oklab, #fff 24%, transparent),
-        transparent 68%
+        80% 70% at calc(var(--px, 0.36) * 100%) 22%,
+        color-mix(in oklab, #fff 20%, transparent),
+        transparent 72%
       ),
-      linear-gradient(180deg, var(--base), color-mix(in oklab, var(--base) 72%, #000));
+      radial-gradient(
+        120% 100% at 50% 80%,
+        color-mix(in oklab, #000 16%, transparent),
+        transparent 58%
+      ),
+      linear-gradient(180deg, color-mix(in oklab, var(--base) 90%, #fff), color-mix(in oklab, var(--base) 68%, #000));
     box-shadow:
-      inset 0 -6px 14px color-mix(in oklab, #000 22%, transparent),
-      0 0 10px color-mix(in oklab, var(--base) 40%, transparent);
+      inset 0 -8px 16px color-mix(in oklab, #000 18%, transparent),
+      0 0 14px color-mix(in oklab, var(--base) 28%, transparent);
   }
 
   /* ======================================================================
@@ -387,9 +403,10 @@
 
   .m-edge-card {
     box-shadow:
-      inset 0 0 0 0.5px color-mix(in oklab, #fff 18%, transparent),
-      1px 1px 0 color-mix(in oklab, #000 30%, transparent),
-      2px 2px 0 color-mix(in oklab, #000 18%, transparent);
+      inset 0 0 0 0.5px color-mix(in oklab, #fff 22%, transparent),
+      1px 1px 0 color-mix(in oklab, #d8cbb4 70%, #000),
+      2px 2px 0 color-mix(in oklab, #c4b49a 55%, #000),
+      3px 3px 0 color-mix(in oklab, #000 16%, transparent);
   }
 
   .m-edge-thick {

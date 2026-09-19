@@ -33,6 +33,7 @@ interface OpenBinderProps {
   arrivedTemplateId?: string | null;
   /** Set that just completed. Drives the celebration on its pages. */
   celebratingSetId?: string | null;
+  cover?: string;
   onHold: (view: HoldingView | null) => void;
   onTurn: (spread: number) => void;
 }
@@ -54,6 +55,7 @@ export function OpenBinder({
   heldTemplateId,
   arrivedTemplateId = null,
   celebratingSetId = null,
+  cover = "#4a1c2c",
   onHold,
   onTurn,
 }: OpenBinderProps) {
@@ -69,7 +71,7 @@ export function OpenBinder({
   const lastSpread = Math.max(0, Math.ceil(pages.length / 2) - 1);
 
   const turn = (dir: 1 | -1) => {
-    if (turning) return;
+    if (turning || heldTemplateId) return;
     const to = spread + dir;
     if (to < 0 || to > lastSpread) return;
     setTurning({ to, dir });
@@ -112,7 +114,7 @@ export function OpenBinder({
         <div
           className="m-velvet"
           style={{
-            ["--base" as string]: "#3a1420",
+            ["--base" as string]: cover,
             position: "absolute",
             left: PAGE_W,
             top: -4,
@@ -151,6 +153,7 @@ export function OpenBinder({
             heldTemplateId={heldTemplateId}
             arrivedTemplateId={arrivedTemplateId}
             celebratingSetId={celebratingSetId}
+            cover={cover}
             onHold={onHold}
             onTurnEdge={() => turn(-1)}
             canTurnEdge={spread > 0}
@@ -166,6 +169,7 @@ export function OpenBinder({
             heldTemplateId={heldTemplateId}
             arrivedTemplateId={arrivedTemplateId}
             celebratingSetId={celebratingSetId}
+            cover={cover}
             onHold={onHold}
             onTurnEdge={() => turn(1)}
             canTurnEdge={spread < lastSpread}
@@ -260,6 +264,7 @@ function BinderLeaf({
   heldTemplateId,
   arrivedTemplateId,
   celebratingSetId,
+  cover,
   onHold,
   onTurnEdge,
   canTurnEdge,
@@ -270,6 +275,7 @@ function BinderLeaf({
   heldTemplateId: string | null;
   arrivedTemplateId: string | null;
   celebratingSetId: string | null;
+  cover: string;
   onHold: (view: HoldingView | null) => void;
   onTurnEdge: () => void;
   canTurnEdge: boolean;
@@ -302,7 +308,7 @@ function BinderLeaf({
       <div
         className="m-velvet"
         style={{
-          ["--base" as string]: "#4a1c2c",
+          ["--base" as string]: cover,
           position: "absolute",
           top: -9,
           bottom: -9,
@@ -327,26 +333,18 @@ function BinderLeaf({
         }}
       />
 
-      <PageFace
-        page={page}
-        side={side}
-        interactive
-        heldTemplateId={heldTemplateId}
-        arrivedTemplateId={arrivedTemplateId}
-        celebrating={celebratingSetId === page.setId}
-        onHold={onHold}
-      />
-
-      {/* Outer-edge turn zone. */}
+      {/* Outer-edge turn zone. The cover overhang, not the cards. Under the
+          page in DOM so a photocard on the outer column still wins. */}
       {canTurnEdge && (
         <div
           style={{
             position: "absolute",
             top: 0,
             bottom: 0,
-            [side === "left" ? "left" : "right"]: 0,
-            width: 30,
+            [side === "left" ? "left" : "right"]: -10,
+            width: 16,
             cursor: "pointer",
+            transform: "translateZ(-2px)",
           }}
           role="button"
           tabIndex={0}
@@ -362,6 +360,16 @@ function BinderLeaf({
           }}
         />
       )}
+
+      <PageFace
+        page={page}
+        side={side}
+        interactive
+        heldTemplateId={heldTemplateId}
+        arrivedTemplateId={arrivedTemplateId}
+        celebrating={celebratingSetId === page.setId}
+        onHold={onHold}
+      />
     </motion.div>
   );
 }
@@ -395,14 +403,26 @@ function PageFace({
 
   return (
     <div
-      className="world-face m-paper"
       style={{
-        ["--base" as string]: "#efe7d8",
+        position: "absolute",
+        inset: 0,
+        transformStyle: "preserve-3d",
         backfaceVisibility: "hidden",
         borderRadius: side === "left" ? "4px 1px 1px 4px" : "1px 4px 4px 1px",
-        overflow: "visible",
+        pointerEvents: "none",
       }}
     >
+      {/* Paper is a flat substrate. Cards live in a preserve-3d sibling so
+          they can lift off the page without the page flattening them, and so
+          a click hits the card instead of the plastic over it. */}
+      <div
+        className="world-face m-paper"
+        style={{
+          ["--base" as string]: "#efe7d8",
+          borderRadius: side === "left" ? "4px 1px 1px 4px" : "1px 4px 4px 1px",
+          pointerEvents: "none",
+        }}
+      />
       {/* Punch holes along the spine edge. */}
       {[0.22, 0.5, 0.78].map((t) => (
         <div
@@ -417,6 +437,7 @@ function PageFace({
             borderRadius: 999,
             background: "rgba(0,0,0,0.42)",
             boxShadow: "inset 0 1px 1px rgba(0,0,0,0.5)",
+            pointerEvents: "none",
           }}
         />
       ))}
@@ -425,6 +446,7 @@ function PageFace({
         <Sleeve
           key={pocket.index}
           pocket={pocket}
+          side={side}
           interactive={interactive}
           held={!!pocket.template && pocket.template.id === heldTemplateId}
           arrived={!!pocket.template && pocket.template.id === arrivedTemplateId}
@@ -446,6 +468,7 @@ function PageFace({
           display: "flex",
           justifyContent: side === "left" ? "flex-start" : "flex-end",
           gap: 8,
+          pointerEvents: "none",
         }}
       >
         {/* The page footer carries the completion mark rather than a stamp
@@ -484,6 +507,7 @@ function PageFace({
  */
 function Sleeve({
   pocket,
+  side,
   interactive,
   held,
   arrived = false,
@@ -491,6 +515,7 @@ function Sleeve({
   onHold,
 }: {
   pocket: BinderPocket;
+  side: "left" | "right";
   interactive: boolean;
   held: boolean;
   arrived?: boolean;
@@ -500,6 +525,7 @@ function Sleeve({
   const [hovered, setHovered] = useState(false);
   const rect = pocketRect(pocket.index % POCKETS_PER_PAGE);
   const { template, holding } = pocket;
+  const canHold = interactive && !!holding;
 
   return (
     <div
@@ -510,10 +536,44 @@ function Sleeve({
         width: rect.w,
         height: rect.h,
         transformStyle: "preserve-3d",
+        cursor: canHold ? "pointer" : "default",
+        pointerEvents: template ? "auto" : "none",
       }}
       {...(template ? { "data-pocket": template.id } : {})}
+      {...(holding ? { "data-hold-card": template!.id } : {})}
+      role={canHold ? "button" : undefined}
+      tabIndex={canHold ? 0 : -1}
+      aria-label={holding ? `${template!.name}. Take out of sleeve.` : undefined}
+      onPointerEnter={canHold ? () => setHovered(true) : undefined}
+      onPointerLeave={() => setHovered(false)}
+      onPointerDown={
+        canHold
+          ? (e) => {
+              e.stopPropagation();
+            }
+          : undefined
+      }
+      onClick={
+        canHold
+          ? (e) => {
+              e.stopPropagation();
+              onHold(held ? null : holding);
+            }
+          : undefined
+      }
+      onKeyDown={
+        canHold
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onHold(held ? null : holding);
+              }
+            }
+          : undefined
+      }
     >
-      {/* The sleeve: a slot with a lip, sitting just off the page. */}
+      {/* The sleeve: a slot with a lip, sitting just off the page. Plastic
+          never takes the pointer — the card underneath is the object. */}
       <div
         className="m-plastic-sleeve"
         style={{
@@ -521,6 +581,7 @@ function Sleeve({
           inset: -3,
           borderRadius: 3,
           transform: "translateZ(3px)",
+          pointerEvents: "none",
         }}
       />
 
@@ -530,42 +591,64 @@ function Sleeve({
             position: "absolute",
             inset: 0,
             transformStyle: "preserve-3d",
-            cursor: interactive && holding ? "pointer" : "default",
           }}
           // A card that just flew in finishes its journey here: the flight hands
           // over a few centimetres out of the sleeve, and the sleeve slides it
           // the rest of the way. Splitting the landing across the handoff is
           // what hides the small mismatch between the flight's target and the
           // page's real angle.
-          initial={arrived ? { z: 46, y: -18, scale: 1.16, rotateZ: -3 } : false}
+          initial={arrived ? { z: 56, y: -22, scale: 1.2, rotateZ: -4 } : false}
           animate={
             held
-              ? // Out of the sleeve and up toward the viewer. Held cards clear
-                // the page by enough that the sleeve's shine stops fighting the
-                // card's own.
-                { z: 150, y: -34, scale: 1.9, rotateY: 0, rotateZ: 0 }
-              : { z: hovered ? 16 : 0, y: hovered ? -7 : 0, scale: 1, rotateZ: 0 }
+              ? {
+                  // Out of the pocket and toward the camera, as if pinched
+                  // between two fingers. These numbers assume the page is
+                  // preserve-3d — if the page flattens them, the card never
+                  // actually leaves the sleeve.
+                  x: side === "right" ? 18 : -18,
+                  z: 132,
+                  y: -36,
+                  scale: 1.72,
+                  rotateX: 8,
+                  rotateY: side === "right" ? -14 : 14,
+                  rotateZ: side === "right" ? -3 : 3,
+                }
+              : {
+                  x: 0,
+                  z: hovered ? 16 : 0,
+                  y: hovered ? -7 : 0,
+                  scale: 1,
+                  rotateX: 0,
+                  rotateY: 0,
+                  rotateZ: 0,
+                }
           }
           transition={arrived ? spring.snap : objectSpring("photocard")}
-          onPointerEnter={interactive ? () => setHovered(true) : undefined}
-          onPointerLeave={() => setHovered(false)}
-          onClick={
-            interactive && holding
-              ? (e) => {
-                  e.stopPropagation();
-                  onHold(held ? null : holding);
-                }
-              : undefined
-          }
-          role={interactive && holding ? "button" : undefined}
-          tabIndex={interactive && holding ? 0 : -1}
-          aria-label={holding ? `${template.name}. Take out of sleeve.` : undefined}
         >
+          <motion.div
+            className="contact-shadow"
+            aria-hidden
+            style={{
+              left: "-18%",
+              right: "-18%",
+              bottom: "-8%",
+              height: "36%",
+              ["--shadow-blur" as string]: "10px",
+            }}
+            animate={{
+              opacity: held ? 0.72 : hovered ? 0.38 : 0.18,
+              scale: held ? 1.85 : 1,
+              z: held ? -48 : -4,
+            }}
+            transition={objectSpring("photocard")}
+          />
+
           <Photocard
             template={template}
             {...(holding?.member ? { member: holding.member } : {})}
             height={POCKET_CARD_H}
             ghost={!holding}
+            examining={held}
           />
 
           {/* Completion shimmer: a specular band crossing the card, as though

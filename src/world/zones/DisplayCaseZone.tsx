@@ -5,6 +5,7 @@ import type { HoldingView, RoomZone } from "@/domain/types";
 import type { InspectTarget } from "@/world/store/worldStore";
 import { WorldNode } from "@/world/stage/WorldNode";
 import { FigureStand, Lightstick, Plushie } from "@/world/objects/CaseObjects";
+import { targetFor, type ArrangeContext } from "@/world/edit/arrange";
 
 const CASE_DEPTH = 150;
 const GLASS_INSET = 12;
@@ -13,6 +14,9 @@ interface DisplayCaseZoneProps {
   zone: RoomZone;
   items: HoldingView[];
   interactive: boolean;
+  far?: boolean;
+  selectedId?: string | null;
+  arrange?: ArrangeContext;
   onSelect: (view: HoldingView, at: InspectTarget) => void;
 }
 
@@ -26,7 +30,7 @@ interface DisplayCaseZoneProps {
  * case from an open shelf, and it's why the rare items in here read as
  * protected rather than just arranged.
  */
-export function DisplayCaseZone({ zone, items, interactive, onSelect }: DisplayCaseZoneProps) {
+export function DisplayCaseZone({ zone, items, interactive, far = false, selectedId, arrange, onSelect }: DisplayCaseZoneProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const { w, h } = zone.size;
 
@@ -34,7 +38,7 @@ export function DisplayCaseZone({ zone, items, interactive, onSelect }: DisplayC
   const shelfH = (h - GLASS_INSET * 2) / shelves.length;
 
   return (
-    <WorldNode x={zone.transform.x} y={zone.transform.y} z={zone.transform.z} w={w} h={h}>
+    <WorldNode x={zone.transform.x} y={zone.transform.y} z={zone.transform.z} w={w} h={h} className={far ? "fidelity-far" : undefined}>
       {/* Cabinet interior, lit from within. Backlighting a case is what makes
           the objects inside pop against a dark room. */}
       <div
@@ -116,7 +120,13 @@ export function DisplayCaseZone({ zone, items, interactive, onSelect }: DisplayC
                 bottom: 6,
                 size: objectSize,
                 hovered: hoveredId === view.holding.id,
+                inspecting: selectedId === view.holding.id,
                 interactive,
+                arrange: targetFor(arrange, view.holding.id, {
+                  x: zone.transform.x - w / 2 + GLASS_INSET + x + objectSize / 2,
+                  y: zone.transform.y - h / 2 + top + shelfH - objectSize * 0.58,
+                  z: zone.transform.z - 40,
+                }),
                 onHover: (hovering: boolean) =>
                   setHoveredId(hovering ? view.holding.id : null),
                 onSelect: () => onSelect(view, zone.transform),
@@ -146,7 +156,11 @@ export function DisplayCaseZone({ zone, items, interactive, onSelect }: DisplayC
         <div
           key={i}
           className="m-brushed-metal"
-          style={{ position: "absolute", ...box, filter: "brightness(0.5)" }}
+          style={{
+            position: "absolute",
+            ...box,
+            background: "color-mix(in oklab, var(--room-furniture-edge) 50%, #2a2433)",
+          }}
         />
       ))}
 

@@ -345,6 +345,17 @@ export class MemoryCollectionRepository implements CollectionRepository {
       });
       if ("error" in created) return;
     }
+    // Auth/Profile may be restored from production while the transitional
+    // prototype snapshot is stale or incomplete. Keep the authenticated
+    // identity usable by ensuring its local Room projection exists; otherwise
+    // callers can silently remain on a fixture viewer and auth-scoped UI
+    // actions (Profile edit/sign-out) are incorrectly unavailable.
+    if (!this.getRoomByOwner(input.user.id)) {
+      const room = createStarterRoom(input.user.id);
+      this.rooms.push(room);
+      this.roomObjects.push(...createStarterFurniture(room.id));
+      this.placements.set(room.id, []);
+    }
     const user = this.users.find((candidate) => candidate.id === input.user.id);
     const profile = this.profiles.find((candidate) => candidate.userId === input.user.id);
     if (!user || !profile) return;

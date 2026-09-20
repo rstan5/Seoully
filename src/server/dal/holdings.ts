@@ -24,6 +24,7 @@ export interface HoldingDTO {
   tradeStatus: "not-for-trade" | "for-trade";
   createdAt: string;
   updatedAt: string;
+  personalMediaUrl?: string;
   template: {
     id: string;
     name: string;
@@ -150,12 +151,22 @@ async function hydrateHoldings(rows: Array<Record<string, unknown>>, supabase: A
   const memberMap = new Map((members.data ?? []).map((row) => [row.id, row.stage_name]));
   const releaseMap = new Map((releases.data ?? []).map((row) => [row.id, row.title]));
   const templateMap = new Map((templates ?? []).map((row) => [row.id, row]));
+  const holdingIds = rows.map((row) => String(row.id));
+  const { data: mediaRows } = holdingIds.length
+    ? await supabase.from("media_assets").select("holding_id,storage_bucket,storage_path").in("holding_id", holdingIds)
+    : { data: [] as Array<Record<string, unknown>> };
+  const mediaUrls = new Map<string, string>();
+  await Promise.all((mediaRows ?? []).map(async (media) => {
+    const signed = await supabase.storage.from(String(media.storage_bucket)).createSignedUrl(String(media.storage_path), 3600);
+    if (signed.data?.signedUrl) mediaUrls.set(String(media.holding_id), signed.data.signedUrl);
+  }));
   return rows.flatMap((row) => {
     const template = templateMap.get(String(row.template_id));
     if (!template) return [];
     return [{
       id: String(row.id), ownerUserId: String(row.owner_user_id), templateId: String(row.template_id),
       acquiredAt: String(row.acquired_at), createdAt: String(row.created_at), updatedAt: String(row.updated_at),
+      ...(mediaUrls.get(String(row.id)) ? { personalMediaUrl: mediaUrls.get(String(row.id)) } : {}),
       tradeStatus: row.trade_status === "for-trade" ? "for-trade" : "not-for-trade",
       template: {
         id: String(template.id), name: String(template.name), kind: String(template.kind), descriptor: String(template.descriptor ?? ""), status: String(template.status),

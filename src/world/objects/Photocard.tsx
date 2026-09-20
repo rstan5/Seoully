@@ -24,6 +24,7 @@ export interface PhotocardProps {
   reactive?: boolean;
   /** Held up to the light — stronger specular, slightly thicker edge. */
   examining?: boolean;
+  imageUrl?: string;
 }
 
 /**
@@ -36,7 +37,7 @@ export interface PhotocardProps {
  * chase card across a room because of how it catches light.
  */
 export const Photocard = forwardRef<HTMLDivElement, PhotocardProps>(function Photocard(
-  { template, member, height = CARD_HEIGHT, flipped = false, ghost = false, className, style, reactive = true, examining = false },
+  { template, member, height = CARD_HEIGHT, flipped = false, ghost = false, className, style, reactive = true, examining = false, imageUrl },
   forwardedRef,
 ) {
   const light = useSurfaceLight<HTMLDivElement>();
@@ -121,7 +122,7 @@ export const Photocard = forwardRef<HTMLDivElement, PhotocardProps>(function Pho
           opacity: flipped ? 0 : 1,
         }}
       >
-        <CardArt template={template} member={member} height={height} />
+        <CardArt template={template} member={member} height={height} imageUrl={imageUrl} />
         {examining && (
           <div
             aria-hidden
@@ -183,10 +184,12 @@ function CardArt({
   template,
   member,
   height,
+  imageUrl,
 }: {
   template: CollectibleTemplate;
   member?: Member | undefined;
   height: number;
+  imageUrl?: string;
 }) {
   const accent = member?.color ?? template.colorway.accent;
   const label = member?.stageName ?? template.name;
@@ -200,6 +203,8 @@ function CardArt({
 
   return (
     <>
+      {imageUrl && <img src={imageUrl} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
+      {imageUrl && <div aria-hidden style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, transparent 60%, color-mix(in oklab, #000 42%, transparent))" }} />}
       {/* Studio backdrop: a lit sweep behind the figure, darker at the edges,
           which is what makes the crop read as a photograph rather than as a
           shape on a colored rectangle. */}

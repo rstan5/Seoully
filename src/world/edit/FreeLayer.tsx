@@ -11,6 +11,7 @@ import { Photocard, CARD_HEIGHT, CARD_WIDTH } from "@/world/objects/Photocard";
 import { targetFor, type ArrangeContext } from "./arrange";
 import { GroundingShadow } from "./Grounding";
 import { heightForKind } from "./useRoomEdit";
+import { representationForView } from "@/domain/representation";
 
 export interface FreeHolding {
   view: HoldingView;
@@ -109,6 +110,7 @@ function FreeCollectible({
 }) {
   const target = targetFor(arrange, view.holding.id, transform);
   const kind = view.template.kind;
+  const representation = representationForView(view);
 
   if (kind === "poster") {
     const w = 180;
@@ -169,6 +171,7 @@ function FreeCollectible({
           <Photocard
             template={view.template}
             {...(view.member ? { member: view.member } : {})}
+            {...(representation.imageUrl ? { imageUrl: representation.imageUrl } : {})}
             reactive={!far}
             examining={target?.selected}
           />

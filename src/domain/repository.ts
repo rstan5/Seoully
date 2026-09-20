@@ -182,6 +182,7 @@ export interface CollectionRepository {
   isWanted(userId: UserId, templateId: TemplateId): boolean;
   removeHolding(holdingId: HoldingId): void;
   setHoldingTradeStatus(holdingId: HoldingId, tradeStatus: "not-for-trade" | "for-trade"): void;
+  setHoldingPersonalMedia(holdingId: HoldingId, url?: string): void;
 
   // Placement
   getRoom(roomId: RoomId): Room | undefined;

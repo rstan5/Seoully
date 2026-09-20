@@ -200,6 +200,8 @@ export interface Holding {
   acquisitionPrice?: number;
   createdAt?: IsoDate;
   updatedAt?: IsoDate;
+  /** Signed URL for the owner's current personal media, when hydrated. */
+  personalMediaUrl?: string;
 }
 
 export interface WishlistItem {

@@ -77,9 +77,9 @@ export function CollectorProfile({
         const localHoldings = repository.listHoldings(viewerId);
         for (const production of holdingsResult.holdings) {
           const local = localHoldings.find((holding) => holding.productionId === production.id);
-          if (local && local.tradeStatus !== production.tradeStatus) {
-            repository.setHoldingTradeStatus(local.id, production.tradeStatus);
-          }
+          if (!local) continue;
+          if (local.tradeStatus !== production.tradeStatus) repository.setHoldingTradeStatus(local.id, production.tradeStatus);
+          repository.setHoldingPersonalMedia(local.id, production.personalMediaUrl);
         }
       }
     });

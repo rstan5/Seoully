@@ -1142,6 +1142,14 @@ export class MemoryCollectionRepository implements CollectionRepository {
     this.notify();
   }
 
+  setHoldingPersonalMedia(holdingId: HoldingId, url?: string): void {
+    const holding = this.holdings.find((item) => item.id === holdingId);
+    if (!holding || holding.personalMediaUrl === url) return;
+    if (url) holding.personalMediaUrl = url;
+    else delete holding.personalMediaUrl;
+    this.notify();
+  }
+
   // --- Placement ----------------------------------------------------------
 
   getRoom(roomId: RoomId): Room | undefined {

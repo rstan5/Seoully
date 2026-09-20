@@ -11,6 +11,7 @@ import { photoErrorKey } from "@/locale/copy";
 import { hydrateLocale } from "@/locale/store";
 import type {
   CollectorInterest,
+  CollectibleKind,
   GroupId,
   IdentificationCandidate,
   MediaRef,
@@ -27,6 +28,7 @@ import { HEART_FINALE, useHeartCompanion } from "@/world/store/heartCompanionSto
 import type { MessageKey } from "@/locale/en";
 import { createSeoullyAccount, resolveCurrentSeoullyIdentity, signInToSeoully, signOutOfSeoully, updateMySeoullyProfile } from "@/server/auth/actions";
 import { contributeCatalogItem } from "@/server/catalog/actions";
+import { createHolding } from "@/server/holdings/actions";
 import type { CurrentProfilePatch } from "@/domain/identity";
 
 export type Gate = "booting" | "welcome" | "onboarding" | "ready";
@@ -54,6 +56,8 @@ interface SessionState {
   photo: MediaRef | null;
   candidates: IdentificationCandidate[];
   selectedTemplateId: TemplateId | null;
+  productionTemplateId: string | null;
+  productionHoldingId: string | null;
   pendingDraft: CatalogDraft | null;
   catalogMatches: CatalogMatch[];
   confirmMode: ConfirmMode;
@@ -85,12 +89,21 @@ interface SessionState {
   identifyPhoto: (file: File) => Promise<void>;
   identifySample: (templateId: TemplateId) => Promise<void>;
   searchPick: (templateId: TemplateId) => void;
+  searchPickProduction: (input: {
+    id: string;
+    name: string;
+    kind: CollectibleKind;
+    groupName: string;
+    memberName?: string | null;
+    releaseName?: string | null;
+    descriptor?: string;
+  }) => void;
   startDescribe: (name?: string) => void;
   reviewDraft: (draft: CatalogDraft) => void;
   resolveDraft: () => void;
   useCatalogMatch: (templateId: TemplateId) => void;
   createFromDraft: () => Promise<void>;
-  confirmHolding: () => void;
+  confirmHolding: () => Promise<void>;
   wantInstead: () => void;
   clearError: () => void;
   openCollect: () => void;
@@ -202,6 +215,8 @@ export const useSession = create<SessionState>((set, get) => ({
   photo: null,
   candidates: [],
   selectedTemplateId: null,
+  productionTemplateId: null,
+  productionHoldingId: null,
   pendingDraft: null,
   catalogMatches: [],
   confirmMode: "identify",
@@ -599,6 +614,15 @@ export const useSession = create<SessionState>((set, get) => ({
     });
   },
 
+  searchPickProduction: (input) => {
+    const templateId = repository.adoptProductionCatalogTemplate(input);
+    if (!templateId) {
+      set({ error: "error.catalogMissing" });
+      return;
+    }
+    set({ photo: null, selectedTemplateId: templateId, productionTemplateId: input.id, confirmMode: "found", error: null, step: "confirm" });
+  },
+
   startDescribe: (name) => {
     const session = get().session;
     const profile = session.kind === "none" ? undefined : repository.getProfile(session.userId);
@@ -670,7 +694,7 @@ export const useSession = create<SessionState>((set, get) => ({
   },
 
   useCatalogMatch: (templateId) => {
-    set({ selectedTemplateId: templateId, confirmMode: "found", error: null });
+    set({ selectedTemplateId: templateId, productionTemplateId: null, confirmMode: "found", error: null });
     get().confirmHolding();
   },
 
@@ -678,6 +702,7 @@ export const useSession = create<SessionState>((set, get) => ({
     const draft = get().pendingDraft;
     if (!draft) return;
     const session = get().session;
+    let productionTemplateId: string | null = null;
     if (session.kind === "auth") {
       const group = repository.getGroup(draft.groupId);
       const member = draft.memberId ? repository.getMember(draft.memberId) : undefined;
@@ -694,20 +719,36 @@ export const useSession = create<SessionState>((set, get) => ({
         set({ error: result.reason === "unauthenticated" ? "error.invalidCredentials" : "error.authUnavailable" });
         return;
       }
+      productionTemplateId = result.contribution.template.id;
+      const ownership = await createHolding({ templateId: productionTemplateId });
+      if (!ownership.ok) {
+        set({ error: ownership.reason === "unauthenticated" ? "error.invalidCredentials" : "error.authUnavailable" });
+        return;
+      }
+      set({ productionHoldingId: ownership.holding.id });
     }
     const created = repository.createCatalogItem(draft);
-    set({ selectedTemplateId: created.id, catalogMatches: [] });
+    set({ selectedTemplateId: created.id, productionTemplateId, catalogMatches: [] });
     get().confirmHolding();
   },
 
-  confirmHolding: () => {
-    const { session, selectedTemplateId } = get();
+  confirmHolding: async () => {
+    const { session, selectedTemplateId, productionTemplateId, productionHoldingId } = get();
     if (session.kind === "none" || !selectedTemplateId) return;
     const room = repository.getRoomByOwner(session.userId);
     const template = repository.getTemplate(selectedTemplateId);
     if (!room || !template) {
       set({ error: "error.roomNotReady" });
       return;
+    }
+    let durableHoldingId = productionHoldingId;
+    if (session.kind === "auth" && productionTemplateId && !durableHoldingId) {
+      const ownership = await createHolding({ templateId: productionTemplateId });
+      if (!ownership.ok) {
+        set({ error: ownership.reason === "unauthenticated" ? "error.invalidCredentials" : "error.authUnavailable" });
+        return;
+      }
+      durableHoldingId = ownership.holding.id;
     }
     const first =
       (session.kind === "local" || session.kind === "auth") && !repository.onboardingState(session.userId).firstHoldingComplete;
@@ -718,6 +759,7 @@ export const useSession = create<SessionState>((set, get) => ({
     repository.addHolding({
       ownerId: session.userId,
       templateId: selectedTemplateId,
+      ...(durableHoldingId ? { productionId: durableHoldingId } : {}),
       ...(zone ? { zoneId: zone.id, slot: slotForHome(template, home.zone, used) } : {}),
     });
     repository.markFirstHoldingComplete(session.userId);
@@ -731,6 +773,8 @@ export const useSession = create<SessionState>((set, get) => ({
         photo: null,
         candidates: [],
         selectedTemplateId: null,
+        productionTemplateId: null,
+        productionHoldingId: null,
         pendingDraft: null,
         catalogMatches: [],
         confirmMode: "identify",
@@ -746,6 +790,8 @@ export const useSession = create<SessionState>((set, get) => ({
       photo: null,
       candidates: [],
       selectedTemplateId: null,
+      productionTemplateId: null,
+      productionHoldingId: null,
       pendingDraft: null,
       catalogMatches: [],
       confirmMode: "identify",

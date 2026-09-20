@@ -65,6 +65,15 @@ export interface CollectionRepository {
   listReleases(groupId?: string): Release[];
   listTemplates(): CollectibleTemplate[];
   searchCatalog(query: string): CollectibleTemplate[];
+  adoptProductionCatalogTemplate(input: {
+    id: string;
+    name: string;
+    kind: CollectibleTemplate["kind"];
+    groupName: string;
+    memberName?: string | null;
+    releaseName?: string | null;
+    descriptor?: string;
+  }): TemplateId | undefined;
   findCatalogMatches(draft: CatalogDraft): CatalogMatch[];
   createCatalogItem(draft: CatalogDraft): CollectibleTemplate;
 
@@ -243,6 +252,7 @@ export interface CollectionRepository {
   addHolding(input: {
     ownerId: UserId;
     templateId: TemplateId;
+    productionId?: string;
     zoneId?: ZoneId;
     slot?: number;
     condition?: Holding["condition"];

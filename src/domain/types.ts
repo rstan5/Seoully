@@ -187,6 +187,8 @@ export interface Acquisition {
 /** One physical object owned by one user. */
 export interface Holding {
   id: HoldingId;
+  /** Durable production Holding id for authenticated-user projections. */
+  productionId?: string;
   ownerId: UserId;
   templateId: TemplateId;
   condition: Condition;

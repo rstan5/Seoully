@@ -23,6 +23,7 @@ import { IconHeart } from "@/world/ui/SocialIcons";
 import { SocialAvatar } from "@/world/ui/SocialAvatar";
 import { SocialShell } from "@/world/ui/SocialShell";
 import { useSession } from "@/world/store/sessionStore";
+import { removeHolding as removeProductionHolding } from "@/server/holdings/actions";
 import { clearProfilePreset, getProfilePreset, type ProfilePresetSection } from "@/world/store/profilePreset";
 
 export function CollectorProfile({
@@ -592,6 +593,7 @@ function OwnedRow({
 }) {
   const open = isOpenToTrade(view.holding.tradeStatus);
   const t = useT();
+  const session = useSession((state) => state.session);
   return (
     <div className="s-shelf-row">
       <ObjectTile
@@ -621,7 +623,13 @@ function OwnedRow({
           <button
             type="button"
             className="s-shelf-action"
-            onClick={() => repository.removeHolding(view.holding.id)}
+            onClick={async () => {
+              if (session.kind === "auth" && view.holding.productionId) {
+                const result = await removeProductionHolding({ holdingId: view.holding.productionId });
+                if (!result.ok || !result.result.removed) return;
+              }
+              repository.removeHolding(view.holding.id);
+            }}
           >
             {t("common.remove")}
           </button>

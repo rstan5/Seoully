@@ -1,4 +1,4 @@
-import { matchCatalog, type CatalogDraft, type CatalogMatch } from "./catalog-match";
+import { matchCatalog, normalizeCatalogName, type CatalogDraft, type CatalogMatch } from "./catalog-match";
 import {
   computeCompatibility,
   describeMatch,
@@ -257,6 +257,37 @@ export class MemoryCollectionRepository implements CollectionRepository {
           .some((value) => (value as string).toLowerCase().includes(q));
       })
       .slice(0, 24);
+  }
+  adoptProductionCatalogTemplate(input: {
+    id: string;
+    name: string;
+    kind: CollectibleTemplate["kind"];
+    groupName: string;
+    memberName?: string | null;
+    releaseName?: string | null;
+    descriptor?: string;
+  }): TemplateId | undefined {
+    const id = input.id as TemplateId;
+    if (this.getTemplate(id)) return id;
+    const group = GROUPS.find((item) => normalizeCatalogName(item.name) === normalizeCatalogName(input.groupName));
+    if (!group) return undefined;
+    const member = input.memberName ? MEMBERS.find((item) => item.groupId === group.id && normalizeCatalogName(item.stageName) === normalizeCatalogName(input.memberName!)) : undefined;
+    const release = input.releaseName ? RELEASES.find((item) => item.groupId === group.id && normalizeCatalogName(item.title) === normalizeCatalogName(input.releaseName!)) : undefined;
+    const template: CollectibleTemplate = {
+      id,
+      kind: input.kind,
+      name: input.name,
+      groupId: group.id,
+      rarity: "common",
+      material: materialForKind(input.kind),
+      colorway: { base: member?.color ?? group.palette.primary, accent: group.palette.secondary, ink: group.palette.accent },
+      ...(member ? { memberId: member.id } : {}),
+      ...(release ? { releaseId: release.id } : {}),
+    };
+    this.userTemplates.push(template);
+    this.persistLive();
+    this.notify();
+    return id;
   }
   findCatalogMatches(draft: CatalogDraft): CatalogMatch[] {
     return matchCatalog(draft, this.listTemplates());
@@ -1503,6 +1534,7 @@ export class MemoryCollectionRepository implements CollectionRepository {
   addHolding(input: {
     ownerId: UserId;
     templateId: TemplateId;
+    productionId?: string;
     zoneId?: ZoneId;
     slot?: number;
     condition?: Holding["condition"];
@@ -1510,6 +1542,7 @@ export class MemoryCollectionRepository implements CollectionRepository {
     const now = new Date().toISOString().slice(0, 10);
     const holding: Holding = {
       id: `h-${this.nextHoldingId++}` as HoldingId,
+      ...(input.productionId ? { productionId: input.productionId } : {}),
       ownerId: input.ownerId,
       templateId: input.templateId,
       condition: input.condition ?? "mint",

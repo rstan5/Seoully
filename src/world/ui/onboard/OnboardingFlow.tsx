@@ -299,11 +299,27 @@ function CollectForm() {
   const identifyPhoto = useSession((s) => s.identifyPhoto);
   const identifySample = useSession((s) => s.identifySample);
   const searchPick = useSession((s) => s.searchPick);
+  const searchPickProduction = useSession((s) => s.searchPickProduction);
   const startDescribe = useSession((s) => s.startDescribe);
   const closeCollect = useSession((s) => s.closeCollect);
   const looking = useSession((s) => s.looking);
   const [query, setQuery] = useState("");
+  const [sharedHits, setSharedHits] = useState<SharedCatalogHit[]>([]);
   const hits = useMemo(() => (query.trim() ? repository.searchCatalog(query) : []), [query]);
+  useEffect(() => {
+    if (session.kind !== "auth" || !query.trim()) {
+      setSharedHits([]);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void fetch(`/api/catalog/search?q=${encodeURIComponent(query.trim())}&limit=8`, { signal: controller.signal })
+        .then((response) => response.ok ? response.json() as Promise<{ results?: SharedCatalogHit[] }> : { results: [] })
+        .then((payload) => setSharedHits(payload.results ?? []))
+        .catch(() => setSharedHits([]));
+    }, 180);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [query, session.kind]);
   const first =
     (session.kind === "local" || session.kind === "auth") && !repository.onboardingState(session.userId).firstHoldingComplete;
   const t = useT();
@@ -384,6 +400,18 @@ function CollectForm() {
           );
         })}
       </ul>
+      {sharedHits.length > 0 && (
+        <ul className="onboard-search">
+          {sharedHits.map((template) => (
+            <li key={template.id}>
+              <button type="button" onClick={() => searchPickProduction(template)}>
+                <strong>{template.name}</strong>
+                <em>{[template.groupName, template.memberName, kindLabel(template.kind, t)].filter(Boolean).join(" · ")}</em>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       {query.trim() && hits.length === 0 && (
         <button type="button" className="onboard-btn" onClick={() => startDescribe(query)}>
           {t("catalog.addWhatYouHave")}
@@ -399,6 +427,16 @@ function CollectForm() {
       )}
     </>
   );
+}
+
+interface SharedCatalogHit {
+  id: string;
+  name: string;
+  kind: CollectibleKind;
+  groupName: string;
+  memberName: string | null;
+  releaseName: string | null;
+  descriptor: string;
 }
 
 function DescribeForm() {

@@ -26,6 +26,7 @@ import { useWorld, type WorldView } from "@/world/store/worldStore";
 import { HEART_FINALE, useHeartCompanion } from "@/world/store/heartCompanionStore";
 import type { MessageKey } from "@/locale/en";
 import { createSeoullyAccount, resolveCurrentSeoullyIdentity, signInToSeoully, signOutOfSeoully, updateMySeoullyProfile } from "@/server/auth/actions";
+import { contributeCatalogItem } from "@/server/catalog/actions";
 import type { CurrentProfilePatch } from "@/domain/identity";
 
 export type Gate = "booting" | "welcome" | "onboarding" | "ready";
@@ -88,7 +89,7 @@ interface SessionState {
   reviewDraft: (draft: CatalogDraft) => void;
   resolveDraft: () => void;
   useCatalogMatch: (templateId: TemplateId) => void;
-  createFromDraft: () => void;
+  createFromDraft: () => Promise<void>;
   confirmHolding: () => void;
   wantInstead: () => void;
   clearError: () => void;
@@ -673,9 +674,27 @@ export const useSession = create<SessionState>((set, get) => ({
     get().confirmHolding();
   },
 
-  createFromDraft: () => {
+  createFromDraft: async () => {
     const draft = get().pendingDraft;
     if (!draft) return;
+    const session = get().session;
+    if (session.kind === "auth") {
+      const group = repository.getGroup(draft.groupId);
+      const member = draft.memberId ? repository.getMember(draft.memberId) : undefined;
+      const release = draft.releaseId ? repository.getRelease(draft.releaseId) : undefined;
+      const result = await contributeCatalogItem({
+        name: draft.name,
+        kind: draft.kind,
+        groupName: group?.name ?? draft.groupId,
+        ...(member ? { memberName: member.stageName } : {}),
+        ...(release ? { releaseName: release.title } : {}),
+        ...(draft.imageUrl ? { descriptor: "community photo reference" } : {}),
+      });
+      if (!result.ok) {
+        set({ error: result.reason === "unauthenticated" ? "error.invalidCredentials" : "error.authUnavailable" });
+        return;
+      }
+    }
     const created = repository.createCatalogItem(draft);
     set({ selectedTemplateId: created.id, catalogMatches: [] });
     get().confirmHolding();

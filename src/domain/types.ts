@@ -726,6 +726,8 @@ export interface MediaRef {
 
 export interface IdentificationCandidate {
   templateId: TemplateId;
+  /** Server-resolved catalog id; never supplied by the vision model. */
+  productionTemplateId?: string;
   confidence: number;
   groupId: GroupId;
   memberId?: MemberId;

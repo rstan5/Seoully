@@ -30,6 +30,7 @@ import { createSeoullyAccount, resolveCurrentSeoullyIdentity, signInToSeoully, s
 import { contributeCatalogItem } from "@/server/catalog/actions";
 import { createHolding } from "@/server/holdings/actions";
 import { addWishlist } from "@/server/wishlist/actions";
+import { uploadPersonalMedia } from "@/world/store/productionMedia";
 import type { CurrentProfilePatch } from "@/domain/identity";
 
 export type Gate = "booting" | "welcome" | "onboarding" | "ready";
@@ -119,6 +120,8 @@ function hideHeart() {
 function resetHeart() {
   useHeartCompanion.getState().reset();
 }
+
+let confirmInFlight = false;
 
 function playHeart(messages: MessageKey | readonly MessageKey[], then?: () => void) {
   useHeartCompanion.getState().play(Array.isArray(messages) ? messages : [messages], then);
@@ -504,11 +507,31 @@ export const useSession = create<SessionState>((set, get) => ({
     const session = get().session;
     const profile = session.kind === "none" ? undefined : repository.getProfile(session.userId);
     try {
-      const candidates = await identification.identify({
-        image: read.media,
-        filename: file.name,
-        favoriteGroupIds: profile?.favoriteGroupIds,
-      });
+      let candidates: IdentificationCandidate[] = [];
+      if (session.kind === "auth") {
+        const formData = new FormData();
+        formData.set("file", file);
+        const response = await fetch("/api/identification", { method: "POST", body: formData });
+        if (!response.ok) throw new Error("identification_provider_unavailable");
+        const payload = await response.json() as { candidates?: Array<{ id: string; name: string; kind: CollectibleKind; groupName: string; memberName?: string | null; releaseName?: string | null; descriptor?: string }> };
+        candidates = (payload.candidates ?? []).flatMap((candidate, index) => {
+          const localId = repository.adoptProductionCatalogTemplate(candidate);
+          return localId ? [{
+            templateId: localId,
+            productionTemplateId: candidate.id,
+            confidence: index === 0 ? 0.8 : 0.62,
+            groupId: repository.getTemplate(localId)!.groupId,
+            kind: candidate.kind,
+            reason: "Possible catalog match",
+          }] : [];
+        });
+      } else {
+        candidates = await identification.identify({
+          image: read.media,
+          filename: file.name,
+          favoriteGroupIds: profile?.favoriteGroupIds,
+        });
+      }
       if (candidates.length === 0) {
         set({
           looking: false,
@@ -538,7 +561,21 @@ export const useSession = create<SessionState>((set, get) => ({
         step: "confirm",
       });
     } catch {
-      set({ looking: false, error: "error.identifyFailed" });
+      set({
+        looking: false,
+        error: null,
+        photo: read.media,
+        candidates: [],
+        selectedTemplateId: null,
+        pendingDraft: {
+          name: "",
+          kind: "photocard",
+          groupId: (profile?.favoriteGroupIds[0] ?? repository.listGroups()[0]?.id ?? "") as GroupId,
+        },
+        catalogMatches: [],
+        confirmMode: "draft",
+        step: "describe",
+      });
     }
   },
 
@@ -734,19 +771,25 @@ export const useSession = create<SessionState>((set, get) => ({
   },
 
   confirmHolding: async () => {
-    const { session, selectedTemplateId, productionTemplateId, productionHoldingId } = get();
-    if (session.kind === "none" || !selectedTemplateId) return;
+    if (confirmInFlight) return;
+    confirmInFlight = true;
+    const { session, selectedTemplateId, productionTemplateId, productionHoldingId, photo, candidates } = get();
+    if (session.kind === "none" || !selectedTemplateId) { confirmInFlight = false; return; }
     const room = repository.getRoomByOwner(session.userId);
     const template = repository.getTemplate(selectedTemplateId);
     if (!room || !template) {
       set({ error: "error.roomNotReady" });
+      confirmInFlight = false;
       return;
     }
     let durableHoldingId = productionHoldingId;
-    if (session.kind === "auth" && productionTemplateId && !durableHoldingId) {
-      const ownership = await createHolding({ templateId: productionTemplateId });
+    const selectedCandidate = candidates.find((candidate) => candidate.templateId === selectedTemplateId);
+    const confirmedProductionTemplateId = productionTemplateId ?? selectedCandidate?.productionTemplateId ?? null;
+    if (session.kind === "auth" && confirmedProductionTemplateId && !durableHoldingId) {
+      const ownership = await createHolding({ templateId: confirmedProductionTemplateId });
       if (!ownership.ok) {
         set({ error: ownership.reason === "unauthenticated" ? "error.invalidCredentials" : "error.authUnavailable" });
+        confirmInFlight = false;
         return;
       }
       durableHoldingId = ownership.holding.id;
@@ -769,6 +812,14 @@ export const useSession = create<SessionState>((set, get) => ({
         void import("@/world/store/roomPersistence").then(({ persistLocalPlacement }) =>
           persistLocalPlacement(room.id, localHolding.id));
       }
+      if (photo) {
+        try {
+          const mediaResult = await uploadPersonalMedia(durableHoldingId, photo);
+          if (!mediaResult.ok) set({ error: "error.authUnavailable" });
+        } catch {
+          set({ error: "error.authUnavailable" });
+        }
+      }
     }
     repository.markFirstHoldingComplete(session.userId);
     if (first) {
@@ -787,6 +838,7 @@ export const useSession = create<SessionState>((set, get) => ({
         catalogMatches: [],
         confirmMode: "identify",
       });
+      confirmInFlight = false;
       return;
     }
     enterHome(session.userId, home.zone, selectedTemplateId);
@@ -804,6 +856,7 @@ export const useSession = create<SessionState>((set, get) => ({
       catalogMatches: [],
       confirmMode: "identify",
     });
+    confirmInFlight = false;
   },
 
   wantInstead: async () => {

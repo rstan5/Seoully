@@ -11,12 +11,17 @@ const pageSchema = z.object({
 
 const templateIdSchema = z.object({ templateId: z.string().uuid() }).strict();
 const holdingIdSchema = z.object({ holdingId: z.string().uuid() }).strict();
+const tradeStateSchema = z.object({
+  holdingId: z.string().uuid(),
+  tradeStatus: z.enum(["not-for-trade", "for-trade"]),
+}).strict();
 
 export interface HoldingDTO {
   id: string;
   ownerUserId: string;
   templateId: string;
   acquiredAt: string;
+  tradeStatus: "not-for-trade" | "for-trade";
   createdAt: string;
   updatedAt: string;
   template: {
@@ -50,7 +55,7 @@ export async function createMyHolding(input: unknown): Promise<HoldingDTO> {
   const { data: holding, error } = await supabase
     .from("holdings")
     .insert({ owner_user_id: identity.user.id, template_id: template.id })
-    .select("id,owner_user_id,template_id,acquired_at,created_at,updated_at")
+    .select("id,owner_user_id,template_id,acquired_at,created_at,updated_at,trade_status")
     .single();
   if (error || !holding) throw new Error("holding_create_failed");
   const [result] = await hydrateHoldings([holding], supabase);
@@ -65,7 +70,7 @@ export async function listMyHoldings(input?: unknown): Promise<HoldingDTO[]> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("holdings")
-    .select("id,owner_user_id,template_id,acquired_at,created_at,updated_at")
+    .select("id,owner_user_id,template_id,acquired_at,created_at,updated_at,trade_status")
     .eq("owner_user_id", identity.user.id)
     .order("created_at", { ascending: false })
     .range(page.offset, page.offset + page.limit - 1);
@@ -80,7 +85,7 @@ export async function getMyHolding(input: unknown): Promise<HoldingDTO | null> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("holdings")
-    .select("id,owner_user_id,template_id,acquired_at,created_at,updated_at")
+    .select("id,owner_user_id,template_id,acquired_at,created_at,updated_at,trade_status")
     .eq("id", holdingId)
     .eq("owner_user_id", identity.user.id)
     .maybeSingle();
@@ -88,6 +93,25 @@ export async function getMyHolding(input: unknown): Promise<HoldingDTO | null> {
   if (!data) return null;
   const [result] = await hydrateHoldings([data], supabase);
   return result ?? null;
+}
+
+export async function setMyHoldingTradeStatus(input: unknown): Promise<HoldingDTO> {
+  const { holdingId, tradeStatus } = tradeStateSchema.parse(input);
+  const identity = await getCurrentIdentity();
+  if (!identity) throw new Error("unauthenticated");
+  const supabase = await createSupabaseServerClient();
+  const { data: holding, error } = await supabase
+    .from("holdings")
+    .update({ trade_status: tradeStatus })
+    .eq("id", holdingId)
+    .eq("owner_user_id", identity.user.id)
+    .select("id,owner_user_id,template_id,acquired_at,created_at,updated_at,trade_status")
+    .maybeSingle();
+  if (error) throw new Error("holding_trade_update_failed");
+  if (!holding) throw new Error("holding_not_found");
+  const [result] = await hydrateHoldings([holding], supabase);
+  if (!result) throw new Error("holding_trade_update_failed");
+  return result;
 }
 
 export async function removeMyHolding(input: unknown): Promise<{ removed: boolean }> {
@@ -132,6 +156,7 @@ async function hydrateHoldings(rows: Array<Record<string, unknown>>, supabase: A
     return [{
       id: String(row.id), ownerUserId: String(row.owner_user_id), templateId: String(row.template_id),
       acquiredAt: String(row.acquired_at), createdAt: String(row.created_at), updatedAt: String(row.updated_at),
+      tradeStatus: row.trade_status === "for-trade" ? "for-trade" : "not-for-trade",
       template: {
         id: String(template.id), name: String(template.name), kind: String(template.kind), descriptor: String(template.descriptor ?? ""), status: String(template.status),
         groupId: String(template.group_id), groupName: groupMap.get(String(template.group_id)) ?? "",

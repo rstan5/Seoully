@@ -29,6 +29,7 @@ import type { MessageKey } from "@/locale/en";
 import { createSeoullyAccount, resolveCurrentSeoullyIdentity, signInToSeoully, signOutOfSeoully, updateMySeoullyProfile } from "@/server/auth/actions";
 import { contributeCatalogItem } from "@/server/catalog/actions";
 import { createHolding } from "@/server/holdings/actions";
+import { addWishlist } from "@/server/wishlist/actions";
 import type { CurrentProfilePatch } from "@/domain/identity";
 
 export type Gate = "booting" | "welcome" | "onboarding" | "ready";
@@ -104,7 +105,7 @@ interface SessionState {
   useCatalogMatch: (templateId: TemplateId) => void;
   createFromDraft: () => Promise<void>;
   confirmHolding: () => Promise<void>;
-  wantInstead: () => void;
+  wantInstead: () => Promise<void>;
   clearError: () => void;
   openCollect: () => void;
   closeCollect: () => void;
@@ -762,6 +763,13 @@ export const useSession = create<SessionState>((set, get) => ({
       ...(durableHoldingId ? { productionId: durableHoldingId } : {}),
       ...(zone ? { zoneId: zone.id, slot: slotForHome(template, home.zone, used) } : {}),
     });
+    if (session.kind === "auth" && durableHoldingId) {
+      const localHolding = repository.listHoldings(session.userId).find((holding) => holding.productionId === durableHoldingId);
+      if (localHolding) {
+        void import("@/world/store/roomPersistence").then(({ persistLocalPlacement }) =>
+          persistLocalPlacement(room.id, localHolding.id));
+      }
+    }
     repository.markFirstHoldingComplete(session.userId);
     if (first) {
       hideHeart();
@@ -798,9 +806,16 @@ export const useSession = create<SessionState>((set, get) => ({
     });
   },
 
-  wantInstead: () => {
-    const { session, selectedTemplateId } = get();
+  wantInstead: async () => {
+    const { session, selectedTemplateId, productionTemplateId } = get();
     if (session.kind === "none" || !selectedTemplateId) return;
+    if (session.kind === "auth" && productionTemplateId) {
+      const result = await addWishlist({ templateId: productionTemplateId });
+      if (!result.ok) {
+        set({ error: result.reason === "unauthenticated" ? "error.invalidCredentials" : "error.authUnavailable" });
+        return;
+      }
+    }
     repository.addToWishlist(session.userId, selectedTemplateId);
     set({
       step: "collect",

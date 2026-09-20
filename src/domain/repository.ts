@@ -176,6 +176,7 @@ export interface CollectionRepository {
   listHoldingViews(userId: UserId): HoldingView[];
   getHoldingView(holdingId: string): HoldingView | undefined;
   listWishlist(userId: UserId): WishlistItem[];
+  replaceWishlist(userId: UserId, templateIds: TemplateId[]): void;
   addToWishlist(userId: UserId, templateId: TemplateId): void;
   removeFromWishlist(userId: UserId, templateId: TemplateId): void;
   isWanted(userId: UserId, templateId: TemplateId): boolean;
@@ -235,6 +236,8 @@ export interface CollectionRepository {
   canRedoRoom(roomId: RoomId): boolean;
   undoRoom(roomId: RoomId): void;
   redoRoom(roomId: RoomId): void;
+  /** Replaces only production-backed collectible placements after server hydration. */
+  replaceProductionPlacements(roomId: RoomId, placements: Placement[]): void;
   exportRoomLayout(roomId: RoomId): RoomLayout;
 
   // Derived

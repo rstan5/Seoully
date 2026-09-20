@@ -21,6 +21,7 @@ import { DecorLayer } from "@/world/edit/DecorLayer";
 import { FreeLayer, type FreeHolding } from "@/world/edit/FreeLayer";
 import { SurfaceHint } from "@/world/edit/Grounding";
 import { useRoomEdit } from "@/world/edit/useRoomEdit";
+import { syncProductionRoom } from "@/world/store/roomPersistence";
 import type { ArrangeContext } from "@/world/edit/arrange";
 import { ShelfZone } from "@/world/zones/ShelfZone";
 import { WallZone } from "@/world/zones/WallZone";
@@ -398,8 +399,8 @@ export function Room({
           selected={edit.selected}
           canUndo={repository.canUndoRoom(room.id)}
           canRedo={repository.canRedoRoom(room.id)}
-          onUndo={() => repository.undoRoom(room.id)}
-          onRedo={() => repository.redoRoom(room.id)}
+          onUndo={() => { repository.undoRoom(room.id); void syncProductionRoom(room.id); }}
+          onRedo={() => { repository.redoRoom(room.id); void syncProductionRoom(room.id); }}
           onStore={edit.storeSelected}
           onDone={finishRoomIntro}
           onPlaceDecor={(asset, event) => edit.placeDecor(asset.id, event)}

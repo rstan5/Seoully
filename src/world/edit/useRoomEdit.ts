@@ -24,6 +24,7 @@ import type {
 } from "@/domain/types";
 import { editPose, scaleAtDepth } from "@/world/stage/camera";
 import { useViewport } from "@/world/stage/useViewport";
+import { persistLocalPlacement, removeLocalPlacement } from "@/world/store/roomPersistence";
 
 export type PlacedSubject =
   | { kind: "holding"; id: HoldingId }
@@ -263,6 +264,7 @@ export function useRoomEdit(room: Room | undefined, editing: boolean) {
       }
       if (subject.kind === "spawn-holding") {
         repository.restorePlacement(room.id, subject.id, transform, surfaceId);
+        void persistLocalPlacement(room.id, subject.id);
         setSelected({ kind: "holding", id: subject.id });
         setLive(null);
         return;
@@ -275,6 +277,7 @@ export function useRoomEdit(room: Room | undefined, editing: boolean) {
       }
       if (subject.kind === "holding") {
         repository.movePlacement(room.id, subject.id, { transform, surfaceId });
+        void persistLocalPlacement(room.id, subject.id);
       } else {
         repository.moveRoomObject(subject.id, { transform, zone, surfaceId });
       }
@@ -293,7 +296,10 @@ export function useRoomEdit(room: Room | undefined, editing: boolean) {
 
   const storeSelected = useCallback(() => {
     if (!selected || !room) return;
-    if (selected.kind === "holding") repository.storePlacement(room.id, selected.id);
+    if (selected.kind === "holding") {
+      repository.storePlacement(room.id, selected.id);
+      void removeLocalPlacement(room.id, selected.id);
+    }
     else if (selected.kind === "decor") repository.storeRoomObject(selected.id);
     else return;
     clear();

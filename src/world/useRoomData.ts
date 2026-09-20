@@ -4,6 +4,7 @@ import { useEffect, useMemo } from "react";
 import { hydrateRoomLayouts, repository } from "@/domain/memory-repository";
 import { useRepoRevision } from "@/domain/use-repository";
 import type { HoldingView, Placement, Room, RoomId, RoomObject, Transform3D, ZoneKind } from "@/domain/types";
+import { hydrateProductionRoom } from "@/world/store/roomPersistence";
 
 export interface ZoneContents {
   /** Items packed into each zone. Freed placements are omitted. */
@@ -35,7 +36,8 @@ export function useRoomData(
   const revision = useRepoRevision();
   useEffect(() => {
     hydrateRoomLayouts();
-  }, []);
+    void hydrateProductionRoom(roomId);
+  }, [roomId]);
   return useMemo(() => {
     const room = repository.getRoom(roomId);
     const byKind: Record<ZoneKind, HoldingView[]> = {

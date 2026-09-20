@@ -195,6 +195,9 @@ export class MemoryCollectionRepository implements CollectionRepository {
   private hydrated = false;
   private locale: Locale = "en";
   private userTemplates: CollectibleTemplate[] = [];
+  /** Transitional entities needed to render production catalog records in the frozen local UI. */
+  private productionGroups = new Map<GroupId, Group>();
+  private productionMembers = new Map<MemberId, Member>();
 
   getLocale(): Locale {
     return this.locale;
@@ -208,10 +211,10 @@ export class MemoryCollectionRepository implements CollectionRepository {
   // --- Catalog ------------------------------------------------------------
 
   getGroup(id: string): Group | undefined {
-    return GROUP_BY_ID.get(id);
+    return GROUP_BY_ID.get(id) ?? this.productionGroups.get(id as GroupId);
   }
   getMember(id: string): Member | undefined {
-    return MEMBER_BY_ID.get(id);
+    return MEMBER_BY_ID.get(id) ?? this.productionMembers.get(id as MemberId);
   }
   getEra(id: string): Era | undefined {
     return ERA_BY_ID.get(id);
@@ -269,9 +272,32 @@ export class MemoryCollectionRepository implements CollectionRepository {
   }): TemplateId | undefined {
     const id = input.id as TemplateId;
     if (this.getTemplate(id)) return id;
-    const group = GROUPS.find((item) => normalizeCatalogName(item.name) === normalizeCatalogName(input.groupName));
-    if (!group) return undefined;
-    const member = input.memberName ? MEMBERS.find((item) => item.groupId === group.id && normalizeCatalogName(item.stageName) === normalizeCatalogName(input.memberName!)) : undefined;
+    let group = GROUPS.find((item) => normalizeCatalogName(item.name) === normalizeCatalogName(input.groupName));
+    if (!group) {
+      const id = `production-group-${normalizeCatalogName(input.groupName).replace(/[^a-z0-9_-]/g, "-").slice(0, 48)}` as GroupId;
+      group = this.productionGroups.get(id) ?? {
+        id,
+        name: input.groupName.trim(),
+        debutYear: 0,
+        memberIds: [],
+        palette: { primary: "#e8567f", secondary: "#fbe3ec", accent: "#ff8fb1" },
+      };
+      this.productionGroups.set(group.id, group);
+    }
+    let member = input.memberName
+      ? MEMBERS.find((item) => item.groupId === group!.id && normalizeCatalogName(item.stageName) === normalizeCatalogName(input.memberName!))
+      : undefined;
+    if (input.memberName && !member) {
+      const id = `production-member-${group.id}-${normalizeCatalogName(input.memberName).replace(/[^a-z0-9_-]/g, "-").slice(0, 40)}` as MemberId;
+      member = this.productionMembers.get(id) ?? {
+        id,
+        groupId: group.id,
+        stageName: input.memberName.trim(),
+        color: group.palette.primary,
+      };
+      this.productionMembers.set(member.id, member);
+      if (!group.memberIds.includes(member.id)) group.memberIds.push(member.id);
+    }
     const release = input.releaseName ? RELEASES.find((item) => item.groupId === group.id && normalizeCatalogName(item.title) === normalizeCatalogName(input.releaseName!)) : undefined;
     const template: CollectibleTemplate = {
       id,
@@ -1056,6 +1082,19 @@ export class MemoryCollectionRepository implements CollectionRepository {
       .sort((a, b) => b.intensity - a.intensity);
   }
 
+  replaceWishlist(userId: UserId, templateIds: TemplateId[]): void {
+    const wanted = new Set(templateIds);
+    const next = this.wishlist.filter((item) => item.userId !== userId || wanted.has(item.templateId));
+    const existing = new Set(next.filter((item) => item.userId === userId).map((item) => item.templateId));
+    for (const templateId of wanted) {
+      if (existing.has(templateId)) continue;
+      next.push({ userId, templateId, addedAt: new Date().toISOString().slice(0, 10), intensity: 3 });
+    }
+    this.wishlist = next;
+    this.persistLive();
+    this.notify();
+  }
+
   addToWishlist(userId: UserId, templateId: TemplateId): void {
     if (this.isWanted(userId, templateId)) return;
     this.wishlist.push({
@@ -1300,6 +1339,19 @@ export class MemoryCollectionRepository implements CollectionRepository {
     const next = hist.future.pop()!;
     this.applyLayout(roomId, next);
     this.persist(roomId);
+    this.notify();
+  }
+
+  replaceProductionPlacements(roomId: RoomId, placements: Placement[]): void {
+    const productionHoldingIds = new Set(
+      this.holdings.filter((holding) => holding.productionId).map((holding) => holding.id),
+    );
+    const current = this.placements.get(roomId) ?? [];
+    const localOnly = current.filter((placement) => !productionHoldingIds.has(placement.holdingId));
+    const hydrated = placements.filter((placement) => productionHoldingIds.has(placement.holdingId));
+    this.placements.set(roomId, [...localOnly, ...hydrated.map((placement) => ({ ...placement }))]);
+    this.persist(roomId);
+    this.persistLive();
     this.notify();
   }
 

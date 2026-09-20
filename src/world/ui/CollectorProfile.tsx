@@ -23,7 +23,8 @@ import { IconHeart } from "@/world/ui/SocialIcons";
 import { SocialAvatar } from "@/world/ui/SocialAvatar";
 import { SocialShell } from "@/world/ui/SocialShell";
 import { useSession } from "@/world/store/sessionStore";
-import { removeHolding as removeProductionHolding } from "@/server/holdings/actions";
+import { listHoldings, removeHolding as removeProductionHolding, setHoldingTradeStatus as setProductionTradeStatus } from "@/server/holdings/actions";
+import { addWishlist, listWishlist, removeWishlist } from "@/server/wishlist/actions";
 import { clearProfilePreset, getProfilePreset, type ProfilePresetSection } from "@/world/store/profilePreset";
 
 export function CollectorProfile({
@@ -50,6 +51,40 @@ export function CollectorProfile({
   const [wishlistExpanded, setWishlistExpanded] = useState(false);
   const t = useT();
   const locale = useLocale();
+  const session = useSession((state) => state.session);
+
+  useEffect(() => {
+    if (!isSelfUser(userId, viewerId) || session.kind !== "auth") return;
+    let cancelled = false;
+    void Promise.all([listWishlist({ limit: 100 }), listHoldings({ limit: 100 })]).then(([wishlistResult, holdingsResult]) => {
+      if (cancelled) return;
+      if (wishlistResult.ok) {
+        const localIds = wishlistResult.entries.flatMap((entry) => {
+          const localId = repository.adoptProductionCatalogTemplate({
+            id: entry.template.id,
+            name: entry.template.name,
+            kind: entry.template.kind,
+            groupName: entry.template.groupName,
+            memberName: entry.template.memberName,
+            releaseName: entry.template.releaseName,
+            descriptor: entry.template.descriptor,
+          });
+          return localId ? [localId] : [];
+        });
+        repository.replaceWishlist(viewerId, localIds);
+      }
+      if (holdingsResult.ok) {
+        const localHoldings = repository.listHoldings(viewerId);
+        for (const production of holdingsResult.holdings) {
+          const local = localHoldings.find((holding) => holding.productionId === production.id);
+          if (local && local.tradeStatus !== production.tradeStatus) {
+            repository.setHoldingTradeStatus(local.id, production.tradeStatus);
+          }
+        }
+      }
+    });
+    return () => { cancelled = true; };
+  }, [userId, viewerId, session.kind]);
 
   useEffect(() => {
     const apply = (request: { userId: string; section: ProfilePresetSection }) => {
@@ -450,7 +485,13 @@ export function CollectorProfile({
                     <button
                       type="button"
                       className="s-shelf-action"
-                      onClick={() => repository.removeFromWishlist(userId, template.id)}
+                      onClick={async () => {
+                        if (session.kind === "auth" && isUuid(template.id)) {
+                          const result = await removeWishlist({ templateId: template.id });
+                          if (!result.ok) return;
+                        }
+                        repository.removeFromWishlist(userId, template.id);
+                      }}
                     >
                       {t("common.remove")}
                     </button>
@@ -614,9 +655,14 @@ function OwnedRow({
           <button
             type="button"
             className={`s-shelf-action${open ? " is-on" : ""}`}
-            onClick={() =>
-              repository.setHoldingTradeStatus(view.holding.id, open ? "not-for-trade" : "for-trade")
-            }
+            onClick={async () => {
+              const next = open ? "not-for-trade" : "for-trade";
+              if (session.kind === "auth" && view.holding.productionId) {
+                const result = await setProductionTradeStatus({ holdingId: view.holding.productionId, tradeStatus: next });
+                if (!result.ok) return;
+              }
+              repository.setHoldingTradeStatus(view.holding.id, next);
+            }}
           >
             {open ? t("profile.openToTrade") : t("profile.notForTrade")}
           </button>
@@ -648,7 +694,24 @@ function WishlistSearch({
   onQuery: (value: string) => void;
   viewerId: UserId;
 }) {
-  const hits = query.trim() ? repository.searchCatalog(query).slice(0, 6) : [];
+  const session = useSession((state) => state.session);
+  const [sharedHits, setSharedHits] = useState<Array<{
+    id: string; name: string; kind: import("@/domain/types").CollectibleKind; groupName: string;
+    memberName: string | null; releaseName: string | null; descriptor: string;
+  }>>([]);
+  useEffect(() => {
+    if (session.kind !== "auth" || !query.trim()) { setSharedHits([]); return; }
+    const timer = window.setTimeout(() => {
+      void fetch(`/api/catalog/search?q=${encodeURIComponent(query)}&limit=6`)
+        .then((response) => response.ok ? response.json() : { results: [] })
+        .then((payload: { results?: typeof sharedHits }) => setSharedHits(payload.results ?? []))
+        .catch(() => setSharedHits([]));
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [query, session.kind]);
+  const hits = query.trim()
+    ? repository.searchCatalog(query).filter((template) => session.kind !== "auth" || isUuid(template.id)).slice(0, 6)
+    : [];
   const t = useT();
   return (
     <div className="s-shelf-search">
@@ -670,7 +733,11 @@ function WishlistSearch({
                 <button
                   type="button"
                   disabled={wanted}
-                  onClick={() => {
+                  onClick={async () => {
+                    if (session.kind === "auth" && isUuid(template.id)) {
+                      const result = await addWishlist({ templateId: template.id });
+                      if (!result.ok) return;
+                    }
                     repository.addToWishlist(viewerId, template.id);
                     onQuery("");
                   }}
@@ -683,8 +750,37 @@ function WishlistSearch({
           })}
         </ul>
       )}
+      {sharedHits.length > 0 && (
+        <ul>
+          {sharedHits.map((hit) => (
+            <li key={`shared-${hit.id}`}>
+              <button
+                type="button"
+                onClick={async () => {
+                  const result = await addWishlist({ templateId: hit.id });
+                  if (!result.ok) return;
+                  const localId = repository.adoptProductionCatalogTemplate(hit);
+                  if (localId) repository.addToWishlist(viewerId, localId);
+                  onQuery("");
+                }}
+              >
+                <strong>{hit.name}</strong>
+                <em>{[hit.groupName, hit.memberName, hit.releaseName, kindLabel(hit.kind, t)].filter(Boolean).join(" · ")}</em>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
+}
+
+function isSelfUser(userId: UserId, viewerId: UserId): boolean {
+  return userId === viewerId;
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function GridThumb({ post }: { post: Post }) {

@@ -41,8 +41,10 @@ function aggregate(person: PairPerson, templateIds: Set<string>): TradeRelations
 export async function getTradeOpportunity(input: unknown): Promise<TradeOpportunity> {
   const { targetUserId } = inputSchema.parse(input);
   const snapshot = await getCollectionPairSnapshot(targetUserId);
-  const a = snapshot.actor!;
-  const b = snapshot.target!;
+  return computeTradeOpportunity(snapshot.actor!, snapshot.target!, targetUserId, snapshot.target_collection_public !== false, snapshot.target_wishlist_public !== false);
+}
+
+export function computeTradeOpportunity(a: PairPerson, b: PairPerson, targetUserId: string, collectionVisible = true, wishlistVisible = true): TradeOpportunity {
   const aOwned = new Set(a.holdings.map((holding) => holding.template_id));
   const bOwned = new Set(b.holdings.map((holding) => holding.template_id));
   const aWants = new Set(a.wishlist_template_ids);
@@ -58,7 +60,7 @@ export async function getTradeOpportunity(input: unknown): Promise<TradeOpportun
   const strength: TradeStrength = reciprocalForTrade ? "RECIPROCAL_FOR_TRADE" : reciprocal ? "RECIPROCAL" : (theyOwnThatIWant.length || iOwnThatTheyWant.length) ? "ONE_WAY" : "NONE";
   return {
     userId: a.user_id,
-    targetUserId: b.user_id,
+    targetUserId,
     theyOwnThatIWant,
     theyHaveForTradeThatIWant,
     iOwnThatTheyWant,
@@ -66,6 +68,6 @@ export async function getTradeOpportunity(input: unknown): Promise<TradeOpportun
     reciprocal,
     reciprocalForTrade,
     strength,
-    visibility: { collectionVisible: snapshot.target_collection_public !== false, wishlistVisible: snapshot.target_wishlist_public !== false },
+    visibility: { collectionVisible, wishlistVisible },
   };
 }

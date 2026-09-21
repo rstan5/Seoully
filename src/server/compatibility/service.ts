@@ -40,8 +40,10 @@ const releases = (person: PairPerson) => person.holdings.flatMap((holding) => ho
 export async function getCollectorCompatibility(input: unknown): Promise<CompatibilityResult> {
   const { targetUserId } = inputSchema.parse(input);
   const snapshot = await getCollectionPairSnapshot(targetUserId);
-  const a = snapshot.actor!;
-  const b = snapshot.target!;
+  return computeCompatibilityPeople(snapshot.actor!, snapshot.target!, targetUserId, snapshot.target_collection_public === false);
+}
+
+export function computeCompatibilityPeople(a: PairPerson, b: PairPerson, targetUserId: string, visibilityLimited = false): CompatibilityResult {
   const templateOverlap = overlap(setOf(owned(a)), setOf(owned(b)));
   const groupOverlap = overlap(setOf(groups(a)), setOf(groups(b)));
   const memberOverlap = overlap(setOf(members(a)), setOf(members(b)));
@@ -73,10 +75,10 @@ export async function getCollectorCompatibility(input: unknown): Promise<Compati
   ] as CompatibilityReason[]).filter((reason) => reason.count > 0).slice(0, MAX_REASONS);
   return {
     userId: a.user_id,
-    targetUserId: b.user_id,
+    targetUserId,
     score,
     evidenceStrength,
-    visibilityLimited: snapshot.target_collection_public === false,
+    visibilityLimited,
     componentScores: Object.fromEntries(Object.entries(components).map(([key, value]) => [key, Math.round(value * 100)])) as CompatibilityResult["componentScores"],
     sharedTemplates: templateOverlap.ids.slice(0, 50),
     sharedGroups: groupOverlap.ids.slice(0, 50),

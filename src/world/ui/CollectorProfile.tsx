@@ -19,12 +19,14 @@ import { CollectibleMatch, type MatchOpen } from "@/world/ui/CollectibleMatch";
 import { EditProfile } from "@/world/ui/EditProfile";
 import { ObjectTile } from "@/world/ui/ObjectTile";
 import { PostCard } from "@/world/ui/PostCard";
+import { ProductionProfilePosts } from "@/world/ui/ProductionProfilePosts";
 import { IconHeart } from "@/world/ui/SocialIcons";
 import { SocialAvatar } from "@/world/ui/SocialAvatar";
 import { SocialShell } from "@/world/ui/SocialShell";
 import { useSession } from "@/world/store/sessionStore";
 import { listHoldings, removeHolding as removeProductionHolding, setHoldingTradeStatus as setProductionTradeStatus } from "@/server/holdings/actions";
 import { addWishlist, listWishlist, removeWishlist } from "@/server/wishlist/actions";
+import { productionFollow, productionFollowState, productionUnfollow } from "@/server/social/actions";
 import { clearProfilePreset, getProfilePreset, type ProfilePresetSection } from "@/world/store/profilePreset";
 
 export function CollectorProfile({
@@ -49,9 +51,24 @@ export function CollectorProfile({
   const [editing, setEditing] = useState(false);
   const [ownedExpanded, setOwnedExpanded] = useState(false);
   const [wishlistExpanded, setWishlistExpanded] = useState(false);
+  const [productionFollowing, setProductionFollowing] = useState<boolean | null>(null);
+  const [productionFollowerCount, setProductionFollowerCount] = useState<number | null>(null);
+  const [productionFollowingCount, setProductionFollowingCount] = useState<number | null>(null);
   const t = useT();
   const locale = useLocale();
   const session = useSession((state) => state.session);
+
+  useEffect(() => {
+    if (session.kind !== "auth" || !isUuid(userId)) return;
+    let cancelled = false;
+    void productionFollowState(userId).then((result) => {
+      if (cancelled || !result.ok) return;
+      setProductionFollowing(result.state.following);
+      setProductionFollowerCount(result.state.followers);
+      setProductionFollowingCount(result.state.followingCount);
+    });
+    return () => { cancelled = true; };
+  }, [session.kind, userId]);
 
   useEffect(() => {
     if (!isSelfUser(userId, viewerId) || session.kind !== "auth") return;
@@ -141,9 +158,9 @@ export function CollectorProfile({
       stored,
       wants,
       isSelf,
-      following: repository.isFollowing(viewerId, userId),
-      followerCount: repository.listFollowers(userId).length,
-      followingCount: repository.listFollowing(userId).length,
+      following: productionFollowing ?? repository.isFollowing(viewerId, userId),
+      followerCount: productionFollowerCount ?? repository.listFollowers(userId).length,
+      followingCount: productionFollowingCount ?? repository.listFollowing(userId).length,
       groups: profile.favoriteGroupIds
         .map((id) => repository.getGroup(id))
         .filter((g): g is NonNullable<typeof g> => g !== undefined),
@@ -154,7 +171,7 @@ export function CollectorProfile({
         .map((id) => repository.getEra(id))
         .filter((e): e is NonNullable<typeof e> => e !== undefined),
     };
-  }, [userId, viewerId, revision]);
+  }, [userId, viewerId, revision, productionFollowing, productionFollowerCount, productionFollowingCount]);
 
   if (!data) return null;
   const { user, profile, stats, isSelf, following } = data;
@@ -167,7 +184,14 @@ export function CollectorProfile({
     );
   }
 
-  const toggleFollow = () => {
+  const toggleFollow = async () => {
+    if (session.kind === "auth" && isUuid(userId)) {
+      const result = following ? await productionUnfollow(userId) : await productionFollow(userId);
+      if (!result.ok) return;
+      setProductionFollowing(result.state.following);
+      setProductionFollowerCount((count) => Math.max(0, (count ?? 0) + (result.state.following ? 1 : -1)));
+      return;
+    }
     if (following) repository.unfollow(viewerId, userId);
     else repository.follow(viewerId, userId);
   };
@@ -386,7 +410,15 @@ export function CollectorProfile({
           </section>
         )}
 
-        {openPost ? (
+        {session.kind === "auth" && isUuid(userId) ? (
+          <CollectionShelf
+            title={t("profile.postsTitle")}
+            empty={t("profile.emptyPosts")}
+            showEmpty={false}
+          >
+            <ProductionProfilePosts userId={userId} viewerId={viewerId} onViewProfile={onViewProfile} />
+          </CollectionShelf>
+        ) : openPost ? (
           <div className="s-profile-post">
             <button type="button" className="s-back-posts" onClick={() => setOpenPost(null)}>
               {t("profile.postsTitle")}

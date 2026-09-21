@@ -6,6 +6,7 @@ import type { PostId, TemplateId, UserId } from "@/domain/types";
 import { Room } from "@/world/Room";
 import { CollectorProfile } from "@/world/ui/CollectorProfile";
 import { CollectorFeed } from "@/world/ui/CollectorFeed";
+import { ProductionFeed } from "@/world/ui/ProductionFeed";
 import { CollectorInbox } from "@/world/ui/CollectorInbox";
 import { CollectorNotices } from "@/world/ui/CollectorNotices";
 import { CollectorSearch } from "@/world/ui/CollectorSearch";
@@ -34,6 +35,7 @@ export default function Page() {
   const boot = useSession((s) => s.boot);
   const roomId = useWorld((s) => s.roomId);
   const viewerId = useWorld((s) => s.viewerId);
+  const session = useSession((s) => s.session);
   const view = useWorld((s) => s.view);
   const traversal = useWorld((s) => s.traversal);
   const showProfile = useWorld((s) => s.showProfile);
@@ -146,7 +148,9 @@ export default function Page() {
         />
       )}
       {view.kind === "feed" && (
-        <CollectorFeed viewerId={viewerId} onViewProfile={showProfile} onShare={startShare} />
+        isUuid(viewerId) && session.kind === "auth"
+          ? <ProductionFeed viewerId={viewerId} onViewProfile={showProfile} />
+          : <CollectorFeed viewerId={viewerId} onViewProfile={showProfile} onShare={startShare} />
       )}
       {view.kind === "search" && (
         <CollectorSearch
@@ -194,4 +198,8 @@ export default function Page() {
       <SeoullyHeartCompanion social={isSocialView(view)} hasNav={isSocialView(view) && view.kind !== "compose"} />
     </main>
   );
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }

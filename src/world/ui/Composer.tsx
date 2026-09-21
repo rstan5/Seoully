@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { readLocalPostMedia } from "@/domain/media";
 import { isFixtureUser } from "@/domain/session";
 import { repository } from "@/domain/memory-repository";
@@ -11,6 +11,10 @@ import { LanguageToggle } from "@/world/ui/LanguageToggle";
 import { ObjectTile } from "@/world/ui/ObjectTile";
 import { SocialAvatar } from "@/world/ui/SocialAvatar";
 import { useWorld } from "@/world/store/worldStore";
+import { useSession } from "@/world/store/sessionStore";
+import { productionSearchCollectibles, productionSearchUsers } from "@/server/social/actions";
+import type { CatalogTemplateDTO } from "@/server/dal/catalog";
+import type { SocialSearchUser } from "@/server/dal/social";
 
 /** A focused post composer backed by the existing collector and catalog data. */
 export function Composer({
@@ -21,6 +25,7 @@ export function Composer({
   onPosted: () => void;
 }) {
   const revision = useRepoRevision();
+  const session = useSession((state) => state.session);
   const back = useWorld((s) => s.back);
   const inputRef = useRef<HTMLInputElement>(null);
   const roll = useMemo(
@@ -37,6 +42,9 @@ export function Composer({
   const [peopleQuery, setPeopleQuery] = useState("");
   const [collectibleQuery, setCollectibleQuery] = useState("");
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [productionPeople, setProductionPeople] = useState<SocialSearchUser[]>([]);
+  const [productionCollectibles, setProductionCollectibles] = useState<CatalogTemplateDTO[]>([]);
   const t = useT();
   void revision;
 
@@ -50,6 +58,16 @@ export function Composer({
       })
       .slice(0, 8);
   }, [peopleQuery, revision]);
+
+  useEffect(() => {
+    if (session.kind !== "auth" || !peopleOpen) return;
+    void productionSearchUsers(peopleQuery).then((result) => { if (result.ok) setProductionPeople(result.users); });
+  }, [session.kind, peopleOpen, peopleQuery]);
+
+  useEffect(() => {
+    if (session.kind !== "auth" || !collectiblesOpen) return;
+    void productionSearchCollectibles(collectibleQuery).then((result) => { if (result.ok) setProductionCollectibles(result.collectibles); });
+  }, [session.kind, collectiblesOpen, collectibleQuery]);
 
   const collectibles = useMemo(
     () => (collectibleQuery.trim() ? repository.searchCatalog(collectibleQuery).slice(0, 8) : []),
@@ -81,8 +99,29 @@ export function Composer({
     setTaggedTemplateIds((ids) => ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]);
   };
 
-  const post = () => {
+  const post = async () => {
     if (!picked || (picked.kind !== "photo" && picked.kind !== "video") || !picked.url.trim()) return;
+    if (publishing) return;
+    setPublishing(true);
+    if (session.kind === "auth" && isUuid(viewerId)) {
+      try {
+        const response = await fetch(picked.url);
+        const blob = await response.blob();
+        const file = new File([blob], `post-media.${picked.kind === "video" ? "mp4" : "jpg"}`, { type: blob.type || (picked.kind === "video" ? "video/mp4" : "image/jpeg") });
+        const form = new FormData();
+        form.set("file", file);
+        form.set("caption", caption.trim());
+        form.set("location", location.trim());
+        form.set("taggedUserIds", JSON.stringify(taggedUserIds.filter(isUuid)));
+        form.set("taggedTemplateIds", JSON.stringify(taggedTemplateIds.filter(isUuid)));
+        const result = await fetch("/api/social/posts", { method: "POST", body: form });
+        if (!result.ok) throw new Error("post_create_failed");
+        onPosted();
+      } catch {
+        setMediaError(t("compose.mediaUnreadable"));
+      } finally { setPublishing(false); }
+      return;
+    }
     repository.createPost({
       authorId: viewerId,
       body: caption.trim(),
@@ -93,6 +132,7 @@ export function Composer({
       ...(location.trim() ? { location: location.trim() } : {}),
     });
     onPosted();
+    setPublishing(false);
   };
 
   return (
@@ -102,7 +142,7 @@ export function Composer({
         <strong>{t("compose.newPost")}</strong>
         <div className="s-compose-top-actions">
           <LanguageToggle />
-          <button type="button" className="s-compose-share" disabled={!picked} onClick={post}>
+          <button type="button" className="s-compose-share" disabled={!picked || publishing} onClick={() => void post()}>
             {t("compose.share")}
           </button>
         </div>
@@ -171,12 +211,13 @@ export function Composer({
               {taggedUserIds.map((id) => {
                 const user = repository.getUser(id);
                 const profile = repository.getProfile(id);
-                if (!user || !profile) return null;
+                const productionUser = productionPeople.find((item) => item.userId === id);
+                if (!user && !productionUser) return null;
                 return (
                   <span key={id} className="s-compose-person-chip">
-                    <SocialAvatar user={user} profile={profile} size={24} />
-                    <span>@{user.handle}</span>
-                    <button type="button" aria-label={t("compose.removeCollector", { handle: user.handle })} onClick={() => toggleUser(id)}>×</button>
+                    {user && profile ? <SocialAvatar user={user} profile={profile} size={24} /> : <span aria-hidden="true">♡</span>}
+                    <span>@{user?.handle ?? productionUser?.handle}</span>
+                    <button type="button" aria-label={t("compose.removeCollector", { handle: user?.handle ?? productionUser?.handle ?? "" })} onClick={() => toggleUser(id)}>×</button>
                   </span>
                 );
               })}
@@ -188,24 +229,26 @@ export function Composer({
               <div className="s-compose-picker">
                 <input value={peopleQuery} onChange={(event) => setPeopleQuery(event.target.value)} placeholder={t("compose.searchCollectors")} aria-label={t("compose.searchCollectors")} />
                 <ul>
-                  {people.map((user) => {
-                    const profile = repository.getProfile(user.id);
-                    if (!profile) return null;
-                    const selected = taggedUserIds.includes(user.id);
+                  {(session.kind === "auth" ? productionPeople : people).map((user) => {
+                    const userId = "userId" in user ? user.userId : user.id;
+                    const handle = user.handle;
+                    const displayName = user.displayName;
+                    const profile = "id" in user ? repository.getProfile(user.id) : undefined;
+                    const selected = taggedUserIds.includes(userId as UserId);
                     return (
-                      <li key={user.id}>
+                      <li key={userId}>
                         <span className="s-compose-result-person">
-                          <SocialAvatar user={user} profile={profile} size={36} />
-                          <span><strong>{user.displayName}</strong><em>@{user.handle}</em></span>
+                          {"id" in user && profile ? <SocialAvatar user={user} profile={profile} size={36} /> : <span aria-hidden="true">♡</span>}
+                          <span><strong>{displayName}</strong><em>@{handle}</em></span>
                         </span>
-                        <button type="button" className="s-compose-tag-button" aria-pressed={selected} onClick={() => toggleUser(user.id)}>
+                        <button type="button" className="s-compose-tag-button" aria-pressed={selected} onClick={() => toggleUser(userId as UserId)}>
                           {selected ? t("compose.tagged") : t("compose.tag")}
                         </button>
                       </li>
                     );
                   })}
                 </ul>
-                {people.length === 0 && <p>{t("compose.noCollectors")}</p>}
+                {(session.kind === "auth" ? productionPeople.length : people.length) === 0 && <p>{t("compose.noCollectors")}</p>}
               </div>
             )}
           </section>
@@ -215,7 +258,9 @@ export function Composer({
             <div className="s-compose-selected-collectibles">
               {taggedTemplateIds.map((id) => {
                 const template = repository.getTemplate(id);
-                return template ? <SelectedCollectible key={id} template={template} onRemove={() => toggleCollectible(id)} /> : null;
+                const remote = productionCollectibles.find((item) => item.id === id);
+                if (template) return <SelectedCollectible key={id} template={template} onRemove={() => toggleCollectible(id)} />;
+                return remote ? <span key={id} className="s-compose-collectible-chip"><span aria-hidden="true">♡</span><span><strong>{remote.name}</strong><em>{[remote.groupName, remote.memberName, remote.releaseName].filter(Boolean).join(" · ")}</em></span><button type="button" aria-label={t("compose.removeCollectible", { name: remote.name })} onClick={() => toggleCollectible(id as TemplateId)}>×</button></span> : null;
               })}
             </div>
             <button type="button" className="s-compose-add-tag" aria-expanded={collectiblesOpen} onClick={() => setCollectiblesOpen((open) => !open)}>
@@ -225,19 +270,19 @@ export function Composer({
               <div className="s-compose-picker">
                 <input value={collectibleQuery} onChange={(event) => setCollectibleQuery(event.target.value)} placeholder={t("compose.searchCollectibles")} aria-label={t("compose.searchCollectibles")} />
                 <ul>
-                  {collectibles.map((template) => (
+                  {(session.kind === "auth" ? productionCollectibles : collectibles).map((template) => (
                     <li key={template.id}>
                       <span className="s-compose-result-object">
-                        <ObjectTile template={template} {...(template.memberId && repository.getMember(template.memberId) ? { member: repository.getMember(template.memberId) } : {})} height={44} />
-                        <span><strong>{template.memberId ? repository.getMember(template.memberId)?.stageName : repository.getGroup(template.groupId)?.name}</strong><em>{collectibleLine(template)}</em></span>
+                        {"groupName" in template ? <span aria-hidden="true">♡</span> : <ObjectTile template={template} {...(template.memberId && repository.getMember(template.memberId) ? { member: repository.getMember(template.memberId) } : {})} height={44} />}
+                        <span><strong>{"memberName" in template ? template.memberName ?? template.groupName : template.memberId ? repository.getMember(template.memberId)?.stageName : repository.getGroup(template.groupId)?.name}</strong><em>{"groupName" in template ? [template.groupName, template.memberName, template.releaseName, template.name].filter(Boolean).join(" · ") : collectibleLine(template)}</em></span>
                       </span>
-                      <button type="button" className="s-compose-tag-button" aria-pressed={taggedTemplateIds.includes(template.id)} onClick={() => toggleCollectible(template.id)}>
-                        {taggedTemplateIds.includes(template.id) ? t("compose.tagged") : t("compose.tag")}
+                      <button type="button" className="s-compose-tag-button" aria-pressed={taggedTemplateIds.includes(template.id as TemplateId)} onClick={() => toggleCollectible(template.id as TemplateId)}>
+                        {taggedTemplateIds.includes(template.id as TemplateId) ? t("compose.tagged") : t("compose.tag")}
                       </button>
                     </li>
                   ))}
                 </ul>
-                {collectibleQuery.trim() && collectibles.length === 0 && <p>{t("compose.noCollectibles")}</p>}
+                {collectibleQuery.trim() && (session.kind === "auth" ? productionCollectibles.length : collectibles.length) === 0 && <p>{t("compose.noCollectibles")}</p>}
               </div>
             )}
           </section>
@@ -249,7 +294,7 @@ export function Composer({
         </div>
 
         <div className="s-compose-bottom-share">
-          <button type="button" className="s-compose-share" disabled={!picked} onClick={post}>{t("compose.share")}</button>
+          <button type="button" className="s-compose-share" disabled={!picked || publishing} onClick={() => void post()}>{t("compose.share")}</button>
         </div>
       </div>
     </div>
@@ -273,4 +318,8 @@ function collectibleLine(template: CollectibleTemplate): string {
   const era = template.eraId ? repository.getEra(template.eraId)?.name : undefined;
   const release = template.releaseId ? repository.getRelease(template.releaseId)?.title : undefined;
   return [group, era ?? release, template.name].filter(Boolean).join(" · ");
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }

@@ -86,6 +86,25 @@ export interface CollectionRepository {
   }): { user: User; profile: Profile; room: Room } | { error: string };
   /** Transitional render projection; production identity data is server-authoritative. */
   adoptAuthenticatedIdentity(input: IdentityProfileDTO): void;
+  adoptPublicRoomProjection(input: {
+    userId: UserId;
+    handle: string;
+    displayName: string;
+    placements: Array<{
+      templateId: string;
+      name: string;
+      kind: CollectibleTemplate["kind"];
+      groupName: string;
+      memberName?: string | null;
+      releaseName?: string | null;
+      personalMediaUrl?: string;
+      zoneId: string;
+      slot: number;
+      offset?: Record<string, number> | null;
+      transform?: Record<string, number> | null;
+      surfaceId?: string | null;
+    }>;
+  }): Room;
   updateProfile(
     userId: UserId,
     patch: Partial<

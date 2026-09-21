@@ -198,6 +198,7 @@ export class MemoryCollectionRepository implements CollectionRepository {
   /** Transitional entities needed to render production catalog records in the frozen local UI. */
   private productionGroups = new Map<GroupId, Group>();
   private productionMembers = new Map<MemberId, Member>();
+  private suppressLivePersistence = false;
 
   getLocale(): Locale {
     return this.locale;
@@ -420,6 +421,40 @@ export class MemoryCollectionRepository implements CollectionRepository {
     Object.assign(profile, input.profile);
     this.persistLive();
     this.notify();
+  }
+
+  adoptPublicRoomProjection(input: Parameters<CollectionRepository["adoptPublicRoomProjection"]>[0]): Room {
+    this.suppressLivePersistence = true;
+    try {
+    let user = this.getUser(input.userId);
+    if (!user) {
+      const identity = this.createIdentity({ handle: input.handle, displayName: input.displayName, userId: input.userId, allowHandleCollision: true });
+      user = "error" in identity ? undefined : identity.user;
+    }
+    if (!user) throw new Error("public_room_identity_failed");
+    let room = this.getRoomByOwner(input.userId);
+    if (!room) {
+      const created = this.createIdentity({ handle: input.handle, displayName: input.displayName, userId: input.userId, allowHandleCollision: true });
+      if ("error" in created) throw new Error("public_room_identity_failed");
+      room = created.room;
+    }
+    const profile = this.getProfile(input.userId);
+    if (profile) Object.assign(profile, { userId: input.userId });
+    const placements: Placement[] = [];
+      for (const item of input.placements.slice(0, 500)) {
+      const templateId = this.adoptProductionCatalogTemplate({ id: item.templateId, name: item.name, kind: item.kind, groupName: item.groupName, memberName: item.memberName, releaseName: item.releaseName });
+      if (!templateId) continue;
+      const holding = this.listHoldings(input.userId).find((candidate) => candidate.productionId === `public:${item.templateId}:${item.slot}`) ?? this.addHolding({ ownerId: input.userId, templateId, productionId: `public:${item.templateId}:${item.slot}` });
+      if (item.personalMediaUrl) this.setHoldingPersonalMedia(holding.id, item.personalMediaUrl);
+      const zone = room.zones.find((candidate) => item.zoneId.endsWith(`-${candidate.kind}`)) ?? room.zones[0];
+        if (zone) placements.push({ holdingId: holding.id, zoneId: zone.id, slot: item.slot, ...(item.offset ? { offset: item.offset } : {}), ...(item.transform ? { transform: item.transform as unknown as Transform3D } : {}), ...(item.surfaceId ? { surfaceId: item.surfaceId } : {}) });
+      }
+      this.placements.set(room.id, placements);
+      this.notify();
+      return room;
+    } finally {
+      this.suppressLivePersistence = false;
+    }
   }
 
   updateProfile(
@@ -1636,7 +1671,7 @@ export class MemoryCollectionRepository implements CollectionRepository {
   }
 
   private persistLive() {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || this.suppressLivePersistence) return;
     const liveUsers = this.users.filter((u) => !isFixtureUser(u.id));
     if (liveUsers.length === 0) {
       try {

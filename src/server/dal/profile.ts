@@ -24,7 +24,13 @@ export const currentProfilePatchSchema = z.object({
 
 export type ValidCurrentProfilePatch = z.infer<typeof currentProfilePatchSchema>;
 
-export interface PublicProfileDTO extends IdentityProfileDTO {}
+export interface PublicProfileDTO extends IdentityProfileDTO {
+  visibility: { collectionPublic: boolean; wishlistPublic: boolean };
+  followerCount: number;
+  followingCount: number;
+  roomAvailable: boolean;
+  collectionSummary?: { holdingCount: number; uniqueTemplateCount: number; groupCount: number };
+}
 
 export async function getCurrentIdentity(): Promise<IdentityProfileDTO | null> {
   const supabase = await createSupabaseServerClient();
@@ -63,11 +69,47 @@ export async function getPublicProfile(userId: string): Promise<PublicProfileDTO
   const supabase = await createSupabaseServerClient();
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("user_id, handle, display_name, tagline, bio, location, favorite_group_ids, bias_member_ids, favorite_era_ids, collector_interests, collector_type, created_at")
+    .select("user_id, handle, display_name, tagline, bio, location, favorite_group_ids, bias_member_ids, favorite_era_ids, collector_interests, collector_type, created_at, collection_public, wishlist_public")
     .eq("user_id", parsedId.data)
     .maybeSingle();
   if (error || !profile) return null;
-  return mapIdentity({ id: profile.user_id, created_at: profile.created_at }, profile);
+  return await hydratePublicProfile(mapIdentity({ id: profile.user_id, created_at: profile.created_at }, profile), profile);
+}
+
+export async function getPublicProfileByHandle(handle: string): Promise<PublicProfileDTO | null> {
+  const normalized = normalizeHandle(handle.replace(/^@/, ""));
+  if (!HANDLE_RE.test(normalized)) return null;
+  const supabase = await createSupabaseServerClient();
+  const { data: profile, error } = await supabase.from("profiles")
+    .select("user_id, handle, display_name, tagline, bio, location, favorite_group_ids, bias_member_ids, favorite_era_ids, collector_interests, collector_type, created_at, collection_public, wishlist_public")
+    .eq("handle", normalized).maybeSingle();
+  if (error || !profile) return null;
+  return await hydratePublicProfile(mapIdentity({ id: profile.user_id, created_at: profile.created_at }, profile), profile);
+}
+
+async function hydratePublicProfile(identity: IdentityProfileDTO, row: Record<string, unknown>): Promise<PublicProfileDTO> {
+  const supabase = await createSupabaseServerClient();
+  const userId = identity.user.id;
+  const [followers, following, room] = await Promise.all([
+    supabase.from("follows").select("follower_user_id", { count: "exact", head: true }).eq("followed_user_id", userId),
+    supabase.from("follows").select("followed_user_id", { count: "exact", head: true }).eq("follower_user_id", userId),
+    supabase.rpc("get_public_room_by_handle", { p_handle: identity.user.handle }),
+  ]);
+  const summaryResult = row.collection_public !== false
+    ? await supabase.rpc("get_public_collection_summary", { p_user_id: userId })
+    : { data: null };
+  const summary = summaryResult.data && typeof summaryResult.data === "object" ? summaryResult.data as Record<string, unknown> : null;
+  return {
+    ...identity,
+    visibility: {
+      collectionPublic: row.collection_public !== false,
+      wishlistPublic: row.wishlist_public !== false,
+    },
+    followerCount: followers.count ?? 0,
+    followingCount: following.count ?? 0,
+    roomAvailable: Boolean(room.data && typeof room.data === "object" && (room.data as Record<string, unknown>).room),
+    ...(summary ? { collectionSummary: { holdingCount: Number(summary.holdingCount ?? 0), uniqueTemplateCount: Number(summary.uniqueTemplateCount ?? 0), groupCount: Number(summary.groupCount ?? 0) } } : {}),
+  };
 }
 
 export async function updateCurrentProfile(input: unknown): Promise<IdentityProfileDTO> {
@@ -112,6 +154,8 @@ function mapIdentity(
     favorite_era_ids: string[];
     collector_interests: CollectorInterest[];
     collector_type: string;
+    collection_public?: boolean;
+    wishlist_public?: boolean;
   },
 ): IdentityProfileDTO {
   const userId = profile.user_id as UserId;

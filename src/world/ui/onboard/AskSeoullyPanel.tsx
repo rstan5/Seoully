@@ -145,10 +145,20 @@ export function AskSeoullyPanel({ viewerId }: { viewerId: string }) {
     const world = useWorld.getState();
     switch (action.type) {
       case "profile":
-        if (repository.getUser(action.userId as never)) world.showProfile(action.userId as never);
+        if (repository.getUser(action.userId as never)) { world.showProfile(action.userId as never); break; }
+        void fetch(`/api/profiles/${encodeURIComponent(action.userId)}`).then(async (response) => {
+          if (!response.ok) return;
+          const profile = await response.json() as { user?: { handle?: string } };
+          if (profile.user?.handle) window.location.assign(`/@${profile.user.handle}`);
+        });
         break;
       case "room":
-        if (repository.getRoomByOwner(action.userId as never)) travelToRoomOf(action.userId as never);
+        if (repository.getRoomByOwner(action.userId as never)) { travelToRoomOf(action.userId as never); break; }
+        void fetch(`/api/profiles/${encodeURIComponent(action.userId)}`).then(async (response) => {
+          if (!response.ok) return;
+          const profile = await response.json() as { user?: { handle?: string } };
+          if (profile.user?.handle) window.location.assign(`/@${profile.user.handle}/room`);
+        });
         break;
       case "search":
         queueSearchPreset(action.query, action.destination);

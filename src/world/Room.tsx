@@ -55,9 +55,11 @@ import { useViewport } from "@/world/stage/useViewport";
 export function Room({
   roomId,
   onMessage,
+  readOnly = false,
 }: {
   roomId: RoomId;
   onMessage?: (peerId: UserId, opts?: { templateIds?: TemplateId[] }) => void;
+  readOnly?: boolean;
 }) {
   const [collectionVersion, setCollectionVersion] = useState(0);
   const { room, contents } = useRoomData(roomId, collectionVersion);
@@ -73,7 +75,7 @@ export function Room({
     useSession.getState().finishRoomIntro();
     exitEdit();
   };
-  const editing = view.kind === "edit";
+  const editing = !readOnly && view.kind === "edit";
   const edit = useRoomEdit(room, editing);
   const [binderHovered, setBinderHovered] = useState(false);
   // A card taken out of its sleeve. Local to the room rather than in the world
@@ -393,7 +395,7 @@ export function Room({
         inspected={inspected ?? heldCard}
         onOpenProfile={() => showProfile(room.ownerId)}
       />
-      {editing && (
+      {editing && !readOnly && (
         <EditChrome
           room={room}
           selected={edit.selected}

@@ -62,6 +62,20 @@ export async function searchSharedCatalog(input: unknown): Promise<CatalogTempla
   return hydrateCatalogTemplates(data ?? [], supabase);
 }
 
+export async function getSharedCatalogTemplate(templateId: string): Promise<CatalogTemplateDTO | null> {
+  const id = z.string().uuid().parse(templateId);
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("collectible_templates")
+    .select("id,group_id,member_id,release_id,kind,name,descriptor,status,created_at")
+    .eq("id", id)
+    .neq("status", "restricted")
+    .maybeSingle();
+  if (error) throw new Error("catalog_search_failed");
+  if (!data) return null;
+  return (await hydrateCatalogTemplates([data], supabase))[0] ?? null;
+}
+
 export async function createSharedCatalogContribution(input: unknown): Promise<CatalogContributionDTO> {
   const payload = catalogContributionSchema.parse(input);
   const identity = await getCurrentIdentity();

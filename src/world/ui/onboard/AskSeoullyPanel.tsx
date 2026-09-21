@@ -56,9 +56,28 @@ export function AskSeoullyPanel({ viewerId }: { viewerId: string }) {
       : undefined;
     const context = {
       surface: worldView.kind,
-      ...(worldView.kind === "profile" ? { profileUserId: worldView.userId } : {}),
+      ...(worldView.kind === "profile" ? { profileUserId: worldView.userId, targetUserId: worldView.userId } : {}),
       ...(inspectId ? { templateId: inspectId } : {}),
     };
+    // Authenticated users use the server-owned production intelligence path.
+    // Fixture/demo users continue through the frozen local assistant below.
+    try {
+      const production = await fetch("/api/assistant/v2", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locale, question: prompt, history, context }),
+      });
+      if (production.ok) {
+        const payload = (await production.json()) as { reply?: string; cards?: AssistantCard[] };
+        if (payload.reply) {
+          addMessage({ role: "assistant", content: payload.reply, cards: payload.cards ?? [] });
+          setPending(false);
+          return;
+        }
+      }
+    } catch {
+      // The deterministic fixture assistant remains the safe fallback.
+    }
     let plannedIntent;
     let plannedQuery: string | undefined;
     let providerReady = false;

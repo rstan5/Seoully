@@ -4,7 +4,7 @@ import { ActivityIndicator, PanResponder, Pressable, SafeAreaView, ScrollView, S
 import { loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomPlacement, type NativeHolding, type NativeRoomSnapshot } from "../src/api";
 import { useCopy } from "../src/locale";
 import { NativeRoomRenderer } from "../src/room/NativeRoomRenderer";
-import { buildRoomRenderables, createInitialRoomRenderable, moveRenderable, toPersistedTransform, type RoomRenderable } from "../src/room/model";
+import { buildRoomRenderables, createInitialRoomRenderable, moveRenderable, settleRoomRenderable, toPersistedTransform, type RoomRenderable } from "../src/room/model";
 import { colors, spacing } from "../src/theme";
 
 export default function RoomScreen() {
@@ -58,14 +58,16 @@ export default function RoomScreen() {
       const current = latestItems.current.find((item) => item.holding.id === id);
       dragOrigin.current = null;
       if (!id || !room || !current) return;
+      const settled = settleRoomRenderable(current, room.id);
+      setItems((all) => all.map((item) => item.holding.id === id ? settled.renderable : item));
       const slot = current.placement?.slot ?? latestItems.current.findIndex((item) => item.holding.id === id);
       void saveNativeRoomPlacement({
         roomId: room.id,
         holdingId: id,
         zoneId: current.placement?.zoneId ?? `${room.id}-floor`,
         slot: Math.max(0, slot),
-        transform: toPersistedTransform(current),
-        surfaceId: `${room.id}-floor`,
+        transform: toPersistedTransform(settled.renderable),
+        surfaceId: settled.surfaceId,
       }).catch(() => setError(copy.roomSaveFailed));
     },
     onPanResponderTerminate: () => { dragOrigin.current = null; },
@@ -75,17 +77,18 @@ export default function RoomScreen() {
 
   async function placeHolding(holding: NativeHolding) {
     if (!snapshot || items.length >= 24) return;
-    const draft = createInitialRoomRenderable(holding, items.length);
+    const initial = createInitialRoomRenderable(holding, items.length);
+    const settled = settleRoomRenderable(initial, snapshot.room.id);
     try {
       const placement = await saveNativeRoomPlacement({
         roomId: snapshot.room.id,
         holdingId: holding.id,
         zoneId: `${snapshot.room.id}-floor`,
         slot: items.length,
-        transform: toPersistedTransform(draft),
-        surfaceId: `${snapshot.room.id}-floor`,
+        transform: toPersistedTransform(settled.renderable),
+        surfaceId: settled.surfaceId,
       });
-      setItems((current) => [...current, { ...draft, placement }]);
+      setItems((current) => [...current, { ...settled.renderable, placement }]);
       setSelectedId(holding.id);
     } catch {
       setError(copy.roomSaveFailed);

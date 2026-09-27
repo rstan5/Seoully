@@ -115,6 +115,10 @@ security, and Room/Binder data model.
   `RoomPlacement`s render in the world. Unplaced Holdings remain in a native stored
   collection tray, can be placed into the Room, moved, persisted, and stored again
   without deleting ownership or personal media.
+- Added a native landing-surface model for the rendered floor, desk, and shelf bays.
+  New and dragged objects settle to the nearest physical plane and persist its
+  `surfaceId` plus the settled transform, preserving the web Room's surface-as-context
+  semantics rather than treating the scene as an arbitrary 2D grid.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 

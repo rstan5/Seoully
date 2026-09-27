@@ -13,13 +13,33 @@ export type RoomRenderable = {
 };
 
 const WORLD_SCALE = 240;
+export const ROOM_TEXTURE_BUDGET = 24;
 
 export function buildRoomRenderables(holdings: NativeHolding[], placements: NativeRoomPlacement[]): RoomRenderable[] {
   const placementByHolding = new Map(placements.map((placement) => [placement.holdingId, placement]));
-  return holdings.filter((holding) => placementByHolding.has(holding.id)).slice(0, 24).map((holding, index) => {
+  return holdings.filter((holding) => placementByHolding.has(holding.id)).map((holding, index) => {
     const placement = placementByHolding.get(holding.id);
-    return roomRenderable(holding, placement, index);
+    return roomRenderable(holding, placement, placement?.slot ?? index);
   });
+}
+
+export function nextNativeSlot(used: number[]) {
+  const taken = new Set(used);
+  let slot = 0;
+  while (taken.has(slot)) slot += 1;
+  return slot;
+}
+
+export function roomTextureIds(items: RoomRenderable[], selectedId: string | null, focusedId: string | null) {
+  const ids = new Set<string>();
+  if (selectedId) ids.add(selectedId);
+  if (focusedId) ids.add(focusedId);
+  const ranked = [...items].sort((a, b) => distanceToRoomLook(a.position) - distanceToRoomLook(b.position));
+  for (const item of ranked) {
+    if (ids.size >= ROOM_TEXTURE_BUDGET) break;
+    if (item.imageUrl) ids.add(item.holding.id);
+  }
+  return ids;
 }
 
 export function createInitialRoomRenderable(holding: NativeHolding, index: number, roomId: string): RoomRenderable {
@@ -92,26 +112,30 @@ export function nativeRoomSurfaces(roomId: string): NativeRoomSurface[] {
   ];
 }
 
-export function nativeHomeForHolding(holding: NativeHolding, roomId: string, index: number) {
+export function nativeHomeForHolding(holding: NativeHolding, roomId: string, slot: number) {
   const kind = holding.template.kind;
   if (kind === "photocard") {
-    return { zoneId: `${roomId}-binder`, surfaceId: `${roomId}-binder`, position: { x: 0.45, y: -0.1, z: -2.7 } };
+    const col = slot % 3;
+    const row = Math.floor(slot / 3) % 2;
+    return { zoneId: `${roomId}-binder`, surfaceId: `${roomId}-binder`, position: { x: 0.12 + col * 0.28, y: -0.1, z: -2.48 - row * 0.24 } };
   }
   if (kind === "album" || kind === "vinyl" || kind === "book") {
-    const bay = index % 3;
-    return { zoneId: `${roomId}-shelf`, surfaceId: `${roomId}-shelf-bay-${bay}`, position: { x: -3.15 + ((index % 2) - 0.5) * 0.8, y: 0, z: -3.48 } };
+    const bay = slot % 3;
+    const along = Math.floor(slot / 3) % 4;
+    return { zoneId: `${roomId}-shelf`, surfaceId: `${roomId}-shelf-bay-${bay}`, position: { x: -3.85 + along * 0.48, y: 0, z: -3.48 } };
   }
   if (kind === "poster") {
-    return { zoneId: `${roomId}-wall`, surfaceId: `${roomId}-wall`, position: { x: 0.2 + (index % 3) * 0.9, y: 0.4 + (index % 2) * 0.8, z: -4.14 } };
+    return { zoneId: `${roomId}-wall`, surfaceId: `${roomId}-wall`, position: { x: 0.2 + (slot % 3) * 0.9, y: 0.4 + (Math.floor(slot / 3) % 2) * 0.8, z: -4.14 } };
   }
   if (kind === "lightstick" || kind === "figure" || kind === "plushie") {
-    const upper = index % 2 === 1;
-    return { zoneId: `${roomId}-display-case`, surfaceId: `${roomId}-display-case-${upper ? "top" : "shelf"}`, position: { x: 3.65, y: 0, z: -3.52 } };
+    const upper = slot % 2 === 1;
+    const along = Math.floor(slot / 2) % 3;
+    return { zoneId: `${roomId}-display-case`, surfaceId: `${roomId}-display-case-${upper ? "top" : "shelf"}`, position: { x: 3.25 + along * 0.32, y: 0, z: -3.52 } };
   }
   if (kind === "apparel" || (kind === "memorabilia" && /kit/i.test(holding.template.name))) {
-    return { zoneId: `${roomId}-archive`, surfaceId: `${roomId}-archive`, position: { x: -1.2, y: 0, z: -0.65 } };
+    return { zoneId: `${roomId}-archive`, surfaceId: `${roomId}-archive`, position: { x: -1.7 + (slot % 3) * 0.45, y: 0, z: -0.4 - (Math.floor(slot / 3) % 2) * 0.35 } };
   }
-  return { zoneId: `${roomId}-desk`, surfaceId: `${roomId}-desk`, position: { x: 1.45, y: 0, z: -2.85 } };
+  return { zoneId: `${roomId}-desk`, surfaceId: `${roomId}-desk`, position: { x: 0.5 + (slot % 4) * 0.55, y: 0, z: -2.4 - (Math.floor(slot / 4) % 2) * 0.45 } };
 }
 
 export function zoneIdForNativeSurface(roomId: string, surfaceId: string) {
@@ -123,9 +147,9 @@ export function zoneIdForNativeSurface(roomId: string, surfaceId: string) {
   return `${roomId}-floor`;
 }
 
-function fallbackPosition(index: number): NativeRoomVector {
-  const column = index % 4;
-  const row = Math.floor(index / 4);
+function fallbackPosition(slot: number): NativeRoomVector {
+  const column = slot % 4;
+  const row = Math.floor(slot / 4);
   return { x: 0.45 + column * 0.68, y: -0.15, z: -2.9 + row * 0.45 };
 }
 
@@ -175,4 +199,7 @@ function footprintDistance(point: NativeRoomVector, surface: NativeRoomSurface) 
 }
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+function distanceToRoomLook(position: NativeRoomVector) {
+  return Math.hypot(position.x, position.y - 0.4, position.z + 2);
 }

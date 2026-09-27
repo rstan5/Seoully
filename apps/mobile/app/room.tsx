@@ -1,14 +1,18 @@
 /* eslint-disable react-hooks/refs -- PanResponder reads refs only inside gesture callbacks. */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ActivityIndicator, PanResponder, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 import { loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomPlacement, saveNativeRoomTheme, type NativeHolding, type NativeRoomSnapshot, type NativeRoomThemeId } from "../src/api";
 import { collectibleKindLabel } from "../src/i18n";
 import { useCopy } from "../src/locale";
 import { RetryNotice } from "../src/components/RetryNotice";
+import { CachedSignedImage } from "../src/media/cachedMedia";
 import { NativeRoomRenderer } from "../src/room/NativeRoomRenderer";
-import { buildRoomRenderables, createInitialRoomRenderable, moveRenderable, nativeHomeForHolding, settleRoomRenderable, toPersistedTransform, zoneIdForNativeSurface, type RoomRenderable } from "../src/room/model";
+import { buildRoomRenderables, createInitialRoomRenderable, moveRenderable, nativeHomeForHolding, nextNativeSlot, settleRoomRenderable, toPersistedTransform, zoneIdForNativeSurface, type RoomRenderable } from "../src/room/model";
 import { colors, spacing } from "../src/theme";
+
+const ROOM_YAW_KEY = "seoully.mobile.room-yaw.v1";
 
 export default function RoomScreen() {
   const copy = useCopy();
@@ -23,7 +27,18 @@ export default function RoomScreen() {
   const dragOrigin = useRef<RoomRenderable | null>(null);
   const cameraOrigin = useRef(0);
   const latestItems = useRef(items);
+  const editingRef = useRef(editing);
   useEffect(() => { latestItems.current = items; }, [items]);
+  useEffect(() => { editingRef.current = editing; }, [editing]);
+  useEffect(() => {
+    const task = setTimeout(() => {
+      void AsyncStorage.getItem(ROOM_YAW_KEY).then((stored) => {
+        const yaw = Number(stored);
+        if (Number.isFinite(yaw)) setCameraYaw(Math.max(-0.38, Math.min(0.38, yaw)));
+      });
+    }, 0);
+    return () => clearTimeout(task);
+  }, []);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -38,10 +53,9 @@ export default function RoomScreen() {
       setLoading(false);
     }
   }, [copy.roomUnavailable]);
-  useEffect(() => {
-    const task = setTimeout(() => { void refresh(); }, 0);
-    return () => clearTimeout(task);
-  }, [refresh]);
+  useFocusEffect(useCallback(() => {
+    if (!editingRef.current) void refresh();
+  }, [refresh]));
 
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => false,
@@ -61,7 +75,10 @@ export default function RoomScreen() {
       setItems((current) => current.map((item) => item.holding.id === moved.holding.id ? moved : item));
     },
     onPanResponderRelease: () => {
-      if (!editing) return;
+      if (!editing) {
+        void AsyncStorage.setItem(ROOM_YAW_KEY, String(cameraYaw));
+        return;
+      }
       const id = selectedId;
       const room = snapshot?.room;
       const current = latestItems.current.find((item) => item.holding.id === id);
@@ -79,18 +96,22 @@ export default function RoomScreen() {
         surfaceId: settled.surfaceId,
       }).catch(() => setError(copy.roomSaveFailed));
     },
-    onPanResponderTerminate: () => { dragOrigin.current = null; },
+    onPanResponderTerminate: () => {
+      dragOrigin.current = null;
+      if (!editing) void AsyncStorage.setItem(ROOM_YAW_KEY, String(cameraYaw));
+    },
   });
   const placedIds = new Set(items.map((item) => item.holding.id));
   const unplaced = snapshot?.holdings.filter((holding) => !placedIds.has(holding.id)) ?? [];
   const selectedItem = items.find((item) => item.holding.id === selectedId) ?? null;
 
   async function placeHolding(holding: NativeHolding) {
-    if (!snapshot || items.length >= 24) return;
-    const home = nativeHomeForHolding(holding, snapshot.room.id, items.length);
-    const initial = createInitialRoomRenderable(holding, items.length, snapshot.room.id);
+    if (!snapshot) return;
+    const homeZone = nativeHomeForHolding(holding, snapshot.room.id, 0).zoneId;
+    const slot = nextNativeSlot(items.filter((item) => item.placement?.zoneId === homeZone).map((item) => item.placement?.slot ?? 0));
+    const home = nativeHomeForHolding(holding, snapshot.room.id, slot);
+    const initial = createInitialRoomRenderable(holding, slot, snapshot.room.id);
     const settled = settleRoomRenderable(initial, snapshot.room.id, home.surfaceId);
-    const slot = items.filter((item) => item.placement?.zoneId === home.zoneId).length;
     try {
       const placement = await saveNativeRoomPlacement({
         roomId: snapshot.room.id,
@@ -156,7 +177,7 @@ export default function RoomScreen() {
       <Pressable accessibilityRole="button" onPress={removeSelected} style={styles.inspectAction}><Text style={styles.inspectActionText}>{copy.removeFromRoom}</Text></Pressable>
     </View> : null}
     {selectedItem && editing ? <View style={styles.selectionRow}><Text numberOfLines={1} style={styles.selection}>{selectedItem.holding.template.name}</Text><Pressable accessibilityRole="button" onPress={removeSelected}><Text style={styles.removeText}>{copy.removeFromRoom}</Text></Pressable></View> : null}
-    {unplaced.length ? <View style={styles.stored}><Text style={styles.storedTitle}>{copy.storedCollection}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storedList}>{unplaced.map((holding) => <Pressable key={holding.id} accessibilityRole="button" onPress={() => placeHolding(holding)} style={styles.storedItem}><Text numberOfLines={2} style={styles.storedItemText}>+ {holding.template.name}</Text></Pressable>)}</ScrollView></View> : null}
+    {unplaced.length ? <View style={styles.stored}><Text style={styles.storedTitle}>{copy.storedCollection}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storedList}>{unplaced.map((holding) => <Pressable key={holding.id} accessibilityRole="button" onPress={() => placeHolding(holding)} style={styles.storedItem}>{holding.personalMediaUrl ? <CachedSignedImage cacheKey={holding.id} url={holding.personalMediaUrl} style={styles.storedImage} /> : null}<Text numberOfLines={2} style={styles.storedItemText}>+ {holding.template.name}</Text></Pressable>)}</ScrollView></View> : null}
   </View></SafeAreaView>;
 }
 
@@ -187,8 +208,9 @@ const styles = StyleSheet.create({
   stored: { borderTopColor: colors.border, borderTopWidth: 1, padding: spacing.sm },
   storedTitle: { color: colors.ink, fontSize: 13, fontWeight: "700", marginBottom: spacing.xs },
   storedList: { gap: spacing.xs },
-  storedItem: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 10, borderWidth: 1, justifyContent: "center", maxWidth: 150, minHeight: 42, paddingHorizontal: spacing.sm },
-  storedItemText: { color: colors.plum, fontSize: 12, fontWeight: "600" },
+  storedItem: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 10, borderWidth: 1, overflow: "hidden", width: 92 },
+  storedImage: { aspectRatio: 55 / 85, width: "100%" },
+  storedItemText: { color: colors.plum, fontSize: 11, fontWeight: "600", padding: spacing.xs },
   inspection: { alignItems: "center", backgroundColor: colors.surface, borderTopColor: colors.border, borderTopWidth: 1, flexDirection: "row", gap: spacing.sm, padding: spacing.sm },
   inspectionCopy: { flex: 1 },
   inspectionTitle: { color: colors.ink, fontSize: 15, fontWeight: "700" },

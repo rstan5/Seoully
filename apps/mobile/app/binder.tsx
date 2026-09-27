@@ -5,6 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { loadAllMyHoldings, type NativeHolding } from "../src/api";
 import { binderSpreads, buildNativeBinderPages, type NativeBinderPage, type NativeBinderSpread } from "../src/binder/model";
 import { RetryNotice } from "../src/components/RetryNotice";
+import { useCachedSignedMedia } from "../src/media/cachedMedia";
 import { useCopy } from "../src/locale";
 import { colors, spacing } from "../src/theme";
 
@@ -106,17 +107,19 @@ function Page({ page, emptyLabel, onSelect }: { page: NativeBinderPage; emptyLab
 
 function BinderPocket({ holding, emptyLabel, onSelect }: { holding?: NativeHolding; emptyLabel: string; onSelect: (selection: CardSelection) => void }) {
   const pocketRef = useRef<View>(null);
+  const mediaUri = useCachedSignedMedia(holding?.id, holding?.personalMediaUrl);
   const select = () => {
     if (!holding) return;
     pocketRef.current?.measureInWindow((x, y, width, height) => onSelect({ holding, origin: { x, y, width, height } }));
   };
   return <Pressable ref={pocketRef} accessibilityRole={holding ? "button" : "text"} accessibilityLabel={holding?.template.name ?? emptyLabel} disabled={!holding} onPress={select} style={styles.pocket}>
-    {holding?.personalMediaUrl ? <Image source={{ uri: holding.personalMediaUrl }} style={styles.cardImage} /> : holding ? <View style={styles.cardFallback}><Text numberOfLines={3} style={styles.cardName}>{holding.template.name}</Text></View> : null}
+    {mediaUri ? <Image source={{ uri: mediaUri }} style={styles.cardImage} /> : holding ? <View style={styles.cardFallback}><Text numberOfLines={3} style={styles.cardName}>{holding.template.name}</Text></View> : null}
   </Pressable>;
 }
 
 function CardInspection({ selection, returnLabel, detailsLabel, onClose }: { selection: CardSelection | null; returnLabel: string; detailsLabel: string; onClose: () => void }) {
   const router = useRouter();
+  const mediaUri = useCachedSignedMedia(selection?.holding.id, selection?.holding.personalMediaUrl);
   const { width, height } = useWindowDimensions();
   const [progress] = useState(() => new Animated.Value(0));
   const closing = useRef(false);
@@ -151,7 +154,7 @@ function CardInspection({ selection, returnLabel, detailsLabel, onClose }: { sel
   return <Modal animationType="none" transparent visible={Boolean(selection)} onRequestClose={returnCard}>
     <Animated.View style={[styles.modalBackdrop, { opacity: progress }]}>
       <Animated.View style={[styles.inspection, { transform: [{ translateX }, { translateY }, { scale }] }]}>
-        {selection?.holding.personalMediaUrl ? <Image resizeMode="contain" source={{ uri: selection.holding.personalMediaUrl }} style={styles.inspectImage} /> : <View style={styles.inspectFallback}><Text style={styles.inspectFallbackText}>{selection?.holding.template.name}</Text></View>}
+        {mediaUri ? <Image resizeMode="contain" source={{ uri: mediaUri }} style={styles.inspectImage} /> : <View style={styles.inspectFallback}><Text style={styles.inspectFallbackText}>{selection?.holding.template.name}</Text></View>}
         <Text style={styles.inspectTitle}>{selection?.holding.template.name}</Text>
         <Text style={styles.inspectMeta}>{[selection?.holding.template.groupName, selection?.holding.template.memberName, selection?.holding.template.releaseName].filter(Boolean).join(" · ")}</Text>
         <Pressable accessibilityRole="button" onPress={() => { if (selection) router.push({ pathname: "/collectible", params: { holdingId: selection.holding.id } }); }} style={styles.closeButton}><Text style={styles.closeText}>{detailsLabel}</Text></Pressable>

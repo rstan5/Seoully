@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { ActivityIndicator, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   loadMyHoldings,
   loadMyWishlist,
@@ -13,6 +13,7 @@ import {
 import { collectibleKindLabel } from "../src/i18n";
 import { useCopy } from "../src/locale";
 import { RetryNotice } from "../src/components/RetryNotice";
+import { CachedSignedImage } from "../src/media/cachedMedia";
 import { colors, spacing } from "../src/theme";
 
 const COLLECTION_TAB_KEY = "seoully.mobile.collection-tab.v1";
@@ -126,7 +127,7 @@ export default function CollectionScreen() {
     {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
     {!loading && tab === "collection" ? <>
       {holdings.map((holding) => <View key={holding.id} style={styles.card}>
-        {holding.personalMediaUrl ? <Image source={{ uri: holding.personalMediaUrl }} style={styles.image} /> : null}
+        {holding.personalMediaUrl ? <CachedSignedImage cacheKey={holding.id} url={holding.personalMediaUrl} style={styles.image} /> : null}
         <View style={styles.cardBody}>
           <Pressable accessibilityRole="button" accessibilityLabel={`${copy.viewCollectible}: ${holding.template.name}`} onPress={() => router.push({ pathname: "/collectible", params: { holdingId: holding.id } })}>
             <Text style={styles.cardTitle}>{holding.template.name}</Text>

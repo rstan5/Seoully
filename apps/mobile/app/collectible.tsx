@@ -5,6 +5,7 @@ import { loadAllMyHoldings, updateHoldingTradeStatus, type NativeHolding } from 
 import { RetryNotice } from "../src/components/RetryNotice";
 import { collectibleKindLabel } from "../src/i18n";
 import { useCopy, useLocale } from "../src/locale";
+import { useCachedSignedMedia } from "../src/media/cachedMedia";
 import { colors, spacing } from "../src/theme";
 
 export default function CollectibleDetailScreen() {
@@ -16,6 +17,7 @@ export default function CollectibleDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const mediaUri = useCachedSignedMedia(holding?.id, holding?.personalMediaUrl);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -52,7 +54,7 @@ export default function CollectibleDetailScreen() {
     {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
     {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
     {holding ? <>
-      {holding.personalMediaUrl ? <Image accessibilityLabel={copy.personalPreview} resizeMode="contain" source={{ uri: holding.personalMediaUrl }} style={styles.image} /> : <View style={styles.fallback}><Text style={styles.fallbackText}>{holding.template.name}</Text></View>}
+      {mediaUri ? <Image accessibilityLabel={copy.personalPreview} resizeMode="contain" source={{ uri: mediaUri }} style={styles.image} /> : <View style={styles.fallback}><Text style={styles.fallbackText}>{holding.template.name}</Text></View>}
       <Text style={styles.kind}>{collectibleKindLabel(holding.template.kind, copy)}</Text>
       <Text style={styles.title}>{holding.template.name}</Text>
       <Text style={styles.meta}>{[holding.template.groupName, holding.template.memberName, holding.template.releaseName].filter(Boolean).join(" · ")}</Text>

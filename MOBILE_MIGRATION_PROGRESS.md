@@ -10,8 +10,8 @@ security, and Room/Binder data model.
 
 - Branch: `mobile-native`
 - Immutable reference checkpoint: `76be07a928ce3e9436031d7324a5cc2b1b0375ed`
-- Current task: physical-device and deployed-backend QA handoff
-- Overall status: NON-DEVICE IMPLEMENTATION CHECKPOINT COMPLETE — AWAITING QA
+- Current task: native Room slot homes, full placement set, and shared signed-media cache
+- Overall status: IN PROGRESS — Room/Binder product behavior still closing; device QA still pending
 
 ## Completed
 
@@ -200,6 +200,14 @@ security, and Room/Binder data model.
   Holdings reload, so page position survives leaving and returning to Binder.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
+- Native Room no longer silently drops or refuses placements after 24 objects. Every
+  persisted RoomPlacement renders; new homes use zone slot offsets so photocards,
+  albums, posters, display objects, archive, and desk items no longer stack on one
+  point. GL personal-media textures stay budgeted to the nearest/focused 24 objects.
+- Signed personal media now uses one Expo local-file cache shared by Room, Binder,
+  Collection, collectible detail, and the Room stored tray. Tray chips show cached
+  card faces. Room camera yaw restores locally, and Room refreshes on focus unless
+  an edit gesture is in progress.
 
 ## Current queue
 
@@ -333,6 +341,10 @@ Native device QA is still pending.
   lists remain AWAITING DEVICE QA.
 - Binder spread restoration passes mobile TypeScript and Expo lint. Scroll-to-index
   after Holdings reload remains AWAITING DEVICE QA.
+- Room slot homes, uncapped placement rendering, texture budget, shared signed-media
+  cache, stored-tray faces, and camera-yaw restore pass mobile TypeScript, Expo lint,
+  web TypeScript, and diff check. Large-room FPS/texture memory, slot spacing, tray
+  scrolling, and yaw restore after process death remain AWAITING DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.
@@ -346,7 +358,7 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-Continue any remaining non-device native gaps. Remaining blockers are pending
-migrations, physical-device QA, and product/schema decisions such as avatars. Do not
-treat Room/Binder as finished; they remain production-backed but still require device
-gesture/FPS/texture QA.
+Continue Room/Binder physical fidelity and remaining ordinary-app gaps that do not
+require a device. Next eligible work includes Holding-by-id reads, Collection list
+virtualization, and richer Binder page-turn. Stop only on genuine blockers: pending
+migrations, avatar schema, and physical-device QA. Do not treat Room/Binder as finished.

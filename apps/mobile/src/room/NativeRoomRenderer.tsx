@@ -1,10 +1,10 @@
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
-import { Suspense, useEffect, useState } from "react";
+import { Suspense } from "react";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber/native";
-import { Directory, File, Paths } from "expo-file-system";
 import { Color, TextureLoader, Vector3 } from "three";
 import type { NativeRoomThemeId } from "../api";
-import type { RoomRenderable } from "./model";
+import { useCachedSignedMedia } from "../media/cachedMedia";
+import { roomTextureIds, type RoomRenderable } from "./model";
 
 const ROOM_THEMES = {
   hearth: { background: "#f4e7e5", wall: "#b9959b", sideWall: "#a98288", floor: "#6f4c4d", furniture: "#56383d", edge: "#8a6261", accent: "#8e5265", light: "#fff1e5" },
@@ -31,6 +31,7 @@ export function NativeRoomRenderer({
 }) {
   const focused = items.find((item) => item.holding.id === focusedId) ?? null;
   const theme = ROOM_THEMES[themeId] ?? ROOM_THEMES.hearth;
+  const textured = roomTextureIds(items, selectedId, focusedId);
   return <Canvas
     camera={{ position: [0, 2.6, 7], fov: 50 }}
     onPointerMissed={onClearSelection}
@@ -44,7 +45,7 @@ export function NativeRoomRenderer({
     <CameraRig yaw={cameraYaw} focused={focused} />
     <RoomShell theme={theme} />
     <RoomFurniture theme={theme} />
-    {items.map((item) => <RoomObject key={item.holding.id} item={item} selected={selectedId === item.holding.id} onSelect={onSelect} />)}
+    {items.map((item) => <RoomObject key={item.holding.id} item={item} selected={selectedId === item.holding.id} loadTexture={textured.has(item.holding.id)} onSelect={onSelect} />)}
   </Canvas>;
 }
 
@@ -92,7 +93,7 @@ function RoomFurniture({ theme }: { theme: typeof ROOM_THEMES[NativeRoomThemeId]
   </>;
 }
 
-function RoomObject({ item, selected, onSelect }: { item: RoomRenderable; selected: boolean; onSelect: (id: string) => void }) {
+function RoomObject({ item, selected, loadTexture, onSelect }: { item: RoomRenderable; selected: boolean; loadTexture: boolean; onSelect: (id: string) => void }) {
   const dimensions: [number, number, number] = item.geometry === "photocard"
     ? [0.72, 1.04, 0.05]
     : item.geometry === "album"
@@ -105,12 +106,12 @@ function RoomObject({ item, selected, onSelect }: { item: RoomRenderable; select
     onClick={(event) => { event.stopPropagation(); onSelect(item.holding.id); }}
   >
     <mesh castShadow><boxGeometry args={dimensions} /><meshStandardMaterial color={selected ? "#bd4268" : "#f2d5dc"} roughness={0.55} /></mesh>
-    {item.imageUrl ? <CachedPersonalMediaFace cacheKey={item.holding.id} url={item.imageUrl} width={dimensions[0] * 0.92} height={dimensions[1] * 0.92} depth={dimensions[2]} /> : null}
+    {loadTexture && item.imageUrl ? <CachedPersonalMediaFace cacheKey={item.holding.id} url={item.imageUrl} width={dimensions[0] * 0.92} height={dimensions[1] * 0.92} depth={dimensions[2]} /> : null}
   </group>;
 }
 
 function CachedPersonalMediaFace({ cacheKey, url, width, height, depth }: { cacheKey: string; url: string; width: number; height: number; depth: number }) {
-  const localUri = useCachedMediaFile(cacheKey, url);
+  const localUri = useCachedSignedMedia(cacheKey, url);
   return localUri ? <Suspense fallback={null}><PersonalMediaFace uri={localUri} width={width} height={height} depth={depth} /></Suspense> : null;
 }
 
@@ -120,19 +121,4 @@ function PersonalMediaFace({ uri, width, height, depth }: { uri: string; width: 
     <planeGeometry args={[width, height]} />
     <meshBasicMaterial map={texture} toneMapped={false} />
   </mesh>;
-}
-
-function useCachedMediaFile(cacheKey: string, url: string) {
-  const [uri, setUri] = useState<string | null>(null);
-  useEffect(() => {
-    let active = true;
-    const directory = new Directory(Paths.cache, "seoully-room-textures");
-    directory.create({ idempotent: true, intermediates: true });
-    const destination = new File(directory, `${cacheKey}.img`);
-    void File.downloadFileAsync(url, destination, { idempotent: true })
-      .then((file) => { if (active) setUri(file.uri); })
-      .catch(() => { if (active) setUri(null); });
-    return () => { active = false; };
-  }, [cacheKey, url]);
-  return uri;
 }

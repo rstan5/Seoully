@@ -59,6 +59,19 @@ export async function uploadHoldingPhoto(holdingId: string, uri: string, mimeTyp
   return response.json();
 }
 
+export async function uploadCatalogReferencePhoto(templateId: string, uri: string, mimeType = "image/jpeg") {
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+  if (!baseUrl || !accessToken) throw new Error("unauthenticated");
+  const body = new FormData();
+  body.append("templateId", templateId);
+  body.append("sourceKey", uri.slice(-160));
+  body.append("file", { uri, name: "catalog-reference.jpg", type: mimeType } as unknown as Blob);
+  const response = await fetch(`${baseUrl}/api/mobile/catalog/reference-images`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body });
+  if (!response.ok) throw new Error("catalog_reference_upload_failed");
+  return response.json();
+}
+
 export async function contributeCatalogItem(input: { name: string; kind: string; groupName: string; memberName?: string; releaseName?: string; descriptor?: string }) {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;

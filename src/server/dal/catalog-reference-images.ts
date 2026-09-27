@@ -1,7 +1,8 @@
 import "server-only";
 
 import { z } from "zod";
-import { getCurrentIdentity } from "@/server/dal/profile";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/profile";
 import { createSupabaseServerClient } from "@/server/supabase/server";
 
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -24,16 +25,16 @@ export async function createCatalogReferenceImage(input: {
   templateId: unknown;
   file: File;
   sourceKey?: unknown;
-}): Promise<CatalogReferenceImageDTO> {
+}, client?: SupabaseClient): Promise<CatalogReferenceImageDTO> {
   const templateId = templateSchema.parse(input.templateId);
-  const identity = await getCurrentIdentity();
+  const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
   await validateImage(input.file);
 
   const sourceKey = typeof input.sourceKey === "string" && input.sourceKey.trim()
     ? input.sourceKey.trim().slice(0, 160)
     : crypto.randomUUID();
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? await createSupabaseServerClient();
 
   const { data: contribution, error: contributionError } = await supabase
     .from("catalog_contributions")

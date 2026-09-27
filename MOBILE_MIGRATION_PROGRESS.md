@@ -42,6 +42,9 @@ security, and Room/Binder data model.
   photo-first consent wiring still remains before this slice can be called complete.
 - Added a bearer-authenticated native Feed read path reusing the existing social DAL;
   the native Feed now renders real followed/public production posts when configured.
+- Added bearer-authenticated catalog-reference upload support and wired the native
+  new-template path to an explicit opt-in shared-photo checkbox. Personal Holding media
+  and shared CatalogReferenceImage uploads remain separate server operations.
 
 ## Current queue
 
@@ -79,6 +82,6 @@ is still pending.
 
 ## Next autonomous task
 
-Finish photo-first manual contribution with explicit reference-image consent and
-shared/personal media separation. Full native social, collection, Room, and Binder
-parity remain in the queue; no device QA is claimed.
+The native manual contribution path now has explicit consent and separate upload
+semantics. Next: native onboarding parity and production social interactions; full
+collection, Room, and Binder parity remain in the queue. No device QA is claimed.

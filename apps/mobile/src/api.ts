@@ -86,6 +86,16 @@ export async function loadMyHoldings(offset = 0, limit = 100): Promise<NativeHol
   return payload.holdings ?? [];
 }
 
+export async function loadMyHolding(holdingId: string): Promise<NativeHolding | null> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/holdings?holdingId=${encodeURIComponent(holdingId)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("holding_read_failed");
+  const payload = await response.json() as { holding?: NativeHolding | null };
+  return payload.holding ?? null;
+}
+
 export async function loadAllMyHoldings(): Promise<NativeHolding[]> {
   const holdings: NativeHolding[] = [];
   for (let offset = 0; offset < 2_000; offset += 100) {

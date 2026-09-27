@@ -10,7 +10,7 @@ security, and Room/Binder data model.
 
 - Branch: `mobile-native`
 - Immutable reference checkpoint: `76be07a928ce3e9436031d7324a5cc2b1b0375ed`
-- Current task: native Room slot homes, full placement set, and shared signed-media cache
+- Current task: owner-scoped Holding-by-id native detail reads
 - Overall status: IN PROGRESS — Room/Binder product behavior still closing; device QA still pending
 
 ## Completed
@@ -208,6 +208,8 @@ security, and Room/Binder data model.
   Collection, collectible detail, and the Room stored tray. Tray chips show cached
   card faces. Room camera yaw restores locally, and Room refreshes on focus unless
   an edit gesture is in progress.
+- Collectible detail now reads one owner-scoped Holding by id through the existing
+  bearer holdings boundary instead of paging the entire collection to find a card.
 
 ## Current queue
 
@@ -345,6 +347,8 @@ Native device QA is still pending.
   cache, stored-tray faces, and camera-yaw restore pass mobile TypeScript, Expo lint,
   web TypeScript, and diff check. Large-room FPS/texture memory, slot spacing, tray
   scrolling, and yaw restore after process death remain AWAITING DEVICE QA.
+- Holding-by-id detail reads pass mobile and web TypeScript plus Expo lint. Deep-link
+  and missing-id empty states remain AWAITING DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.
@@ -359,6 +363,6 @@ Native device QA is still pending.
 ## Next autonomous task
 
 Continue Room/Binder physical fidelity and remaining ordinary-app gaps that do not
-require a device. Next eligible work includes Holding-by-id reads, Collection list
-virtualization, and richer Binder page-turn. Stop only on genuine blockers: pending
-migrations, avatar schema, and physical-device QA. Do not treat Room/Binder as finished.
+require a device. Next eligible work includes Collection list virtualization and
+richer Binder page-turn. Stop only on genuine blockers: pending migrations, avatar
+schema, and physical-device QA. Do not treat Room/Binder as finished.

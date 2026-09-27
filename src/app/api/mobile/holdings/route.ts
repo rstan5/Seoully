@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createMyHolding, listMyHoldings, setMyHoldingTradeStatus } from "@/server/dal/holdings";
+import { createMyHolding, getMyHolding, listMyHoldings, setMyHoldingTradeStatus } from "@/server/dal/holdings";
 import { createSupabaseBearerClient } from "@/server/supabase/bearer";
 
 export async function POST(request: Request) {
@@ -19,6 +19,11 @@ export async function GET(request: Request) {
   if (!client) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   try {
     const url = new URL(request.url);
+    const holdingId = url.searchParams.get("holdingId");
+    if (holdingId) {
+      const holding = await getMyHolding({ holdingId }, client);
+      return NextResponse.json({ holding }, { headers: { "Cache-Control": "no-store" } });
+    }
     const holdings = await listMyHoldings({
       limit: Number(url.searchParams.get("limit") ?? "100"),
       offset: Number(url.searchParams.get("offset") ?? "0"),

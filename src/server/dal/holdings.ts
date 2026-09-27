@@ -80,11 +80,11 @@ export async function listMyHoldings(input?: unknown, client?: SupabaseClient): 
   return hydrateHoldings(data ?? [], supabase);
 }
 
-export async function getMyHolding(input: unknown): Promise<HoldingDTO | null> {
+export async function getMyHolding(input: unknown, client?: SupabaseClient): Promise<HoldingDTO | null> {
   const { holdingId } = holdingIdSchema.parse(input);
-  const identity = await getCurrentIdentity();
+  const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("holdings")
     .select("id,owner_user_id,template_id,acquired_at,created_at,updated_at,trade_status")

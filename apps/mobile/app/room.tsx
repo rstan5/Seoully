@@ -10,7 +10,7 @@ import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
 import { CachedSignedImage } from "../src/media/cachedMedia";
 import { NativeRoomRenderer } from "../src/room/NativeRoomRenderer";
-import { buildRoomRenderables, createInitialRoomRenderable, moveRenderable, nativeHomeForHolding, nextNativeSlot, resizeRenderable, settleRoomRenderable, toPersistedTransform, turnRenderable, zoneIdForNativeSurface, type RoomRenderable } from "../src/room/model";
+import { buildRoomRenderables, createInitialRoomRenderable, isSupportedRoomPlacement, moveRenderable, nativeHomeForHolding, nextNativeSlot, resizeRenderable, settleRoomRenderable, toPersistedTransform, turnRenderable, zoneIdForNativeSurface, type NativeRoomVector, type RoomRenderable } from "../src/room/model";
 import { colors, spacing } from "../src/theme";
 
 const ROOM_CAMERA_KEY = "seoully.mobile.room-camera.v1";
@@ -24,9 +24,11 @@ export default function RoomScreen() {
   const [editing, setEditing] = useState(false);
   const [cameraYaw, setCameraYaw] = useState(0);
   const [cameraPitch, setCameraPitch] = useState(0);
+  const [lookTarget, setLookTarget] = useState<NativeRoomVector | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const dragOrigin = useRef<RoomRenderable | null>(null);
+  const editBaseline = useRef<RoomRenderable[]>([]);
   const cameraOrigin = useRef({ yaw: 0, pitch: 0 });
   const latestItems = useRef(items);
   const editingRef = useRef(editing);
@@ -75,6 +77,7 @@ export default function RoomScreen() {
     },
     onPanResponderMove: (_, gesture) => {
       if (!editing || !selectedId) {
+        setLookTarget(null);
         setCameraYaw(clampCamera(cameraOrigin.current.yaw + gesture.dx * 0.003, -0.38, 0.38));
         setCameraPitch(clampCamera(cameraOrigin.current.pitch - gesture.dy * 0.003, -0.22, 0.28));
         return;
@@ -94,6 +97,12 @@ export default function RoomScreen() {
       const current = latestItems.current.find((item) => item.holding.id === id);
       dragOrigin.current = null;
       if (!id || !room || !current) return;
+      if (!isSupportedRoomPlacement(current, room.id)) {
+        const origin = editBaseline.current.find((item) => item.holding.id === id);
+        if (origin) setItems((all) => all.map((item) => item.holding.id === id ? origin : item));
+        setError(copy.roomInvalidPlacement);
+        return;
+      }
       const settled = settleRoomRenderable(current, room.id);
       setItems((all) => all.map((item) => item.holding.id === id ? settled.renderable : item));
       const slot = current.placement?.slot ?? latestItems.current.findIndex((item) => item.holding.id === id);
@@ -111,6 +120,14 @@ export default function RoomScreen() {
       if (!editing) persistRoomCamera(cameraYaw, cameraPitch);
     },
   });
+  const roomLooks = [
+    ["home", null, copy.roomLookHome],
+    ["shelf", { x: -3.15, y: 0, z: -3.48 }, copy.roomLookShelf],
+    ["wall", { x: 1.1, y: 0.75, z: -4.2 }, copy.roomLookWall],
+    ["desk", { x: 1.45, y: -0.4, z: -2.85 }, copy.roomLookDesk],
+    ["case", { x: 3.65, y: 0, z: -3.52 }, copy.roomLookCase],
+    ["binder", { x: 0.45, y: -0.3, z: -2.7 }, copy.roomLookBinder],
+  ] as const;
   const placedIds = new Set(items.map((item) => item.holding.id));
   const unplaced = snapshot?.holdings.filter((holding) => !placedIds.has(holding.id)) ?? [];
   const storedGroups = groupStoredHoldings(unplaced);
@@ -119,6 +136,10 @@ export default function RoomScreen() {
   function persistSelected(next: RoomRenderable) {
     const room = snapshot?.room;
     if (!room) return;
+    if (!isSupportedRoomPlacement(next, room.id)) {
+      setError(copy.roomInvalidPlacement);
+      return;
+    }
     const settled = settleRoomRenderable(next, room.id, next.placement?.surfaceId ?? undefined);
     setItems((all) => all.map((item) => item.holding.id === next.holding.id ? settled.renderable : item));
     const slot = next.placement?.slot ?? items.findIndex((item) => item.holding.id === next.holding.id);
@@ -166,6 +187,43 @@ export default function RoomScreen() {
     }
   }
 
+  function beginEditing() {
+    editBaseline.current = items.map((item) => ({ ...item, position: { ...item.position }, rotation: { ...item.rotation } }));
+    setEditing(true);
+    setLookTarget(null);
+  }
+
+  async function cancelEditing() {
+    const room = snapshot?.room;
+    const baseline = editBaseline.current;
+    setItems(baseline);
+    setEditing(false);
+    setSelectedId(null);
+    if (!room) return;
+    try {
+      await Promise.all(baseline.map((item) => saveNativeRoomPlacement({
+        roomId: room.id,
+        holdingId: item.holding.id,
+        zoneId: item.placement?.zoneId ?? zoneIdForNativeSurface(room.id, item.placement?.surfaceId ?? `${room.id}-floor`),
+        slot: item.placement?.slot ?? 0,
+        transform: toPersistedTransform(item),
+        surfaceId: item.placement?.surfaceId ?? undefined,
+      })));
+    } catch {
+      setError(copy.roomSaveFailed);
+    }
+  }
+
+  function lookAtZone(target: NativeRoomVector | null) {
+    setSelectedId(null);
+    setLookTarget(target);
+    if (!target) {
+      setCameraYaw(0);
+      setCameraPitch(0);
+      persistRoomCamera(0, 0);
+    }
+  }
+
   async function changeTheme(themeId: NativeRoomThemeId) {
     if (!snapshot || snapshot.room.themeId === themeId) return;
     const previous = snapshot.room;
@@ -183,8 +241,9 @@ export default function RoomScreen() {
     <View style={styles.header}>
       <View style={styles.heading}>{router.canGoBack() ? <ScreenBack label={copy.back} onPress={() => router.back()} /> : null}<Text style={styles.title}>{copy.room}</Text><Text style={styles.lead}>{copy.roomLead}</Text></View>
       <View style={styles.headerActions}>
-        <Pressable accessibilityRole="button" onPress={() => router.push("/binder")} style={styles.editButton}><Text style={styles.editButtonText}>{copy.binder}</Text></Pressable>
-        <Pressable accessibilityRole="button" disabled={!snapshot} onPress={() => setEditing((value) => !value)} style={styles.editButton}><Text style={styles.editButtonText}>{editing ? copy.finishEditing : copy.editRoom}</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={copy.openBinder} onPress={() => router.push("/binder")} style={styles.editButton}><Text style={styles.editButtonText}>{copy.binder}</Text></Pressable>
+        {editing ? <Pressable accessibilityRole="button" onPress={() => void cancelEditing()} style={styles.editButton}><Text style={styles.editButtonText}>{copy.cancelEditing}</Text></Pressable> : null}
+        <Pressable accessibilityRole="button" disabled={!snapshot} onPress={() => editing ? setEditing(false) : beginEditing()} style={styles.editButton}><Text style={styles.editButtonText}>{editing ? copy.finishEditing : copy.editRoom}</Text></Pressable>
       </View>
     </View>
     {editing && snapshot ? <View><Text style={styles.themeLabel}>{copy.roomStyle}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.themeRow}>{([
@@ -195,8 +254,12 @@ export default function RoomScreen() {
     {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
     {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
     {!loading && !snapshot?.holdings.length ? <Text style={styles.empty}>{copy.roomEmpty}</Text> : null}
+    {!loading && snapshot ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.lookRow}>{roomLooks.map(([id, target, label]) => {
+      const selected = id === "home" ? !lookTarget && cameraYaw === 0 && cameraPitch === 0 : Boolean(lookTarget && target && lookTarget.x === target.x && lookTarget.z === target.z);
+      return <Pressable key={id} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => lookAtZone(target)} style={[styles.lookChip, selected && styles.lookChipSelected]}><Text style={[styles.lookChipText, selected && styles.lookChipTextSelected]}>{label}</Text></Pressable>;
+    })}</ScrollView> : null}
     {!loading && snapshot ? <View style={styles.stage} {...panResponder.panHandlers}>
-      <NativeRoomRenderer items={items} selectedId={selectedId} focusedId={editing ? null : selectedId} themeId={snapshot.room.themeId} cameraYaw={cameraYaw} cameraPitch={cameraPitch} onSelect={setSelectedId} onClearSelection={() => setSelectedId(null)} />
+      <NativeRoomRenderer items={items} selectedId={selectedId} focusedId={editing ? null : selectedId} themeId={snapshot.room.themeId} cameraYaw={cameraYaw} cameraPitch={cameraPitch} lookTarget={lookTarget} onSelect={setSelectedId} onClearSelection={() => setSelectedId(null)} onOpenBinder={editing ? undefined : () => router.push("/binder")} />
       {editing && selectedId ? <View pointerEvents="none" style={styles.hint}><Text style={styles.hintText}>{copy.roomDragHint}</Text></View> : null}
       {!editing ? <View pointerEvents="none" style={styles.hint}><Text style={styles.hintText}>{copy.roomOrbitHint}</Text></View> : null}
     </View> : null}
@@ -224,7 +287,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { alignItems: "center", flexDirection: "row", gap: spacing.sm, padding: spacing.lg },
   heading: { flex: 1 },
-  headerActions: { flexDirection: "row", gap: spacing.xs },
+  headerActions: { flexDirection: "row", flexShrink: 0, flexWrap: "wrap", gap: spacing.xs, justifyContent: "flex-end", maxWidth: 220 },
   title: { color: colors.ink, fontSize: 30, fontWeight: "700" },
   lead: { color: colors.muted, fontSize: 14, marginTop: spacing.xs },
   editButton: { backgroundColor: colors.plum, borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
@@ -238,6 +301,11 @@ const styles = StyleSheet.create({
   loading: { marginTop: spacing.xl },
   error: { color: colors.plum, paddingHorizontal: spacing.lg },
   empty: { color: colors.muted, padding: spacing.lg },
+  lookRow: { gap: spacing.xs, paddingHorizontal: spacing.md, paddingBottom: spacing.xs },
+  lookChip: { borderColor: colors.border, borderRadius: 999, borderWidth: 1, justifyContent: "center", minHeight: 32, paddingHorizontal: spacing.sm },
+  lookChipSelected: { backgroundColor: colors.plum, borderColor: colors.plum },
+  lookChipText: { color: colors.plum, fontSize: 12, fontWeight: "700" },
+  lookChipTextSelected: { color: colors.surface },
   stage: { flex: 1, minHeight: 360, overflow: "hidden" },
   hint: { alignSelf: "center", backgroundColor: colors.surface, borderRadius: 999, bottom: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, position: "absolute" },
   hintText: { color: colors.ink, fontSize: 13, fontWeight: "600" },

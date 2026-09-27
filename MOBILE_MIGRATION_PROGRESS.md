@@ -11,7 +11,7 @@ security, and Room/Binder data model.
 - Branch: `mobile-native`
 - Immutable reference checkpoint: `76be07a928ce3e9436031d7324a5cc2b1b0375ed`
 - Recovered from: `d2d779d`
-- Current task: Room representation-by-kind, zone camera, edit cancel/placement, Binder close/empty
+- Current task: Room representation, edit/camera, Binder open/close and Room jump
 - Overall status: IN PROGRESS — Room/Binder product behavior still closing; device QA still pending
 
 ## Current Room parity matrix
@@ -58,7 +58,7 @@ Compared live `src/world` Room (zones, objects, `useRoomEdit`, camera) against
 | **STATE** | |
 | RoomPlacement | IMPLEMENTED |
 | Production IDs | IMPLEMENTED |
-| Relaunch restoration | PARTIAL — placements from server; camera from AsyncStorage |
+| Relaunch restoration | PARTIAL — placements from server; camera and focused Holding from AsyncStorage |
 | Room customization persistence | PARTIAL — theme write exists; migration not applied |
 | Holding ownership independent from placement | IMPLEMENTED |
 | **ENTRY/EXIT** | |
@@ -77,8 +77,8 @@ Compared live `OpenBinder` / `binderGeometry.ts` / `BinderZone` against
 | --- | --- |
 | Production Holdings | IMPLEMENTED |
 | Photocard filtering | IMPLEMENTED |
-| Grouping | PARTIAL — release/group pages; not catalog CollectibleSet progress |
-| Member / set / section organization | PARTIAL — section chips by group/release |
+| Grouping | PARTIAL — release/group pages; not catalog CollectibleSet progress (no production set table) |
+| Member / set / section organization | PARTIAL — member-sorted pockets plus section chips; no catalog set slots |
 | Pocket indexing | IMPLEMENTED — 3×2, empty pockets retained |
 | Pages | IMPLEMENTED |
 | Spreads | IMPLEMENTED — left/right pair |
@@ -94,9 +94,9 @@ Compared live `OpenBinder` / `binderGeometry.ts` / `BinderZone` against
 | Card lift | IMPLEMENTED — spring from pocket origin |
 | Card inspection | IMPLEMENTED — chrome below the card, not on the face |
 | Card return | IMPLEMENTED |
-| Binder open / close | PARTIAL — stack open/close; not in-room 3D open |
-| Room → Binder transition | PARTIAL — route + in-world tap; not camera fly-in |
-| State restoration | IMPLEMENTED — spread index persisted |
+| Binder open / close | PARTIAL — cover opens/closes before Room return; not in-world 3D fly-in |
+| Room → Binder transition | PARTIAL — in-world tap and selected photocard opens that spread; cover staging exists; not camera fly-in |
+| State restoration | IMPLEMENTED — spread index persisted; Room focus restores |
 | Empty states | IMPLEMENTED — empty physical binder + copy |
 
 Do not treat Room or Binder as finished. Visual/tactile/FPS/gesture quality remains AWAITING DEVICE QA.
@@ -341,6 +341,9 @@ Do not treat Room or Binder as finished. Visual/tactile/FPS/gesture quality rema
 - Binder close returns to Room, empty collections still render a physical
   spread with pockets, and a failed personal image no longer paints text over
   the card face or collapses the pocket.
+- Opening Binder from a focused Room photocard jumps to that card's spread.
+  Binder pockets sort by member inside a section. Room restores the last
+  focused Holding after relaunch.
 
 ## Current queue
 
@@ -514,8 +517,27 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-Continue remaining non-device Room/Binder fidelity (catalog-set pocket gaps if a
-production set-progress boundary exists, in-room Binder open staging) and ordinary
-gaps that still block the launch loop. Remaining blockers: pending SQL migrations,
-avatar schema, fixture-only notices, public Room viewing, and physical-device QA.
-Do not treat Room/Binder as finished.
+Room/Binder non-device owner loop is largely in place. Remaining work is
+classified below. Do not treat Room/Binder visual/tactile parity as finished.
+
+### IMPLEMENTATION REMAINING
+- Public Room viewing for other collectors (no native client yet)
+- Catalog-set empty-pocket layout if production ever exposes CollectibleSet
+  progress (no `collectible_sets` table exists today)
+- In-world 3D Binder open that stays inside the Room GL scene
+
+### AWAITING DEVICE QA
+- Room GL FPS, texture memory, raycast hits, drag/orbit feel, inspect lift
+- Binder swipe, cover open/close, card lift springs, page perspective
+- Camera, crop, keyboard, safe areas, Android
+
+### HUMAN REVIEW REQUIRED
+- `20260930000000_native_onboarding_progress.sql`
+- `20261001000000_direct_messages.sql`
+- `20261002000000_native_room_theme.sql`
+- Durable profiles avatar/media contract
+- Notices beyond fixture-only content
+
+### ENVIRONMENT BLOCKED
+- Known unrelated Turbopack process-binding issue (do not re-investigate)
+- Expo toolchain moderate advisories that require unsafe major downgrades

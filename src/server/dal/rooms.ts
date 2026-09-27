@@ -83,11 +83,11 @@ export async function upsertMyRoomPlacement(input: unknown, client?: SupabaseCli
   return mapPlacement(data);
 }
 
-export async function removeMyRoomPlacement(input: unknown): Promise<{ removed: boolean }> {
+export async function removeMyRoomPlacement(input: unknown, client?: SupabaseClient): Promise<{ removed: boolean }> {
   const { roomId, holdingId } = z.object({ roomId: uuid, holdingId: uuid }).strict().parse(input);
-  const room = await ensureMyRoom();
+  const room = await ensureMyRoom(client);
   if (room.id !== roomId) throw new Error("room_not_found");
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? await createSupabaseServerClient();
   const { data, error } = await supabase.from("room_placements").delete()
     .eq("room_id", roomId).eq("holding_id", holdingId).select("id");
   if (error) throw new Error("room_placement_delete_failed");

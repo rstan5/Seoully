@@ -1,10 +1,10 @@
 /* eslint-disable react-hooks/refs -- PanResponder reads refs only inside gesture callbacks. */
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, PanResponder, Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
-import { loadNativeRoom, saveNativeRoomPlacement, type NativeRoomSnapshot } from "../src/api";
+import { ActivityIndicator, PanResponder, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
+import { loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomPlacement, type NativeHolding, type NativeRoomSnapshot } from "../src/api";
 import { useCopy } from "../src/locale";
 import { NativeRoomRenderer } from "../src/room/NativeRoomRenderer";
-import { buildRoomRenderables, moveRenderable, toPersistedTransform, type RoomRenderable } from "../src/room/model";
+import { buildRoomRenderables, createInitialRoomRenderable, moveRenderable, toPersistedTransform, type RoomRenderable } from "../src/room/model";
 import { colors, spacing } from "../src/theme";
 
 export default function RoomScreen() {
@@ -70,6 +70,38 @@ export default function RoomScreen() {
     },
     onPanResponderTerminate: () => { dragOrigin.current = null; },
   });
+  const placedIds = new Set(items.map((item) => item.holding.id));
+  const unplaced = snapshot?.holdings.filter((holding) => !placedIds.has(holding.id)) ?? [];
+
+  async function placeHolding(holding: NativeHolding) {
+    if (!snapshot || items.length >= 24) return;
+    const draft = createInitialRoomRenderable(holding, items.length);
+    try {
+      const placement = await saveNativeRoomPlacement({
+        roomId: snapshot.room.id,
+        holdingId: holding.id,
+        zoneId: `${snapshot.room.id}-floor`,
+        slot: items.length,
+        transform: toPersistedTransform(draft),
+        surfaceId: `${snapshot.room.id}-floor`,
+      });
+      setItems((current) => [...current, { ...draft, placement }]);
+      setSelectedId(holding.id);
+    } catch {
+      setError(copy.roomSaveFailed);
+    }
+  }
+
+  async function removeSelected() {
+    if (!snapshot || !selectedId) return;
+    try {
+      await removeNativeRoomPlacement(snapshot.room.id, selectedId);
+      setItems((current) => current.filter((item) => item.holding.id !== selectedId));
+      setSelectedId(null);
+    } catch {
+      setError(copy.roomSaveFailed);
+    }
+  }
 
   return <SafeAreaView style={styles.safe}><View style={styles.container}>
     <View style={styles.header}>
@@ -78,13 +110,14 @@ export default function RoomScreen() {
     </View>
     {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
     {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-    {!loading && items.length === 0 ? <Text style={styles.empty}>{copy.roomEmpty}</Text> : null}
-    {items.length ? <View style={styles.stage} {...panResponder.panHandlers}>
+    {!loading && !snapshot?.holdings.length ? <Text style={styles.empty}>{copy.roomEmpty}</Text> : null}
+    {!loading && snapshot ? <View style={styles.stage} {...panResponder.panHandlers}>
       <NativeRoomRenderer items={items} selectedId={selectedId} cameraYaw={cameraYaw} onSelect={setSelectedId} />
       {editing && selectedId ? <View pointerEvents="none" style={styles.hint}><Text style={styles.hintText}>{copy.roomDragHint}</Text></View> : null}
       {!editing ? <View pointerEvents="none" style={styles.hint}><Text style={styles.hintText}>{copy.roomOrbitHint}</Text></View> : null}
     </View> : null}
-    {selectedId ? <Text numberOfLines={1} style={styles.selection}>{items.find((item) => item.holding.id === selectedId)?.holding.template.name}</Text> : null}
+    {selectedId ? <View style={styles.selectionRow}><Text numberOfLines={1} style={styles.selection}>{items.find((item) => item.holding.id === selectedId)?.holding.template.name}</Text><Pressable accessibilityRole="button" onPress={removeSelected}><Text style={styles.removeText}>{copy.removeFromRoom}</Text></Pressable></View> : null}
+    {unplaced.length ? <View style={styles.stored}><Text style={styles.storedTitle}>{copy.storedCollection}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storedList}>{unplaced.map((holding) => <Pressable key={holding.id} accessibilityRole="button" onPress={() => placeHolding(holding)} style={styles.storedItem}><Text numberOfLines={2} style={styles.storedItemText}>+ {holding.template.name}</Text></Pressable>)}</ScrollView></View> : null}
   </View></SafeAreaView>;
 }
 
@@ -103,5 +136,12 @@ const styles = StyleSheet.create({
   stage: { flex: 1, minHeight: 360, overflow: "hidden" },
   hint: { alignSelf: "center", backgroundColor: colors.surface, borderRadius: 999, bottom: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, position: "absolute" },
   hintText: { color: colors.ink, fontSize: 13, fontWeight: "600" },
-  selection: { color: colors.plum, fontWeight: "700", padding: spacing.md, textAlign: "center" },
+  selectionRow: { alignItems: "center", flexDirection: "row", gap: spacing.sm, justifyContent: "center", padding: spacing.sm },
+  selection: { color: colors.plum, flexShrink: 1, fontWeight: "700" },
+  removeText: { color: colors.muted, fontSize: 13, fontWeight: "700" },
+  stored: { borderTopColor: colors.border, borderTopWidth: 1, padding: spacing.sm },
+  storedTitle: { color: colors.ink, fontSize: 13, fontWeight: "700", marginBottom: spacing.xs },
+  storedList: { gap: spacing.xs },
+  storedItem: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 10, borderWidth: 1, justifyContent: "center", maxWidth: 150, minHeight: 42, paddingHorizontal: spacing.sm },
+  storedItemText: { color: colors.plum, fontSize: 12, fontWeight: "600" },
 });

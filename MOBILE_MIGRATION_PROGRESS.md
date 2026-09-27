@@ -111,6 +111,10 @@ security, and Room/Binder data model.
 - Deepened Room V2 beyond the proof with native one-finger camera orbit and physical
   shelf/desk/rug geometry while retaining the GL scene, tap focus, edit drag, and
   production placement persistence boundary.
+- Corrected Room membership semantics beyond the proof: only persisted
+  `RoomPlacement`s render in the world. Unplaced Holdings remain in a native stored
+  collection tray, can be placed into the Room, moved, persisted, and stored again
+  without deleting ownership or personal media.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 
@@ -190,6 +194,6 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-Room V2 now has camera orbit plus physical scene geometry, and focus refresh closes
-key cross-surface stale-state gaps. Continue integration hardening where it does not
-require device/deployed-backend validation. No device QA is claimed.
+Room V2 now distinguishes owned Holdings from displayed placements and supports the
+full place → move → persist → store lifecycle. Continue integration hardening where it
+does not require device/deployed-backend validation. No device QA is claimed.

@@ -449,3 +449,13 @@ export async function saveNativeRoomPlacement(input: {
   const payload = await response.json() as { placement: NativeRoomPlacement };
   return payload.placement;
 }
+
+export async function removeNativeRoomPlacement(roomId: string, holdingId: string) {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/room`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ roomId, holdingId }),
+  });
+  if (!response.ok) throw new Error("room_placement_delete_failed");
+}

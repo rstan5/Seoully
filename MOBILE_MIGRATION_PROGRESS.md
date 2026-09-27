@@ -155,6 +155,10 @@ security, and Room/Binder data model.
   Profile editing now has explicit loading, unavailable, retry, save-busy, and sign-out
   failure states instead of silently rendering an empty editor when identity loading
   fails.
+- Added a production-backed native Holding detail destination from Collection. It
+  preserves personal media as the primary card face, shows localized acquisition and
+  catalog metadata, supports trade-status changes, retries failed reads, and links into
+  the native Room and Binder without changing ownership or placement.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 
@@ -256,6 +260,9 @@ Native device QA is still pending.
 - Collector/thread/Search/Profile hardening passes mobile strict TypeScript and Expo
   lint. Keyboard, focus return, and retry behavior after process suspension remain
   AWAITING DEVICE QA.
+- Native collectible detail passes mobile strict TypeScript and Expo lint. Personal
+  media sizing, long descriptors, and locale-specific date rendering remain AWAITING
+  DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.
@@ -269,6 +276,6 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-Continue the ordinary app parity audit with navigation/draft restoration and detailed
-screen-level parity. Pending database migrations still require review/application in
-an approved environment, and physical iOS/Android behavior remains AWAITING DEVICE QA.
+Continue the ordinary app parity audit with navigation/draft restoration and remaining
+detailed screen-level gaps. Pending database migrations still require review/application
+in an approved environment, and physical iOS/Android behavior remains AWAITING DEVICE QA.

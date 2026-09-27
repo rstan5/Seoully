@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "expo-router";
 import { ActivityIndicator, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   loadMyHoldings,
@@ -14,6 +15,7 @@ import { colors, spacing } from "../src/theme";
 
 export default function CollectionScreen() {
   const copy = useCopy();
+  const router = useRouter();
   const [holdings, setHoldings] = useState<NativeHolding[]>([]);
   const [wishlist, setWishlist] = useState<NativeWishlistEntry[]>([]);
   const [tab, setTab] = useState<"collection" | "wishlist">("collection");
@@ -77,9 +79,11 @@ export default function CollectionScreen() {
       {holdings.map((holding) => <View key={holding.id} style={styles.card}>
         {holding.personalMediaUrl ? <Image source={{ uri: holding.personalMediaUrl }} style={styles.image} /> : null}
         <View style={styles.cardBody}>
-          <Text style={styles.cardTitle}>{holding.template.name}</Text>
-          <Text style={styles.meta}>{[holding.template.groupName, holding.template.memberName, holding.template.releaseName, holding.template.kind].filter(Boolean).join(" · ")}</Text>
-          <Text style={styles.status}>{holding.tradeStatus === "for-trade" ? copy.forTrade : copy.notForTrade}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel={`${copy.viewCollectible}: ${holding.template.name}`} onPress={() => router.push({ pathname: "/collectible", params: { holdingId: holding.id } })}>
+            <Text style={styles.cardTitle}>{holding.template.name}</Text>
+            <Text style={styles.meta}>{[holding.template.groupName, holding.template.memberName, holding.template.releaseName, holding.template.kind].filter(Boolean).join(" · ")}</Text>
+            <Text style={styles.status}>{holding.tradeStatus === "for-trade" ? copy.forTrade : copy.notForTrade}</Text>
+          </Pressable>
           <Pressable accessibilityRole="button" accessibilityState={{ selected: holding.tradeStatus === "for-trade", disabled: busyId === holding.id }} disabled={busyId === holding.id} onPress={() => toggleTrade(holding)} style={styles.action}>
             <Text style={styles.actionText}>{holding.tradeStatus === "for-trade" ? copy.keepInCollection : copy.markForTrade}</Text>
           </Pressable>

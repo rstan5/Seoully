@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 import { loadMyHoldings, updateHoldingTradeStatus, type NativeHolding } from "../src/api";
 import { RetryNotice } from "../src/components/RetryNotice";
+import { collectibleKindLabel } from "../src/i18n";
 import { useCopy, useLocale } from "../src/locale";
 import { colors, spacing } from "../src/theme";
 
@@ -52,7 +53,7 @@ export default function CollectibleDetailScreen() {
     {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
     {holding ? <>
       {holding.personalMediaUrl ? <Image accessibilityLabel={copy.personalPreview} resizeMode="contain" source={{ uri: holding.personalMediaUrl }} style={styles.image} /> : <View style={styles.fallback}><Text style={styles.fallbackText}>{holding.template.name}</Text></View>}
-      <Text style={styles.kind}>{holding.template.kind}</Text>
+      <Text style={styles.kind}>{collectibleKindLabel(holding.template.kind, copy)}</Text>
       <Text style={styles.title}>{holding.template.name}</Text>
       <Text style={styles.meta}>{[holding.template.groupName, holding.template.memberName, holding.template.releaseName].filter(Boolean).join(" · ")}</Text>
       {holding.template.descriptor ? <Text style={styles.descriptor}>{holding.template.descriptor}</Text> : null}

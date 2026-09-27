@@ -382,3 +382,19 @@ export type MobileCopy = (typeof messages)[Locale];
 export function copy(locale: Locale = "en") {
   return messages[locale];
 }
+
+export function collectibleKindLabel(kind: string, t: MobileCopy) {
+  const labels: Record<string, string> = {
+    photocard: t.kindPhotocard,
+    album: t.kindAlbum,
+    vinyl: t.kindVinyl,
+    poster: t.kindPoster,
+    lightstick: t.kindLightstick,
+    plushie: t.kindPlushie,
+    figure: t.kindFigure,
+    book: t.kindBook,
+    apparel: t.kindApparel,
+    memorabilia: t.kindMemorabilia,
+  };
+  return labels[kind] ?? kind;
+}

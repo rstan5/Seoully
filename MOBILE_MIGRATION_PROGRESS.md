@@ -180,6 +180,9 @@ security, and Room/Binder data model.
 - Create now supports camera or library post photos and a localized kind picker for
   catalog contributions, persisting the selected kind in the local draft. Binder now
   refreshes Holdings when it regains focus so newly added photocards appear in pockets.
+- Room inspection camera now frames wall-mounted objects more closely instead of using
+  the same floor dolly offset, and collectible kinds are localized across Collection,
+  Search, Room inspection, and Holding detail.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 
@@ -301,6 +304,8 @@ Native device QA is still pending.
   QA / DEPLOYED BACKEND.
 - Create kind/camera and Binder focus refresh pass mobile TypeScript and Expo lint.
   Camera permission sheets and kind-chip wrapping remain AWAITING DEVICE QA.
+- Wall-aware Room focus and localized collectible kinds pass mobile TypeScript. Focus
+  framing across device sizes remains AWAITING DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.

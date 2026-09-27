@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { contributeCatalogItem, createNativePost } from "../../src/api";
+import { collectibleKindLabel } from "../../src/i18n";
 import { useCopy } from "../../src/locale";
 import { colors, spacing } from "../../src/theme";
 
@@ -125,26 +126,11 @@ export default function CreateScreen() {
       <TextInput maxLength={120} placeholder={copy.memberOptionalPlaceholder} value={memberName} onChangeText={setMemberName} style={styles.input} />
       <TextInput maxLength={160} placeholder={copy.releaseOptionalPlaceholder} value={releaseName} onChangeText={setReleaseName} style={styles.input} />
       <Text style={styles.kindLabel}>{copy.collectibleKind}</Text>
-      <View style={styles.kinds}>{COLLECTIBLE_KINDS.map((id) => <Pressable key={id} accessibilityRole="button" accessibilityState={{ selected: kind === id }} onPress={() => setKind(id)} style={[styles.kind, kind === id && styles.kindSelected]}><Text style={[styles.kindText, kind === id && styles.kindTextSelected]}>{kindLabel(id, copy)}</Text></Pressable>)}</View>
+      <View style={styles.kinds}>{COLLECTIBLE_KINDS.map((id) => <Pressable key={id} accessibilityRole="button" accessibilityState={{ selected: kind === id }} onPress={() => setKind(id)} style={[styles.kind, kind === id && styles.kindSelected]}><Text style={[styles.kindText, kind === id && styles.kindTextSelected]}>{collectibleKindLabel(id, copy)}</Text></Pressable>)}</View>
       <Pressable accessibilityRole="button" disabled={working} onPress={submitCollectible} style={styles.button}><Text style={styles.buttonText}>{copy.continue}</Text></Pressable>
     </>}
     {message ? <Text accessibilityRole="alert" style={styles.message}>{message}</Text> : null}
   </ScrollView></SafeAreaView>;
-}
-
-function kindLabel(kind: (typeof COLLECTIBLE_KINDS)[number], copy: ReturnType<typeof useCopy>) {
-  return {
-    photocard: copy.kindPhotocard,
-    album: copy.kindAlbum,
-    vinyl: copy.kindVinyl,
-    poster: copy.kindPoster,
-    lightstick: copy.kindLightstick,
-    plushie: copy.kindPlushie,
-    figure: copy.kindFigure,
-    book: copy.kindBook,
-    apparel: copy.kindApparel,
-    memorabilia: copy.kindMemorabilia,
-  }[kind];
 }
 
 function draftText(value: unknown, max: number) {

@@ -56,7 +56,8 @@ function CameraRig({ yaw, focused }: { yaw: number; focused: RoomRenderable | nu
   useFrame((_, delta) => {
     const alpha = 1 - Math.exp(-7 * delta);
     if (focused) {
-      targetPosition.set(focused.position.x, focused.position.y + 0.25, focused.position.z + 2.45);
+      const wall = focused.placement?.surfaceId?.endsWith("-wall") || focused.position.z < -3.9;
+      targetPosition.set(focused.position.x, focused.position.y + (wall ? 0.05 : 0.25), focused.position.z + (wall ? 1.55 : 2.45));
       desiredLook.set(focused.position.x, focused.position.y, focused.position.z);
     } else {
       targetPosition.set(Math.sin(yaw) * 9, 2.6, -2 + Math.cos(yaw) * 9);

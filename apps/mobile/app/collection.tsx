@@ -9,6 +9,7 @@ import {
   type NativeHolding,
   type NativeWishlistEntry,
 } from "../src/api";
+import { collectibleKindLabel } from "../src/i18n";
 import { useCopy } from "../src/locale";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { colors, spacing } from "../src/theme";
@@ -80,7 +81,7 @@ export default function CollectionScreen() {
         <View style={styles.cardBody}>
           <Pressable accessibilityRole="button" accessibilityLabel={`${copy.viewCollectible}: ${holding.template.name}`} onPress={() => router.push({ pathname: "/collectible", params: { holdingId: holding.id } })}>
             <Text style={styles.cardTitle}>{holding.template.name}</Text>
-            <Text style={styles.meta}>{[holding.template.groupName, holding.template.memberName, holding.template.releaseName, holding.template.kind].filter(Boolean).join(" · ")}</Text>
+            <Text style={styles.meta}>{[holding.template.groupName, holding.template.memberName, holding.template.releaseName, collectibleKindLabel(holding.template.kind, copy)].filter(Boolean).join(" · ")}</Text>
             <Text style={styles.status}>{holding.tradeStatus === "for-trade" ? copy.forTrade : copy.notForTrade}</Text>
           </Pressable>
           <Pressable accessibilityRole="button" accessibilityState={{ selected: holding.tradeStatus === "for-trade", disabled: busyId === holding.id }} disabled={busyId === holding.id} onPress={() => toggleTrade(holding)} style={styles.action}>
@@ -93,7 +94,7 @@ export default function CollectionScreen() {
     {!loading && tab === "wishlist" ? <>
       {wishlist.map((entry) => <View key={entry.id} style={styles.cardBodyOnly}>
         <Text style={styles.cardTitle}>{entry.template.name}</Text>
-        <Text style={styles.meta}>{[entry.template.groupName, entry.template.memberName, entry.template.releaseName, entry.template.kind].filter(Boolean).join(" · ")}</Text>
+        <Text style={styles.meta}>{[entry.template.groupName, entry.template.memberName, entry.template.releaseName, collectibleKindLabel(entry.template.kind, copy)].filter(Boolean).join(" · ")}</Text>
         <Pressable accessibilityRole="button" disabled={busyId === entry.id} onPress={() => removeWanted(entry)} style={styles.action}><Text style={styles.actionText}>{copy.removeFromWishlist}</Text></Pressable>
       </View>)}
       {wishlist.length === 0 ? <Text style={styles.empty}>{copy.wishlistEmpty}</Text> : null}

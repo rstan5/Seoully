@@ -13,6 +13,7 @@ import {
   type NativeCollectibleDiscovery,
   type NativeCollectorDiscovery,
 } from "../../src/api";
+import { collectibleKindLabel } from "../../src/i18n";
 import { useCopy } from "../../src/locale";
 import { RetryNotice } from "../../src/components/RetryNotice";
 import { colors, spacing } from "../../src/theme";
@@ -116,7 +117,7 @@ export default function SearchScreen() {
       <Text style={styles.sectionTitle}>{copy.catalogResults}</Text>
       {results.map((item) => <View key={item.id} style={styles.result}>
         <Text style={styles.resultTitle}>{item.name}</Text>
-        <Text style={styles.resultMeta}>{[item.groupName, item.memberName, item.releaseName, item.kind].filter(Boolean).join(" · ")}</Text>
+        <Text style={styles.resultMeta}>{[item.groupName, item.memberName, item.releaseName, collectibleKindLabel(item.kind, copy)].filter(Boolean).join(" · ")}</Text>
         {item.descriptor ? <Text style={styles.resultDescriptor}>{item.descriptor}</Text> : null}
         <View style={styles.resultActions}><Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/add", params: { templateId: item.id, name: item.name, kind: item.kind } })}><Text style={styles.actionText}>{copy.addYourCopy}</Text></Pressable>
           <Pressable accessibilityRole="button" disabled={wantedIds.has(item.id)} onPress={() => saveWanted(item.id)}><Text style={styles.actionText}>{wantedIds.has(item.id) ? copy.savedToWishlist : copy.saveToWishlist}</Text></Pressable>
@@ -135,7 +136,7 @@ export default function SearchScreen() {
       {collectibles.length > 0 ? <><Text style={styles.sectionTitle}>{copy.collectiblesForYou}</Text>
         {collectibles.map(({ template, reasons }) => <View key={template.id} style={styles.result}>
           <Text style={styles.resultTitle}>{template.name}</Text>
-          <Text style={styles.resultMeta}>{template.kind}</Text>
+          <Text style={styles.resultMeta}>{collectibleKindLabel(template.kind, copy)}</Text>
           <Text style={styles.resultDescriptor}>{reasonLabel(reasons[0]?.code, copy)}</Text>
           <View style={styles.resultActions}><Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/add", params: { templateId: template.id, name: template.name, kind: template.kind } })}><Text style={styles.actionText}>{copy.addYourCopy}</Text></Pressable>
             <Pressable accessibilityRole="button" disabled={wantedIds.has(template.id)} onPress={() => saveWanted(template.id)}><Text style={styles.actionText}>{wantedIds.has(template.id) ? copy.savedToWishlist : copy.saveToWishlist}</Text></Pressable>

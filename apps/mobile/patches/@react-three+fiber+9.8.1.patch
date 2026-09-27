@@ -1,0 +1,60 @@
+diff --git a/node_modules/@react-three/fiber/native/dist/react-three-fiber-native.cjs.dev.js b/node_modules/@react-three/fiber/native/dist/react-three-fiber-native.cjs.dev.js
+index 95ff3e5..3ae1e85 100644
+--- a/node_modules/@react-three/fiber/native/dist/react-three-fiber-native.cjs.dev.js
++++ b/node_modules/@react-three/fiber/native/dist/react-three-fiber-native.cjs.dev.js
+@@ -487,8 +487,13 @@ function polyfills() {
+   }
+ 
+   // Don't pre-process urls, let expo-asset generate an absolute URL
+-  const extractUrlBase = THREE__namespace.LoaderUtils.extractUrlBase.bind(THREE__namespace.LoaderUtils);
+-  THREE__namespace.LoaderUtils.extractUrlBase = url => typeof url === 'string' ? extractUrlBase(url) : './';
++  const extractUrlBaseFn = THREE__namespace.LoaderUtils && THREE__namespace.LoaderUtils.extractUrlBase;
++  const extractUrlBase = typeof extractUrlBaseFn === 'function' ? extractUrlBaseFn.bind(THREE__namespace.LoaderUtils) : function extractUrlBase(url) {
++    if (typeof url !== 'string') return './';
++    const index = url.lastIndexOf('/');
++    return index === -1 ? './' : url.slice(0, index + 1);
++  };
++  if (THREE__namespace.LoaderUtils) THREE__namespace.LoaderUtils.extractUrlBase = url => typeof url === 'string' ? extractUrlBase(url) : './';
+ 
+   // There's no Image in native, so create a data texture instead
+   THREE__namespace.TextureLoader.prototype.load = function load(url, onLoad, onProgress, onError) {
+diff --git a/node_modules/@react-three/fiber/native/dist/react-three-fiber-native.cjs.prod.js b/node_modules/@react-three/fiber/native/dist/react-three-fiber-native.cjs.prod.js
+index 9d18598..cd552f2 100644
+--- a/node_modules/@react-three/fiber/native/dist/react-three-fiber-native.cjs.prod.js
++++ b/node_modules/@react-three/fiber/native/dist/react-three-fiber-native.cjs.prod.js
+@@ -487,8 +487,13 @@ function polyfills() {
+   }
+ 
+   // Don't pre-process urls, let expo-asset generate an absolute URL
+-  const extractUrlBase = THREE__namespace.LoaderUtils.extractUrlBase.bind(THREE__namespace.LoaderUtils);
+-  THREE__namespace.LoaderUtils.extractUrlBase = url => typeof url === 'string' ? extractUrlBase(url) : './';
++  const extractUrlBaseFn = THREE__namespace.LoaderUtils && THREE__namespace.LoaderUtils.extractUrlBase;
++  const extractUrlBase = typeof extractUrlBaseFn === 'function' ? extractUrlBaseFn.bind(THREE__namespace.LoaderUtils) : function extractUrlBase(url) {
++    if (typeof url !== 'string') return './';
++    const index = url.lastIndexOf('/');
++    return index === -1 ? './' : url.slice(0, index + 1);
++  };
++  if (THREE__namespace.LoaderUtils) THREE__namespace.LoaderUtils.extractUrlBase = url => typeof url === 'string' ? extractUrlBase(url) : './';
+ 
+   // There's no Image in native, so create a data texture instead
+   THREE__namespace.TextureLoader.prototype.load = function load(url, onLoad, onProgress, onError) {
+diff --git a/node_modules/@react-three/fiber/native/dist/react-three-fiber-native.esm.js b/node_modules/@react-three/fiber/native/dist/react-three-fiber-native.esm.js
+index 2a39a1d..adc14a6 100644
+--- a/node_modules/@react-three/fiber/native/dist/react-three-fiber-native.esm.js
++++ b/node_modules/@react-three/fiber/native/dist/react-three-fiber-native.esm.js
+@@ -463,8 +463,13 @@ function polyfills() {
+   }
+ 
+   // Don't pre-process urls, let expo-asset generate an absolute URL
+-  const extractUrlBase = THREE.LoaderUtils.extractUrlBase.bind(THREE.LoaderUtils);
+-  THREE.LoaderUtils.extractUrlBase = url => typeof url === 'string' ? extractUrlBase(url) : './';
++  const extractUrlBaseFn = THREE.LoaderUtils && THREE.LoaderUtils.extractUrlBase;
++  const extractUrlBase = typeof extractUrlBaseFn === 'function' ? extractUrlBaseFn.bind(THREE.LoaderUtils) : function extractUrlBase(url) {
++    if (typeof url !== 'string') return './';
++    const index = url.lastIndexOf('/');
++    return index === -1 ? './' : url.slice(0, index + 1);
++  };
++  if (THREE.LoaderUtils) THREE.LoaderUtils.extractUrlBase = url => typeof url === 'string' ? extractUrlBase(url) : './';
+ 
+   // There's no Image in native, so create a data texture instead
+   THREE.TextureLoader.prototype.load = function load(url, onLoad, onProgress, onError) {

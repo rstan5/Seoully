@@ -11,8 +11,9 @@ security, and Room/Binder data model.
 - Branch: `mobile-native`
 - Immutable reference checkpoint: `76be07a928ce3e9436031d7324a5cc2b1b0375ed`
 - Recovered from: `d2d779d`
-- Current HEAD: `8882f57`
-- Current task: Room representation, edit/camera, Binder open/close and Room jump
+- Device-QA checkpoint: `ae8e155`
+- Current HEAD: Room import-time crash fix on `mobile-native`
+- Current task: physical iPhone Room startup crash
 - Overall status: IN PROGRESS — Room/Binder product behavior still closing; device QA still pending
 
 ## Current Room parity matrix
@@ -518,6 +519,13 @@ Native device QA is still pending.
   Binder close/empty/image isolation pass mobile and web TypeScript, Expo lint,
   Expo Doctor 21/21, fixture checks, and `git diff --check`. GL appearance,
   binder-object hit testing, and gesture feel remain AWAITING DEVICE QA.
+- Physical iPhone Expo Go QA reproduced an import-time Room crash:
+  `@react-three/fiber/native` `polyfills()` called
+  `THREE.LoaderUtils.extractUrlBase.bind(...)` when Metro’s `three` namespace
+  omitted that static. The Expo Router missing-default-export warnings were
+  cascading from that throw. Fix: R3F patch, three compat, Metro resolve to
+  `three.module.js`, and lazy Room renderer load. Expo Go remains the retest
+  target; a development build is not required for this JS failure.
 
 ## Next autonomous task
 
@@ -530,7 +538,8 @@ classified below. Do not treat Room/Binder visual/tactile parity as finished.
 - In-world 3D Binder open that stays inside the Room GL scene
 
 ### AWAITING DEVICE QA
-- Room GL FPS, texture memory, raycast hits, drag/orbit feel, inspect lift
+- Physical iPhone Expo Go relaunch after the Room import-time crash fix
+- Room GL canvas mount, FPS, texture memory, raycast hits, drag/orbit feel
 - Binder swipe, cover open/close, card lift springs, page perspective
 - Camera, crop, keyboard, safe areas, Android
 

@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/refs -- PanResponder reads refs only inside gesture callbacks. */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ActivityIndicator, PanResponder, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -9,9 +9,13 @@ import { useCopy } from "../src/locale";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
 import { CachedSignedImage } from "../src/media/cachedMedia";
-import { NativeRoomRenderer } from "../src/room/NativeRoomRenderer";
 import { buildRoomRenderables, createInitialRoomRenderable, isSupportedRoomPlacement, moveRenderable, nativeHomeForHolding, nextNativeSlot, resizeRenderable, settleRoomRenderable, toPersistedTransform, turnRenderable, zoneIdForNativeSurface, type NativeRoomVector, type RoomRenderable } from "../src/room/model";
 import { colors, spacing } from "../src/theme";
+
+const NativeRoomRenderer = lazy(async () => {
+  const mod = await import("../src/room/NativeRoomRenderer");
+  return { default: mod.NativeRoomRenderer };
+});
 
 const ROOM_CAMERA_KEY = "seoully.mobile.room-camera.v1";
 const ROOM_FOCUS_KEY = "seoully.mobile.room-focus.v1";
@@ -282,7 +286,7 @@ export default function RoomScreen() {
       return <Pressable key={id} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => lookAtZone(target)} style={[styles.lookChip, selected && styles.lookChipSelected]}><Text style={[styles.lookChipText, selected && styles.lookChipTextSelected]}>{label}</Text></Pressable>;
     })}</ScrollView> : null}
     {!loading && snapshot ? <View style={styles.stage} {...panResponder.panHandlers}>
-      <NativeRoomRenderer items={items} selectedId={selectedId} focusedId={editing ? null : selectedId} themeId={snapshot.room.themeId} cameraYaw={cameraYaw} cameraPitch={cameraPitch} lookTarget={lookTarget} onSelect={setSelectedId} onClearSelection={() => setSelectedId(null)} onOpenBinder={editing ? undefined : openBinder} />
+      <Suspense fallback={<ActivityIndicator color={colors.plum} style={styles.loading} />}><NativeRoomRenderer items={items} selectedId={selectedId} focusedId={editing ? null : selectedId} themeId={snapshot.room.themeId} cameraYaw={cameraYaw} cameraPitch={cameraPitch} lookTarget={lookTarget} onSelect={setSelectedId} onClearSelection={() => setSelectedId(null)} onOpenBinder={editing ? undefined : openBinder} /></Suspense>
       {editing && selectedId ? <View pointerEvents="none" style={styles.hint}><Text style={styles.hintText}>{copy.roomDragHint}</Text></View> : null}
       {!editing ? <View pointerEvents="none" style={styles.hint}><Text style={styles.hintText}>{copy.roomOrbitHint}</Text></View> : null}
     </View> : null}

@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/refs -- PanResponder reads refs only inside gesture callbacks. */
-import { useCallback, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useRef, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, PanResponder, Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
 import { loadCollectorRoom } from "../src/api";
@@ -7,9 +7,13 @@ import { collectibleKindLabel } from "../src/i18n";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
 import { useCopy } from "../src/locale";
-import { NativeRoomRenderer } from "../src/room/NativeRoomRenderer";
 import { buildPublicRoomRenderables, type RoomRenderable } from "../src/room/model";
 import { colors, spacing } from "../src/theme";
+
+const NativeRoomRenderer = lazy(async () => {
+  const mod = await import("../src/room/NativeRoomRenderer");
+  return { default: mod.NativeRoomRenderer };
+});
 
 export default function CollectorRoomScreen() {
   const copy = useCopy();
@@ -66,7 +70,7 @@ export default function CollectorRoomScreen() {
     {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
     {!loading && privateRoom ? <Text style={styles.empty}>{copy.roomPrivate}</Text> : null}
     {!loading && !privateRoom ? <View style={styles.stage} {...panResponder.panHandlers}>
-      <NativeRoomRenderer items={items} selectedId={selectedId} focusedId={selectedId} themeId="hearth" cameraYaw={cameraYaw} cameraPitch={cameraPitch} onSelect={setSelectedId} onClearSelection={() => setSelectedId(null)} />
+      <Suspense fallback={<ActivityIndicator color={colors.plum} style={styles.loading} />}><NativeRoomRenderer items={items} selectedId={selectedId} focusedId={selectedId} themeId="hearth" cameraYaw={cameraYaw} cameraPitch={cameraPitch} onSelect={setSelectedId} onClearSelection={() => setSelectedId(null)} /></Suspense>
       <View pointerEvents="none" style={styles.hint}><Text style={styles.hintText}>{copy.roomOrbitHint}</Text></View>
     </View> : null}
     {selected ? <View style={styles.inspection}>

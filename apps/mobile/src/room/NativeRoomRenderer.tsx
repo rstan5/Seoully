@@ -1,4 +1,5 @@
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
+import "./threeFiberCompat";
 import { Suspense } from "react";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber/native";
 import { Color, TextureLoader, Vector3 } from "three";

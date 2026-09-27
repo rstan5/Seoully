@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
 import {
   loadMyHoldings,
   loadMyWishlist,
@@ -17,6 +17,9 @@ import { CachedSignedImage } from "../src/media/cachedMedia";
 import { colors, spacing } from "../src/theme";
 
 const COLLECTION_TAB_KEY = "seoully.mobile.collection-tab.v1";
+type CollectionRow =
+  | { kind: "holding"; id: string; holding: NativeHolding }
+  | { kind: "wishlist"; id: string; entry: NativeWishlistEntry };
 
 export default function CollectionScreen() {
   const copy = useCopy();
@@ -48,22 +51,23 @@ export default function CollectionScreen() {
     }
   }, [copy.collectionUnavailable]);
 
-  async function loadMore() {
-    if (!hasMore || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const page = await loadMyHoldings(holdings.length, 100);
-      setHoldings((current) => [...current, ...page.filter((item) => !current.some((existing) => existing.id === item.id))]);
-      setHasMore(page.length === 100);
-    } catch {
-      setError(copy.collectionUnavailable);
-    } finally {
-      setLoadingMore(false);
+  const loadMore = useCallback(async () => {
+    if (loading || loadingMore) return;
+    if (tab === "collection") {
+      if (!hasMore) return;
+      setLoadingMore(true);
+      try {
+        const page = await loadMyHoldings(holdings.length, 100);
+        setHoldings((current) => [...current, ...page.filter((item) => !current.some((existing) => existing.id === item.id))]);
+        setHasMore(page.length === 100);
+      } catch {
+        setError(copy.collectionUnavailable);
+      } finally {
+        setLoadingMore(false);
+      }
+      return;
     }
-  }
-
-  async function loadMoreWishlist() {
-    if (!hasMoreWishlist || loadingMore) return;
+    if (!hasMoreWishlist) return;
     setLoadingMore(true);
     try {
       const page = await loadMyWishlist(wishlist.length, 100);
@@ -74,7 +78,8 @@ export default function CollectionScreen() {
     } finally {
       setLoadingMore(false);
     }
-  }
+  }, [copy.collectionUnavailable, hasMore, hasMoreWishlist, holdings.length, loading, loadingMore, tab, wishlist.length]);
+
   useFocusEffect(useCallback(() => {
     void refresh();
   }, [refresh]));
@@ -116,42 +121,81 @@ export default function CollectionScreen() {
     }
   }
 
-  return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.container}>
-    <Text style={styles.title}>{copy.myCollection}</Text>
-    <Text style={styles.lead}>{copy.collectionLead}</Text>
-    <View style={styles.tabs}>
-      <Tab selected={tab === "collection"} label={`${copy.collection} (${holdings.length})`} onPress={() => setTab("collection")} />
-      <Tab selected={tab === "wishlist"} label={`${copy.wishlist} (${wishlist.length})`} onPress={() => setTab("wishlist")} />
+  const rows: CollectionRow[] = tab === "collection"
+    ? holdings.map((holding) => ({ kind: "holding", id: holding.id, holding }))
+    : wishlist.map((entry) => ({ kind: "wishlist", id: entry.id, entry }));
+  const canPage = tab === "collection" ? hasMore : hasMoreWishlist;
+
+  return <SafeAreaView style={styles.safe}><FlatList
+    data={rows}
+    keyExtractor={(item) => item.id}
+    contentContainerStyle={styles.container}
+    onEndReached={() => { if (canPage) void loadMore(); }}
+    onEndReachedThreshold={0.35}
+    ListHeaderComponent={<View>
+      <Text style={styles.title}>{copy.myCollection}</Text>
+      <Text style={styles.lead}>{copy.collectionLead}</Text>
+      <View style={styles.tabs}>
+        <Tab selected={tab === "collection"} label={`${copy.collection} (${holdings.length})`} onPress={() => setTab("collection")} />
+        <Tab selected={tab === "wishlist"} label={`${copy.wishlist} (${wishlist.length})`} onPress={() => setTab("wishlist")} />
+      </View>
+      {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
+      {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
+    </View>}
+    ListEmptyComponent={!loading ? <Text style={styles.empty}>{tab === "collection" ? copy.collectionEmpty : copy.wishlistEmpty}</Text> : null}
+    ListFooterComponent={canPage || loadingMore ? <Pressable accessibilityRole="button" disabled={loadingMore} onPress={() => { void loadMore(); }} style={styles.action}>
+      <Text style={styles.actionText}>{loadingMore ? copy.saving : copy.loadMoreHoldings}</Text>
+    </Pressable> : null}
+    renderItem={({ item }) => item.kind === "holding"
+      ? <HoldingRow busy={busyId === item.holding.id} copy={copy} holding={item.holding} onOpen={() => router.push({ pathname: "/collectible", params: { holdingId: item.holding.id } })} onToggleTrade={() => { void toggleTrade(item.holding); }} />
+      : <WishlistRow busy={busyId === item.entry.id} copy={copy} entry={item.entry} onRemove={() => { void removeWanted(item.entry); }} />}
+  /></SafeAreaView>;
+}
+
+function HoldingRow({
+  holding,
+  copy,
+  busy,
+  onOpen,
+  onToggleTrade,
+}: {
+  holding: NativeHolding;
+  copy: ReturnType<typeof useCopy>;
+  busy: boolean;
+  onOpen: () => void;
+  onToggleTrade: () => void;
+}) {
+  return <View style={styles.card}>
+    {holding.personalMediaUrl ? <CachedSignedImage cacheKey={holding.id} url={holding.personalMediaUrl} style={styles.image} /> : null}
+    <View style={styles.cardBody}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${copy.viewCollectible}: ${holding.template.name}`} onPress={onOpen}>
+        <Text style={styles.cardTitle}>{holding.template.name}</Text>
+        <Text style={styles.meta}>{[holding.template.groupName, holding.template.memberName, holding.template.releaseName, collectibleKindLabel(holding.template.kind, copy)].filter(Boolean).join(" · ")}</Text>
+        <Text style={styles.status}>{holding.tradeStatus === "for-trade" ? copy.forTrade : copy.notForTrade}</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" accessibilityState={{ selected: holding.tradeStatus === "for-trade", disabled: busy }} disabled={busy} onPress={onToggleTrade} style={styles.action}>
+        <Text style={styles.actionText}>{holding.tradeStatus === "for-trade" ? copy.keepInCollection : copy.markForTrade}</Text>
+      </Pressable>
     </View>
-    {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
-    {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
-    {!loading && tab === "collection" ? <>
-      {holdings.map((holding) => <View key={holding.id} style={styles.card}>
-        {holding.personalMediaUrl ? <CachedSignedImage cacheKey={holding.id} url={holding.personalMediaUrl} style={styles.image} /> : null}
-        <View style={styles.cardBody}>
-          <Pressable accessibilityRole="button" accessibilityLabel={`${copy.viewCollectible}: ${holding.template.name}`} onPress={() => router.push({ pathname: "/collectible", params: { holdingId: holding.id } })}>
-            <Text style={styles.cardTitle}>{holding.template.name}</Text>
-            <Text style={styles.meta}>{[holding.template.groupName, holding.template.memberName, holding.template.releaseName, collectibleKindLabel(holding.template.kind, copy)].filter(Boolean).join(" · ")}</Text>
-            <Text style={styles.status}>{holding.tradeStatus === "for-trade" ? copy.forTrade : copy.notForTrade}</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" accessibilityState={{ selected: holding.tradeStatus === "for-trade", disabled: busyId === holding.id }} disabled={busyId === holding.id} onPress={() => toggleTrade(holding)} style={styles.action}>
-            <Text style={styles.actionText}>{holding.tradeStatus === "for-trade" ? copy.keepInCollection : copy.markForTrade}</Text>
-          </Pressable>
-        </View>
-      </View>)}
-      {hasMore ? <Pressable accessibilityRole="button" disabled={loadingMore} onPress={loadMore} style={styles.action}><Text style={styles.actionText}>{loadingMore ? copy.saving : copy.loadMoreHoldings}</Text></Pressable> : null}
-      {holdings.length === 0 ? <Text style={styles.empty}>{copy.collectionEmpty}</Text> : null}
-    </> : null}
-    {!loading && tab === "wishlist" ? <>
-      {wishlist.map((entry) => <View key={entry.id} style={styles.cardBodyOnly}>
-        <Text style={styles.cardTitle}>{entry.template.name}</Text>
-        <Text style={styles.meta}>{[entry.template.groupName, entry.template.memberName, entry.template.releaseName, collectibleKindLabel(entry.template.kind, copy)].filter(Boolean).join(" · ")}</Text>
-        <Pressable accessibilityRole="button" disabled={busyId === entry.id} onPress={() => removeWanted(entry)} style={styles.action}><Text style={styles.actionText}>{copy.removeFromWishlist}</Text></Pressable>
-      </View>)}
-      {hasMoreWishlist ? <Pressable accessibilityRole="button" disabled={loadingMore} onPress={loadMoreWishlist} style={styles.action}><Text style={styles.actionText}>{loadingMore ? copy.saving : copy.loadMoreHoldings}</Text></Pressable> : null}
-      {wishlist.length === 0 ? <Text style={styles.empty}>{copy.wishlistEmpty}</Text> : null}
-    </> : null}
-  </ScrollView></SafeAreaView>;
+  </View>;
+}
+
+function WishlistRow({
+  entry,
+  copy,
+  busy,
+  onRemove,
+}: {
+  entry: NativeWishlistEntry;
+  copy: ReturnType<typeof useCopy>;
+  busy: boolean;
+  onRemove: () => void;
+}) {
+  return <View style={styles.cardBodyOnly}>
+    <Text style={styles.cardTitle}>{entry.template.name}</Text>
+    <Text style={styles.meta}>{[entry.template.groupName, entry.template.memberName, entry.template.releaseName, collectibleKindLabel(entry.template.kind, copy)].filter(Boolean).join(" · ")}</Text>
+    <Pressable accessibilityRole="button" disabled={busy} onPress={onRemove} style={styles.action}><Text style={styles.actionText}>{copy.removeFromWishlist}</Text></Pressable>
+  </View>;
 }
 
 function Tab({ selected, label, onPress }: { selected: boolean; label: string; onPress: () => void }) {
@@ -171,7 +215,6 @@ const styles = StyleSheet.create({
   tabText: { color: colors.ink, fontWeight: "700" },
   tabTextSelected: { color: colors.surface },
   loading: { marginTop: spacing.xl },
-  error: { color: colors.plum, marginTop: spacing.md },
   card: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, marginTop: spacing.md, overflow: "hidden" },
   image: { aspectRatio: 0.72, width: "100%" },
   cardBody: { padding: spacing.md },

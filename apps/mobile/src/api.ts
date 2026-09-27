@@ -76,14 +76,24 @@ export type NativeWishlistEntry = {
   template: NativeCatalogTemplate;
 };
 
-export async function loadMyHoldings(): Promise<NativeHolding[]> {
+export async function loadMyHoldings(offset = 0, limit = 100): Promise<NativeHolding[]> {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/holdings`, {
+  const response = await fetch(`${baseUrl}/api/mobile/holdings?offset=${offset}&limit=${limit}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) throw new Error("holding_read_failed");
   const payload = await response.json() as { holdings?: NativeHolding[] };
   return payload.holdings ?? [];
+}
+
+export async function loadAllMyHoldings(): Promise<NativeHolding[]> {
+  const holdings: NativeHolding[] = [];
+  for (let offset = 0; offset < 2_000; offset += 100) {
+    const page = await loadMyHoldings(offset, 100);
+    holdings.push(...page);
+    if (page.length < 100) break;
+  }
+  return holdings;
 }
 
 export async function updateHoldingTradeStatus(holdingId: string, tradeStatus: NativeHolding["tradeStatus"]) {

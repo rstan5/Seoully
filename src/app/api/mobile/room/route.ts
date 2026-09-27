@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { listMyHoldings } from "@/server/dal/holdings";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { ensureMyRoom, listMyRoomPlacements, removeMyRoomPlacement, updateMyRoomTheme, upsertMyRoomPlacement } from "@/server/dal/rooms";
 import { createSupabaseBearerClient } from "@/server/supabase/bearer";
 
@@ -10,7 +11,7 @@ export async function GET(request: Request) {
     const room = await ensureMyRoom(client);
     const [{ placements }, holdings] = await Promise.all([
       listMyRoomPlacements({ roomId: room.id }, client),
-      listMyHoldings({ limit: 100, offset: 0 }, client),
+      loadAllHoldings(client),
     ]);
     return NextResponse.json({ room, placements, holdings }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
@@ -53,4 +54,14 @@ export async function DELETE(request: Request) {
     const reason = error instanceof Error ? error.message : "room_placement_delete_failed";
     return NextResponse.json({ error: reason }, { status: reason === "unauthenticated" ? 401 : 400 });
   }
+}
+
+async function loadAllHoldings(client: SupabaseClient) {
+  const holdings = [];
+  for (let offset = 0; offset < 2_000; offset += 100) {
+    const page = await listMyHoldings({ limit: 100, offset }, client);
+    holdings.push(...page);
+    if (page.length < 100) break;
+  }
+  return holdings;
 }

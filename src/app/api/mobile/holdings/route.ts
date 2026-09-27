@@ -18,7 +18,11 @@ export async function GET(request: Request) {
   const client = createSupabaseBearerClient(request);
   if (!client) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   try {
-    const holdings = await listMyHoldings({ limit: 100, offset: 0 }, client);
+    const url = new URL(request.url);
+    const holdings = await listMyHoldings({
+      limit: Number(url.searchParams.get("limit") ?? "100"),
+      offset: Number(url.searchParams.get("offset") ?? "0"),
+    }, client);
     return NextResponse.json({ holdings }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "holding_read_failed";

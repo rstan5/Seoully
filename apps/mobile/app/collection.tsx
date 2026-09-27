@@ -27,12 +27,15 @@ export default function CollectionScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [tabReady, setTabReady] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [nextHoldings, nextWishlist] = await Promise.all([loadMyHoldings(), loadMyWishlist()]);
+      const [nextHoldings, nextWishlist] = await Promise.all([loadMyHoldings(0, 100), loadMyWishlist()]);
       setHoldings(nextHoldings);
+      setHasMore(nextHoldings.length === 100);
       setWishlist(nextWishlist);
       setError(null);
     } catch {
@@ -41,6 +44,20 @@ export default function CollectionScreen() {
       setLoading(false);
     }
   }, [copy.collectionUnavailable]);
+
+  async function loadMore() {
+    if (!hasMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const page = await loadMyHoldings(holdings.length, 100);
+      setHoldings((current) => [...current, ...page.filter((item) => !current.some((existing) => existing.id === item.id))]);
+      setHasMore(page.length === 100);
+    } catch {
+      setError(copy.collectionUnavailable);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
   useFocusEffect(useCallback(() => {
     void refresh();
   }, [refresh]));
@@ -105,6 +122,7 @@ export default function CollectionScreen() {
           </Pressable>
         </View>
       </View>)}
+      {hasMore ? <Pressable accessibilityRole="button" disabled={loadingMore} onPress={loadMore} style={styles.action}><Text style={styles.actionText}>{loadingMore ? copy.saving : copy.loadMoreHoldings}</Text></Pressable> : null}
       {holdings.length === 0 ? <Text style={styles.empty}>{copy.collectionEmpty}</Text> : null}
     </> : null}
     {!loading && tab === "wishlist" ? <>

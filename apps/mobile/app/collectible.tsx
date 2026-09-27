@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
-import { loadMyHoldings, updateHoldingTradeStatus, type NativeHolding } from "../src/api";
+import { loadAllMyHoldings, updateHoldingTradeStatus, type NativeHolding } from "../src/api";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { collectibleKindLabel } from "../src/i18n";
 import { useCopy, useLocale } from "../src/locale";
@@ -20,7 +20,7 @@ export default function CollectibleDetailScreen() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const item = (await loadMyHoldings()).find((candidate) => candidate.id === holdingId) ?? null;
+      const item = (await loadAllMyHoldings()).find((candidate) => candidate.id === holdingId) ?? null;
       setHolding(item);
       setError(item ? null : copy.collectibleUnavailable);
     } catch {

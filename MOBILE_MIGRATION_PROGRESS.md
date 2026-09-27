@@ -191,6 +191,9 @@ security, and Room/Binder data model.
 - Completed cursor propagation for post comments and added native load-more for
   comment threads, matching the production comment page contract instead of the first
   25 comments only.
+- Holdings reads now honor offset/limit. Collection can page beyond the first 100
+  items, while Binder, Holding detail, and the Room stored tray load subsequent
+  pages so later photocards are not silently omitted.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 
@@ -320,6 +323,8 @@ Native device QA is still pending.
   dismissal versus stack navigation remain AWAITING DEVICE QA.
 - Paginated comments pass mobile and web TypeScript plus Expo lint. Long-thread
   scrolling and keyboard collision remain AWAITING DEVICE QA.
+- Holdings pagination passes mobile and web TypeScript plus Expo lint. Large-collection
+  memory and Room tray length remain AWAITING DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, FlatList, Image, Modal, Pressable, SafeAreaView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
-import { loadMyHoldings, type NativeHolding } from "../src/api";
+import { loadAllMyHoldings, type NativeHolding } from "../src/api";
 import { binderSpreads, buildNativeBinderPages, type NativeBinderPage, type NativeBinderSpread } from "../src/binder/model";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { useCopy } from "../src/locale";
@@ -21,7 +21,7 @@ export default function BinderScreen() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      setHoldings(await loadMyHoldings());
+      setHoldings(await loadAllMyHoldings());
       setError(null);
     } catch {
       setError(copy.binderUnavailable);

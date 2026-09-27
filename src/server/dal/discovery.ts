@@ -1,7 +1,8 @@
 import "server-only";
 
 import { z } from "zod";
-import { getCurrentIdentity } from "@/server/dal/profile";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/profile";
 import { createSupabaseServerClient } from "@/server/supabase/server";
 import type { PairPerson } from "@/server/dal/collection-graph-pair";
 
@@ -16,22 +17,22 @@ export type DiscoveryBatch = { actor: PairPerson; candidates: DiscoveryCandidate
 
 export interface DiscoveryCatalogItem { id: string; name: string; kind: string; groupId: string; memberId: string | null; releaseId: string | null; status: string; }
 
-export async function getDiscoveryCandidateBatch(input?: unknown): Promise<DiscoveryBatch> {
+export async function getDiscoveryCandidateBatch(input?: unknown, client?: SupabaseClient): Promise<DiscoveryBatch> {
   const limit = z.object({ limit: z.number().int().min(1).max(100).default(100) }).strict().parse(input ?? {}).limit;
-  const identity = await getCurrentIdentity();
+  const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? await createSupabaseServerClient();
   const { data, error } = await supabase.rpc("graph_discovery_candidates", { p_limit: limit });
   if (error) throw new Error("discovery_candidates_failed");
   const parsed = batchSchema.parse(data);
   return { actor: parsed.actor as PairPerson, candidates: parsed.candidates };
 }
 
-export async function getDiscoveryCatalog(input?: unknown): Promise<DiscoveryCatalogItem[]> {
+export async function getDiscoveryCatalog(input?: unknown, client?: SupabaseClient): Promise<DiscoveryCatalogItem[]> {
   const page = z.object({ limit: z.number().int().min(1).max(200).default(200), offset: z.number().int().min(0).max(10_000).default(0) }).strict().parse(input ?? {});
-  const identity = await getCurrentIdentity();
+  const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? await createSupabaseServerClient();
   const { data, error } = await supabase.from("collectible_templates").select("id,name,kind,group_id,member_id,release_id,status").neq("status", "restricted").order("name").range(page.offset, page.offset + page.limit - 1);
   if (error) throw new Error("discovery_catalog_failed");
   return (data ?? []).map((row) => ({ id: String(row.id), name: String(row.name), kind: String(row.kind), groupId: String(row.group_id), memberId: typeof row.member_id === "string" ? row.member_id : null, releaseId: typeof row.release_id === "string" ? row.release_id : null, status: String(row.status) }));

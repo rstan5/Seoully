@@ -57,6 +57,14 @@ security, and Room/Binder data model.
   Supabase provisions the same Seoully identity shape as the web client.
 - Added persisted English/Korean locale state and an Expo ESLint configuration; mobile
   lint is now part of migration validation.
+- Added production-backed native Explore recommendations for collectors and
+  collectibles through a bearer-authenticated discovery boundary. The existing
+  deterministic ranking, compatibility evidence, privacy filtering, canonical
+  catalog, and authenticated actor derivation are reused rather than duplicated.
+- Reworked native Search into localized Search/Explore behavior: an empty query shows
+  ranked recommendations, while a catalog query retains the production add-to-
+  collection path. Native Room entry is intentionally not implied before its renderer
+  exists.
 
 ## Current queue
 
@@ -100,10 +108,13 @@ Native device QA is still pending.
 - Native onboarding validation passes `expo lint`, mobile strict TypeScript, Expo config
   resolution, web TypeScript, fixture checks, and `git diff --check`. No physical-device
   behavior is claimed.
+- Native Search/Explore passes mobile lint and strict TypeScript, all 21 Expo Doctor
+  checks, web TypeScript, fixture integrity checks, and `git diff --check`. Responsive,
+  keyboard, and touch behavior remain AWAITING DEVICE QA.
 
 ## Next autonomous task
 
-Native onboarding now persists and resumes group/bias/interest progress without
-replaying for existing profiles. Next: production Search/Explore and social
-interactions, followed by collection/detail/wishlist/trade and Messages parity. Full
-Room and Binder parity remain mandatory in the queue. No device QA is claimed.
+Native Search/Explore now uses authenticated production recommendations and catalog
+search. Next: production social interactions, followed by collection/detail/wishlist/
+trade and Messages parity. Full Room and Binder parity remain mandatory in the queue.
+No device QA is claimed.

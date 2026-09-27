@@ -156,3 +156,56 @@ export async function updateNativeOnboarding(
   if (!response.ok) throw new Error("onboarding_update_failed");
   return response.json() as Promise<{ step: NativeOnboardingStep }>;
 }
+
+export type NativeDiscoveryReason = {
+  code: string;
+  ids?: string[];
+  count?: number;
+};
+export type NativeCollectorDiscovery = {
+  collector: { userId: string; handle: string; displayName: string };
+  rankScore: number;
+  compatibilityScore: number;
+  evidenceStrength: string;
+  wishlistItemsOwnedCount: number;
+  wishlistItemsForTradeCount: number;
+  itemsTheyWantFromMeCount: number;
+  reciprocal: boolean;
+  reciprocalForTrade: boolean;
+  reasons: NativeDiscoveryReason[];
+};
+export type NativeCollectibleDiscovery = {
+  template: {
+    id: string;
+    name: string;
+    kind: string;
+    groupId: string;
+    memberId: string | null;
+    releaseId: string | null;
+  };
+  rankScore: number;
+  reasons: NativeDiscoveryReason[];
+};
+
+async function loadDiscovery<T>(surface: "collectors" | "collectibles"): Promise<T[]> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/discovery/${surface}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ limit: 12 }),
+  });
+  if (!response.ok) throw new Error("discovery_unavailable");
+  const payload = await response.json() as { items?: T[] };
+  return payload.items ?? [];
+}
+
+export function loadCollectorDiscovery() {
+  return loadDiscovery<NativeCollectorDiscovery>("collectors");
+}
+
+export function loadCollectibleDiscovery() {
+  return loadDiscovery<NativeCollectibleDiscovery>("collectibles");
+}

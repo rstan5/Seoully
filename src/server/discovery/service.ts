@@ -1,6 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getDiscoveryCandidateBatch, getDiscoveryCatalog, asPairPerson, type DiscoveryCandidate } from "@/server/dal/discovery";
 import type { PairPerson } from "@/server/dal/collection-graph-pair";
 import { computeCompatibilityPeople } from "@/server/compatibility/service";
@@ -56,16 +57,16 @@ function rankCollector(actor: PairPerson, candidate: DiscoveryCandidate): Collec
   return { collector: { userId: candidate.user_id, handle: candidate.handle, displayName: candidate.display_name }, rankScore: Math.min(100, score), compatibilityScore: compatibility.score, evidenceStrength: compatibility.evidenceStrength, wishlistItemsOwnedCount, wishlistItemsForTradeCount, itemsTheyWantFromMeCount, reciprocal: trade.reciprocal, reciprocalForTrade: trade.reciprocalForTrade, reasons };
 }
 
-export async function discoverCollectors(input?: unknown): Promise<CollectorDiscoveryResult[]> {
+export async function discoverCollectors(input?: unknown, client?: SupabaseClient): Promise<CollectorDiscoveryResult[]> {
   const { limit } = optionsSchema.parse(input ?? {});
-  const batch = await getDiscoveryCandidateBatch({ limit: 100 });
+  const batch = await getDiscoveryCandidateBatch({ limit: 100 }, client);
   const ranked = batch.candidates.map((candidate) => rankCollector(batch.actor, candidate)).sort((a, b) => b.rankScore - a.rankScore || b.compatibilityScore - a.compatibilityScore || a.collector.displayName.localeCompare(b.collector.displayName) || a.collector.userId.localeCompare(b.collector.userId));
   return diversify(ranked, limit, (item) => item.reasons.find((reason) => reason.code === "SHARED_GROUP")?.ids?.[0] ?? null);
 }
 
-export async function discoverRooms(input?: unknown): Promise<RoomDiscoveryResult[]> {
+export async function discoverRooms(input?: unknown, client?: SupabaseClient): Promise<RoomDiscoveryResult[]> {
   const { limit } = optionsSchema.parse(input ?? {});
-  const batch = await getDiscoveryCandidateBatch({ limit: 100 });
+  const batch = await getDiscoveryCandidateBatch({ limit: 100 }, client);
   const results = batch.candidates.filter((candidate) => candidate.room).map((candidate) => {
     const collector = rankCollector(batch.actor, candidate);
     const room = candidate.room!;
@@ -78,10 +79,10 @@ export async function discoverRooms(input?: unknown): Promise<RoomDiscoveryResul
   return results.slice(0, limit);
 }
 
-export async function discoverCollectibles(input?: unknown): Promise<CollectibleDiscoveryResult[]> {
+export async function discoverCollectibles(input?: unknown, client?: SupabaseClient): Promise<CollectibleDiscoveryResult[]> {
   const { limit } = optionsSchema.parse(input ?? {});
-  const batch = await getDiscoveryCandidateBatch({ limit: 1 });
-  const catalog = await getDiscoveryCatalog({ limit: 200, offset: 0 });
+  const batch = await getDiscoveryCandidateBatch({ limit: 1 }, client);
+  const catalog = await getDiscoveryCatalog({ limit: 200, offset: 0 }, client);
   const owned = new Set(batch.actor.holdings.map((holding) => holding.template_id));
   const wanted = new Set(batch.actor.wishlist_template_ids);
   const ownedGroups = new Set(batch.actor.holdings.map((holding) => holding.group_id));

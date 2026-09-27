@@ -1,30 +1,145 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "expo-router";
-import { ActivityIndicator, FlatList, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from "react-native";
-import { searchCatalog, type NativeCatalogTemplate } from "../../src/api";
-import { copy } from "../../src/i18n";
+import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  loadCollectibleDiscovery,
+  loadCollectorDiscovery,
+  searchCatalog,
+  type NativeCatalogTemplate,
+  type NativeCollectibleDiscovery,
+  type NativeCollectorDiscovery,
+} from "../../src/api";
+import { useCopy } from "../../src/locale";
 import { colors, spacing } from "../../src/theme";
+
 export default function SearchScreen() {
   const router = useRouter();
+  const copy = useCopy();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<NativeCatalogTemplate[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<NativeCatalogTemplate[] | null>(null);
+  const [collectors, setCollectors] = useState<NativeCollectorDiscovery[]>([]);
+  const [collectibles, setCollectibles] = useState<NativeCollectibleDiscovery[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<NativeCatalogTemplate | null>(null);
-  const [added, setAdded] = useState(false);
+
+  const loadExplore = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setResults(null);
+    try {
+      const [nextCollectors, nextCollectibles] = await Promise.all([
+        loadCollectorDiscovery(),
+        loadCollectibleDiscovery(),
+      ]);
+      setCollectors(nextCollectors);
+      setCollectibles(nextCollectibles);
+    } catch {
+      setError(copy.exploreUnavailable);
+    } finally {
+      setLoading(false);
+    }
+  }, [copy.exploreUnavailable]);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.all([loadCollectorDiscovery(), loadCollectibleDiscovery()])
+      .then(([nextCollectors, nextCollectibles]) => {
+        if (!active) return;
+        setCollectors(nextCollectors);
+        setCollectibles(nextCollectibles);
+      })
+      .catch(() => {
+        if (active) setError(copy.exploreUnavailable);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, [copy.exploreUnavailable]);
+
   async function runSearch() {
-    setLoading(true); setError(null); setAdded(false);
-    try { setResults(await searchCatalog(query)); } catch { setError("Catalog search is temporarily unavailable."); }
-    setLoading(false);
+    if (!query.trim()) return void loadExplore();
+    setLoading(true);
+    setError(null);
+    try {
+      setResults(await searchCatalog(query));
+    } catch {
+      setError(copy.catalogUnavailable);
+    } finally {
+      setLoading(false);
+    }
   }
-  return <SafeAreaView style={styles.safe}><View style={styles.container}>
-    <Text style={styles.title}>{copy().search}</Text>
-    <Text style={styles.body}>Find something collectors have already added.</Text>
-    <View style={styles.searchRow}><TextInput accessibilityLabel="Search Seoully catalog" placeholder="Group, member, release..." value={query} onChangeText={setQuery} onSubmitEditing={runSearch} returnKeyType="search" style={styles.input} /><Pressable accessibilityRole="button" onPress={runSearch} style={styles.searchButton}><Text style={styles.searchButtonText}>Search</Text></Pressable></View>
+
+  function clearSearch(value: string) {
+    setQuery(value);
+    if (!value.trim()) void loadExplore();
+  }
+
+  return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <Text style={styles.title}>{copy.explore}</Text>
+    <Text style={styles.body}>{copy.exploreLead}</Text>
+    <View style={styles.searchRow}>
+      <TextInput accessibilityLabel={copy.catalogSearchLabel} placeholder={copy.catalogSearchPlaceholder} value={query} onChangeText={clearSearch} onSubmitEditing={runSearch} returnKeyType="search" style={styles.input} />
+      <Pressable accessibilityRole="button" onPress={runSearch} style={styles.searchButton}><Text style={styles.searchButtonText}>{copy.search}</Text></Pressable>
+    </View>
     {loading && <ActivityIndicator color={colors.plum} style={styles.loading} />}
     {error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
-    {selected && <View style={styles.selection}><Text style={styles.selectionTitle}>{selected.name}</Text><Text style={styles.resultMeta}>Add your personal copy to the collection.</Text><Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/add", params: { templateId: selected.id, name: selected.name, kind: selected.kind } })} style={styles.addButton}><Text style={styles.searchButtonText}>{added ? "Added to collection" : "Continue"}</Text></Pressable></View>}
-    <FlatList data={results} keyExtractor={(item) => item.id} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled" renderItem={({ item }) => <Pressable accessibilityRole="button" onPress={() => setSelected(item)} style={styles.result}><Text style={styles.resultTitle}>{item.name}</Text><Text style={styles.resultMeta}>{[item.groupName, item.memberName, item.releaseName, item.kind].filter(Boolean).join(" · ")}</Text>{item.descriptor ? <Text style={styles.resultDescriptor}>{item.descriptor}</Text> : null}</Pressable>} ListEmptyComponent={!loading && query ? <Text style={styles.empty}>No catalog matches yet.</Text> : null} />
-  </View></SafeAreaView>;
+
+    {results ? <>
+      <Text style={styles.sectionTitle}>{copy.catalogResults}</Text>
+      {results.map((item) => <Pressable key={item.id} accessibilityRole="button" onPress={() => router.push({ pathname: "/add", params: { templateId: item.id, name: item.name, kind: item.kind } })} style={styles.result}>
+        <Text style={styles.resultTitle}>{item.name}</Text>
+        <Text style={styles.resultMeta}>{[item.groupName, item.memberName, item.releaseName, item.kind].filter(Boolean).join(" · ")}</Text>
+        {item.descriptor ? <Text style={styles.resultDescriptor}>{item.descriptor}</Text> : null}
+        <Text style={styles.actionText}>{copy.addYourCopy}</Text>
+      </Pressable>)}
+      {!loading && results.length === 0 ? <Text style={styles.empty}>{copy.noCatalogMatches}</Text> : null}
+    </> : <>
+      {collectors.length > 0 ? <><Text style={styles.sectionTitle}>{copy.collectorsForYou}</Text>
+        {collectors.map(({ collector, reciprocal, reasons }) => <View key={collector.userId} style={styles.result}>
+          <Text style={styles.resultTitle}>{collector.displayName}</Text>
+          <Text style={styles.resultMeta}>@{collector.handle}</Text>
+          <Text style={styles.resultDescriptor}>{reciprocal ? copy.mutualMatch : reasonLabel(reasons[0]?.code, copy)}</Text>
+        </View>)}
+      </> : null}
+      {collectibles.length > 0 ? <><Text style={styles.sectionTitle}>{copy.collectiblesForYou}</Text>
+        {collectibles.map(({ template, reasons }) => <Pressable key={template.id} accessibilityRole="button" onPress={() => router.push({ pathname: "/add", params: { templateId: template.id, name: template.name, kind: template.kind } })} style={styles.result}>
+          <Text style={styles.resultTitle}>{template.name}</Text>
+          <Text style={styles.resultMeta}>{template.kind}</Text>
+          <Text style={styles.resultDescriptor}>{reasonLabel(reasons[0]?.code, copy)}</Text>
+          <Text style={styles.actionText}>{copy.addYourCopy}</Text>
+        </Pressable>)}
+      </> : null}
+      {!loading && !error && collectors.length === 0 && collectibles.length === 0 ? <Text style={styles.empty}>{copy.exploreEmpty}</Text> : null}
+    </>}
+  </ScrollView></SafeAreaView>;
 }
-const styles = StyleSheet.create({ safe: { flex: 1, backgroundColor: colors.canvas }, container: { flex: 1, padding: spacing.lg }, title: { color: colors.ink, fontSize: 32, fontWeight: "700" }, body: { color: colors.muted, fontSize: 16, marginTop: spacing.md }, searchRow: { alignItems: "center", flexDirection: "row", gap: spacing.xs, marginTop: spacing.lg }, input: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 14, borderWidth: 1, color: colors.ink, flex: 1, minHeight: 50, paddingHorizontal: spacing.md }, searchButton: { alignItems: "center", backgroundColor: colors.plum, borderRadius: 14, justifyContent: "center", minHeight: 50, paddingHorizontal: spacing.md }, searchButtonText: { color: colors.surface, fontWeight: "700" }, loading: { marginTop: spacing.md }, error: { color: colors.plum, marginTop: spacing.md }, selection: { backgroundColor: colors.blush, borderRadius: 16, marginTop: spacing.md, padding: spacing.md }, selectionTitle: { color: colors.ink, fontSize: 17, fontWeight: "700" }, addButton: { alignItems: "center", backgroundColor: colors.plum, borderRadius: 12, justifyContent: "center", marginTop: spacing.sm, minHeight: 46 }, list: { gap: spacing.sm, paddingVertical: spacing.lg }, result: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, padding: spacing.md }, resultTitle: { color: colors.ink, fontSize: 16, fontWeight: "700" }, resultMeta: { color: colors.plum, fontSize: 13, marginTop: spacing.xs }, resultDescriptor: { color: colors.muted, fontSize: 13, marginTop: spacing.xs }, empty: { color: colors.muted, paddingTop: spacing.md } });
+
+type SearchCopy = ReturnType<typeof useCopy>;
+function reasonLabel(code: string | undefined, copy: SearchCopy) {
+  const normalized = code?.toLowerCase();
+  if (normalized?.includes("wishlist")) return copy.basedOnWishlist;
+  if (normalized?.includes("bias")) return copy.basedOnBias;
+  if (normalized?.includes("group")) return copy.basedOnGroups;
+  return copy.recommendedForYou;
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.canvas },
+  container: { padding: spacing.lg, paddingBottom: 120 },
+  title: { color: colors.ink, fontSize: 32, fontWeight: "700" },
+  body: { color: colors.muted, fontSize: 16, marginTop: spacing.md },
+  searchRow: { alignItems: "center", flexDirection: "row", gap: spacing.xs, marginTop: spacing.lg },
+  input: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 14, borderWidth: 1, color: colors.ink, flex: 1, minHeight: 50, paddingHorizontal: spacing.md },
+  searchButton: { alignItems: "center", backgroundColor: colors.plum, borderRadius: 14, justifyContent: "center", minHeight: 50, paddingHorizontal: spacing.md },
+  searchButtonText: { color: colors.surface, fontWeight: "700" },
+  loading: { marginTop: spacing.md },
+  error: { color: colors.plum, marginTop: spacing.md },
+  sectionTitle: { color: colors.ink, fontSize: 19, fontWeight: "700", marginBottom: spacing.sm, marginTop: spacing.xl },
+  result: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, marginBottom: spacing.sm, padding: spacing.md },
+  resultTitle: { color: colors.ink, fontSize: 16, fontWeight: "700" },
+  resultMeta: { color: colors.plum, fontSize: 13, marginTop: spacing.xs },
+  resultDescriptor: { color: colors.muted, fontSize: 13, marginTop: spacing.xs },
+  actionText: { color: colors.plum, fontSize: 13, fontWeight: "700", marginTop: spacing.sm },
+  empty: { color: colors.muted, paddingTop: spacing.lg },
+});

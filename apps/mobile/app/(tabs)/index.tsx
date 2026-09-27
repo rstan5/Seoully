@@ -49,7 +49,7 @@ export default function FeedScreen() {
     <Text style={styles.title}>{copy.feed}</Text>
     {loading && <ActivityIndicator color={colors.plum} />}
     {error && <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} />}
-    <FlatList data={posts} keyExtractor={(item) => item.id} contentContainerStyle={styles.list} onEndReached={loadMore} onEndReachedThreshold={0.4} renderItem={({ item }) =>
+    <FlatList data={posts} keyExtractor={(item) => item.id} contentContainerStyle={styles.list} refreshing={loading && posts.length > 0} onRefresh={refresh} onEndReached={loadMore} onEndReachedThreshold={0.4} renderItem={({ item }) =>
       <PostCard item={item} copy={copy} onChange={(next) => setPosts((current) => current.map((post) => post.id === next.id ? next : post))} />
     } ListEmptyComponent={!loading && !error ? <Text style={styles.body}>{copy.feedEmpty}</Text> : null} ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.plum} /> : null} />
   </View></SafeAreaView>;

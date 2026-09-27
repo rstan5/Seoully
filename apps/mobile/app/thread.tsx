@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { useLocalSearchParams } from "expo-router";
+import { useCallback, useRef, useState } from "react";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from "react-native";
 import { loadDirectMessages, sendDirectMessage, type NativeDirectMessage } from "../src/api";
 import { RetryNotice } from "../src/components/RetryNotice";
@@ -16,22 +16,27 @@ export default function ThreadScreen() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const refreshInFlight = useRef(false);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async (showLoading = true) => {
+    if (refreshInFlight.current) return;
+    refreshInFlight.current = true;
+    if (showLoading) setLoading(true);
     try {
       setMessages(await loadDirectMessages(conversationId));
       setLoadError(null);
     } catch {
       setLoadError(copy.messagesUnavailable);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
+      refreshInFlight.current = false;
     }
   }, [conversationId, copy.messagesUnavailable]);
-  useEffect(() => {
-    const task = setTimeout(() => { void refresh(); }, 0);
-    return () => clearTimeout(task);
-  }, [refresh]);
+  useFocusEffect(useCallback(() => {
+    void refresh();
+    const task = setInterval(() => { void refresh(false); }, 10_000);
+    return () => clearInterval(task);
+  }, [refresh]));
 
   async function send() {
     const text = body.trim();
@@ -52,9 +57,9 @@ export default function ThreadScreen() {
   return <SafeAreaView style={styles.safe}><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.container}>
     <View style={styles.header}><Text style={styles.title}>{params.displayName}</Text><Text style={styles.handle}>@{params.handle}</Text></View>
     {loading ? <ActivityIndicator color={colors.plum} /> : null}
-    {loadError ? <RetryNotice message={loadError} retryLabel={copy.retry} onRetry={refresh} /> : null}
+    {loadError ? <RetryNotice message={loadError} retryLabel={copy.retry} onRetry={() => { void refresh(); }} /> : null}
     {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-    <FlatList data={messages} keyExtractor={(item) => item.id} contentContainerStyle={styles.log} renderItem={({ item }) =>
+    <FlatList data={messages} keyExtractor={(item) => item.id} contentContainerStyle={styles.log} refreshing={loading && messages.length > 0} onRefresh={() => { void refresh(); }} renderItem={({ item }) =>
       <View style={[styles.bubble, item.mine ? styles.mine : styles.theirs]}><Text style={[styles.message, item.mine && styles.mineText]}>{item.body}</Text></View>
     } />
     <View style={styles.composer}>

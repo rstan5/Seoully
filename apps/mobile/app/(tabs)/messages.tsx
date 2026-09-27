@@ -31,7 +31,7 @@ export default function MessagesScreen() {
     <Text style={styles.body}>{copy.messagesLead}</Text>
     {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
     {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
-    <FlatList data={conversations} keyExtractor={(item) => item.id} contentContainerStyle={styles.list} renderItem={({ item }) =>
+    <FlatList data={conversations} keyExtractor={(item) => item.id} contentContainerStyle={styles.list} refreshing={loading && conversations.length > 0} onRefresh={refresh} renderItem={({ item }) =>
       <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/thread", params: { conversationId: item.id, displayName: item.peer.displayName, handle: item.peer.handle } })} style={styles.conversation}>
         <Text style={styles.name}>{item.peer.displayName}</Text>
         <Text style={styles.handle}>@{item.peer.handle}</Text>

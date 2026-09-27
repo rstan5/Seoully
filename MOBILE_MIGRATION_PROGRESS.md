@@ -95,6 +95,13 @@ security, and Room/Binder data model.
   the native scene; coordinates are adapted to the existing web world convention and
   persisted through the existing `RoomPlacement` transform, zone, surface, slot, and
   Holding identity semantics under bearer auth and RLS.
+- Added Binder V2 as native physical paging rather than a CSS-3D translation. Real
+  photocard Holdings are grouped stably by group/release, laid into 3×2 pockets,
+  organized as left/right spreads, padded with a blank partner for odd page counts,
+  and placed into a general section when no release exists.
+- Binder pockets preserve Holding identity and render the owner's signed personal
+  media as the card face. Native horizontal page gestures turn spreads and tapping a
+  card opens a focused inspection view.
 
 ## Current queue
 
@@ -160,10 +167,12 @@ Native device QA is still pending.
   checks, web strict TypeScript, and a complete Metro iOS production export. GL context
   stability, signed texture appearance, raycast taps, drag feel, FPS, and memory remain
   AWAITING DEVICE QA; simulator-only success is not claimed.
+- Native Binder V2 passes mobile strict TypeScript and Expo lint. Responsive pocket
+  sizing, page-swipe feel, signed media rendering, and inspection ergonomics remain
+  AWAITING DEVICE QA.
 
 ## Next autonomous task
 
-The native Room renderer proof is viable at the implementation/bundle boundary and
-preserves production placement semantics. Next: deepen Room V2 beyond the proof, then
-implement Binder V2 with native pages/pockets and personal photocard media. No device
-QA is claimed.
+Native Binder V2 now preserves grouping, pockets, spreads, blank partners, fallback
+organization, Holding identity, and personal card media. Next: deepen Room V2 beyond
+the proof and perform cross-surface integration hardening. No device QA is claimed.

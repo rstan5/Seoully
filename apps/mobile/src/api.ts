@@ -17,6 +17,9 @@ export async function resolveNativeIdentity<T>(): Promise<T | null> {
 
 export type NativeCatalogTemplate = {
   id: string;
+  groupId: string;
+  memberId: string | null;
+  releaseId: string | null;
   kind: string;
   name: string;
   descriptor: string;

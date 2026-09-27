@@ -81,6 +81,8 @@ export default function CreateScreen() {
   }
 
   async function submitCollectible() {
+    if (!name.trim()) return setMessage(copy.collectibleNameRequired);
+    if (!groupName.trim()) return setMessage(copy.groupNameRequired);
     setWorking(true);
     setMessage(null);
     try {

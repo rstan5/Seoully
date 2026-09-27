@@ -170,6 +170,10 @@ security, and Room/Binder data model.
   contribution fields. Bounded drafts restore after process restart, save with a short
   debounce, clearly disclose device-local storage, and clear after successful creation;
   temporary picker URIs are intentionally not persisted as if they were durable media.
+- Wired production Feed author/comment identities into collector profiles, added retry
+  for failed comment reads, and validated manual catalog contribution before the server
+  boundary. Collection now refreshes when it regains focus so newly created Holdings
+  appear without restarting the app.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 
@@ -283,6 +287,9 @@ Native device QA is still pending.
 - Create draft restoration passes mobile strict TypeScript, Expo lint, and all 21 Expo
   Doctor checks with the SDK-compatible AsyncStorage package. Process-kill restoration,
   OS storage eviction, and keyboard behavior remain AWAITING DEVICE QA.
+- Feed collector navigation, comment retry, Collection focus refresh, and Create
+  validation pass mobile strict TypeScript and Expo lint. Author-tap feedback and
+  Collection refresh timing remain AWAITING DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.
@@ -296,6 +303,7 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-Continue the ordinary app parity audit for remaining detailed screen-level gaps.
+Continue the ordinary app parity audit for remaining detailed screen-level gaps that
+do not require a physical device, then document any remaining AWAITING DEVICE QA items.
 Pending database migrations still require review/application in an approved environment,
 and physical iOS/Android behavior remains AWAITING DEVICE QA.

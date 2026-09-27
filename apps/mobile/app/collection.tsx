@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "expo-router";
+import { useCallback, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
 import { ActivityIndicator, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   loadMyHoldings,
@@ -36,10 +36,9 @@ export default function CollectionScreen() {
       setLoading(false);
     }
   }, [copy.collectionUnavailable]);
-  useEffect(() => {
-    const task = setTimeout(() => { void refresh(); }, 0);
-    return () => clearTimeout(task);
-  }, [refresh]);
+  useFocusEffect(useCallback(() => {
+    void refresh();
+  }, [refresh]));
 
   async function toggleTrade(holding: NativeHolding) {
     const nextStatus = holding.tradeStatus === "for-trade" ? "not-for-trade" : "for-trade";

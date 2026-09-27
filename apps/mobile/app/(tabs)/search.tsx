@@ -45,21 +45,9 @@ export default function SearchScreen() {
   }, [copy.exploreUnavailable]);
 
   useEffect(() => {
-    let active = true;
-    void Promise.all([loadCollectorDiscovery(), loadCollectibleDiscovery()])
-      .then(([nextCollectors, nextCollectibles]) => {
-        if (!active) return;
-        setCollectors(nextCollectors);
-        setCollectibles(nextCollectibles);
-      })
-      .catch(() => {
-        if (active) setError(copy.exploreUnavailable);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => { active = false; };
-  }, [copy.exploreUnavailable]);
+    const task = setTimeout(() => { void loadExplore(); }, 0);
+    return () => clearTimeout(task);
+  }, [loadExplore]);
 
   async function runSearch() {
     if (!query.trim()) return void loadExplore();

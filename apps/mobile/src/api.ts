@@ -140,8 +140,9 @@ export async function contributeCatalogItem(input: { name: string; kind: string;
   return response.json() as Promise<{ contribution: { template: NativeCatalogTemplate } }>;
 }
 
-export type NativeFeedPost = { id: string; caption: string; createdAt: string; author: { displayName: string; handle: string }; likeCount: number; commentCount: number; likedByMe: boolean; media: { url: string; mediaType: string }[] };
-export type NativePostComment = { id: string; postId: string; body: string; createdAt: string; author: { displayName: string; handle: string } };
+export type NativeSocialAuthor = { userId: string; displayName: string; handle: string };
+export type NativeFeedPost = { id: string; caption: string; createdAt: string; author: NativeSocialAuthor; likeCount: number; commentCount: number; likedByMe: boolean; media: { url: string; mediaType: string }[] };
+export type NativePostComment = { id: string; postId: string; body: string; createdAt: string; author: NativeSocialAuthor };
 export type NativeFeedPage = { items: NativeFeedPost[]; nextCursor: string | null };
 export async function loadFeed(cursor?: string): Promise<NativeFeedPage> {
   const { data } = await supabase.auth.getSession();

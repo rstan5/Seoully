@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Image, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from "react-native";
 import { addPostComment, loadFeed, loadPostComments, setPostLiked, type NativeFeedPost, type NativePostComment } from "../../src/api";
 import { RetryNotice } from "../../src/components/RetryNotice";
@@ -56,10 +56,16 @@ export default function FeedScreen() {
 }
 
 function PostCard({ item, copy, onChange }: { item: NativeFeedPost; copy: MobileCopy; onChange: (post: NativeFeedPost) => void }) {
+  const router = useRouter();
   const [comments, setComments] = useState<NativePostComment[] | null>(null);
   const [commentBody, setCommentBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
+
+  function openCollector(userId?: string) {
+    if (!userId) return;
+    router.push({ pathname: "/collector", params: { userId } });
+  }
 
   async function toggleLike() {
     if (busy) return;
@@ -74,6 +80,10 @@ function PostCard({ item, copy, onChange }: { item: NativeFeedPost; copy: Mobile
 
   async function toggleComments() {
     if (comments) return setComments(null);
+    await loadComments();
+  }
+
+  async function loadComments() {
     setCommentError(null);
     try { setComments(await loadPostComments(item.id)); }
     catch { setCommentError(copy.commentsUnavailable); }
@@ -98,7 +108,9 @@ function PostCard({ item, copy, onChange }: { item: NativeFeedPost; copy: Mobile
 
   const image = item.media.find((media) => media.mediaType === "image");
   return <View style={styles.post}>
-    <Text style={styles.author}>{item.author.displayName} · @{item.author.handle}</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${copy.viewCollector}: ${item.author.displayName}`} onPress={() => openCollector(item.author.userId)}>
+      <Text style={styles.author}>{item.author.displayName} · @{item.author.handle}</Text>
+    </Pressable>
     {image ? <Image accessibilityIgnoresInvertColors source={{ uri: image.url }} style={styles.media} /> : null}
     <Text style={styles.caption}>{item.caption || copy.sharedMoment}</Text>
     <Text style={styles.meta}>{item.likeCount} {copy.likes} · {item.commentCount} {copy.comments}</Text>
@@ -110,9 +122,9 @@ function PostCard({ item, copy, onChange }: { item: NativeFeedPost; copy: Mobile
         <Text style={styles.actionLabel}>{comments ? copy.hideComments : copy.viewComments}</Text>
       </Pressable>
     </View>
-    {commentError ? <Text accessibilityRole="alert" style={styles.error}>{commentError}</Text> : null}
+    {commentError ? <RetryNotice message={commentError} retryLabel={copy.retry} onRetry={() => { void loadComments(); }} /> : null}
     {comments ? <View style={styles.comments}>
-      {comments.map((comment) => <View key={comment.id} style={styles.comment}><Text style={styles.commentAuthor}>@{comment.author.handle}</Text><Text style={styles.commentBody}>{comment.body}</Text></View>)}
+      {comments.map((comment) => <View key={comment.id} style={styles.comment}><Pressable accessibilityRole="button" onPress={() => openCollector(comment.author.userId)}><Text style={styles.commentAuthor}>@{comment.author.handle}</Text></Pressable><Text style={styles.commentBody}>{comment.body}</Text></View>)}
       <View style={styles.commentComposer}>
         <TextInput accessibilityLabel={copy.commentPlaceholder} placeholder={copy.commentPlaceholder} value={commentBody} onChangeText={setCommentBody} onSubmitEditing={submitComment} style={styles.commentInput} />
         <Pressable accessibilityRole="button" disabled={!commentBody.trim() || busy} onPress={submitComment} style={styles.commentButton}><Text style={styles.commentButtonLabel}>{copy.postComment}</Text></Pressable>

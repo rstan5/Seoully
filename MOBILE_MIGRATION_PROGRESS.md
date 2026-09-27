@@ -143,6 +143,10 @@ security, and Room/Binder data model.
   dismissal. Reduced-motion users retain the interaction with a shorter settle.
 - Localized the Binder general/fallback section in English and Korean and added bounded,
   accessible previous/next spread controls alongside native swipe paging.
+- Replaced the fixed center-only photocard crop with a native touch crop stage. Camera
+  and library photos can now be dragged, pinched up to 3×, adjusted with accessible
+  zoom controls, previewed in the actual card ratio, and converted to a bounded source
+  crop before personal-media upload. Crop guidance is localized in English/Korean.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 
@@ -236,6 +240,9 @@ Native device QA is still pending.
 - Binder lift/return, localized grouping, and spread controls pass mobile strict
   TypeScript and Expo lint. Pocket-origin measurement, spring feel, signed image
   rendering, and reduced-motion behavior remain AWAITING DEVICE QA.
+- The touch-adjustable photocard crop passes mobile strict TypeScript and Expo lint.
+  Camera orientation metadata, multi-touch feel, small-screen safe areas, and final
+  image appearance remain AWAITING DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.
@@ -249,7 +256,7 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-Audit ordinary app parity for remaining non-device-dependent gaps, prioritizing
-touch-adjustable image crop, loading/error/retry completeness, and navigation state
-restoration. Pending database migrations still require review/application in an
-approved environment, and physical iOS/Android behavior remains AWAITING DEVICE QA.
+Continue the ordinary app parity audit, prioritizing loading/error/retry completeness
+and navigation state restoration. Pending database migrations still require review/
+application in an approved environment, and physical iOS/Android behavior remains
+AWAITING DEVICE QA.

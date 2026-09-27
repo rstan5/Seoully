@@ -156,20 +156,20 @@ export async function getFollowState(userId: unknown): Promise<{ following: bool
   return { following: Boolean(state.data), followers: followers.count ?? 0, followingCount: following.count ?? 0 };
 }
 
-export async function likePost(postId: unknown): Promise<{ liked: boolean }> {
-  const id = postIdSchema.parse(postId); const { identity, supabase } = await actorClient();
+export async function likePost(postId: unknown, client?: SupabaseClient): Promise<{ liked: boolean }> {
+  const id = postIdSchema.parse(postId); const { identity, supabase } = await actorClient(client);
   const { error } = await supabase.from("post_likes").upsert({ post_id: id, user_id: identity.user.id }, { onConflict: "post_id,user_id", ignoreDuplicates: true });
   if (error) throw new Error("like_failed"); return { liked: true };
 }
 
-export async function unlikePost(postId: unknown): Promise<{ liked: boolean }> {
-  const id = postIdSchema.parse(postId); const { identity, supabase } = await actorClient();
+export async function unlikePost(postId: unknown, client?: SupabaseClient): Promise<{ liked: boolean }> {
+  const id = postIdSchema.parse(postId); const { identity, supabase } = await actorClient(client);
   const { error } = await supabase.from("post_likes").delete().eq("post_id", id).eq("user_id", identity.user.id);
   if (error) throw new Error("unlike_failed"); return { liked: false };
 }
 
-export async function listPostComments(postId: unknown, input?: unknown): Promise<SocialPage<SocialCommentDTO>> {
-  const id = postIdSchema.parse(postId); const page = pageSchema.parse(input ?? {}); const cursor = decodeCursor(page.cursor); const { supabase } = await actorClient();
+export async function listPostComments(postId: unknown, input?: unknown, client?: SupabaseClient): Promise<SocialPage<SocialCommentDTO>> {
+  const id = postIdSchema.parse(postId); const page = pageSchema.parse(input ?? {}); const cursor = decodeCursor(page.cursor); const { supabase } = await actorClient(client);
   let query = supabase.from("post_comments").select("id,post_id,author_user_id,body,created_at").eq("post_id", id).order("created_at", { ascending: true }).order("id", { ascending: true }).limit(page.limit + 1);
   if (cursor) query = query.or("created_at.gt." + cursor.createdAt + ",and(created_at.eq." + cursor.createdAt + ",id.gt." + cursor.id + ")");
   const { data, error } = await query; if (error) throw new Error("comments_read_failed");
@@ -206,8 +206,8 @@ export async function createPost(input: { file: File; caption?: unknown; locatio
   }
 }
 
-export async function createComment(postId: unknown, body: unknown): Promise<SocialCommentDTO> {
-  const id = postIdSchema.parse(postId); const text = z.string().trim().min(1).max(1_000).parse(body); const { identity, supabase } = await actorClient();
+export async function createComment(postId: unknown, body: unknown, client?: SupabaseClient): Promise<SocialCommentDTO> {
+  const id = postIdSchema.parse(postId); const text = z.string().trim().min(1).max(1_000).parse(body); const { identity, supabase } = await actorClient(client);
   const { data, error } = await supabase.from("post_comments").insert({ post_id: id, author_user_id: identity.user.id, body: text }).select("id,post_id,author_user_id,body,created_at").single();
   if (error || !data) throw new Error("comment_create_failed");
   const { data: profile, error: profileError } = await supabase.from("profiles").select("user_id,handle,display_name").eq("user_id", identity.user.id).single();

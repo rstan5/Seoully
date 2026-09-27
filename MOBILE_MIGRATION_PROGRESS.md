@@ -65,6 +65,11 @@ security, and Room/Binder data model.
   ranked recommendations, while a catalog query retains the production add-to-
   collection path. Native Room entry is intentionally not implied before its renderer
   exists.
+- Added bearer-authenticated native post like/unlike and comment read/create
+  boundaries that reuse the production Social DAL, authenticated actor derivation,
+  validation, RLS, and idempotent like semantics.
+- Upgraded the native Feed with production image media, localized optimistic
+  like/unlike controls with rollback, expandable comments, and comment composition.
 
 ## Current queue
 
@@ -111,10 +116,13 @@ Native device QA is still pending.
 - Native Search/Explore passes mobile lint and strict TypeScript, all 21 Expo Doctor
   checks, web TypeScript, fixture integrity checks, and `git diff --check`. Responsive,
   keyboard, and touch behavior remain AWAITING DEVICE QA.
+- Native Feed interactions pass mobile lint and strict TypeScript, web TypeScript, and
+  fixture integrity checks. Media layout, optimistic touch feedback, keyboard behavior,
+  and comment composition remain AWAITING DEVICE QA.
 
 ## Next autonomous task
 
-Native Search/Explore now uses authenticated production recommendations and catalog
-search. Next: production social interactions, followed by collection/detail/wishlist/
-trade and Messages parity. Full Room and Binder parity remain mandatory in the queue.
-No device QA is claimed.
+Native Feed now supports authenticated production likes and comments. Next:
+collection/detail/wishlist/trade and Messages parity, with follow/profile navigation
+folded into the relevant collector surface. Full Room and Binder parity remain
+mandatory in the queue. No device QA is claimed.

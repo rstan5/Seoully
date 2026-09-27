@@ -81,7 +81,8 @@ export async function contributeCatalogItem(input: { name: string; kind: string;
   return response.json() as Promise<{ contribution: { template: NativeCatalogTemplate } }>;
 }
 
-export type NativeFeedPost = { id: string; caption: string; createdAt: string; author: { displayName: string; handle: string }; likeCount: number; commentCount: number; media: { url: string; mediaType: string }[] };
+export type NativeFeedPost = { id: string; caption: string; createdAt: string; author: { displayName: string; handle: string }; likeCount: number; commentCount: number; likedByMe: boolean; media: { url: string; mediaType: string }[] };
+export type NativePostComment = { id: string; postId: string; body: string; createdAt: string; author: { displayName: string; handle: string } };
 export async function loadFeed(): Promise<NativeFeedPost[]> {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
@@ -90,6 +91,38 @@ export async function loadFeed(): Promise<NativeFeedPost[]> {
   if (!response.ok) throw new Error("social_read_failed");
   const payload = await response.json() as { page?: { items?: NativeFeedPost[] } };
   return payload.page?.items ?? [];
+}
+
+export async function setPostLiked(postId: string, liked: boolean) {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/posts/${encodeURIComponent(postId)}/like`, {
+    method: liked ? "PUT" : "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("like_failed");
+  return response.json() as Promise<{ liked: boolean }>;
+}
+
+export async function loadPostComments(postId: string): Promise<NativePostComment[]> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/posts/${encodeURIComponent(postId)}/comments`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("comments_read_failed");
+  const payload = await response.json() as { page?: { items?: NativePostComment[] } };
+  return payload.page?.items ?? [];
+}
+
+export async function addPostComment(postId: string, body: string): Promise<NativePostComment> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/posts/${encodeURIComponent(postId)}/comments`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ body }),
+  });
+  if (!response.ok) throw new Error("comment_create_failed");
+  const payload = await response.json() as { comment: NativePostComment };
+  return payload.comment;
 }
 
 export async function updateNativeProfile(input: { displayName?: string; bio?: string; tagline?: string }) {

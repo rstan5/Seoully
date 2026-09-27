@@ -11,7 +11,7 @@ export type NativeBinderPage = {
 };
 export type NativeBinderSpread = { index: number; left: NativeBinderPage; right: NativeBinderPage };
 
-export function buildNativeBinderPages(holdings: NativeHolding[]): NativeBinderPage[] {
+export function buildNativeBinderPages(holdings: NativeHolding[], generalName: string): NativeBinderPage[] {
   const photocards = holdings.filter((holding) => holding.template.kind === "photocard");
   const groups = new Map<string, { name: string; holdings: NativeHolding[] }>();
   const ungrouped: NativeHolding[] = [];
@@ -33,8 +33,8 @@ export function buildNativeBinderPages(holdings: NativeHolding[]): NativeBinderP
   for (const [setId, group] of [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     appendSetPages(pages, setId, group.name, stableHoldings(group.holdings), true);
   }
-  if (ungrouped.length) appendSetPages(pages, "seoully-general-photocards", "Your Photocards", stableHoldings(ungrouped), false);
-  if (!pages.length) appendSetPages(pages, "seoully-general-photocards", "Your Photocards", [], false);
+  if (ungrouped.length) appendSetPages(pages, "seoully-general-photocards", generalName, stableHoldings(ungrouped), false);
+  if (!pages.length) appendSetPages(pages, "seoully-general-photocards", generalName, [], false);
   if (pages.length % 2 === 1) {
     const last = pages.at(-1)!;
     pages.push(blankPage(last.setId, last.setName, last.pageInSet + 1));

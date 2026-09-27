@@ -137,6 +137,12 @@ security, and Room/Binder data model.
   immediate renderer relighting/recoloring, optimistic rollback, English/Korean labels,
   a bearer-authenticated server boundary, and existing owner-only Room RLS. The preset
   is stored on the Room rather than device-local state.
+- Deepened Binder V2 inspection into a physical card interaction. A tapped pocket is
+  measured on screen, the real Holding/media face springs from that pocket into focused
+  inspection, and the explicit return action eases the card back to its source before
+  dismissal. Reduced-motion users retain the interaction with a shorter settle.
+- Localized the Binder general/fallback section in English and Korean and added bounded,
+  accessible previous/next spread controls alongside native swipe paging.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 
@@ -227,6 +233,9 @@ Native device QA is still pending.
 - Owner-scoped Room presets pass mobile and web strict TypeScript, Expo lint, and diff
   checks. Visual contrast, GL relighting, and control ergonomics remain AWAITING DEVICE
   QA, and deployed persistence awaits the pending migration.
+- Binder lift/return, localized grouping, and spread controls pass mobile strict
+  TypeScript and Expo lint. Pocket-origin measurement, spring feel, signed image
+  rendering, and reduced-motion behavior remain AWAITING DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.
@@ -240,7 +249,7 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-Deepen Binder V2 with animated card lift/return, localized fallback organization, and
-more physical spread navigation. Then audit ordinary app parity for remaining
-non-device-dependent gaps. Pending database migrations still require review/application
-in an approved environment, and physical iOS/Android behavior remains AWAITING DEVICE QA.
+Audit ordinary app parity for remaining non-device-dependent gaps, prioritizing
+touch-adjustable image crop, loading/error/retry completeness, and navigation state
+restoration. Pending database migrations still require review/application in an
+approved environment, and physical iOS/Android behavior remains AWAITING DEVICE QA.

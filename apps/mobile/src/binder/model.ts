@@ -17,17 +17,25 @@ export function buildNativeBinderPages(holdings: NativeHolding[], generalName: s
   const ungrouped: NativeHolding[] = [];
   for (const holding of photocards) {
     const releaseId = holding.template.releaseId;
-    if (!releaseId) {
-      ungrouped.push(holding);
+    const groupId = holding.template.groupId;
+    if (releaseId) {
+      const key = `${groupId}:${releaseId}`;
+      const current = groups.get(key) ?? {
+        name: [holding.template.groupName, holding.template.releaseName].filter(Boolean).join(" · "),
+        holdings: [],
+      };
+      current.holdings.push(holding);
+      groups.set(key, current);
       continue;
     }
-    const key = `${holding.template.groupId}:${releaseId}`;
-    const current = groups.get(key) ?? {
-      name: [holding.template.groupName, holding.template.releaseName].filter(Boolean).join(" · "),
-      holdings: [],
-    };
-    current.holdings.push(holding);
-    groups.set(key, current);
+    if (groupId && holding.template.groupName) {
+      const key = `${groupId}:general`;
+      const current = groups.get(key) ?? { name: holding.template.groupName, holdings: [] };
+      current.holdings.push(holding);
+      groups.set(key, current);
+      continue;
+    }
+    ungrouped.push(holding);
   }
   const pages: NativeBinderPage[] = [];
   for (const [setId, group] of [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))) {

@@ -180,12 +180,12 @@ export async function listPostComments(postId: unknown, input?: unknown, client?
   return { items, nextCursor: hasMore && visible.length ? encodeCursor(String(visible.at(-1)!.created_at), String(visible.at(-1)!.id)) : null };
 }
 
-export async function createPost(input: { file: File; caption?: unknown; location?: unknown; taggedUserIds?: unknown; taggedTemplateIds?: unknown }): Promise<SocialPostDTO> {
+export async function createPost(input: { file: File; caption?: unknown; location?: unknown; taggedUserIds?: unknown; taggedTemplateIds?: unknown }, client?: SupabaseClient): Promise<SocialPostDTO> {
   const caption = z.string().trim().max(2_000).optional().parse(input.caption); const location = z.string().trim().max(160).optional().parse(input.location);
   const taggedUserIds = z.array(uuid).max(10).default([]).parse(input.taggedUserIds); const taggedTemplateIds = z.array(uuid).max(10).default([]).parse(input.taggedTemplateIds);
   const file = input.file; if (!(file instanceof File) || !allowedMime.has(file.type) || file.size <= 0 || file.size > MAX_MEDIA_BYTES) throw new Error("invalid_media");
   if (!(await matchesMediaSignature(file))) throw new Error("invalid_media");
-  const { identity, supabase } = await actorClient();
+  const { identity, supabase } = await actorClient(client);
   if (taggedUserIds.length) { const { data, error } = await supabase.from("profiles").select("user_id").in("user_id", taggedUserIds); if (error || (data ?? []).length !== taggedUserIds.length) throw new Error("invalid_user_tag"); }
   if (taggedTemplateIds.length) { const { data, error } = await supabase.from("collectible_templates").select("id").in("id", taggedTemplateIds).neq("status", "restricted"); if (error || (data ?? []).length !== taggedTemplateIds.length) throw new Error("invalid_collectible_tag"); }
   const { data: post, error: postError } = await supabase.from("posts").insert({ author_user_id: identity.user.id, caption: caption || null, location_text: location || null, visibility: "public" }).select("id").single();
@@ -198,7 +198,7 @@ export async function createPost(input: { file: File; caption?: unknown; locatio
     if (mediaError) throw new Error("post_media_record_failed");
     if (taggedUserIds.length) { const { error } = await supabase.from("post_user_tags").insert(taggedUserIds.map((tagged_user_id) => ({ post_id: postId, tagged_user_id }))); if (error) throw new Error("post_user_tag_failed"); }
     if (taggedTemplateIds.length) { const { error } = await supabase.from("post_collectible_tags").insert(taggedTemplateIds.map((template_id) => ({ post_id: postId, template_id }))); if (error) throw new Error("post_collectible_tag_failed"); }
-    const page = await listPosts([identity.user.id], { limit: 1 }); const created = page.items.find((item) => item.id === postId); if (!created) throw new Error("post_read_failed"); return created;
+    const page = await listPosts([identity.user.id], { limit: 1 }, client); const created = page.items.find((item) => item.id === postId); if (!created) throw new Error("post_read_failed"); return created;
   } catch (error) {
     await supabase.storage.from("post-media").remove([path]);
     await supabase.from("posts").delete().eq("id", postId).eq("author_user_id", identity.user.id);

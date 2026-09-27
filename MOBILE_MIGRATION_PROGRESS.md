@@ -102,6 +102,12 @@ security, and Room/Binder data model.
 - Binder pockets preserve Holding identity and render the owner's signed personal
   media as the card face. Native horizontal page gestures turn spreads and tapping a
   card opens a focused inspection view.
+- Added native authored-post creation with production media validation/storage,
+  server-derived authorship, and RLS through a bearer endpoint. The Create tab now
+  supports a real image post/caption flow while retaining manual catalog contribution.
+- Completed English/Korean localization for Create, Add collectible, personal/shared
+  photo consent, and Profile editing; Profile now initializes its editor with the
+  persisted production bio instead of an empty value.
 
 ## Current queue
 
@@ -170,9 +176,12 @@ Native device QA is still pending.
 - Native Binder V2 passes mobile strict TypeScript and Expo lint. Responsive pocket
   sizing, page-swipe feel, signed media rendering, and inspection ergonomics remain
   AWAITING DEVICE QA.
+- Native post creation and the localization hardening pass mobile strict TypeScript,
+  Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
+  and keyboard behavior remain AWAITING DEVICE QA.
 
 ## Next autonomous task
 
-Native Binder V2 now preserves grouping, pockets, spreads, blank partners, fallback
-organization, Holding identity, and personal card media. Next: deepen Room V2 beyond
-the proof and perform cross-surface integration hardening. No device QA is claimed.
+Native authored posts and the remaining primary create/profile copy now have production
+and localization parity. Next: deepen Room V2 beyond the proof and continue
+cross-surface integration hardening. No device QA is claimed.

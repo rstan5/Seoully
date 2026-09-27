@@ -184,6 +184,20 @@ export async function addPostComment(postId: string, body: string): Promise<Nati
   return payload.comment;
 }
 
+export async function createNativePost(uri: string, caption: string, mimeType = "image/jpeg") {
+  const accessToken = await mobileAccessToken();
+  const body = new FormData();
+  body.append("caption", caption);
+  body.append("file", { uri, name: "seoully-post.jpg", type: mimeType } as unknown as Blob);
+  const response = await fetch(`${baseUrl}/api/mobile/posts`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body,
+  });
+  if (!response.ok) throw new Error("post_create_failed");
+  return response.json() as Promise<{ post: NativeFeedPost }>;
+}
+
 export async function updateNativeProfile(input: { displayName?: string; bio?: string; tagline?: string }) {
   const { data } = await supabase.auth.getSession(); const accessToken = data.session?.access_token;
   if (!baseUrl || !accessToken) throw new Error("unauthenticated");

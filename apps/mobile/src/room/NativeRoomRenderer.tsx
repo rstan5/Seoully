@@ -1,6 +1,7 @@
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber/native";
+import { Directory, File, Paths } from "expo-file-system";
 import { Color, TextureLoader, Vector3 } from "three";
 import type { RoomRenderable } from "./model";
 
@@ -73,14 +74,34 @@ function RoomObject({ item, selected, onSelect }: { item: RoomRenderable; select
     onClick={(event) => { event.stopPropagation(); onSelect(item.holding.id); }}
   >
     <mesh castShadow><boxGeometry args={dimensions} /><meshStandardMaterial color={selected ? "#bd4268" : "#f2d5dc"} roughness={0.55} /></mesh>
-    {item.imageUrl ? <Suspense fallback={null}><PersonalMediaFace url={item.imageUrl} width={dimensions[0] * 0.92} height={dimensions[1] * 0.92} depth={dimensions[2]} /></Suspense> : null}
+    {item.imageUrl ? <CachedPersonalMediaFace cacheKey={item.holding.id} url={item.imageUrl} width={dimensions[0] * 0.92} height={dimensions[1] * 0.92} depth={dimensions[2]} /> : null}
   </group>;
 }
 
-function PersonalMediaFace({ url, width, height, depth }: { url: string; width: number; height: number; depth: number }) {
-  const texture = useLoader(TextureLoader, url);
+function CachedPersonalMediaFace({ cacheKey, url, width, height, depth }: { cacheKey: string; url: string; width: number; height: number; depth: number }) {
+  const localUri = useCachedMediaFile(cacheKey, url);
+  return localUri ? <Suspense fallback={null}><PersonalMediaFace uri={localUri} width={width} height={height} depth={depth} /></Suspense> : null;
+}
+
+function PersonalMediaFace({ uri, width, height, depth }: { uri: string; width: number; height: number; depth: number }) {
+  const texture = useLoader(TextureLoader, uri);
   return <mesh position={[0, 0, depth / 2 + 0.003]}>
     <planeGeometry args={[width, height]} />
     <meshBasicMaterial map={texture} toneMapped={false} />
   </mesh>;
+}
+
+function useCachedMediaFile(cacheKey: string, url: string) {
+  const [uri, setUri] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    const directory = new Directory(Paths.cache, "seoully-room-textures");
+    directory.create({ idempotent: true, intermediates: true });
+    const destination = new File(directory, `${cacheKey}.img`);
+    void File.downloadFileAsync(url, destination, { idempotent: true })
+      .then((file) => { if (active) setUri(file.uri); })
+      .catch(() => { if (active) setUri(null); });
+    return () => { active = false; };
+  }, [cacheKey, url]);
+  return uri;
 }

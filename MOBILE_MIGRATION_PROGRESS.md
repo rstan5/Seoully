@@ -119,6 +119,9 @@ security, and Room/Binder data model.
   New and dragged objects settle to the nearest physical plane and persist its
   `surfaceId` plus the settled transform, preserving the web Room's surface-as-context
   semantics rather than treating the scene as an arbitrary 2D grid.
+- Hardened native GL texture loading by downloading each signed personal-media URL to
+  an idempotent Expo cache file before handing its local URI to Three.js. This avoids
+  relying on native GL loaders to consume expiring remote URLs directly.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 

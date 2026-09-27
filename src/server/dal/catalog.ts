@@ -1,7 +1,8 @@
 import "server-only";
 
 import { z } from "zod";
-import { getCurrentIdentity } from "@/server/dal/profile";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/profile";
 import { createSupabaseServerClient } from "@/server/supabase/server";
 
 const kindValues = ["photocard", "album", "vinyl", "poster", "lightstick", "plushie", "figure", "book", "apparel", "memorabilia"] as const;
@@ -76,11 +77,11 @@ export async function getSharedCatalogTemplate(templateId: string): Promise<Cata
   return (await hydrateCatalogTemplates([data], supabase))[0] ?? null;
 }
 
-export async function createSharedCatalogContribution(input: unknown): Promise<CatalogContributionDTO> {
+export async function createSharedCatalogContribution(input: unknown, client?: SupabaseClient): Promise<CatalogContributionDTO> {
   const payload = catalogContributionSchema.parse(input);
-  const identity = await getCurrentIdentity();
+  const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? await createSupabaseServerClient();
   const { data, error } = await supabase.rpc("create_catalog_contribution", { p_payload: payload });
   if (error) {
     if (error.code === "42501") throw new Error("unauthenticated");

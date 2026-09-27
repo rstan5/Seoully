@@ -37,6 +37,9 @@ security, and Room/Binder data model.
   personal-media upload boundary, and a photocard aspect-ratio crop step using Expo
   ImageManipulator. This first slice is implementation-complete for native API
   wiring; touch-adjustable crop and physical-device validation remain pending.
+- Added a bearer-authenticated native catalog contribution endpoint and a first native
+  manual-details screen. The current screen proves production contribution semantics;
+  photo-first consent wiring still remains before this slice can be called complete.
 
 ## Current queue
 
@@ -70,5 +73,5 @@ is still pending.
 
 ## Next autonomous task
 
-Commit the native collection/media slice, then add a real manual-contribution endpoint
-and native Add Manually path, keeping consent and personal/reference media separate.
+Commit the contribution slice, then finish photo-first manual contribution with explicit
+reference-image consent and shared/personal media separation.

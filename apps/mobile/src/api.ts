@@ -58,3 +58,12 @@ export async function uploadHoldingPhoto(holdingId: string, uri: string, mimeTyp
   if (!response.ok) throw new Error("media_upload_failed");
   return response.json();
 }
+
+export async function contributeCatalogItem(input: { name: string; kind: string; groupName: string; memberName?: string; releaseName?: string; descriptor?: string }) {
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+  if (!baseUrl || !accessToken) throw new Error("unauthenticated");
+  const response = await fetch(`${baseUrl}/api/mobile/catalog/contributions`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify(input) });
+  if (!response.ok) throw new Error("catalog_contribution_failed");
+  return response.json() as Promise<{ contribution: { template: NativeCatalogTemplate } }>;
+}

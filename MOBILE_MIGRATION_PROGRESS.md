@@ -196,6 +196,8 @@ security, and Room/Binder data model.
   pages so later photocards are not silently omitted.
 - Wishlist reads now honor the same offset/limit contract so large wishlists can be
   paged in Collection instead of stopping at the first 100 saved catalog items.
+- Binder now restores the last viewed spread locally and scrolls back to that page after
+  Holdings reload, so page position survives leaving and returning to Binder.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 
@@ -329,6 +331,8 @@ Native device QA is still pending.
   memory and Room tray length remain AWAITING DEVICE QA.
 - Wishlist pagination passes mobile and web TypeScript plus Expo lint. Long wishlist
   lists remain AWAITING DEVICE QA.
+- Binder spread restoration passes mobile TypeScript and Expo lint. Scroll-to-index
+  after Holdings reload remains AWAITING DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.

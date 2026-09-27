@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, FlatList, Image, Modal, Pressable, SafeAreaView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { loadAllMyHoldings, type NativeHolding } from "../src/api";
 import { binderSpreads, buildNativeBinderPages, type NativeBinderPage, type NativeBinderSpread } from "../src/binder/model";
 import { RetryNotice } from "../src/components/RetryNotice";
@@ -8,6 +9,7 @@ import { useCopy } from "../src/locale";
 import { colors, spacing } from "../src/theme";
 
 type CardSelection = { holding: NativeHolding; origin: { x: number; y: number; width: number; height: number } };
+const BINDER_SPREAD_KEY = "seoully.mobile.binder-spread.v1";
 
 export default function BinderScreen() {
   const copy = useCopy();
@@ -16,6 +18,7 @@ export default function BinderScreen() {
   const [holdings, setHoldings] = useState<NativeHolding[]>([]);
   const [selected, setSelected] = useState<CardSelection | null>(null);
   const [spreadIndex, setSpreadIndex] = useState(0);
+  const [spreadReady, setSpreadReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const refresh = useCallback(async () => {
@@ -33,7 +36,28 @@ export default function BinderScreen() {
     void refresh();
   }, [refresh]));
   const listRef = useRef<FlatList<NativeBinderSpread>>(null);
+  useEffect(() => {
+    const task = setTimeout(() => {
+      void AsyncStorage.getItem(BINDER_SPREAD_KEY).then((stored) => {
+        const index = Number(stored);
+        if (Number.isInteger(index) && index >= 0) setSpreadIndex(index);
+        setSpreadReady(true);
+      });
+    }, 0);
+    return () => clearTimeout(task);
+  }, []);
+  useEffect(() => {
+    if (spreadReady) void AsyncStorage.setItem(BINDER_SPREAD_KEY, String(spreadIndex));
+  }, [spreadIndex, spreadReady]);
   const spreads = useMemo(() => binderSpreads(buildNativeBinderPages(holdings, copy.binderGeneral)), [copy.binderGeneral, holdings]);
+  const visibleSpread = spreads.length ? Math.min(spreadIndex, spreads.length - 1) : 0;
+  useEffect(() => {
+    if (!spreads.length) return;
+    const task = setTimeout(() => {
+      listRef.current?.scrollToIndex({ index: visibleSpread, animated: false });
+    }, 0);
+    return () => clearTimeout(task);
+  }, [spreads.length, visibleSpread]);
 
   return <SafeAreaView style={styles.safe}><View style={styles.container}>
     <Text style={styles.title}>{copy.binder}</Text>
@@ -54,10 +78,10 @@ export default function BinderScreen() {
       renderItem={({ item }) => <Spread spread={item} width={spreadWidth} emptyLabel={copy.binderEmptyPocket} onSelect={setSelected} />}
       style={styles.binder}
     /> : null}
-    <Text style={styles.pageCount}>{copy.binderPage} {spreadIndex + 1} / {spreads.length}</Text>
+    <Text style={styles.pageCount}>{copy.binderPage} {visibleSpread + 1} / {spreads.length}</Text>
     <View style={styles.pageControls}>
-      <Pressable accessibilityRole="button" accessibilityState={{ disabled: spreadIndex === 0 }} disabled={spreadIndex === 0} onPress={() => listRef.current?.scrollToIndex({ index: spreadIndex - 1, animated: true })} style={[styles.pageButton, spreadIndex === 0 && styles.pageButtonDisabled]}><Text style={styles.pageButtonText}>{copy.previousSpread}</Text></Pressable>
-      <Pressable accessibilityRole="button" accessibilityState={{ disabled: spreadIndex >= spreads.length - 1 }} disabled={spreadIndex >= spreads.length - 1} onPress={() => listRef.current?.scrollToIndex({ index: spreadIndex + 1, animated: true })} style={[styles.pageButton, spreadIndex >= spreads.length - 1 && styles.pageButtonDisabled]}><Text style={styles.pageButtonText}>{copy.nextSpread}</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityState={{ disabled: visibleSpread === 0 }} disabled={visibleSpread === 0} onPress={() => listRef.current?.scrollToIndex({ index: visibleSpread - 1, animated: true })} style={[styles.pageButton, visibleSpread === 0 && styles.pageButtonDisabled]}><Text style={styles.pageButtonText}>{copy.previousSpread}</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityState={{ disabled: visibleSpread >= spreads.length - 1 }} disabled={visibleSpread >= spreads.length - 1} onPress={() => listRef.current?.scrollToIndex({ index: visibleSpread + 1, animated: true })} style={[styles.pageButton, visibleSpread >= spreads.length - 1 && styles.pageButtonDisabled]}><Text style={styles.pageButtonText}>{copy.nextSpread}</Text></Pressable>
     </View>
     <CardInspection selection={selected} returnLabel={copy.returnToBinder} detailsLabel={copy.viewCollectible} onClose={() => setSelected(null)} />
   </View></SafeAreaView>;

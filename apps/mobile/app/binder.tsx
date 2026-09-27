@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
-import { AccessibilityInfo, ActivityIndicator, Animated, Easing, FlatList, Image, Modal, Pressable, SafeAreaView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { AccessibilityInfo, ActivityIndicator, Animated, Easing, FlatList, Image, Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { loadAllMyHoldings, type NativeHolding } from "../src/api";
-import { binderSpreads, buildNativeBinderPages, type NativeBinderPage, type NativeBinderSpread } from "../src/binder/model";
+import { binderSectionStarts, binderSpreads, buildNativeBinderPages, type NativeBinderPage, type NativeBinderSpread } from "../src/binder/model";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
 import { useCachedSignedMedia } from "../src/media/cachedMedia";
@@ -53,6 +53,7 @@ export default function BinderScreen() {
     if (spreadReady) void AsyncStorage.setItem(BINDER_SPREAD_KEY, String(spreadIndex));
   }, [spreadIndex, spreadReady]);
   const spreads = useMemo(() => binderSpreads(buildNativeBinderPages(holdings, copy.binderGeneral)), [copy.binderGeneral, holdings]);
+  const sections = useMemo(() => binderSectionStarts(spreads), [spreads]);
   const visibleSpread = spreads.length ? Math.min(spreadIndex, spreads.length - 1) : 0;
   useEffect(() => {
     if (!spreads.length) return;
@@ -63,9 +64,10 @@ export default function BinderScreen() {
   }, [spreads.length, visibleSpread]);
 
   return <SafeAreaView style={styles.safe}><View style={styles.container}>
-    <ScreenBack label={copy.back} onPress={() => router.back()} />
+    {router.canGoBack() ? <ScreenBack label={copy.back} onPress={() => router.back()} /> : null}
     <Text style={styles.title}>{copy.binder}</Text>
     <Text style={styles.lead}>{copy.binderLead}</Text>
+    {sections.length > 1 ? <View><Text style={styles.sectionLabel}>{copy.jumpToSet}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sectionRow}>{sections.map((section) => <Pressable key={section.setId} accessibilityRole="button" accessibilityState={{ selected: spreads[visibleSpread]?.left.setId === section.setId }} onPress={() => listRef.current?.scrollToIndex({ index: section.spreadIndex, animated: true })} style={[styles.sectionChip, spreads[visibleSpread]?.left.setId === section.setId && styles.sectionChipSelected]}><Text style={[styles.sectionChipText, spreads[visibleSpread]?.left.setId === section.setId && styles.sectionChipTextSelected]}>{section.setName}</Text></Pressable>)}</ScrollView></View> : null}
     {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
     {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
     {!loading ? <FlatList
@@ -172,6 +174,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: spacing.lg },
   title: { color: colors.ink, fontSize: 30, fontWeight: "700", marginTop: spacing.sm },
   lead: { color: colors.muted, fontSize: 14, marginTop: spacing.xs },
+  sectionLabel: { color: colors.muted, fontSize: 11, fontWeight: "700", marginTop: spacing.sm, textTransform: "uppercase" },
+  sectionRow: { gap: spacing.xs, paddingVertical: spacing.xs },
+  sectionChip: { borderColor: colors.border, borderRadius: 999, borderWidth: 1, justifyContent: "center", minHeight: 34, paddingHorizontal: spacing.md },
+  sectionChipSelected: { backgroundColor: colors.plum, borderColor: colors.plum },
+  sectionChipText: { color: colors.plum, fontSize: 12, fontWeight: "700" },
+  sectionChipTextSelected: { color: colors.surface },
   loading: { marginTop: spacing.xl },
   error: { color: colors.plum, marginTop: spacing.md },
   binder: { marginTop: spacing.lg },

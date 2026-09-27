@@ -57,6 +57,7 @@ export default function TabsLayout() {
   return <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.plum, tabBarInactiveTintColor: colors.muted, tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border } }}>
     <Tabs.Screen name="index" options={{ title: t.feed }} />
     <Tabs.Screen name="search" options={{ title: t.search }} />
+    <Tabs.Screen name="room" options={{ title: t.room }} />
     <Tabs.Screen name="create" options={{ title: t.create }} />
     <Tabs.Screen name="messages" options={{ title: t.messages }} />
     <Tabs.Screen name="profile" options={{ title: t.profile }} />

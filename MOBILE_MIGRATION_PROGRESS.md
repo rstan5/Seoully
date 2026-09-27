@@ -10,7 +10,7 @@ security, and Room/Binder data model.
 
 - Branch: `mobile-native`
 - Immutable reference checkpoint: `76be07a928ce3e9436031d7324a5cc2b1b0375ed`
-- Current task: remaining ordinary-surface audit gaps (wishlist truth, collector posts, back, locale, late media)
+- Current task: Room as a first-class tab with rotate/scale and Binder section jump
 - Overall status: IN PROGRESS — Room/Binder product behavior still closing; device QA still pending
 
 ## Completed
@@ -232,6 +232,13 @@ security, and Room/Binder data model.
 - Collectible detail can add or replace personal media later, including the
   photocard crop stage. Email-confirmation deep links with an auth `code` are
   exchanged in the root layout; confirmation return remains AWAITING DEVICE QA.
+- Room is now a first-class tab, not only a Profile destination. Edit mode can rotate
+  and scale a selected Holding and persist the existing transform contract. The stored
+  tray is grouped by collectible kind, and Room opens Binder directly.
+- Binder can jump to the first spread of each group/release section.
+- Completed collectors can re-edit groups, bias, and interests from Profile without
+  resetting onboarding_step; the onboarding endpoint accepts those patches when the
+  profile is already done.
 
 ## Current queue
 
@@ -394,9 +401,12 @@ Native device QA is still pending.
   Expo public config resolution, all 21 Expo Doctor checks, complete iOS and Android
   Metro production exports, web strict TypeScript, fixture integrity, and
   `git diff --check`.
+- Room tab, rotate/scale persistence, grouped stored tray, Binder section jump, and
+  collector-taste re-edit pass mobile and web TypeScript plus Expo lint. Tab switching
+  with an open Room GL context and taste-edit keyboard remain AWAITING DEVICE QA.
 
 ## Next autonomous task
 
-The stale ordinary-surface audit items are now implemented. Remaining blockers:
-pending SQL migrations, avatar schema, fixture-only notices, public Room viewing
-for other collectors, and physical-device QA. Do not treat Room/Binder as finished.
+Continue Room/Binder product fidelity and remaining ordinary-app polish. Remaining
+blockers: pending SQL migrations, avatar schema, fixture-only notices, public Room
+viewing, and physical-device QA. Do not treat Room/Binder as finished.

@@ -10,7 +10,7 @@ import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
 import { CachedSignedImage } from "../src/media/cachedMedia";
 import { NativeRoomRenderer } from "../src/room/NativeRoomRenderer";
-import { buildRoomRenderables, createInitialRoomRenderable, moveRenderable, nativeHomeForHolding, nextNativeSlot, settleRoomRenderable, toPersistedTransform, zoneIdForNativeSurface, type RoomRenderable } from "../src/room/model";
+import { buildRoomRenderables, createInitialRoomRenderable, moveRenderable, nativeHomeForHolding, nextNativeSlot, resizeRenderable, settleRoomRenderable, toPersistedTransform, turnRenderable, zoneIdForNativeSurface, type RoomRenderable } from "../src/room/model";
 import { colors, spacing } from "../src/theme";
 
 const ROOM_CAMERA_KEY = "seoully.mobile.room-camera.v1";
@@ -113,7 +113,24 @@ export default function RoomScreen() {
   });
   const placedIds = new Set(items.map((item) => item.holding.id));
   const unplaced = snapshot?.holdings.filter((holding) => !placedIds.has(holding.id)) ?? [];
+  const storedGroups = groupStoredHoldings(unplaced);
   const selectedItem = items.find((item) => item.holding.id === selectedId) ?? null;
+
+  function persistSelected(next: RoomRenderable) {
+    const room = snapshot?.room;
+    if (!room) return;
+    const settled = settleRoomRenderable(next, room.id, next.placement?.surfaceId ?? undefined);
+    setItems((all) => all.map((item) => item.holding.id === next.holding.id ? settled.renderable : item));
+    const slot = next.placement?.slot ?? items.findIndex((item) => item.holding.id === next.holding.id);
+    void saveNativeRoomPlacement({
+      roomId: room.id,
+      holdingId: next.holding.id,
+      zoneId: zoneIdForNativeSurface(room.id, settled.surfaceId),
+      slot: Math.max(0, slot),
+      transform: toPersistedTransform(settled.renderable),
+      surfaceId: settled.surfaceId,
+    }).catch(() => setError(copy.roomSaveFailed));
+  }
 
   async function placeHolding(holding: NativeHolding) {
     if (!snapshot) return;
@@ -164,8 +181,11 @@ export default function RoomScreen() {
 
   return <SafeAreaView style={styles.safe}><View style={styles.container}>
     <View style={styles.header}>
-      <View style={styles.heading}><ScreenBack label={copy.back} onPress={() => router.back()} /><Text style={styles.title}>{copy.room}</Text><Text style={styles.lead}>{copy.roomLead}</Text></View>
-      <Pressable accessibilityRole="button" disabled={!snapshot} onPress={() => setEditing((value) => !value)} style={styles.editButton}><Text style={styles.editButtonText}>{editing ? copy.finishEditing : copy.editRoom}</Text></Pressable>
+      <View style={styles.heading}>{router.canGoBack() ? <ScreenBack label={copy.back} onPress={() => router.back()} /> : null}<Text style={styles.title}>{copy.room}</Text><Text style={styles.lead}>{copy.roomLead}</Text></View>
+      <View style={styles.headerActions}>
+        <Pressable accessibilityRole="button" onPress={() => router.push("/binder")} style={styles.editButton}><Text style={styles.editButtonText}>{copy.binder}</Text></Pressable>
+        <Pressable accessibilityRole="button" disabled={!snapshot} onPress={() => setEditing((value) => !value)} style={styles.editButton}><Text style={styles.editButtonText}>{editing ? copy.finishEditing : copy.editRoom}</Text></Pressable>
+      </View>
     </View>
     {editing && snapshot ? <View><Text style={styles.themeLabel}>{copy.roomStyle}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.themeRow}>{([
       ["hearth", copy.roomThemeHearth],
@@ -186,8 +206,16 @@ export default function RoomScreen() {
       <Pressable accessibilityRole="button" onPress={() => setSelectedId(null)} style={styles.inspectAction}><Text style={styles.inspectActionText}>{copy.close}</Text></Pressable>
       <Pressable accessibilityRole="button" onPress={removeSelected} style={styles.inspectAction}><Text style={styles.inspectActionText}>{copy.removeFromRoom}</Text></Pressable>
     </View> : null}
-    {selectedItem && editing ? <View style={styles.selectionRow}><Text numberOfLines={1} style={styles.selection}>{selectedItem.holding.template.name}</Text><Pressable accessibilityRole="button" onPress={removeSelected}><Text style={styles.removeText}>{copy.removeFromRoom}</Text></Pressable></View> : null}
-    {unplaced.length ? <View style={styles.stored}><Text style={styles.storedTitle}>{copy.storedCollection}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storedList}>{unplaced.map((holding) => <Pressable key={holding.id} accessibilityRole="button" onPress={() => placeHolding(holding)} style={styles.storedItem}>{holding.personalMediaUrl ? <CachedSignedImage cacheKey={holding.id} url={holding.personalMediaUrl} style={styles.storedImage} /> : null}<Text numberOfLines={2} style={styles.storedItemText}>+ {holding.template.name}</Text></Pressable>)}</ScrollView></View> : null}
+    {selectedItem && editing ? <View style={styles.selectionColumn}>
+      <View style={styles.selectionRow}><Text numberOfLines={1} style={styles.selection}>{selectedItem.holding.template.name}</Text><Pressable accessibilityRole="button" onPress={removeSelected}><Text style={styles.removeText}>{copy.removeFromRoom}</Text></Pressable></View>
+      <View style={styles.transformRow}>
+        <Pressable accessibilityRole="button" onPress={() => persistSelected(turnRenderable(selectedItem, -Math.PI / 12))} style={styles.transformButton}><Text style={styles.transformText}>{copy.rotateLeft}</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => persistSelected(turnRenderable(selectedItem, Math.PI / 12))} style={styles.transformButton}><Text style={styles.transformText}>{copy.rotateRight}</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => persistSelected(resizeRenderable(selectedItem, 0.9))} style={styles.transformButton}><Text style={styles.transformText}>{copy.scaleDown}</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => persistSelected(resizeRenderable(selectedItem, 1.1))} style={styles.transformButton}><Text style={styles.transformText}>{copy.scaleUp}</Text></Pressable>
+      </View>
+    </View> : null}
+    {storedGroups.length ? <View style={styles.stored}><Text style={styles.storedTitle}>{copy.storedCollection}</Text>{storedGroups.map(([kind, holdings]) => <View key={kind} style={styles.storedGroup}><Text style={styles.storedKind}>{collectibleKindLabel(kind, copy)}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storedList}>{holdings.map((holding) => <Pressable key={holding.id} accessibilityRole="button" onPress={() => placeHolding(holding)} style={styles.storedItem}>{holding.personalMediaUrl ? <CachedSignedImage cacheKey={holding.id} url={holding.personalMediaUrl} style={styles.storedImage} /> : null}<Text numberOfLines={2} style={styles.storedItemText}>+ {holding.template.name}</Text></Pressable>)}</ScrollView></View>)}</View> : null}
   </View></SafeAreaView>;
 }
 
@@ -196,6 +224,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { alignItems: "center", flexDirection: "row", gap: spacing.sm, padding: spacing.lg },
   heading: { flex: 1 },
+  headerActions: { flexDirection: "row", gap: spacing.xs },
   title: { color: colors.ink, fontSize: 30, fontWeight: "700" },
   lead: { color: colors.muted, fontSize: 14, marginTop: spacing.xs },
   editButton: { backgroundColor: colors.plum, borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
@@ -212,11 +241,17 @@ const styles = StyleSheet.create({
   stage: { flex: 1, minHeight: 360, overflow: "hidden" },
   hint: { alignSelf: "center", backgroundColor: colors.surface, borderRadius: 999, bottom: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, position: "absolute" },
   hintText: { color: colors.ink, fontSize: 13, fontWeight: "600" },
-  selectionRow: { alignItems: "center", flexDirection: "row", gap: spacing.sm, justifyContent: "center", padding: spacing.sm },
+  selectionColumn: { gap: spacing.xs, paddingBottom: spacing.sm },
+  selectionRow: { alignItems: "center", flexDirection: "row", gap: spacing.sm, justifyContent: "center", paddingHorizontal: spacing.sm },
   selection: { color: colors.plum, flexShrink: 1, fontWeight: "700" },
   removeText: { color: colors.muted, fontSize: 13, fontWeight: "700" },
+  transformRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, justifyContent: "center", paddingHorizontal: spacing.sm },
+  transformButton: { borderColor: colors.border, borderRadius: 999, borderWidth: 1, minHeight: 34, paddingHorizontal: spacing.sm, justifyContent: "center" },
+  transformText: { color: colors.plum, fontSize: 12, fontWeight: "700" },
   stored: { borderTopColor: colors.border, borderTopWidth: 1, padding: spacing.sm },
   storedTitle: { color: colors.ink, fontSize: 13, fontWeight: "700", marginBottom: spacing.xs },
+  storedGroup: { marginBottom: spacing.xs },
+  storedKind: { color: colors.muted, fontSize: 11, fontWeight: "700", marginBottom: 4, textTransform: "uppercase" },
   storedList: { gap: spacing.xs },
   storedItem: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 10, borderWidth: 1, overflow: "hidden", width: 92 },
   storedImage: { aspectRatio: 55 / 85, width: "100%" },
@@ -235,4 +270,14 @@ function clampCamera(value: number, min: number, max: number) {
 
 function persistRoomCamera(yaw: number, pitch: number) {
   void AsyncStorage.setItem(ROOM_CAMERA_KEY, JSON.stringify({ yaw, pitch }));
+}
+
+function groupStoredHoldings(holdings: NativeHolding[]) {
+  const groups = new Map<string, NativeHolding[]>();
+  for (const holding of holdings) {
+    const list = groups.get(holding.template.kind) ?? [];
+    list.push(holding);
+    groups.set(holding.template.kind, list);
+  }
+  return [...groups.entries()];
 }

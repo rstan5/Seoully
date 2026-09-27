@@ -81,6 +81,7 @@ export default function ProfileScreen() {
       <TextInput accessibilityLabel={copy.profileBio} placeholder={copy.profileBioPlaceholder} value={bio} onChangeText={setBio} multiline style={styles.input} />
       <Pressable accessibilityRole="button" disabled={busy} onPress={save} style={styles.button}><Text style={styles.buttonText}>{copy.saveProfile}</Text></Pressable>
       {message ? <Text accessibilityRole="alert" style={styles.message}>{message}</Text> : null}
+      <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/onboarding", params: { edit: "1" } })} style={styles.secondary}><Text style={styles.secondaryText}>{copy.editCollectorTastes}</Text></Pressable>
       <Pressable accessibilityRole="button" disabled={busy} onPress={signOut} style={styles.secondary}><Text style={styles.secondaryText}>{copy.signOut}</Text></Pressable>
     </> : null}
   </ScrollView></KeyboardScreen></SafeAreaView>;

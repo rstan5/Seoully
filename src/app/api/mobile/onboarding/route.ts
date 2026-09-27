@@ -110,13 +110,14 @@ export async function PATCH(request: Request) {
     }
 
     const patch: Record<string, unknown> = {};
-    if (parsed.data.action === "groups" && state.step === "group") {
+    const editingComplete = state.step === "done";
+    if (parsed.data.action === "groups" && (state.step === "group" || editingComplete)) {
       if (parsed.data.favoriteGroupIds.some((id) => !groupIds.has(id))) {
         return NextResponse.json({ error: "invalid_input" }, { status: 400 });
       }
       patch.favorite_group_ids = parsed.data.favoriteGroupIds;
-      patch.onboarding_step = parsed.data.favoriteGroupIds.length > 0 ? "bias" : "interest";
-    } else if (parsed.data.action === "bias" && state.step === "bias") {
+      if (!editingComplete) patch.onboarding_step = parsed.data.favoriteGroupIds.length > 0 ? "bias" : "interest";
+    } else if (parsed.data.action === "bias" && (state.step === "bias" || editingComplete)) {
       if (parsed.data.biasMemberIds.some((id) => {
         const member = membersById.get(id);
         return !member || !state.favoriteGroupIds.includes(member.groupId);
@@ -124,13 +125,13 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: "invalid_input" }, { status: 400 });
       }
       patch.bias_member_ids = parsed.data.biasMemberIds;
-      patch.onboarding_step = "interest";
-    } else if (parsed.data.action === "interests" && state.step === "interest") {
+      if (!editingComplete) patch.onboarding_step = "interest";
+    } else if (parsed.data.action === "interests" && (state.step === "interest" || editingComplete)) {
       patch.collector_interests = parsed.data.collectorInterests;
       patch.collector_type = parsed.data.collectorInterests.includes("everything")
         ? "Collects everything"
         : "Collector";
-      patch.onboarding_step = "done";
+      if (!editingComplete) patch.onboarding_step = "done";
     } else {
       return NextResponse.json({ step: state.step });
     }

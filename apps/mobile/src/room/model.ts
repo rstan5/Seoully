@@ -59,6 +59,14 @@ export function toPersistedTransform(renderable: RoomRenderable) {
   };
 }
 
+export function turnRenderable(renderable: RoomRenderable, deltaRadians: number): RoomRenderable {
+  return { ...renderable, rotation: { ...renderable.rotation, y: renderable.rotation.y + deltaRadians } };
+}
+
+export function resizeRenderable(renderable: RoomRenderable, factor: number): RoomRenderable {
+  return { ...renderable, scale: clamp(renderable.scale * factor, 0.5, 1.85) };
+}
+
 export function moveRenderable(renderable: RoomRenderable, dx: number, depthOrVertical: number): RoomRenderable {
   if (renderable.placement?.surfaceId?.endsWith("-wall")) {
     return {

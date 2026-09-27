@@ -50,6 +50,17 @@ export function buildNativeBinderPages(holdings: NativeHolding[], generalName: s
   return pages;
 }
 
+export function binderSectionStarts(spreads: NativeBinderSpread[]) {
+  const seen = new Set<string>();
+  const sections: { setId: string; setName: string; spreadIndex: number }[] = [];
+  for (const spread of spreads) {
+    if (seen.has(spread.left.setId)) continue;
+    seen.add(spread.left.setId);
+    sections.push({ setId: spread.left.setId, setName: spread.left.setName, spreadIndex: spread.index });
+  }
+  return sections;
+}
+
 export function binderSpreads(pages: NativeBinderPage[]): NativeBinderSpread[] {
   const spreads: NativeBinderSpread[] = [];
   for (let index = 0; index < pages.length; index += 2) {

@@ -8,13 +8,14 @@ import {
   Text,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   loadNativeOnboarding,
   updateNativeOnboarding,
   type NativeOnboardingState,
   type NativeOnboardingStep,
 } from "../src/api";
+import { ScreenBack } from "../src/components/ScreenBack";
 import { useCopy, useLocale } from "../src/locale";
 import { colors, spacing } from "../src/theme";
 
@@ -26,6 +27,8 @@ function toggle(list: string[], id: string) {
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const { edit } = useLocalSearchParams<{ edit?: string }>();
+  const editingTastes = edit === "1";
   const t = useCopy();
   const { locale, toggleLocale } = useLocale();
   const [state, setState] = useState<NativeOnboardingState | null>(null);
@@ -43,12 +46,12 @@ export default function OnboardingScreen() {
     setError(null);
     try {
       const next = await loadNativeOnboarding();
-      if (next.step === "done") {
+      if (next.step === "done" && !editingTastes) {
         router.replace("/(tabs)");
         return;
       }
       setState(next);
-      setStep(next.step);
+      setStep(next.step === "done" && editingTastes ? "group" : next.step);
       setGroupIds(next.favoriteGroupIds);
       setBiasIds(next.biasMemberIds);
       if (next.collectorInterests.length > 0) setInterests(next.collectorInterests);
@@ -64,12 +67,12 @@ export default function OnboardingScreen() {
     void loadNativeOnboarding()
       .then((next) => {
         if (!mounted) return;
-        if (next.step === "done") {
+        if (next.step === "done" && !editingTastes) {
           router.replace("/(tabs)");
           return;
         }
         setState(next);
-        setStep(next.step);
+        setStep(next.step === "done" && editingTastes ? "group" : next.step);
         setGroupIds(next.favoriteGroupIds);
         setBiasIds(next.biasMemberIds);
         if (next.collectorInterests.length > 0) setInterests(next.collectorInterests);
@@ -83,7 +86,7 @@ export default function OnboardingScreen() {
     return () => {
       mounted = false;
     };
-  }, [initialUnavailable, router]);
+  }, [editingTastes, initialUnavailable, router]);
 
   const members = useMemo(
     () => state?.members.filter((member) => groupIds.includes(member.groupId)) ?? [],
@@ -99,6 +102,12 @@ export default function OnboardingScreen() {
         : step === "bias"
           ? await updateNativeOnboarding({ action: "bias", biasMemberIds: biasIds })
           : await updateNativeOnboarding({ action: "interests", collectorInterests: interests });
+      if (editingTastes) {
+        if (step === "group") setStep("bias");
+        else if (step === "bias") setStep("interest");
+        else router.back();
+        return;
+      }
       if (result.step === "done") {
         router.replace("/(tabs)");
         return;
@@ -146,6 +155,7 @@ export default function OnboardingScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
+        {editingTastes ? <ScreenBack label={t.back} onPress={() => router.back()} /> : null}
         <View style={styles.topline}>
           <Text style={styles.brand}>{t.brand} ♡</Text>
           <Pressable accessibilityRole="button" onPress={toggleLocale} style={styles.language}>

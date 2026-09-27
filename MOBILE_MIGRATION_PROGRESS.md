@@ -24,6 +24,10 @@ security, and Room/Binder data model.
   and a small English/Korean foundation dictionary.
 - Excluded the isolated native project from the Next.js root TypeScript project so the
   web DOM and React Native platform libraries do not collide during web checks.
+- Added `/api/mobile/session`, a bearer-token native identity boundary that reuses the
+  existing server-derived identity provisioning path without accepting client user IDs
+  or privileged credentials.
+- Added the first native production identity client call on the Profile tab.
 
 ## Current queue
 
@@ -57,5 +61,5 @@ is still pending.
 
 ## Next autonomous task
 
-Commit the foundation, then replace placeholder tabs with the first production-backed
-profile/session vertical slice using an HTTP/Supabase boundary.
+Commit the foundation and native identity boundary, then replace placeholder tabs with
+the first production-backed catalog/search vertical slice using the same HTTP boundary.

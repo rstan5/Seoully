@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ensureConversation, loadCollectorProfile, setCollectorFollowing, type NativeCollectorProfile } from "../src/api";
+import { RetryNotice } from "../src/components/RetryNotice";
 import { useCopy } from "../src/locale";
 import { colors, spacing } from "../src/theme";
 
@@ -16,19 +17,24 @@ export default function CollectorScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    void loadCollectorProfile(userId)
-      .then((result) => {
-        if (!active) return;
-        setProfile(result.profile);
-        setFollowing(result.follow.following);
-        setFollowers(result.follow.followers);
-      })
-      .catch(() => { if (active) setError(copy.collectorUnavailable); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await loadCollectorProfile(userId);
+      setProfile(result.profile);
+      setFollowing(result.follow.following);
+      setFollowers(result.follow.followers);
+      setError(null);
+    } catch {
+      setError(copy.collectorUnavailable);
+    } finally {
+      setLoading(false);
+    }
   }, [copy.collectorUnavailable, userId]);
+  useEffect(() => {
+    const task = setTimeout(() => { void refresh(); }, 0);
+    return () => clearTimeout(task);
+  }, [refresh]);
 
   async function toggleFollow() {
     if (busy) return;
@@ -60,7 +66,7 @@ export default function CollectorScreen() {
 
   return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.container}>
     {loading ? <ActivityIndicator color={colors.plum} /> : null}
-    {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+    {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
     {profile ? <>
       <Text style={styles.title}>{profile.user.displayName}</Text>
       <Text style={styles.handle}>@{profile.user.handle}</Text>

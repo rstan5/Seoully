@@ -151,6 +151,10 @@ security, and Room/Binder data model.
   Messages, Collection/Wishlist, Room, and Binder. Failed reads no longer leave those
   production-backed screens at an inert error message; retries restore loading state,
   clear stale errors on success, and preserve localized feedback.
+- Extended recoverable reads to Search/Explore, collector profiles, and message threads.
+  Profile editing now has explicit loading, unavailable, retry, save-busy, and sign-out
+  failure states instead of silently rendering an empty editor when identity loading
+  fails.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 
@@ -249,6 +253,9 @@ Native device QA is still pending.
   image appearance remain AWAITING DEVICE QA.
 - Main-surface retry flows pass mobile strict TypeScript and Expo lint. Offline recovery
   timing and repeated foreground/background transitions remain AWAITING DEVICE QA.
+- Collector/thread/Search/Profile hardening passes mobile strict TypeScript and Expo
+  lint. Keyboard, focus return, and retry behavior after process suspension remain
+  AWAITING DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.
@@ -262,6 +269,6 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-Continue the ordinary app parity audit with collector/thread retry gaps and navigation
-state restoration. Pending database migrations still require review/application in an
-approved environment, and physical iOS/Android behavior remains AWAITING DEVICE QA.
+Continue the ordinary app parity audit with navigation/draft restoration and detailed
+screen-level parity. Pending database migrations still require review/application in
+an approved environment, and physical iOS/Android behavior remains AWAITING DEVICE QA.

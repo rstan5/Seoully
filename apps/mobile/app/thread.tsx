@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from "react-native";
 import { loadDirectMessages, sendDirectMessage, type NativeDirectMessage } from "../src/api";
+import { RetryNotice } from "../src/components/RetryNotice";
 import { useCopy } from "../src/locale";
 import { colors, spacing } from "../src/theme";
 
@@ -14,15 +15,23 @@ export default function ThreadScreen() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    void loadDirectMessages(conversationId)
-      .then((items) => { if (active) setMessages(items); })
-      .catch(() => { if (active) setError(copy.messagesUnavailable); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      setMessages(await loadDirectMessages(conversationId));
+      setLoadError(null);
+    } catch {
+      setLoadError(copy.messagesUnavailable);
+    } finally {
+      setLoading(false);
+    }
   }, [conversationId, copy.messagesUnavailable]);
+  useEffect(() => {
+    const task = setTimeout(() => { void refresh(); }, 0);
+    return () => clearTimeout(task);
+  }, [refresh]);
 
   async function send() {
     const text = body.trim();
@@ -43,6 +52,7 @@ export default function ThreadScreen() {
   return <SafeAreaView style={styles.safe}><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.container}>
     <View style={styles.header}><Text style={styles.title}>{params.displayName}</Text><Text style={styles.handle}>@{params.handle}</Text></View>
     {loading ? <ActivityIndicator color={colors.plum} /> : null}
+    {loadError ? <RetryNotice message={loadError} retryLabel={copy.retry} onRetry={refresh} /> : null}
     {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
     <FlatList data={messages} keyExtractor={(item) => item.id} contentContainerStyle={styles.log} renderItem={({ item }) =>
       <View style={[styles.bubble, item.mine ? styles.mine : styles.theirs]}><Text style={[styles.message, item.mine && styles.mineText]}>{item.body}</Text></View>

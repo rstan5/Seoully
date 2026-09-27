@@ -12,6 +12,7 @@ import {
   type NativeCollectorDiscovery,
 } from "../../src/api";
 import { useCopy } from "../../src/locale";
+import { RetryNotice } from "../../src/components/RetryNotice";
 import { colors, spacing } from "../../src/theme";
 
 export default function SearchScreen() {
@@ -105,7 +106,7 @@ export default function SearchScreen() {
       <Pressable accessibilityRole="button" onPress={runSearch} style={styles.searchButton}><Text style={styles.searchButtonText}>{copy.search}</Text></Pressable>
     </View>
     {loading && <ActivityIndicator color={colors.plum} style={styles.loading} />}
-    {error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
+    {error && <RetryNotice message={error} retryLabel={copy.retry} onRetry={results ? runSearch : loadExplore} />}
 
     {results ? <>
       <Text style={styles.sectionTitle}>{copy.catalogResults}</Text>

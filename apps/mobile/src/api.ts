@@ -33,3 +33,16 @@ export async function searchCatalog(query: string): Promise<NativeCatalogTemplat
   const payload = await response.json() as { results?: NativeCatalogTemplate[] };
   return payload.results ?? [];
 }
+
+export async function createHolding(templateId: string) {
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+  if (!baseUrl || !accessToken) throw new Error("unauthenticated");
+  const response = await fetch(`${baseUrl}/api/mobile/holdings`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ templateId }),
+  });
+  if (!response.ok) throw new Error("holding_create_failed");
+  return response.json();
+}

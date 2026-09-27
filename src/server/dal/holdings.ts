@@ -1,7 +1,8 @@
 import "server-only";
 
 import { z } from "zod";
-import { getCurrentIdentity } from "@/server/dal/profile";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/profile";
 import { createSupabaseServerClient } from "@/server/supabase/server";
 
 const pageSchema = z.object({
@@ -40,11 +41,11 @@ export interface HoldingDTO {
   };
 }
 
-export async function createMyHolding(input: unknown): Promise<HoldingDTO> {
+export async function createMyHolding(input: unknown, client?: SupabaseClient): Promise<HoldingDTO> {
   const { templateId } = templateIdSchema.parse(input);
-  const identity = await getCurrentIdentity();
+  const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? await createSupabaseServerClient();
   const { data: template, error: templateError } = await supabase
     .from("collectible_templates")
     .select("id,status")

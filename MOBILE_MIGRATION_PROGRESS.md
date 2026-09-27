@@ -30,6 +30,9 @@ security, and Room/Binder data model.
 - Added the first native production identity client call on the Profile tab.
 - Added native catalog search against the existing production `/api/catalog/search`
   endpoint, with bounded real template results and no fabricated data.
+- Added a bearer-authenticated native Holding creation endpoint that reuses the
+  production Holding DAL and server-derived actor, plus native catalog selection and
+  Add to Collection behavior.
 
 ## Current queue
 
@@ -63,6 +66,5 @@ is still pending.
 
 ## Next autonomous task
 
-Commit the catalog/search slice, then build the native Add Collectible entry shell and
-connect selection to the existing authenticated Holding API without importing Server
-Actions.
+Commit the collection-selection slice, then add native personal-media acquisition and
+photocard crop contracts without changing the existing web media semantics.

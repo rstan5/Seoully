@@ -1,4 +1,5 @@
 import type { NativeHolding, NativeRoomPlacement } from "../api";
+import { extentsForGeometry, representationForHolding, representationKindForHolding, type NativeRepresentationKind } from "./representation";
 
 export type NativeRoomVector = { x: number; y: number; z: number };
 export type NativeRoomSurface = { id: string; kind: "horizontal" | "wall"; x: number; y: number; z: number; width: number; depth: number };
@@ -7,7 +8,9 @@ export type RoomRenderable = {
   position: NativeRoomVector;
   rotation: NativeRoomVector;
   scale: number;
-  geometry: "photocard" | "album" | "object" | "generic";
+  geometry: NativeRepresentationKind;
+  color: string;
+  accent: string;
   imageUrl?: string;
   placement?: NativeRoomPlacement;
 };
@@ -88,12 +91,16 @@ export function moveRenderable(renderable: RoomRenderable, dx: number, depthOrVe
   };
 }
 
+export function isSupportedRoomPlacement(renderable: RoomRenderable, roomId: string) {
+  return nativeRoomSurfaces(roomId).some((surface) => footprintDistance(renderable.position, surface) < 1.45);
+}
+
 export function settleRoomRenderable(renderable: RoomRenderable, roomId: string, preferredSurfaceId?: string) {
   const surfaces = nativeRoomSurfaces(roomId);
   const surface = surfaces.find((candidate) => candidate.id === preferredSurfaceId) ?? surfaces
     .map((candidate) => ({ candidate, distance: footprintDistance(renderable.position, candidate) }))
     .sort((a, b) => a.distance - b.distance)[0]!.candidate;
-  const halfHeight = renderable.geometry === "photocard" ? 0.52 : renderable.geometry === "album" ? 0.46 : 0.35;
+  const halfHeight = extentsForGeometry(renderable.geometry).y / 2;
   return {
     renderable: {
       ...renderable,
@@ -143,6 +150,14 @@ export function nativeHomeForHolding(holding: NativeHolding, roomId: string, slo
   if (kind === "apparel" || (kind === "memorabilia" && /kit/i.test(holding.template.name))) {
     return { zoneId: `${roomId}-archive`, surfaceId: `${roomId}-archive`, position: { x: -1.7 + (slot % 3) * 0.45, y: 0, z: -0.4 - (Math.floor(slot / 3) % 2) * 0.35 } };
   }
+  if (kind === "memorabilia") {
+    const form = representationKindForHolding(holding);
+    if (form === "disc-case" || form === "book") {
+      const bay = slot % 3;
+      const along = Math.floor(slot / 3) % 4;
+      return { zoneId: `${roomId}-shelf`, surfaceId: `${roomId}-shelf-bay-${bay}`, position: { x: -3.85 + along * 0.48, y: 0, z: -3.48 } };
+    }
+  }
   return { zoneId: `${roomId}-desk`, surfaceId: `${roomId}-desk`, position: { x: 0.5 + (slot % 4) * 0.55, y: 0, z: -2.4 - (Math.floor(slot / 4) % 2) * 0.45 } };
 }
 
@@ -164,11 +179,14 @@ function fallbackPosition(slot: number): NativeRoomVector {
 function roomRenderable(holding: NativeHolding, placement: NativeRoomPlacement | undefined, index: number): RoomRenderable {
   const transform = placement?.transform;
   const fallback = fallbackPosition(index);
+  const representation = representationForHolding(holding);
   return {
     holding,
     ...(placement ? { placement } : {}),
-    geometry: geometryForKind(holding.template.kind),
-    ...(holding.personalMediaUrl ? { imageUrl: holding.personalMediaUrl } : {}),
+    geometry: representation.geometry,
+    color: representation.color,
+    accent: representation.accent,
+    ...(representation.imageUrl ? { imageUrl: representation.imageUrl } : {}),
     position: transform ? {
       x: numberAt(transform.x, fallback.x * WORLD_SCALE) / WORLD_SCALE,
       y: -numberAt(transform.y, -fallback.y * WORLD_SCALE) / WORLD_SCALE,
@@ -181,13 +199,6 @@ function roomRenderable(holding: NativeHolding, placement: NativeRoomPlacement |
     },
     scale: numberAt(transform?.scale, 1),
   };
-}
-
-function geometryForKind(kind: string): RoomRenderable["geometry"] {
-  if (kind === "photocard" || kind === "poster") return "photocard";
-  if (kind === "album" || kind === "vinyl" || kind === "book") return "album";
-  if (["lightstick", "plushie", "figure", "apparel", "memorabilia"].includes(kind)) return "object";
-  return "generic";
 }
 
 function numberAt(value: unknown, fallback: number) {

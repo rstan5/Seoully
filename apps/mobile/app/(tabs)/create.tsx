@@ -8,6 +8,7 @@ import { useCopy } from "../../src/locale";
 import { colors, spacing } from "../../src/theme";
 
 const CREATE_DRAFT_KEY = "seoully.mobile.create-draft.v1";
+const COLLECTIBLE_KINDS = ["photocard", "album", "vinyl", "poster", "lightstick", "plushie", "figure", "book", "apparel", "memorabilia"] as const;
 
 export default function CreateScreen() {
   const copy = useCopy();
@@ -17,6 +18,7 @@ export default function CreateScreen() {
   const [groupName, setGroupName] = useState("");
   const [memberName, setMemberName] = useState("");
   const [releaseName, setReleaseName] = useState("");
+  const [kind, setKind] = useState<(typeof COLLECTIBLE_KINDS)[number]>("photocard");
   const [caption, setCaption] = useState("");
   const [postUri, setPostUri] = useState<string | null>(null);
   const [postMimeType, setPostMimeType] = useState("image/jpeg");
@@ -35,6 +37,7 @@ export default function CreateScreen() {
         setGroupName(draftText(draft.groupName, 120));
         setMemberName(draftText(draft.memberName, 120));
         setReleaseName(draftText(draft.releaseName, 160));
+        if (COLLECTIBLE_KINDS.includes(draft.kind as (typeof COLLECTIBLE_KINDS)[number])) setKind(draft.kind as (typeof COLLECTIBLE_KINDS)[number]);
         setCaption(draftText(draft.caption, 2_000));
       } catch {
         void AsyncStorage.removeItem(CREATE_DRAFT_KEY);
@@ -46,16 +49,18 @@ export default function CreateScreen() {
   useEffect(() => {
     if (!draftRestored) return;
     const task = setTimeout(() => {
-      void AsyncStorage.setItem(CREATE_DRAFT_KEY, JSON.stringify({ mode, name, groupName, memberName, releaseName, caption }));
+      void AsyncStorage.setItem(CREATE_DRAFT_KEY, JSON.stringify({ mode, name, groupName, memberName, releaseName, kind, caption }));
     }, 250);
     return () => clearTimeout(task);
-  }, [caption, draftRestored, groupName, memberName, mode, name, releaseName]);
+  }, [caption, draftRestored, groupName, kind, memberName, mode, name, releaseName]);
 
-  async function choosePostPhoto() {
+  async function choosePostPhoto(source: "camera" | "library") {
     setMessage(null);
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const permission = source === "camera" ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) return setMessage(copy.postPhotoRequired);
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.9, exif: false });
+    const result = source === "camera"
+      ? await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.9, exif: false })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.9, exif: false });
     const asset = result.canceled ? null : result.assets[0];
     if (asset) {
       setPostUri(asset.uri);
@@ -86,9 +91,9 @@ export default function CreateScreen() {
     setWorking(true);
     setMessage(null);
     try {
-      const result = await contributeCatalogItem({ name, groupName, memberName: memberName || undefined, releaseName: releaseName || undefined, kind: "photocard" });
+      const result = await contributeCatalogItem({ name, groupName, memberName: memberName || undefined, releaseName: releaseName || undefined, kind });
       await AsyncStorage.removeItem(CREATE_DRAFT_KEY);
-      setName(""); setGroupName(""); setMemberName(""); setReleaseName("");
+      setName(""); setGroupName(""); setMemberName(""); setReleaseName(""); setKind("photocard");
       router.push({ pathname: "/add", params: { templateId: result.contribution.template.id, name: result.contribution.template.name, kind: result.contribution.template.kind, newTemplate: "true" } });
     } catch {
       setMessage(copy.collectibleCreateFailed);
@@ -107,7 +112,10 @@ export default function CreateScreen() {
     {mode === "post" ? <>
       <Text style={styles.body}>{copy.createPostLead}</Text>
       {postUri ? <Image source={{ uri: postUri }} style={styles.preview} /> : null}
-      <Pressable accessibilityRole="button" onPress={choosePostPhoto} style={styles.secondary}><Text style={styles.secondaryText}>{copy.choosePostPhoto}</Text></Pressable>
+      <View style={styles.photoActions}>
+        <Pressable accessibilityRole="button" onPress={() => choosePostPhoto("camera")} style={styles.secondary}><Text style={styles.secondaryText}>{copy.takePostPhoto}</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => choosePostPhoto("library")} style={styles.secondary}><Text style={styles.secondaryText}>{copy.choosePostPhoto}</Text></Pressable>
+      </View>
       <TextInput maxLength={2000} placeholder={copy.captionPlaceholder} value={caption} onChangeText={setCaption} multiline style={[styles.input, styles.caption]} />
       <Pressable accessibilityRole="button" disabled={working} onPress={publishPost} style={styles.button}><Text style={styles.buttonText}>{copy.publishPost}</Text></Pressable>
     </> : <>
@@ -116,10 +124,27 @@ export default function CreateScreen() {
       <TextInput maxLength={120} placeholder={copy.groupPlaceholder} value={groupName} onChangeText={setGroupName} style={styles.input} />
       <TextInput maxLength={120} placeholder={copy.memberOptionalPlaceholder} value={memberName} onChangeText={setMemberName} style={styles.input} />
       <TextInput maxLength={160} placeholder={copy.releaseOptionalPlaceholder} value={releaseName} onChangeText={setReleaseName} style={styles.input} />
+      <Text style={styles.kindLabel}>{copy.collectibleKind}</Text>
+      <View style={styles.kinds}>{COLLECTIBLE_KINDS.map((id) => <Pressable key={id} accessibilityRole="button" accessibilityState={{ selected: kind === id }} onPress={() => setKind(id)} style={[styles.kind, kind === id && styles.kindSelected]}><Text style={[styles.kindText, kind === id && styles.kindTextSelected]}>{kindLabel(id, copy)}</Text></Pressable>)}</View>
       <Pressable accessibilityRole="button" disabled={working} onPress={submitCollectible} style={styles.button}><Text style={styles.buttonText}>{copy.continue}</Text></Pressable>
     </>}
     {message ? <Text accessibilityRole="alert" style={styles.message}>{message}</Text> : null}
   </ScrollView></SafeAreaView>;
+}
+
+function kindLabel(kind: (typeof COLLECTIBLE_KINDS)[number], copy: ReturnType<typeof useCopy>) {
+  return {
+    photocard: copy.kindPhotocard,
+    album: copy.kindAlbum,
+    vinyl: copy.kindVinyl,
+    poster: copy.kindPoster,
+    lightstick: copy.kindLightstick,
+    plushie: copy.kindPlushie,
+    figure: copy.kindFigure,
+    book: copy.kindBook,
+    apparel: copy.kindApparel,
+    memorabilia: copy.kindMemorabilia,
+  }[kind];
 }
 
 function draftText(value: unknown, max: number) {
@@ -144,8 +169,15 @@ const styles = StyleSheet.create({
   input: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 14, borderWidth: 1, color: colors.ink, minHeight: 50, paddingHorizontal: spacing.md },
   caption: { minHeight: 100, paddingTop: spacing.md, textAlignVertical: "top" },
   preview: { aspectRatio: 4 / 3, borderRadius: 16, width: "100%" },
+  photoActions: { gap: spacing.sm },
   secondary: { alignItems: "center", borderColor: colors.plum, borderRadius: 14, borderWidth: 1, justifyContent: "center", minHeight: 50 },
   secondaryText: { color: colors.plum, fontWeight: "700" },
+  kindLabel: { color: colors.muted, fontSize: 12, fontWeight: "700", marginTop: spacing.xs },
+  kinds: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
+  kind: { borderColor: colors.border, borderRadius: 999, borderWidth: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+  kindSelected: { backgroundColor: colors.plum, borderColor: colors.plum },
+  kindText: { color: colors.ink, fontSize: 13, fontWeight: "700" },
+  kindTextSelected: { color: colors.surface },
   button: { alignItems: "center", backgroundColor: colors.plum, borderRadius: 14, justifyContent: "center", marginTop: spacing.sm, minHeight: 52 },
   buttonText: { color: colors.surface, fontWeight: "700" },
   message: { color: colors.plum, marginTop: spacing.sm },

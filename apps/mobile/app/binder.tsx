@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, FlatList, Image, Modal, Pressable, SafeAreaView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { loadMyHoldings, type NativeHolding } from "../src/api";
 import { binderSpreads, buildNativeBinderPages, type NativeBinderPage, type NativeBinderSpread } from "../src/binder/model";
@@ -28,10 +29,9 @@ export default function BinderScreen() {
       setLoading(false);
     }
   }, [copy.binderUnavailable]);
-  useEffect(() => {
-    const task = setTimeout(() => { void refresh(); }, 0);
-    return () => clearTimeout(task);
-  }, [refresh]);
+  useFocusEffect(useCallback(() => {
+    void refresh();
+  }, [refresh]));
   const listRef = useRef<FlatList<NativeBinderSpread>>(null);
   const spreads = useMemo(() => binderSpreads(buildNativeBinderPages(holdings, copy.binderGeneral)), [copy.binderGeneral, holdings]);
 

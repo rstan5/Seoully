@@ -177,6 +177,9 @@ security, and Room/Binder data model.
 - Added bearer-authenticated collector search through the existing production profile
   lookup contract. Explore now returns both collectors and catalog items for a query,
   with localized empty states and existing follow/message destinations.
+- Create now supports camera or library post photos and a localized kind picker for
+  catalog contributions, persisting the selected kind in the local draft. Binder now
+  refreshes Holdings when it regains focus so newly added photocards appear in pockets.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 
@@ -296,6 +299,8 @@ Native device QA is still pending.
 - Collector search passes mobile and web strict TypeScript plus Expo lint. Keyboard
   search, result ranking, and privacy-sensitive handle matching remain AWAITING DEVICE
   QA / DEPLOYED BACKEND.
+- Create kind/camera and Binder focus refresh pass mobile TypeScript and Expo lint.
+  Camera permission sheets and kind-chip wrapping remain AWAITING DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.

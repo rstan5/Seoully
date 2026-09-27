@@ -63,10 +63,17 @@ export default function BinderScreen() {
     return () => clearTimeout(task);
   }, [spreads.length, visibleSpread]);
 
+  const photocards = holdings.filter((holding) => holding.template.kind === "photocard");
+  const closeBinder = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/room");
+  };
+
   return <SafeAreaView style={styles.safe}><View style={styles.container}>
-    {router.canGoBack() ? <ScreenBack label={copy.back} onPress={() => router.back()} /> : null}
+    <ScreenBack label={copy.closeBinder} onPress={closeBinder} />
     <Text style={styles.title}>{copy.binder}</Text>
     <Text style={styles.lead}>{copy.binderLead}</Text>
+    {!loading && !photocards.length ? <Text style={styles.empty}>{copy.binderEmpty}</Text> : null}
     {sections.length > 1 ? <View><Text style={styles.sectionLabel}>{copy.jumpToSet}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sectionRow}>{sections.map((section) => <Pressable key={section.setId} accessibilityRole="button" accessibilityState={{ selected: spreads[visibleSpread]?.left.setId === section.setId }} onPress={() => listRef.current?.scrollToIndex({ index: section.spreadIndex, animated: true })} style={[styles.sectionChip, spreads[visibleSpread]?.left.setId === section.setId && styles.sectionChipSelected]}><Text style={[styles.sectionChipText, spreads[visibleSpread]?.left.setId === section.setId && styles.sectionChipTextSelected]}>{section.setName}</Text></Pressable>)}</ScrollView></View> : null}
     {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
     {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
@@ -112,13 +119,15 @@ function Page({ page, emptyLabel, onSelect, side }: { page: NativeBinderPage; em
 
 function BinderPocket({ holding, emptyLabel, onSelect }: { holding?: NativeHolding; emptyLabel: string; onSelect: (selection: CardSelection) => void }) {
   const pocketRef = useRef<View>(null);
+  const [imageFailed, setImageFailed] = useState(false);
   const mediaUri = useCachedSignedMedia(holding?.id, holding?.personalMediaUrl);
+  const faceUri = imageFailed ? undefined : mediaUri;
   const select = () => {
     if (!holding) return;
     pocketRef.current?.measureInWindow((x, y, width, height) => onSelect({ holding, origin: { x, y, width, height } }));
   };
   return <Pressable ref={pocketRef} accessibilityRole={holding ? "button" : "text"} accessibilityLabel={holding?.template.name ?? emptyLabel} disabled={!holding} onPress={select} style={styles.pocket}>
-    {mediaUri ? <Image source={{ uri: mediaUri }} style={styles.cardImage} /> : holding ? <View style={styles.cardFallback}><Text numberOfLines={3} style={styles.cardName}>{holding.template.name}</Text></View> : null}
+    {faceUri ? <Image source={{ uri: faceUri }} style={styles.cardImage} onError={() => setImageFailed(true)} /> : holding ? <View style={styles.cardFallback} /> : null}
   </Pressable>;
 }
 
@@ -159,7 +168,7 @@ function CardInspection({ selection, returnLabel, detailsLabel, onClose }: { sel
   return <Modal animationType="none" transparent visible={Boolean(selection)} onRequestClose={returnCard}>
     <Animated.View style={[styles.modalBackdrop, { opacity: progress }]}>
       <Animated.View style={[styles.inspection, { transform: [{ translateX }, { translateY }, { scale }] }]}>
-        {mediaUri ? <Image resizeMode="contain" source={{ uri: mediaUri }} style={styles.inspectImage} /> : <View style={styles.inspectFallback}><Text style={styles.inspectFallbackText}>{selection?.holding.template.name}</Text></View>}
+        {mediaUri ? <Image resizeMode="contain" source={{ uri: mediaUri }} style={styles.inspectImage} /> : <View style={styles.inspectFallback} />}
         <Text style={styles.inspectTitle}>{selection?.holding.template.name}</Text>
         <Text style={styles.inspectMeta}>{[selection?.holding.template.groupName, selection?.holding.template.memberName, selection?.holding.template.releaseName].filter(Boolean).join(" · ")}</Text>
         <Pressable accessibilityRole="button" onPress={() => { if (selection) router.push({ pathname: "/collectible", params: { holdingId: selection.holding.id } }); }} style={styles.closeButton}><Text style={styles.closeText}>{detailsLabel}</Text></Pressable>
@@ -182,6 +191,7 @@ const styles = StyleSheet.create({
   sectionChipTextSelected: { color: colors.surface },
   loading: { marginTop: spacing.xl },
   error: { color: colors.plum, marginTop: spacing.md },
+  empty: { color: colors.muted, fontSize: 13, marginTop: spacing.sm },
   binder: { marginTop: spacing.lg },
   spread: { alignItems: "stretch", flexDirection: "row", paddingVertical: spacing.md },
   page: { backgroundColor: "#7d3e55", borderRadius: 10, flex: 1, padding: 7 },

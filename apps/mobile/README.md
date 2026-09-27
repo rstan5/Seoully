@@ -6,9 +6,9 @@ Supabase project and production identity model as the Next.js reference applicat
 ## Local configuration
 
 Copy `env.example` to a local environment file and provide only the Supabase project
-URL and publishable key. Never put service-role keys or other server secrets in this
-client. Expo inlines `EXPO_PUBLIC_*` values into the bundle, so they must be treated as
-public configuration and protected by Supabase RLS.
+URL, publishable key, and deployed web/API origin. Never put service-role keys or other
+server secrets in this client. Expo inlines `EXPO_PUBLIC_*` values into the bundle, so
+they must be treated as public configuration and protected by Supabase RLS.
 
 ## Commands
 

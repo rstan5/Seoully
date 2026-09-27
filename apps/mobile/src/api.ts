@@ -355,3 +355,35 @@ export async function sendDirectMessage(conversationId: string, body: string): P
   const payload = await response.json() as { message: NativeDirectMessage };
   return payload.message;
 }
+
+export type NativeCollectorProfile = {
+  user: { id: string; handle: string; displayName: string; joinedAt: string };
+  profile: { tagline: string; bio: string; location?: string; collectorInterests: string[] };
+  followerCount: number;
+  followingCount: number;
+  roomAvailable: boolean;
+  collectionSummary?: { holdingCount: number; uniqueTemplateCount: number; groupCount: number };
+};
+
+export async function loadCollectorProfile(userId: string) {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/collectors/${encodeURIComponent(userId)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("collector_read_failed");
+  return response.json() as Promise<{
+    profile: NativeCollectorProfile;
+    follow: { following: boolean; followers: number; followingCount: number };
+  }>;
+}
+
+export async function setCollectorFollowing(userId: string, following: boolean) {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/collectors/${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ following }),
+  });
+  if (!response.ok) throw new Error("follow_failed");
+  return response.json() as Promise<{ following: boolean }>;
+}

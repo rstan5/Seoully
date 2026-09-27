@@ -121,7 +121,7 @@ export default function SearchScreen() {
     </> : <>
       {collectors.length > 0 ? <><Text style={styles.sectionTitle}>{copy.collectorsForYou}</Text>
         {collectors.map(({ collector, reciprocal, reasons }) => <View key={collector.userId} style={styles.result}>
-          <Text style={styles.resultTitle}>{collector.displayName}</Text>
+          <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/collector", params: { userId: collector.userId } })}><Text style={styles.resultTitle}>{collector.displayName}</Text></Pressable>
           <Text style={styles.resultMeta}>@{collector.handle}</Text>
           <Text style={styles.resultDescriptor}>{reciprocal ? copy.mutualMatch : reasonLabel(reasons[0]?.code, copy)}</Text>
           <Pressable accessibilityRole="button" onPress={() => messageCollector(collector)}><Text style={styles.actionText}>{copy.messageCollector}</Text></Pressable>

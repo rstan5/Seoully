@@ -130,8 +130,8 @@ export async function getProductionProfilePosts(userId: unknown, input?: unknown
   return listPosts([uuid.parse(userId)], input);
 }
 
-export async function followUser(userId: unknown): Promise<{ following: boolean }> {
-  const target = uuid.parse(userId); const { identity, supabase } = await actorClient();
+export async function followUser(userId: unknown, client?: SupabaseClient): Promise<{ following: boolean }> {
+  const target = uuid.parse(userId); const { identity, supabase } = await actorClient(client);
   if (target === identity.user.id) throw new Error("cannot_follow_self");
   const { data: profile, error: profileError } = await supabase.from("profiles").select("user_id").eq("user_id", target).maybeSingle();
   if (profileError) throw new Error("follow_failed"); if (!profile) throw new Error("collector_not_found");
@@ -139,14 +139,14 @@ export async function followUser(userId: unknown): Promise<{ following: boolean 
   if (error) throw new Error("follow_failed"); return { following: true };
 }
 
-export async function unfollowUser(userId: unknown): Promise<{ following: boolean }> {
-  const target = uuid.parse(userId); const { identity, supabase } = await actorClient();
+export async function unfollowUser(userId: unknown, client?: SupabaseClient): Promise<{ following: boolean }> {
+  const target = uuid.parse(userId); const { identity, supabase } = await actorClient(client);
   const { error } = await supabase.from("follows").delete().eq("follower_user_id", identity.user.id).eq("followed_user_id", target);
   if (error) throw new Error("unfollow_failed"); return { following: false };
 }
 
-export async function getFollowState(userId: unknown): Promise<{ following: boolean; followers: number; followingCount: number }> {
-  const target = uuid.parse(userId); const { identity, supabase } = await actorClient();
+export async function getFollowState(userId: unknown, client?: SupabaseClient): Promise<{ following: boolean; followers: number; followingCount: number }> {
+  const target = uuid.parse(userId); const { identity, supabase } = await actorClient(client);
   const [state, followers, following] = await Promise.all([
     supabase.from("follows").select("follower_user_id").eq("follower_user_id", identity.user.id).eq("followed_user_id", target).maybeSingle(),
     supabase.from("follows").select("follower_user_id", { count: "exact", head: true }).eq("followed_user_id", target),

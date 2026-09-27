@@ -69,17 +69,17 @@ export async function getCurrentIdentityFromClient(supabase: SupabaseClient): Pr
   return mapIdentity(account, profile);
 }
 
-export async function getPublicProfile(userId: string): Promise<PublicProfileDTO | null> {
+export async function getPublicProfile(userId: string, client?: SupabaseClient): Promise<PublicProfileDTO | null> {
   const parsedId = z.string().uuid().safeParse(userId);
   if (!parsedId.success) return null;
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? await createSupabaseServerClient();
   const { data: profile, error } = await supabase
     .from("profiles")
     .select("user_id, handle, display_name, tagline, bio, location, favorite_group_ids, bias_member_ids, favorite_era_ids, collector_interests, collector_type, created_at, collection_public, wishlist_public")
     .eq("user_id", parsedId.data)
     .maybeSingle();
   if (error || !profile) return null;
-  return await hydratePublicProfile(mapIdentity({ id: profile.user_id, created_at: profile.created_at }, profile), profile);
+  return await hydratePublicProfile(mapIdentity({ id: profile.user_id, created_at: profile.created_at }, profile), profile, supabase);
 }
 
 export async function getPublicProfileByHandle(handle: string): Promise<PublicProfileDTO | null> {
@@ -93,8 +93,8 @@ export async function getPublicProfileByHandle(handle: string): Promise<PublicPr
   return await hydratePublicProfile(mapIdentity({ id: profile.user_id, created_at: profile.created_at }, profile), profile);
 }
 
-async function hydratePublicProfile(identity: IdentityProfileDTO, row: Record<string, unknown>): Promise<PublicProfileDTO> {
-  const supabase = await createSupabaseServerClient();
+async function hydratePublicProfile(identity: IdentityProfileDTO, row: Record<string, unknown>, client?: SupabaseClient): Promise<PublicProfileDTO> {
+  const supabase = client ?? await createSupabaseServerClient();
   const userId = identity.user.id;
   const [followers, following, room] = await Promise.all([
     supabase.from("follows").select("follower_user_id", { count: "exact", head: true }).eq("followed_user_id", userId),

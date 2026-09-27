@@ -82,6 +82,10 @@ security, and Room/Binder data model.
 - Replaced the native Messages placeholder with production conversation and thread
   screens, private message composition, localized loading/error/empty states, and a
   message entry point from collector recommendations.
+- Added native collector profiles backed by the production public-profile contract,
+  including privacy-aware collection summaries, follower counts, idempotent follow/
+  unfollow, and direct-message entry. Explore recommendations now navigate to these
+  profiles rather than acting as inert cards.
 
 ## Current queue
 
@@ -140,10 +144,12 @@ Native device QA is still pending.
 - Native Messages passes mobile lint and strict TypeScript plus web strict TypeScript.
   The production migration was not applied; RLS integration, keyboard avoidance,
   thread scrolling, and real-time refresh remain AWAITING DEPLOYED BACKEND / DEVICE QA.
+- Native collector profiles and follow mutations pass mobile lint and strict TypeScript,
+  web strict TypeScript, and fixture integrity checks. Navigation and optimistic follow
+  touch feedback remain AWAITING DEVICE QA.
 
 ## Next autonomous task
 
-Native Messages now has a secure production persistence boundary and native
-conversation UI. Next: collector follow/profile navigation and integration hardening,
-then the required Room renderer proof. Full Room and Binder parity remain mandatory in
-the queue. No device QA is claimed.
+Native collector profiles now connect Explore, follows, and private messages. Next:
+integration hardening, then the required Room renderer proof. Full Room and Binder
+parity remain mandatory in the queue. No device QA is claimed.

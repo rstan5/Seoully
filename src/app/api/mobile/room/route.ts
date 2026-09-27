@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { listMyHoldings } from "@/server/dal/holdings";
-import { ensureMyRoom, listMyRoomPlacements, removeMyRoomPlacement, upsertMyRoomPlacement } from "@/server/dal/rooms";
+import { ensureMyRoom, listMyRoomPlacements, removeMyRoomPlacement, updateMyRoomTheme, upsertMyRoomPlacement } from "@/server/dal/rooms";
 import { createSupabaseBearerClient } from "@/server/supabase/bearer";
 
 export async function GET(request: Request) {
@@ -27,6 +27,18 @@ export async function PUT(request: Request) {
     return NextResponse.json({ placement }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "room_placement_write_failed";
+    return NextResponse.json({ error: reason }, { status: reason === "unauthenticated" ? 401 : 400 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  const client = createSupabaseBearerClient(request);
+  if (!client) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+  try {
+    const room = await updateMyRoomTheme(await request.json(), client);
+    return NextResponse.json({ room }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "room_theme_write_failed";
     return NextResponse.json({ error: reason }, { status: reason === "unauthenticated" ? 401 : 400 });
   }
 }

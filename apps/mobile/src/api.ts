@@ -405,7 +405,8 @@ export async function setCollectorFollowing(userId: string, following: boolean) 
   return response.json() as Promise<{ following: boolean }>;
 }
 
-export type NativeRoom = { id: string; ownerUserId: string };
+export type NativeRoomThemeId = "hearth" | "blossom" | "midnight";
+export type NativeRoom = { id: string; ownerUserId: string; themeId: NativeRoomThemeId };
 export type NativeRoomPlacement = {
   id: string;
   roomId: string;
@@ -448,6 +449,18 @@ export async function saveNativeRoomPlacement(input: {
   if (!response.ok) throw new Error("room_placement_write_failed");
   const payload = await response.json() as { placement: NativeRoomPlacement };
   return payload.placement;
+}
+
+export async function saveNativeRoomTheme(roomId: string, themeId: NativeRoomThemeId) {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/room`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ roomId, themeId }),
+  });
+  if (!response.ok) throw new Error("room_theme_write_failed");
+  const payload = await response.json() as { room: NativeRoom };
+  return payload.room;
 }
 
 export async function removeNativeRoomPlacement(roomId: string, holdingId: string) {

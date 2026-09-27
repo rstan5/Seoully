@@ -133,6 +133,10 @@ security, and Room/Binder data model.
   zone and native surface IDs, including vertical wall drag behavior.
 - Expanded the native Room furniture/surface adapter with visible binder, display-case,
   and archive homes while retaining persisted web coordinate and ownership semantics.
+- Added durable native Room style customization with three bounded Seoully presets,
+  immediate renderer relighting/recoloring, optimistic rollback, English/Korean labels,
+  a bearer-authenticated server boundary, and existing owner-only Room RLS. The preset
+  is stored on the Room rather than device-local state.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 
@@ -164,6 +168,10 @@ security, and Room/Binder data model.
 - `20261001000000_direct_messages.sql` must be reviewed and applied through the normal
   migration process before native Messages can be used. It has not been applied to
   production, and no production messages or conversations were created during testing.
+- `20261002000000_native_room_theme.sql` must be reviewed and applied through the normal
+  migration process before the theme-aware Room endpoint is deployed. It only adds a
+  validated preset column and retains the existing owner-scoped Room RLS; it was not
+  applied to production.
 - Production `profiles` currently has no durable avatar/media contract; native avatar
   upload was not fabricated against the prototype-only web avatar field. Adding it
   requires an approved storage/schema/privacy design and migration.
@@ -216,6 +224,9 @@ Native device QA is still pending.
 - Native home/zone placement and the expanded Room surfaces pass mobile strict
   TypeScript and Expo lint. Surface hit intent and vertical poster dragging remain
   AWAITING DEVICE QA.
+- Owner-scoped Room presets pass mobile and web strict TypeScript, Expo lint, and diff
+  checks. Visual contrast, GL relighting, and control ergonomics remain AWAITING DEVICE
+  QA, and deployed persistence awaits the pending migration.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.
@@ -229,7 +240,7 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-Add durable owner-scoped Room theme customization behind a reviewed migration, then
-deepen Binder V2 with animated card lift/return and localized fallback organization.
-Pending database migrations still require review/application in an approved
-environment, and physical iOS/Android behavior remains AWAITING DEVICE QA.
+Deepen Binder V2 with animated card lift/return, localized fallback organization, and
+more physical spread navigation. Then audit ordinary app parity for remaining
+non-device-dependent gaps. Pending database migrations still require review/application
+in an approved environment, and physical iOS/Android behavior remains AWAITING DEVICE QA.

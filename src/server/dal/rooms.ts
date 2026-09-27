@@ -23,8 +23,12 @@ const placementSchema = z.object({
   surfaceId: z.string().trim().max(200).optional().nullable(),
 }).strict();
 const roomSchema = z.object({ roomId: uuid }).strict();
+const roomThemeSchema = z.object({
+  roomId: uuid,
+  themeId: z.enum(["hearth", "blossom", "midnight"]),
+}).strict();
 
-export interface RoomDTO { id: string; ownerUserId: string; createdAt: string; updatedAt: string; }
+export interface RoomDTO { id: string; ownerUserId: string; themeId: "hearth" | "blossom" | "midnight"; createdAt: string; updatedAt: string; }
 export interface RoomPlacementDTO {
   id: string; roomId: string; holdingId: string; zoneId: string; slot: number;
   offset: Record<string, number> | null;
@@ -37,16 +41,16 @@ export async function ensureMyRoom(client?: SupabaseClient): Promise<RoomDTO> {
   if (!identity) throw new Error("unauthenticated");
   const supabase = client ?? await createSupabaseServerClient();
   const { data: existing, error: readError } = await supabase.from("rooms")
-    .select("id,owner_user_id,created_at,updated_at").eq("owner_user_id", identity.user.id).maybeSingle();
+    .select("id,owner_user_id,theme_id,created_at,updated_at").eq("owner_user_id", identity.user.id).maybeSingle();
   if (readError) throw new Error("room_read_failed");
   if (existing) return mapRoom(existing);
   const { data, error } = await supabase.from("rooms")
     .insert({ owner_user_id: identity.user.id })
-    .select("id,owner_user_id,created_at,updated_at").single();
+    .select("id,owner_user_id,theme_id,created_at,updated_at").single();
   if (error) {
     if (error.code === "23505") {
       const { data: raced } = await supabase.from("rooms")
-        .select("id,owner_user_id,created_at,updated_at").eq("owner_user_id", identity.user.id).maybeSingle();
+        .select("id,owner_user_id,theme_id,created_at,updated_at").eq("owner_user_id", identity.user.id).maybeSingle();
       if (raced) return mapRoom(raced);
     }
     throw new Error("room_create_failed");
@@ -56,6 +60,20 @@ export async function ensureMyRoom(client?: SupabaseClient): Promise<RoomDTO> {
 }
 
 export async function getMyRoom(client?: SupabaseClient): Promise<RoomDTO> { return ensureMyRoom(client); }
+
+export async function updateMyRoomTheme(input: unknown, client?: SupabaseClient): Promise<RoomDTO> {
+  const payload = roomThemeSchema.parse(input);
+  const room = await ensureMyRoom(client);
+  if (room.id !== payload.roomId) throw new Error("room_not_found");
+  const supabase = client ?? await createSupabaseServerClient();
+  const { data, error } = await supabase.from("rooms")
+    .update({ theme_id: payload.themeId })
+    .eq("id", room.id)
+    .select("id,owner_user_id,theme_id,created_at,updated_at")
+    .single();
+  if (error || !data) throw new Error(error?.code === "42501" ? "room_theme_forbidden" : "room_theme_write_failed");
+  return mapRoom(data);
+}
 
 export async function listMyRoomPlacements(input: unknown, client?: SupabaseClient): Promise<{ room: RoomDTO; placements: RoomPlacementDTO[] }> {
   const { roomId } = roomSchema.parse(input);
@@ -95,7 +113,8 @@ export async function removeMyRoomPlacement(input: unknown, client?: SupabaseCli
 }
 
 function mapRoom(row: Record<string, unknown>): RoomDTO {
-  return { id: String(row.id), ownerUserId: String(row.owner_user_id), createdAt: String(row.created_at), updatedAt: String(row.updated_at) };
+  const themeId = row.theme_id === "blossom" || row.theme_id === "midnight" ? row.theme_id : "hearth";
+  return { id: String(row.id), ownerUserId: String(row.owner_user_id), themeId, createdAt: String(row.created_at), updatedAt: String(row.updated_at) };
 }
 function mapPlacement(row: Record<string, unknown>): RoomPlacementDTO {
   return {

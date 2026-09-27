@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/refs -- PanResponder reads refs only inside gesture callbacks. */
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, PanResponder, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
-import { loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomPlacement, type NativeHolding, type NativeRoomSnapshot } from "../src/api";
+import { loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomPlacement, saveNativeRoomTheme, type NativeHolding, type NativeRoomSnapshot, type NativeRoomThemeId } from "../src/api";
 import { useCopy } from "../src/locale";
 import { NativeRoomRenderer } from "../src/room/NativeRoomRenderer";
 import { buildRoomRenderables, createInitialRoomRenderable, moveRenderable, nativeHomeForHolding, settleRoomRenderable, toPersistedTransform, zoneIdForNativeSurface, type RoomRenderable } from "../src/room/model";
@@ -109,16 +109,34 @@ export default function RoomScreen() {
     }
   }
 
+  async function changeTheme(themeId: NativeRoomThemeId) {
+    if (!snapshot || snapshot.room.themeId === themeId) return;
+    const previous = snapshot.room;
+    setSnapshot((current) => current ? { ...current, room: { ...current.room, themeId } } : current);
+    try {
+      const room = await saveNativeRoomTheme(snapshot.room.id, themeId);
+      setSnapshot((current) => current ? { ...current, room } : current);
+    } catch {
+      setSnapshot((current) => current ? { ...current, room: previous } : current);
+      setError(copy.roomSaveFailed);
+    }
+  }
+
   return <SafeAreaView style={styles.safe}><View style={styles.container}>
     <View style={styles.header}>
       <View style={styles.heading}><Text style={styles.title}>{copy.room}</Text><Text style={styles.lead}>{copy.roomLead}</Text></View>
-      <Pressable accessibilityRole="button" disabled={!items.length} onPress={() => setEditing((value) => !value)} style={styles.editButton}><Text style={styles.editButtonText}>{editing ? copy.finishEditing : copy.editRoom}</Text></Pressable>
+      <Pressable accessibilityRole="button" disabled={!snapshot} onPress={() => setEditing((value) => !value)} style={styles.editButton}><Text style={styles.editButtonText}>{editing ? copy.finishEditing : copy.editRoom}</Text></Pressable>
     </View>
+    {editing && snapshot ? <View><Text style={styles.themeLabel}>{copy.roomStyle}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.themeRow}>{([
+      ["hearth", copy.roomThemeHearth],
+      ["blossom", copy.roomThemeBlossom],
+      ["midnight", copy.roomThemeMidnight],
+    ] as const).map(([id, label]) => <Pressable key={id} accessibilityRole="button" accessibilityState={{ selected: snapshot.room.themeId === id }} onPress={() => changeTheme(id)} style={[styles.themeChoice, snapshot.room.themeId === id && styles.themeChoiceSelected]}><Text style={[styles.themeChoiceText, snapshot.room.themeId === id && styles.themeChoiceTextSelected]}>{label}</Text></Pressable>)}</ScrollView></View> : null}
     {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
     {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
     {!loading && !snapshot?.holdings.length ? <Text style={styles.empty}>{copy.roomEmpty}</Text> : null}
     {!loading && snapshot ? <View style={styles.stage} {...panResponder.panHandlers}>
-      <NativeRoomRenderer items={items} selectedId={selectedId} focusedId={editing ? null : selectedId} cameraYaw={cameraYaw} onSelect={setSelectedId} onClearSelection={() => setSelectedId(null)} />
+      <NativeRoomRenderer items={items} selectedId={selectedId} focusedId={editing ? null : selectedId} themeId={snapshot.room.themeId} cameraYaw={cameraYaw} onSelect={setSelectedId} onClearSelection={() => setSelectedId(null)} />
       {editing && selectedId ? <View pointerEvents="none" style={styles.hint}><Text style={styles.hintText}>{copy.roomDragHint}</Text></View> : null}
       {!editing ? <View pointerEvents="none" style={styles.hint}><Text style={styles.hintText}>{copy.roomOrbitHint}</Text></View> : null}
     </View> : null}
@@ -141,6 +159,12 @@ const styles = StyleSheet.create({
   lead: { color: colors.muted, fontSize: 14, marginTop: spacing.xs },
   editButton: { backgroundColor: colors.plum, borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   editButtonText: { color: colors.surface, fontWeight: "700" },
+  themeLabel: { color: colors.muted, fontSize: 11, fontWeight: "700", paddingHorizontal: spacing.md, textTransform: "uppercase" },
+  themeRow: { gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+  themeChoice: { borderColor: colors.border, borderRadius: 999, borderWidth: 1, justifyContent: "center", minHeight: 36, paddingHorizontal: spacing.md },
+  themeChoiceSelected: { backgroundColor: colors.plum, borderColor: colors.plum },
+  themeChoiceText: { color: colors.plum, fontSize: 12, fontWeight: "700" },
+  themeChoiceTextSelected: { color: colors.surface },
   loading: { marginTop: spacing.xl },
   error: { color: colors.plum, paddingHorizontal: spacing.lg },
   empty: { color: colors.muted, padding: spacing.lg },

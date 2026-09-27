@@ -3,12 +3,20 @@ import { Suspense, useEffect, useState } from "react";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber/native";
 import { Directory, File, Paths } from "expo-file-system";
 import { Color, TextureLoader, Vector3 } from "three";
+import type { NativeRoomThemeId } from "../api";
 import type { RoomRenderable } from "./model";
+
+const ROOM_THEMES = {
+  hearth: { background: "#f4e7e5", wall: "#b9959b", sideWall: "#a98288", floor: "#6f4c4d", furniture: "#56383d", edge: "#8a6261", accent: "#8e5265", light: "#fff1e5" },
+  blossom: { background: "#fff3f5", wall: "#e8b8c5", sideWall: "#dca4b6", floor: "#a8757e", furniture: "#835765", edge: "#c98b9d", accent: "#d8789a", light: "#fff8ed" },
+  midnight: { background: "#171522", wall: "#342d46", sideWall: "#29243a", floor: "#1f1b2d", furniture: "#282237", edge: "#705d86", accent: "#794f72", light: "#d6c9ff" },
+} as const;
 
 export function NativeRoomRenderer({
   items,
   selectedId,
   focusedId,
+  themeId,
   cameraYaw,
   onSelect,
   onClearSelection,
@@ -16,24 +24,26 @@ export function NativeRoomRenderer({
   items: RoomRenderable[];
   selectedId: string | null;
   focusedId: string | null;
+  themeId: NativeRoomThemeId;
   cameraYaw: number;
   onSelect: (holdingId: string) => void;
   onClearSelection: () => void;
 }) {
   const focused = items.find((item) => item.holding.id === focusedId) ?? null;
+  const theme = ROOM_THEMES[themeId] ?? ROOM_THEMES.hearth;
   return <Canvas
     camera={{ position: [0, 2.6, 7], fov: 50 }}
     onPointerMissed={onClearSelection}
     onCreated={({ camera, scene }) => {
       camera.lookAt(0, 0.4, -2);
-      scene.background = new Color("#f4e7e5");
+      scene.background = new Color(theme.background);
     }}
   >
     <ambientLight intensity={1.5} />
-    <directionalLight color="#fff1e5" intensity={2.2} position={[-3, 6, 4]} />
+    <directionalLight color={theme.light} intensity={2.2} position={[-3, 6, 4]} />
     <CameraRig yaw={cameraYaw} focused={focused} />
-    <RoomShell />
-    <RoomFurniture />
+    <RoomShell theme={theme} />
+    <RoomFurniture theme={theme} />
     {items.map((item) => <RoomObject key={item.holding.id} item={item} selected={selectedId === item.holding.id} onSelect={onSelect} />)}
   </Canvas>;
 }
@@ -59,25 +69,25 @@ function CameraRig({ yaw, focused }: { yaw: number; focused: RoomRenderable | nu
   return null;
 }
 
-function RoomShell() {
+function RoomShell({ theme }: { theme: typeof ROOM_THEMES[NativeRoomThemeId] }) {
   return <>
-    <mesh position={[0, 0, -4.2]}><boxGeometry args={[9.5, 6.4, 0.12]} /><meshStandardMaterial color="#b9959b" roughness={0.9} /></mesh>
-    <mesh position={[0, -2.15, -1.2]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[9.5, 6.2]} /><meshStandardMaterial color="#6f4c4d" roughness={0.8} /></mesh>
-    <mesh position={[-4.7, 0, -1.25]} rotation={[0, Math.PI / 2, 0]}><planeGeometry args={[5.9, 6.4]} /><meshStandardMaterial color="#a98288" roughness={0.9} /></mesh>
-    <mesh position={[4.7, 0, -1.25]} rotation={[0, -Math.PI / 2, 0]}><planeGeometry args={[5.9, 6.4]} /><meshStandardMaterial color="#a98288" roughness={0.9} /></mesh>
+    <mesh position={[0, 0, -4.2]}><boxGeometry args={[9.5, 6.4, 0.12]} /><meshStandardMaterial color={theme.wall} roughness={0.9} /></mesh>
+    <mesh position={[0, -2.15, -1.2]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[9.5, 6.2]} /><meshStandardMaterial color={theme.floor} roughness={0.8} /></mesh>
+    <mesh position={[-4.7, 0, -1.25]} rotation={[0, Math.PI / 2, 0]}><planeGeometry args={[5.9, 6.4]} /><meshStandardMaterial color={theme.sideWall} roughness={0.9} /></mesh>
+    <mesh position={[4.7, 0, -1.25]} rotation={[0, -Math.PI / 2, 0]}><planeGeometry args={[5.9, 6.4]} /><meshStandardMaterial color={theme.sideWall} roughness={0.9} /></mesh>
   </>;
 }
 
-function RoomFurniture() {
+function RoomFurniture({ theme }: { theme: typeof ROOM_THEMES[NativeRoomThemeId] }) {
   return <>
-    <mesh position={[-3.15, -0.55, -3.75]}><boxGeometry args={[2.25, 3.1, 0.38]} /><meshStandardMaterial color="#56383d" roughness={0.8} /></mesh>
-    {[-1.45, -0.55, 0.35].map((y) => <mesh key={y} position={[-3.15, y, -3.48]}><boxGeometry args={[2.1, 0.09, 0.62]} /><meshStandardMaterial color="#8a6261" roughness={0.75} /></mesh>)}
-    <mesh position={[1.45, -0.82, -2.85]}><boxGeometry args={[3.25, 0.18, 1.65]} /><meshStandardMaterial color="#7b5654" roughness={0.72} /></mesh>
-    <mesh position={[0.45, -0.66, -2.7]} rotation={[-0.08, 0, 0]}><boxGeometry args={[1.05, 0.1, 0.78]} /><meshStandardMaterial color="#9d5b70" roughness={0.7} /></mesh>
-    <mesh position={[3.65, -0.55, -3.76]}><boxGeometry args={[1.58, 3.15, 0.34]} /><meshStandardMaterial color="#5f4147" roughness={0.78} /></mesh>
-    {[-0.55, 0.43].map((y) => <mesh key={`case-${y}`} position={[3.65, y, -3.5]}><boxGeometry args={[1.45, 0.08, 0.66]} /><meshStandardMaterial color="#936b69" roughness={0.7} /></mesh>)}
-    <mesh position={[-1.2, -1.86, -0.65]}><boxGeometry args={[1.82, 0.58, 1.16]} /><meshStandardMaterial color="#68484b" roughness={0.9} /></mesh>
-    <mesh position={[0.2, -1.28, -1.15]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[1.35, 48]} /><meshStandardMaterial color="#8e5265" roughness={1} /></mesh>
+    <mesh position={[-3.15, -0.55, -3.75]}><boxGeometry args={[2.25, 3.1, 0.38]} /><meshStandardMaterial color={theme.furniture} roughness={0.8} /></mesh>
+    {[-1.45, -0.55, 0.35].map((y) => <mesh key={y} position={[-3.15, y, -3.48]}><boxGeometry args={[2.1, 0.09, 0.62]} /><meshStandardMaterial color={theme.edge} roughness={0.75} /></mesh>)}
+    <mesh position={[1.45, -0.82, -2.85]}><boxGeometry args={[3.25, 0.18, 1.65]} /><meshStandardMaterial color={theme.edge} roughness={0.72} /></mesh>
+    <mesh position={[0.45, -0.66, -2.7]} rotation={[-0.08, 0, 0]}><boxGeometry args={[1.05, 0.1, 0.78]} /><meshStandardMaterial color={theme.accent} roughness={0.7} /></mesh>
+    <mesh position={[3.65, -0.55, -3.76]}><boxGeometry args={[1.58, 3.15, 0.34]} /><meshStandardMaterial color={theme.furniture} roughness={0.78} /></mesh>
+    {[-0.55, 0.43].map((y) => <mesh key={`case-${y}`} position={[3.65, y, -3.5]}><boxGeometry args={[1.45, 0.08, 0.66]} /><meshStandardMaterial color={theme.edge} roughness={0.7} /></mesh>)}
+    <mesh position={[-1.2, -1.86, -0.65]}><boxGeometry args={[1.82, 0.58, 1.16]} /><meshStandardMaterial color={theme.furniture} roughness={0.9} /></mesh>
+    <mesh position={[0.2, -1.28, -1.15]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[1.35, 48]} /><meshStandardMaterial color={theme.accent} roughness={1} /></mesh>
   </>;
 }
 

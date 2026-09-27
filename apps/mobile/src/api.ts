@@ -177,14 +177,16 @@ export async function setPostLiked(postId: string, liked: boolean) {
   return response.json() as Promise<{ liked: boolean }>;
 }
 
-export async function loadPostComments(postId: string): Promise<NativePostComment[]> {
+export type NativeCommentPage = { items: NativePostComment[]; nextCursor: string | null };
+export async function loadPostComments(postId: string, cursor?: string): Promise<NativeCommentPage> {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/posts/${encodeURIComponent(postId)}/comments`, {
+  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+  const response = await fetch(`${baseUrl}/api/mobile/posts/${encodeURIComponent(postId)}/comments${query}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) throw new Error("comments_read_failed");
-  const payload = await response.json() as { page?: { items?: NativePostComment[] } };
-  return payload.page?.items ?? [];
+  const payload = await response.json() as { page?: { items?: NativePostComment[]; nextCursor?: string | null } };
+  return { items: payload.page?.items ?? [], nextCursor: payload.page?.nextCursor ?? null };
 }
 
 export async function addPostComment(postId: string, body: string): Promise<NativePostComment> {

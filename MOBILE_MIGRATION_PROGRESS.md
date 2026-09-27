@@ -188,6 +188,9 @@ security, and Room/Binder data model.
 - Room inspection and Binder card inspection now open the production Holding detail
   screen, so trade state and personal media remain one destination rather than
   isolated overlays.
+- Completed cursor propagation for post comments and added native load-more for
+  comment threads, matching the production comment page contract instead of the first
+  25 comments only.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 
@@ -315,6 +318,8 @@ Native device QA is still pending.
   restore and keyboard-return search remain AWAITING DEVICE QA.
 - Room/Binder-to-detail navigation passes mobile TypeScript and Expo lint. Overlay
   dismissal versus stack navigation remain AWAITING DEVICE QA.
+- Paginated comments pass mobile and web TypeScript plus Expo lint. Long-thread
+  scrolling and keyboard collision remain AWAITING DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.

@@ -9,7 +9,8 @@ export async function GET(request: Request, context: Context) {
   if (!client) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   try {
     const { postId } = await context.params;
-    const page = await listPostComments(postId, { limit: 25 }, client);
+    const cursor = new URL(request.url).searchParams.get("cursor") || undefined;
+    const page = await listPostComments(postId, { limit: 25, ...(cursor ? { cursor } : {}) }, client);
     return NextResponse.json({ page }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "comments_read_failed";

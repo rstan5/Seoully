@@ -58,6 +58,7 @@ export default function FeedScreen() {
 function PostCard({ item, copy, onChange }: { item: NativeFeedPost; copy: MobileCopy; onChange: (post: NativeFeedPost) => void }) {
   const router = useRouter();
   const [comments, setComments] = useState<NativePostComment[] | null>(null);
+  const [commentCursor, setCommentCursor] = useState<string | null>(null);
   const [commentBody, setCommentBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
@@ -79,14 +80,21 @@ function PostCard({ item, copy, onChange }: { item: NativeFeedPost; copy: Mobile
   }
 
   async function toggleComments() {
-    if (comments) return setComments(null);
+    if (comments) {
+      setComments(null);
+      setCommentCursor(null);
+      return;
+    }
     await loadComments();
   }
 
-  async function loadComments() {
+  async function loadComments(cursor?: string) {
     setCommentError(null);
-    try { setComments(await loadPostComments(item.id)); }
-    catch { setCommentError(copy.commentsUnavailable); }
+    try {
+      const page = await loadPostComments(item.id, cursor);
+      setComments((current) => cursor ? [...(current ?? []), ...page.items.filter((comment) => !(current ?? []).some((existing) => existing.id === comment.id))] : page.items);
+      setCommentCursor(page.nextCursor);
+    } catch { setCommentError(copy.commentsUnavailable); }
   }
 
   async function submitComment() {
@@ -125,6 +133,7 @@ function PostCard({ item, copy, onChange }: { item: NativeFeedPost; copy: Mobile
     {commentError ? <RetryNotice message={commentError} retryLabel={copy.retry} onRetry={() => { void loadComments(); }} /> : null}
     {comments ? <View style={styles.comments}>
       {comments.map((comment) => <View key={comment.id} style={styles.comment}><Pressable accessibilityRole="button" onPress={() => openCollector(comment.author.userId)}><Text style={styles.commentAuthor}>@{comment.author.handle}</Text></Pressable><Text style={styles.commentBody}>{comment.body}</Text></View>)}
+      {commentCursor ? <Pressable accessibilityRole="button" onPress={() => { void loadComments(commentCursor); }}><Text style={styles.actionLabel}>{copy.loadMoreComments}</Text></Pressable> : null}
       <View style={styles.commentComposer}>
         <TextInput accessibilityLabel={copy.commentPlaceholder} placeholder={copy.commentPlaceholder} value={commentBody} onChangeText={setCommentBody} onSubmitEditing={submitComment} style={styles.commentInput} />
         <Pressable accessibilityRole="button" disabled={!commentBody.trim() || busy} onPress={submitComment} style={styles.commentButton}><Text style={styles.commentButtonLabel}>{copy.postComment}</Text></Pressable>

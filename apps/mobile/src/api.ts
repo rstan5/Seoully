@@ -91,3 +91,10 @@ export async function loadFeed(): Promise<NativeFeedPost[]> {
   const payload = await response.json() as { page?: { items?: NativeFeedPost[] } };
   return payload.page?.items ?? [];
 }
+
+export async function updateNativeProfile(input: { displayName?: string; bio?: string; tagline?: string }) {
+  const { data } = await supabase.auth.getSession(); const accessToken = data.session?.access_token;
+  if (!baseUrl || !accessToken) throw new Error("unauthenticated");
+  const response = await fetch(`${baseUrl}/api/mobile/profile`, { method: "PATCH", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify(input) });
+  if (!response.ok) throw new Error("profile_update_failed"); return response.json();
+}

@@ -118,10 +118,10 @@ async function hydratePublicProfile(identity: IdentityProfileDTO, row: Record<st
   };
 }
 
-export async function updateCurrentProfile(input: unknown): Promise<IdentityProfileDTO> {
+export async function updateCurrentProfile(input: unknown, client?: SupabaseClient): Promise<IdentityProfileDTO> {
   const patch = currentProfilePatchSchema.parse(input);
   if (Object.keys(patch).length === 0) throw new Error("empty_profile_update");
-  const current = await getCurrentIdentity();
+  const current = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!current) throw new Error("unauthenticated");
 
   const payload: Record<string, unknown> = {};
@@ -136,12 +136,12 @@ export async function updateCurrentProfile(input: unknown): Promise<IdentityProf
   if (patch.collectorInterests !== undefined) payload.collector_interests = patch.collectorInterests;
   if (patch.collectorType !== undefined) payload.collector_type = patch.collectorType;
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? await createSupabaseServerClient();
   const { error } = await supabase.from("profiles").update(payload).eq("user_id", current.user.id);
   if (error?.code === "23505") throw new Error("handle_taken");
   if (error) throw new Error("profile_update_failed");
 
-  const updated = await getCurrentIdentity();
+  const updated = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!updated) throw new Error("profile_missing");
   return updated;
 }

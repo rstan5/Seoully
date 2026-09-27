@@ -45,6 +45,8 @@ security, and Room/Binder data model.
 - Added bearer-authenticated catalog-reference upload support and wired the native
   new-template path to an explicit opt-in shared-photo checkbox. Personal Holding media
   and shared CatalogReferenceImage uploads remain separate server operations.
+- Added native Profile bio editing through a bearer-authenticated server boundary that
+  reuses the existing validated profile patch and server-derived actor.
 
 ## Current queue
 

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type CSSProperties } from "react";
 import { readLocalImage } from "@/domain/media";
+import { PhotoPicker } from "@/world/ui/PhotoPicker";
 import { repository } from "@/domain/memory-repository";
 import {
   ACCENT_PICKER,
@@ -209,26 +210,23 @@ export function EditProfile({
         <section className="s-edit-section">
           <h2>{t("edit.identity")}</h2>
 
-          <label className="s-edit-photo">
+          <div className="s-edit-photo">
             <SocialAvatar user={draftUser} profile={draftProfile} size={88} />
             <span>{t("edit.changePhoto")}</span>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={async (event) => {
-                const file = event.target.files?.[0];
-                event.target.value = "";
-                if (!file) return;
-                const read = await readLocalImage(file);
-                if (!read.ok) {
-                  setPhotoError(photoErrorKey(read.code));
-                  return;
-                }
-                setPhotoError(null);
-                setAvatarUrl(read.media.url);
-              }}
-            />
-          </label>
+          </div>
+          <PhotoPicker
+            onPhotoSelected={async (file) => {
+              const read = await readLocalImage(file);
+              if (!read.ok) {
+                setPhotoError(photoErrorKey(read.code));
+                return;
+              }
+              setPhotoError(null);
+              setAvatarUrl(read.media.url);
+            }}
+            takeLabel="Take Photo"
+            libraryLabel="Choose from Library"
+          />
           {photoError && <p className="s-edit-error">{localizeError(photoError, t)}</p>}
 
           <Field label={t("edit.username")} htmlFor="edit-handle">

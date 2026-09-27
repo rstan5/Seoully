@@ -280,6 +280,13 @@
   color: var(--s-lilac-deep, #c45374);
 }
 
+.photo-cropper { display: grid; gap: 14px; width: 100%; }
+.photo-cropper-frame { position: relative; width: min(100%, 300px); margin: 0 auto; overflow: hidden; border-radius: 14px; background: #1c1720; touch-action: none; box-shadow: 0 16px 34px rgba(30,20,28,.18); }
+.photo-cropper-frame::after { content: ""; position: absolute; inset: 0; pointer-events: none; border: 2px solid rgba(255,255,255,.85); border-radius: inherit; box-shadow: 0 0 0 999px rgba(20,14,20,.28); }
+.photo-cropper-frame img { position: absolute; left: 50%; top: 50%; width: 100%; height: 100%; object-fit: cover; transform-origin: center; user-select: none; pointer-events: none; }
+.photo-cropper-zoom { display: grid; gap: 6px; font-size: .78rem; color: var(--ink-muted); }
+.photo-cropper-zoom input { width: 100%; accent-color: var(--accent); }
+
 .onboard-chips {
   display: flex;
   flex-wrap: wrap;

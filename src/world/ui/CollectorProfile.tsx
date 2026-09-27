@@ -57,6 +57,7 @@ export function CollectorProfile({
   const t = useT();
   const locale = useLocale();
   const session = useSession((state) => state.session);
+  const signOut = useSession((state) => state.signOut);
 
   useEffect(() => {
     if (session.kind !== "auth" || !isUuid(userId)) return;
@@ -257,6 +258,9 @@ export function CollectorProfile({
               </button>
               <button type="button" className="s-btn is-ghost" onClick={() => useSession.getState().openCollect()}>
                 {t("profile.addToCollection")}
+              </button>
+              <button type="button" className="s-btn is-ghost" onClick={() => void signOut()}>
+                {t("edit.signOut")}
               </button>
             </div>
           )}

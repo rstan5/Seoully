@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { HoldingView } from "@/domain/types";
+import { representationForView } from "@/domain/representation";
 import { ease, objectSpring, spring } from "@/design/motion";
 import { WorldNode } from "@/world/stage/WorldNode";
 import { Photocard } from "./Photocard";
@@ -63,16 +64,16 @@ export function OpenBinder({
   // underneath is already showing what will be revealed behind it.
   const [turning, setTurning] = useState<{ to: number; dir: 1 | -1 } | null>(null);
 
-  const current = { left: pages[spread * 2], right: pages[spread * 2 + 1] };
+  const lastSpread = Math.max(0, Math.ceil(pages.length / 2) - 1);
+  const safeSpread = Math.min(Math.max(0, spread), lastSpread);
+  const current = { left: pages[safeSpread * 2], right: pages[safeSpread * 2 + 1] };
   const next = turning
     ? { left: pages[turning.to * 2], right: pages[turning.to * 2 + 1] }
     : null;
 
-  const lastSpread = Math.max(0, Math.ceil(pages.length / 2) - 1);
-
   const turn = (dir: 1 | -1) => {
     if (turning || heldTemplateId) return;
-    const to = spread + dir;
+    const to = safeSpread + dir;
     if (to < 0 || to > lastSpread) return;
     setTurning({ to, dir });
   };
@@ -156,7 +157,7 @@ export function OpenBinder({
             cover={cover}
             onHold={onHold}
             onTurnEdge={() => turn(-1)}
-            canTurnEdge={spread > 0}
+            canTurnEdge={safeSpread > 0}
           />
         )}
 
@@ -172,7 +173,7 @@ export function OpenBinder({
             cover={cover}
             onHold={onHold}
             onTurnEdge={() => turn(1)}
-            canTurnEdge={spread < lastSpread}
+            canTurnEdge={safeSpread < lastSpread}
           />
         )}
 
@@ -526,6 +527,7 @@ function Sleeve({
   const rect = pocketRect(pocket.index % POCKETS_PER_PAGE);
   const { template, holding } = pocket;
   const canHold = interactive && !!holding;
+  const representation = holding ? representationForView(holding) : undefined;
 
   return (
     <div
@@ -615,7 +617,10 @@ function Sleeve({
                 }
               : {
                   x: 0,
-                  z: hovered ? 16 : 0,
+                  // Keep the card just proud of the translucent sleeve while
+                  // it settles; returning to z=0 puts the sleeve in front of
+                  // the image for a frame and causes the white flash.
+                  z: hovered ? 16 : 5,
                   y: hovered ? -7 : 0,
                   scale: 1,
                   rotateX: 0,
@@ -646,6 +651,7 @@ function Sleeve({
           <Photocard
             template={template}
             {...(holding?.member ? { member: holding.member } : {})}
+            {...(representation?.imageUrl ? { imageUrl: representation.imageUrl } : {})}
             height={POCKET_CARD_H}
             ghost={!holding}
             examining={held}
@@ -685,4 +691,3 @@ function Sleeve({
     </div>
   );
 }
-

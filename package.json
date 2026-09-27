@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "check:fixtures": "tsc scripts/check-fixtures.ts --outDir .tmp/build --module commonjs --moduleResolution node --target es2022 --skipLibCheck --strict false && node .tmp/build/scripts/check-fixtures.js"
+    "check:fixtures": "tsc --project tsconfig.check-fixtures.json && node -r ./scripts/register-build-alias.cjs .tmp/build/scripts/check-fixtures.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

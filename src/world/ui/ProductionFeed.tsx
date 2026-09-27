@@ -11,7 +11,8 @@ import { ProductionPostCard } from "@/world/ui/ProductionPostCard";
 export function ProductionFeed({ viewerId, onViewProfile }: { viewerId: UserId; onViewProfile: (userId: UserId) => void }) {
   const [posts, setPosts] = useState<SocialPostDTO[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
   const t = useT();
-  useEffect(() => { let cancelled = false; void productionFeed({ limit: 20 }).then((result) => { if (!cancelled && result.ok) setPosts(result.page.items); if (!cancelled) setLoaded(true); }); return () => { cancelled = true; }; }, []);
-  return <SocialShell tab="feed"><div className="s-feed">{loaded && posts.length === 0 ? <p className="s-profile-empty s-feed-empty">{t("feed.emptyFollowing")}</p> : posts.map((post) => <ProductionPostCard key={post.id} post={post} viewerId={viewerId} onViewProfile={onViewProfile} />)}</div></SocialShell>;
+  useEffect(() => { let cancelled = false; void productionFeed({ limit: 20 }).then((result) => { if (cancelled) return; if (result.ok) setPosts(result.page.items); else setFailed(true); setLoaded(true); }).catch(() => { if (!cancelled) { setFailed(true); setLoaded(true); } }); return () => { cancelled = true; }; }, []);
+  return <SocialShell tab="feed"><div className="s-feed">{!loaded ? <p className="s-profile-empty s-feed-empty">Loading your feed…</p> : failed ? <p className="s-profile-empty s-feed-empty" role="alert">Your feed could not load. Please try again.</p> : posts.length === 0 ? <p className="s-profile-empty s-feed-empty">{t("feed.emptyFollowing")}</p> : posts.map((post) => <ProductionPostCard key={post.id} post={post} viewerId={viewerId} onViewProfile={onViewProfile} />)}</div></SocialShell>;
 }

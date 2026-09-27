@@ -205,6 +205,7 @@ function CardArt({
     <>
       {imageUrl && <img src={imageUrl} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
       {imageUrl && <div aria-hidden style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, transparent 60%, color-mix(in oklab, #000 42%, transparent))" }} />}
+      {!imageUrl && <>
       {/* Studio backdrop: a lit sweep behind the figure, darker at the edges,
           which is what makes the crop read as a photograph rather than as a
           shape on a colored rectangle. */}
@@ -264,9 +265,10 @@ function CardArt({
           mixBlendMode: "soft-light",
         }}
       />
+      </>}
 
-      {/* Scrim so the name plate has something to sit on. */}
-      <div
+      {/* Scrim so the generated name plate has something to sit on. */}
+      {!imageUrl && <div
         style={{
           position: "absolute",
           left: 0,
@@ -275,9 +277,9 @@ function CardArt({
           height: "38%",
           background: "linear-gradient(0deg, rgba(8,6,12,0.66), transparent)",
         }}
-      />
+      />}
 
-      <div style={{ position: "absolute", left: "7%", right: "7%", bottom: "5%" }}>
+      {!imageUrl && <div style={{ position: "absolute", left: "7%", right: "7%", bottom: "5%" }}>
         <div
           style={{
             fontFamily: "var(--font-display)",
@@ -303,10 +305,10 @@ function CardArt({
             {pose}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Set number, printed small in the corner as they are in real sets. */}
-      {template.setIndex && (
+      {!imageUrl && template.setIndex && (
         <div
           className="u-stat"
           style={{

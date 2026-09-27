@@ -3,7 +3,6 @@
 import { create } from "zustand";
 import { repository } from "@/domain/memory-repository";
 import type { CatalogDraft, CatalogMatch } from "@/domain/catalog-match";
-import { identification } from "@/domain/identification";
 import { readLocalImage } from "@/domain/media";
 import { homeForTemplate, slotForHome } from "@/domain/homes";
 import { handleError, isFixtureUser, normalizeHandle, readSession, writeSession } from "@/domain/session";
@@ -13,7 +12,6 @@ import type {
   CollectorInterest,
   CollectibleKind,
   GroupId,
-  IdentificationCandidate,
   MediaRef,
   MemberId,
   EraId,
@@ -28,9 +26,10 @@ import { HEART_FINALE, useHeartCompanion } from "@/world/store/heartCompanionSto
 import type { MessageKey } from "@/locale/en";
 import { createSeoullyAccount, resolveCurrentSeoullyIdentity, signInToSeoully, signOutOfSeoully, updateMySeoullyProfile } from "@/server/auth/actions";
 import { contributeCatalogItem } from "@/server/catalog/actions";
-import { createHolding } from "@/server/holdings/actions";
+import { createHolding, listHoldings } from "@/server/holdings/actions";
 import { addWishlist } from "@/server/wishlist/actions";
 import { uploadPersonalMedia } from "@/world/store/productionMedia";
+import { uploadCatalogReferenceImage } from "@/world/store/catalogReferenceMedia";
 import type { CurrentProfilePatch } from "@/domain/identity";
 
 export type Gate = "booting" | "welcome" | "onboarding" | "ready";
@@ -42,6 +41,11 @@ export type OnboardStep =
   | "bias"
   | "interest"
   | "collect"
+  | "detailSearch"
+  | "detailResults"
+  | "catalogPhoto"
+  | "cropPhoto"
+  | "manualEntry"
   | "describe"
   | "confirm"
   | "reveal"
@@ -56,13 +60,15 @@ interface SessionState {
   error: string | null;
   looking: boolean;
   photo: MediaRef | null;
-  candidates: IdentificationCandidate[];
+  visionFile: File | null;
+  candidates: Array<{ templateId: TemplateId; confidence: number; groupId: GroupId; kind: CollectibleKind; reason: string; productionTemplateId?: string }>;
   selectedTemplateId: TemplateId | null;
   productionTemplateId: string | null;
   productionHoldingId: string | null;
   pendingDraft: CatalogDraft | null;
   catalogMatches: CatalogMatch[];
   confirmMode: ConfirmMode;
+  referenceImageConsent: boolean;
   placementHint: boolean;
 
   boot: () => void;
@@ -88,8 +94,9 @@ interface SessionState {
   enterFirstRoom: () => void;
   finishRoomIntro: () => void;
   finishFirstSession: (next: "feed" | "profile", userId?: UserId) => void;
-  identifyPhoto: (file: File) => Promise<void>;
-  identifySample: (templateId: TemplateId) => Promise<void>;
+  beginManualPhoto: (file: File) => Promise<void>;
+  submitDraft: (draft: CatalogDraft) => Promise<void>;
+  setReferenceImageConsent: (consented: boolean) => void;
   searchPick: (templateId: TemplateId) => void;
   searchPickProduction: (input: {
     id: string;
@@ -100,6 +107,8 @@ interface SessionState {
     releaseName?: string | null;
     descriptor?: string;
   }) => void;
+  selectCatalogPhoto: (file: File) => Promise<void>;
+  confirmCrop: (dataUrl: string) => void;
   startDescribe: (name?: string) => void;
   reviewDraft: (draft: CatalogDraft) => void;
   resolveDraft: () => void;
@@ -109,6 +118,8 @@ interface SessionState {
   wantInstead: () => Promise<void>;
   clearError: () => void;
   openCollect: () => void;
+  startCatalogSearch: () => void;
+  startDetailSearch: () => void;
   closeCollect: () => void;
   dismissPlacementHint: () => void;
 }
@@ -137,6 +148,27 @@ function heartBusy() {
 
 function productionSession(userId: UserId): Extract<Session, { kind: "auth" }> {
   return { kind: "auth", userId };
+}
+
+async function hydrateProductionHoldings(userId: UserId) {
+  const result = await listHoldings({ limit: 100 });
+  if (!result.ok) return;
+  for (const item of result.holdings) {
+    const templateId = repository.adoptProductionCatalogTemplate({
+      id: item.template.id,
+      name: item.template.name,
+      kind: item.template.kind as CollectibleKind,
+      groupName: item.template.groupName,
+      memberName: item.template.memberName,
+      releaseName: item.template.releaseName,
+      descriptor: item.template.descriptor,
+    });
+    if (!templateId) continue;
+    const local = repository.listHoldings(userId).find((holding) => holding.productionId === item.id)
+      ?? repository.addHolding({ ownerId: userId, templateId, productionId: item.id });
+    repository.setHoldingTradeStatus(local.id, item.tradeStatus);
+    if (item.personalMediaUrl) repository.setHoldingPersonalMedia(local.id, item.personalMediaUrl);
+  }
 }
 
 function translateAuthFailure(reason: string): string {
@@ -200,10 +232,7 @@ function enterHome(userId: UserId, zoneKind: ZoneKind, templateId: TemplateId) {
   let view: WorldView = { kind: "zone", zoneId: zone.id };
   if (zoneKind === "binder") {
     const progress = repository.listSetProgress(userId);
-    const cards = repository
-      .listPlacementsInZone(room.id, zone.id)
-      .map((placement) => repository.getHoldingView(placement.holdingId))
-      .filter((item): item is NonNullable<typeof item> => item !== undefined);
+    const cards = repository.listHoldingViews(userId).filter((item) => item.template.kind === "photocard");
     const pages = buildPages(progress, cards, (id) => repository.getTemplate(id));
     view = { kind: "binder", zoneId: zone.id, page: spreadOfTemplate(pages, templateId) };
   }
@@ -217,6 +246,7 @@ export const useSession = create<SessionState>((set, get) => ({
   error: null,
   looking: false,
   photo: null,
+  visionFile: null,
   candidates: [],
   selectedTemplateId: null,
   productionTemplateId: null,
@@ -224,6 +254,7 @@ export const useSession = create<SessionState>((set, get) => ({
   pendingDraft: null,
   catalogMatches: [],
   confirmMode: "identify",
+  referenceImageConsent: false,
   placementHint: false,
 
   boot: async () => {
@@ -239,6 +270,7 @@ export const useSession = create<SessionState>((set, get) => ({
     const identity = resolvedIdentity;
     if (identity) {
       repository.adoptAuthenticatedIdentity(identity);
+      await hydrateProductionHoldings(identity.user.id);
       const session = productionSession(identity.user.id);
       const progress = repository.onboardingState(identity.user.id);
       if (!progress.profileComplete) {
@@ -278,7 +310,9 @@ export const useSession = create<SessionState>((set, get) => ({
         adopt(user.id, "arrival");
         settleHeart();
         set({ gate: "ready", session: fixtureSession, error: null });
-      } else set({ gate: "welcome", session: { kind: "none" }, error: "error.sessionLost" });
+      } else {
+        set({ gate: "welcome", session: { kind: "none" }, error: "error.sessionLost" });
+      }
       return;
     }
     const session: Session = { kind: "none" };
@@ -335,6 +369,7 @@ export const useSession = create<SessionState>((set, get) => ({
       return;
     }
     repository.adoptAuthenticatedIdentity(result.identity);
+    await hydrateProductionHoldings(result.identity.user.id);
     const session = productionSession(result.identity.user.id);
     writeSession(session);
     adopt(result.identity.user.id, "room");
@@ -350,6 +385,7 @@ export const useSession = create<SessionState>((set, get) => ({
     }
     if (!("identity" in result)) { set({ error: "error.authUnavailable" }); return; }
     repository.adoptAuthenticatedIdentity(result.identity);
+    await hydrateProductionHoldings(result.identity.user.id);
     const session = productionSession(result.identity.user.id);
     writeSession(session);
     const progress = repository.onboardingState(session.userId);
@@ -497,131 +533,42 @@ export const useSession = create<SessionState>((set, get) => ({
     });
   },
 
-  identifyPhoto: async (file) => {
-    set({ looking: true, error: null });
+  beginManualPhoto: async (file) => {
     const read = await readLocalImage(file);
-    if (!read.ok) {
-      set({ looking: false, error: photoErrorKey(read.code) });
-      return;
-    }
-    const session = get().session;
-    const profile = session.kind === "none" ? undefined : repository.getProfile(session.userId);
-    try {
-      let candidates: IdentificationCandidate[] = [];
-      if (session.kind === "auth") {
-        const formData = new FormData();
-        formData.set("file", file);
-        const response = await fetch("/api/identification", { method: "POST", body: formData });
-        if (!response.ok) throw new Error("identification_provider_unavailable");
-        const payload = await response.json() as { candidates?: Array<{ id: string; name: string; kind: CollectibleKind; groupName: string; memberName?: string | null; releaseName?: string | null; descriptor?: string }> };
-        candidates = (payload.candidates ?? []).flatMap((candidate, index) => {
-          const localId = repository.adoptProductionCatalogTemplate(candidate);
-          return localId ? [{
-            templateId: localId,
-            productionTemplateId: candidate.id,
-            confidence: index === 0 ? 0.8 : 0.62,
-            groupId: repository.getTemplate(localId)!.groupId,
-            kind: candidate.kind,
-            reason: "Possible catalog match",
-          }] : [];
-        });
-      } else {
-        candidates = await identification.identify({
-          image: read.media,
-          filename: file.name,
-          favoriteGroupIds: profile?.favoriteGroupIds,
-        });
-      }
-      if (candidates.length === 0) {
-        set({
-          looking: false,
-          error: null,
-          photo: read.media,
-          candidates: [],
-          selectedTemplateId: null,
-          pendingDraft: {
-            name: "",
-            kind: "photocard",
-            groupId: (profile?.favoriteGroupIds[0] ?? repository.listGroups()[0]?.id ?? "") as GroupId,
-          },
-          catalogMatches: [],
-          confirmMode: "draft",
-          step: "describe",
-        });
-        return;
-      }
-      set({
-        looking: false,
-        photo: read.media,
-        candidates,
-        selectedTemplateId: candidates[0]!.templateId,
-        pendingDraft: null,
-        catalogMatches: [],
-        confirmMode: "identify",
-        step: "confirm",
-      });
-    } catch {
-      set({
-        looking: false,
-        error: null,
-        photo: read.media,
-        candidates: [],
-        selectedTemplateId: null,
-        pendingDraft: {
-          name: "",
-          kind: "photocard",
-          groupId: (profile?.favoriteGroupIds[0] ?? repository.listGroups()[0]?.id ?? "") as GroupId,
-        },
-        catalogMatches: [],
-        confirmMode: "draft",
-        step: "describe",
-      });
-    }
+    if (!read.ok) { set({ error: photoErrorKey(read.code) }); return; }
+    set({
+      looking: false,
+      error: null,
+      photo: read.media,
+      visionFile: null,
+      candidates: [],
+      selectedTemplateId: null,
+      pendingDraft: { name: "", kind: "photocard", groupId: "" as GroupId },
+      catalogMatches: [],
+      confirmMode: "draft",
+      step: "manualEntry",
+    });
   },
 
-  identifySample: async (templateId) => {
-    const template = repository.getTemplate(templateId);
-    if (!template) {
-      set({ error: "error.catalogMissing" });
+  submitDraft: async (draft) => {
+    if (!draft.name.trim() || !draft.groupId || !draft.kind) {
+      set({ error: "catalog.needDetails" });
       return;
     }
-    set({ looking: true, error: null });
-    const session = get().session;
-    const profile = session.kind === "none" ? undefined : repository.getProfile(session.userId);
-    try {
-      const candidates = await identification.identify({
-        filename: `${template.name}.jpg`,
-        favoriteGroupIds: profile?.favoriteGroupIds,
-      });
-      const top = candidates[0] && candidates.some((c) => c.templateId === templateId)
-        ? candidates
-        : [
-            {
-              templateId,
-              confidence: 0.91,
-              groupId: template.groupId,
-              ...(template.memberId ? { memberId: template.memberId } : {}),
-              ...(template.eraId ? { eraId: template.eraId } : {}),
-              ...(template.releaseId ? { releaseId: template.releaseId } : {}),
-              kind: template.kind,
-              reason: "Selected from the catalog",
-            },
-            ...candidates.filter((c) => c.templateId !== templateId),
-          ];
-      set({
-        looking: false,
-        photo: null,
-        candidates: top.slice(0, 3),
-        selectedTemplateId: templateId,
-        pendingDraft: null,
-        catalogMatches: [],
-        confirmMode: "identify",
-        step: "confirm",
-      });
-    } catch {
-      set({ looking: false, error: "error.identifyFailed" });
-    }
+    const photo = get().photo;
+    set({
+      pendingDraft: {
+        ...draft,
+        name: draft.name.trim(),
+        ...(photo?.url ? { imageUrl: photo.url } : {}),
+      },
+      confirmMode: "draft",
+      error: null,
+    });
+    await get().createFromDraft();
   },
+
+  setReferenceImageConsent: (consented) => set({ referenceImageConsent: consented }),
 
   searchPick: (templateId) => {
     const template = repository.getTemplate(templateId);
@@ -631,6 +578,7 @@ export const useSession = create<SessionState>((set, get) => ({
     }
     set({
       photo: null,
+      visionFile: null,
       selectedTemplateId: templateId,
       candidates: [
         {
@@ -646,8 +594,8 @@ export const useSession = create<SessionState>((set, get) => ({
       ],
       pendingDraft: null,
       catalogMatches: [],
-      confirmMode: "identify",
-      step: "confirm",
+      confirmMode: "found",
+      step: "catalogPhoto",
       error: null,
     });
   },
@@ -658,15 +606,28 @@ export const useSession = create<SessionState>((set, get) => ({
       set({ error: "error.catalogMissing" });
       return;
     }
-    set({ photo: null, selectedTemplateId: templateId, productionTemplateId: input.id, confirmMode: "found", error: null, step: "confirm" });
+    set({ photo: null, visionFile: null, selectedTemplateId: templateId, productionTemplateId: input.id, confirmMode: "found", error: null, step: "catalogPhoto" });
+  },
+
+  selectCatalogPhoto: async (file) => {
+    const read = await readLocalImage(file);
+    if (!read.ok) { set({ error: photoErrorKey(read.code) }); return; }
+    const template = get().selectedTemplateId ? repository.getTemplate(get().selectedTemplateId!) : undefined;
+    set({ photo: read.media, error: null, step: template?.kind === "photocard" ? "cropPhoto" : "confirm" });
+  },
+
+  confirmCrop: (dataUrl) => {
+    const current = get().photo;
+    if (!current) return;
+    set({ photo: { ...current, url: dataUrl }, step: "confirm", error: null });
   },
 
   startDescribe: (name) => {
-    const session = get().session;
-    const profile = session.kind === "none" ? undefined : repository.getProfile(session.userId);
-    const groupId = (profile?.favoriteGroupIds[0] ?? repository.listGroups()[0]?.id ?? "") as GroupId;
+    const groupId = "" as GroupId;
     set({
-      step: "describe",
+      step: "manualEntry",
+      visionFile: null,
+      photo: null,
       confirmMode: "draft",
       selectedTemplateId: null,
       catalogMatches: [],
@@ -680,7 +641,7 @@ export const useSession = create<SessionState>((set, get) => ({
   },
 
   reviewDraft: (draft) => {
-    if (!draft.name.trim() || !draft.groupId) {
+    if (!draft.name.trim() || !draft.groupId || !draft.kind) {
       set({ error: "catalog.needDetails" });
       return;
     }
@@ -694,7 +655,7 @@ export const useSession = create<SessionState>((set, get) => ({
       selectedTemplateId: null,
       catalogMatches: [],
       confirmMode: "draft",
-      step: "confirm",
+      step: draft.kind === "photocard" && photo ? "cropPhoto" : "confirm",
       error: null,
     });
   },
@@ -751,7 +712,7 @@ export const useSession = create<SessionState>((set, get) => ({
         groupName: group?.name ?? draft.groupId,
         ...(member ? { memberName: member.stageName } : {}),
         ...(release ? { releaseName: release.title } : {}),
-        ...(draft.imageUrl ? { descriptor: "community photo reference" } : {}),
+        ...(get().referenceImageConsent && draft.imageUrl ? { descriptor: "community photo reference" } : {}),
       });
       if (!result.ok) {
         set({ error: result.reason === "unauthenticated" ? "error.invalidCredentials" : "error.authUnavailable" });
@@ -764,6 +725,16 @@ export const useSession = create<SessionState>((set, get) => ({
         return;
       }
       set({ productionHoldingId: ownership.holding.id });
+      const contributedPhoto = get().photo;
+      if (get().referenceImageConsent && contributedPhoto) {
+        try {
+          const reference = await uploadCatalogReferenceImage(productionTemplateId, contributedPhoto);
+          if (!reference.ok) console.warn("catalog_reference_upload_failed");
+        } catch {
+          // Reference imagery is optional. The Holding remains valid if this fails.
+          console.warn("catalog_reference_upload_failed");
+        }
+      }
     }
     const created = repository.createCatalogItem(draft);
     set({ selectedTemplateId: created.id, productionTemplateId, catalogMatches: [] });
@@ -815,6 +786,10 @@ export const useSession = create<SessionState>((set, get) => ({
       if (photo) {
         try {
           const mediaResult = await uploadPersonalMedia(durableHoldingId, photo);
+          if (mediaResult.ok) {
+            const localHolding = repository.listHoldings(session.userId).find((holding) => holding.productionId === durableHoldingId);
+            if (localHolding) repository.setHoldingPersonalMedia(localHolding.id, mediaResult.asset.url);
+          }
           if (!mediaResult.ok) set({ error: "error.authUnavailable" });
         } catch {
           set({ error: "error.authUnavailable" });
@@ -828,8 +803,9 @@ export const useSession = create<SessionState>((set, get) => ({
         gate: "onboarding",
         step: "reveal",
         looking: false,
-        error: owned ? "error.alreadyOwned" : null,
-        photo: null,
+      error: owned ? "error.alreadyOwned" : null,
+      photo: null,
+      visionFile: null,
         candidates: [],
         selectedTemplateId: null,
         productionTemplateId: null,
@@ -837,6 +813,7 @@ export const useSession = create<SessionState>((set, get) => ({
         pendingDraft: null,
         catalogMatches: [],
         confirmMode: "identify",
+        referenceImageConsent: false,
       });
       confirmInFlight = false;
       return;
@@ -848,6 +825,7 @@ export const useSession = create<SessionState>((set, get) => ({
       looking: false,
       error: owned ? "error.alreadyOwned" : "catalog.added",
       photo: null,
+      visionFile: null,
       candidates: [],
       selectedTemplateId: null,
       productionTemplateId: null,
@@ -855,6 +833,7 @@ export const useSession = create<SessionState>((set, get) => ({
       pendingDraft: null,
       catalogMatches: [],
       confirmMode: "identify",
+      referenceImageConsent: false,
     });
     confirmInFlight = false;
   },
@@ -874,11 +853,13 @@ export const useSession = create<SessionState>((set, get) => ({
       step: "collect",
       error: "error.savedWishlist",
       photo: null,
+      visionFile: null,
       candidates: [],
       selectedTemplateId: null,
       pendingDraft: null,
       catalogMatches: [],
       confirmMode: "identify",
+      referenceImageConsent: false,
     });
   },
 
@@ -892,7 +873,12 @@ export const useSession = create<SessionState>((set, get) => ({
       pendingDraft: null,
       catalogMatches: [],
       confirmMode: "identify",
+      visionFile: null,
+      photo: null,
+      referenceImageConsent: false,
     }),
+  startCatalogSearch: () => set({ step: "detailSearch", error: null, photo: null, visionFile: null, candidates: [], selectedTemplateId: null, pendingDraft: null, catalogMatches: [], confirmMode: "identify", referenceImageConsent: false }),
+  startDetailSearch: () => set({ step: "detailSearch", error: null, photo: null, visionFile: null, candidates: [], selectedTemplateId: null, pendingDraft: null, catalogMatches: [], confirmMode: "identify", referenceImageConsent: false }),
   closeCollect: () => {
     const session = get().session;
     if (session.kind === "none") return;
@@ -904,11 +890,13 @@ export const useSession = create<SessionState>((set, get) => ({
       step: "collect",
       error: null,
       photo: null,
+      visionFile: null,
       candidates: [],
       selectedTemplateId: null,
       pendingDraft: null,
       catalogMatches: [],
       confirmMode: "identify",
+      referenceImageConsent: false,
     });
   },
   dismissPlacementHint: () => set({ placementHint: false }),

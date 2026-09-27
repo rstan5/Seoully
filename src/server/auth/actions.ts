@@ -3,7 +3,7 @@
 import { z } from "zod";
 import type { AuthActionResult, CurrentProfilePatch, IdentityProfileDTO } from "@/domain/identity";
 import { normalizeHandle } from "@/domain/session";
-import { currentProfilePatchSchema, getCurrentIdentity, updateCurrentProfile } from "@/server/dal/profile";
+import { currentProfilePatchSchema, getCurrentIdentity, getCurrentIdentityFromClient, updateCurrentProfile } from "@/server/dal/profile";
 import { createSupabaseServerClient, hasSupabaseConfiguration } from "@/server/supabase/server";
 
 const handleSchema = z.string().trim().min(3).max(32).transform(normalizeHandle).pipe(z.string().regex(/^[a-z][a-z0-9_]{2,15}$/));
@@ -40,15 +40,23 @@ export async function createSeoullyAccount(input: unknown): Promise<AuthActionRe
       },
     });
     if (error) {
+      logAuthError("signUp", error);
       if (error.code === "user_already_exists") return { ok: false, reason: "email-taken" };
       if (/handle.*(unique|duplicate)|profiles_handle/i.test(error.message)) return { ok: false, reason: "handle-taken" };
       if (error.code === "weak_password" || error.code === "email_address_invalid") return { ok: false, reason: "invalid-input" };
       return { ok: false, reason: "unavailable" };
     }
     if (!data.session) return { ok: true, needsEmailConfirmation: true };
-    const identity = await getCurrentIdentity();
+    let identity: IdentityProfileDTO | null;
+    try {
+      identity = await getCurrentIdentityFromClient(supabase);
+    } catch (error) {
+      logAuthError("signupIdentityProvisioning", error);
+      return { ok: false, reason: "profile-missing" };
+    }
     return identity ? { ok: true, identity } : { ok: false, reason: "profile-missing" };
-  } catch {
+  } catch (error) {
+    logAuthError("signUp", error);
     return { ok: false, reason: "unavailable" };
   }
 }
@@ -61,14 +69,23 @@ export async function signInToSeoully(input: unknown): Promise<AuthActionResult>
     const supabase = await createSupabaseServerClient();
     const { error } = await supabase.auth.signInWithPassword(parsed.data);
     if (error) {
+      logAuthError("signInWithPassword", error);
       if (error.code === "invalid_credentials" || error.code === "email_not_confirmed") {
         return { ok: false, reason: "invalid-credentials" };
       }
       return { ok: false, reason: "unavailable" };
     }
-    const identity = await getCurrentIdentity();
+    let identity: IdentityProfileDTO | null;
+    try {
+      identity = await getCurrentIdentity();
+    } catch (error) {
+      logAuthError("identityProvisioning", error);
+      return { ok: false, reason: "profile-missing" };
+    }
+    if (!identity) console.error("[auth] sign-in succeeded but no current identity was resolved");
     return identity ? { ok: true, identity } : { ok: false, reason: "profile-missing" };
-  } catch {
+  } catch (error) {
+    logAuthError("signIn", error);
     return { ok: false, reason: "unavailable" };
   }
 }
@@ -118,4 +135,20 @@ function safeSiteUrl(): string | null {
   } catch {
     return null;
   }
+}
+
+function logAuthError(stage: string, error: unknown): void {
+  if (error && typeof error === "object") {
+    const value = error as { name?: unknown; message?: unknown; code?: unknown; status?: unknown; __isAuthError?: unknown };
+    console.error(`[auth] ${stage} failed ${JSON.stringify({
+      name: typeof value.name === "string" ? value.name : undefined,
+      code: typeof value.code === "string" ? value.code : undefined,
+      status: typeof value.status === "number" ? value.status : undefined,
+      message: typeof value.message === "string" ? value.message : String(error),
+      detail: String(error),
+      authError: value.__isAuthError === true,
+    })}`);
+    return;
+  }
+  console.error(`[auth] ${stage} failed ${JSON.stringify({ message: String(error) })}`);
 }

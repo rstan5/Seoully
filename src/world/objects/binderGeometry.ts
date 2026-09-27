@@ -110,6 +110,34 @@ export function buildPages(
     }
   }
 
+  // Community-created templates often have no curated CollectibleSet yet.
+  // Keep those owned cards in a stable general page instead of silently
+  // dropping them from the Binder.
+  const known = new Set(ordered.flatMap((entry) => entry.set.templateIds));
+  const ungrouped = [...byTemplate.entries()].filter(([id]) => !known.has(id as TemplateId));
+  if (ungrouped.length > 0) {
+    const pageCount = Math.max(1, Math.ceil(ungrouped.length / POCKETS_PER_PAGE));
+    for (let page = 0; page < pageCount; page += 1) {
+      const pockets: BinderPocket[] = [];
+      for (let slot = 0; slot < POCKETS_PER_PAGE; slot += 1) {
+        const view = ungrouped[page * POCKETS_PER_PAGE + slot]?.[1];
+        pockets.push({ index: page * POCKETS_PER_PAGE + slot, ...(view ? { template: view.template, holding: view } : {}) });
+      }
+      pages.push({ setId: "seoully-general-photocards", setName: "Your Photocards", pageInSet: page, pockets });
+    }
+  }
+
+  if (pages.length === 0) {
+    pages.push({ setId: "seoully-general-photocards", setName: "Your Photocards", pageInSet: 0, pockets: Array.from({ length: POCKETS_PER_PAGE }, (_, index) => ({ index })) });
+  }
+
+  // An open binder is always a physical left/right pair. Keep a blank partner
+  // for an odd logical page count so one side can never disappear.
+  if (pages.length % 2 === 1) {
+    const last = pages[pages.length - 1]!;
+    pages.push({ setId: last.setId, setName: last.setName, pageInSet: last.pageInSet + 1, pockets: Array.from({ length: POCKETS_PER_PAGE }, (_, index) => ({ index })) });
+  }
+
   return pages;
 }
 

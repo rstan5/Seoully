@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { getPublicProfileByHandle } from "@/server/dal/profile";
+import { getCurrentIdentity, getPublicProfileByHandle } from "@/server/dal/profile";
 
 export async function GET(_request: Request, context: { params: Promise<{ handle: string }> }) {
   try {
+    if (!(await getCurrentIdentity())) return NextResponse.json({ error: "authentication_required" }, { status: 401 });
     const { handle } = await context.params;
     const profile = await getPublicProfileByHandle(handle);
     if (!profile) return NextResponse.json({ error: "not_found" }, { status: 404 });

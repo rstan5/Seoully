@@ -736,6 +736,7 @@ export interface IdentificationCandidate {
   releaseVersionId?: ReleaseVersionId;
   kind: CollectibleKind;
   reason: string;
+  referenceImageUrl?: string;
 }
 
 export interface IdentificationInput {

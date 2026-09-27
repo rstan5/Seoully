@@ -67,6 +67,10 @@ export function useRoomData(
           .map((placement) => repository.getHoldingView(placement.holdingId))
           .filter((v): v is HoldingView => v !== undefined);
       }
+      // The binder is the collection's storage view, not a placement-only zone.
+      // A newly contributed template may not belong to a curated set yet, but
+      // it must still be visible and available here.
+      byKind.binder = repository.listHoldingViews(room.ownerId).filter((view) => view.template.kind === "photocard");
     }
 
     return { room, contents: { byKind, offsets, objects, freeHoldings } };

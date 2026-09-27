@@ -16,15 +16,11 @@ import { LanguageToggle } from "@/world/ui/LanguageToggle";
 import { HeartScene } from "@/world/ui/onboard/HeartScene";
 import { ObjectTile } from "@/world/ui/ObjectTile";
 import { SocialAvatar } from "@/world/ui/SocialAvatar";
+import { PhotoPicker } from "@/world/ui/PhotoPicker";
+import { PhotoCropper } from "@/world/ui/PhotoCropper";
 import { useSession } from "@/world/store/sessionStore";
 
 const INTERESTS: CollectorInterest[] = ["photocards", "albums", "merch", "everything"];
-
-const SAMPLES: TemplateId[] = [
-  "set-ate-pc-4" as TemplateId,
-  "set-lovedive-pc-4" as TemplateId,
-  "set-ate-pc-1" as TemplateId,
-];
 
 export function OnboardingFlow() {
   const step = useSession((s) => s.step);
@@ -58,8 +54,11 @@ export function OnboardingFlow() {
         {step === "group" && <GroupBeat />}
         {step === "bias" && <BiasBeat />}
         {step === "interest" && <InterestBeat />}
-        {step === "collect" && <CollectForm />}
-        {step === "describe" && <DescribeForm />}
+        {step === "collect" && <CollectEntry />}
+        {step === "detailSearch" && <DetailSearch />}
+        {step === "catalogPhoto" && <CatalogPhoto />}
+        {step === "cropPhoto" && <CropPhoto />}
+        {(step === "describe" || step === "manualEntry") && <DescribeForm />}
         {step === "confirm" && <ConfirmForm />}
         {step === "reveal" && <RevealBeat />}
         {step === "meet" && <MeetCollectors />}
@@ -149,20 +148,18 @@ function PhotoBeat() {
     <>
       <h1>{t("onboard.photoTitle")}</h1>
       <p className="onboard-lede">{t("onboard.photoLede")}</p>
-      <label className="onboard-avatar">
+      <div className="onboard-avatar">
         {avatarUrl ? <img src={avatarUrl} alt="" /> : <span>{t("onboard.addPhoto")}</span>}
-        <input
-          type="file"
-          accept="image/*"
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            const { readLocalImage } = await import("@/domain/media");
-            const read = await readLocalImage(file);
-            if (read.ok) setAvatarUrl(read.media.url);
-          }}
-        />
-      </label>
+      </div>
+      <PhotoPicker
+        onPhotoSelected={async (file) => {
+          const { readLocalImage } = await import("@/domain/media");
+          const read = await readLocalImage(file);
+          if (read.ok) setAvatarUrl(read.media.url);
+        }}
+        takeLabel="Take Photo"
+        libraryLabel="Choose from Library"
+      />
       <div className="onboard-actions">
         <button type="button" className="onboard-btn" onClick={() => savePhoto(avatarUrl)}>
           {avatarUrl ? t("common.continue") : t("common.skipForNow")}
@@ -294,137 +291,84 @@ const COLLECTIBLE_KINDS: CollectibleKind[] = [
   "memorabilia",
 ];
 
-function CollectForm() {
+function CollectEntry() {
+  const startCatalogSearch = useSession((s) => s.startCatalogSearch);
+  const startDescribe = useSession((s) => s.startDescribe);
   const session = useSession((s) => s.session);
-  const identifyPhoto = useSession((s) => s.identifyPhoto);
-  const identifySample = useSession((s) => s.identifySample);
+  const closeCollect = useSession((s) => s.closeCollect);
+  const t = useT();
+  const first = (session.kind === "local" || session.kind === "auth") && !repository.onboardingState(session.userId).firstHoldingComplete;
+  return (
+    <>
+      <h1>{t("catalog.entryTitle")}</h1>
+      <p className="onboard-lede">{t("catalog.entryLede")}</p>
+      <div className="onboard-actions" aria-label="Add collectible source">
+        <button type="button" className="onboard-btn" onClick={startCatalogSearch}>{t("catalog.searchCatalog")}</button>
+        <p className="onboard-kicker">{t("catalog.searchCatalogLede")}</p>
+        <button type="button" className="onboard-btn is-ghost" onClick={() => startDescribe()}>{t("catalog.addManually")}</button>
+        <p className="onboard-kicker">{t("catalog.addManuallyLede")}</p>
+      </div>
+      {!first && <button type="button" className="onboard-btn is-ghost" onClick={closeCollect}>Back</button>}
+    </>
+  );
+}
+
+function CatalogPhoto() {
+  const photo = useSession((s) => s.photo);
+  const selectCatalogPhoto = useSession((s) => s.selectCatalogPhoto);
+  const confirmHolding = useSession((s) => s.confirmHolding);
+  const openCollect = useSession((s) => s.openCollect);
+  const selected = useSession((s) => s.selectedTemplateId);
+  const t = useT();
+  return <>
+    <h1>{selected ? "Add your photo" : t("catalog.detailSearchLabel")}</h1>
+    {selected && <CollectibleSummary templateId={selected} />}
+    {photo && <div className="onboard-avatar" style={{ width: "100%", height: 180, borderRadius: 16 }}><img src={photo.url} alt="Your collectible" /></div>}
+    <PhotoPicker onPhotoSelected={(file) => void selectCatalogPhoto(file)} takeLabel="Take Photo" libraryLabel="Choose from Library" />
+    <div className="onboard-actions">
+      <button type="button" className="onboard-btn" disabled={!selected} onClick={() => void confirmHolding()}>{t("profile.addToCollection")}</button>
+      <button type="button" className="onboard-btn is-ghost" onClick={openCollect}>{t("common.back")}</button>
+    </div>
+  </>;
+}
+
+function CropPhoto() {
+  const photo = useSession((s) => s.photo);
+  const confirmCrop = useSession((s) => s.confirmCrop);
+  const openCollect = useSession((s) => s.openCollect);
+  if (!photo) return null;
+  return <PhotoCropper src={photo.url} onConfirm={confirmCrop} onBack={openCollect} />;
+}
+
+function DetailSearch() {
+  const session = useSession((s) => s.session);
   const searchPick = useSession((s) => s.searchPick);
   const searchPickProduction = useSession((s) => s.searchPickProduction);
   const startDescribe = useSession((s) => s.startDescribe);
-  const closeCollect = useSession((s) => s.closeCollect);
-  const looking = useSession((s) => s.looking);
+  const openCollect = useSession((s) => s.openCollect);
   const [query, setQuery] = useState("");
   const [sharedHits, setSharedHits] = useState<SharedCatalogHit[]>([]);
-  const hits = useMemo(() => (query.trim() ? repository.searchCatalog(query) : []), [query]);
+  const hits = useMemo(() => (session.kind === "auth" ? [] : (query.trim() ? repository.searchCatalog(query) : [])), [query, session.kind]);
   useEffect(() => {
-    if (session.kind !== "auth" || !query.trim()) {
-      setSharedHits([]);
-      return;
-    }
+    if (session.kind !== "auth" || !query.trim()) { setSharedHits([]); return; }
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       void fetch(`/api/catalog/search?q=${encodeURIComponent(query.trim())}&limit=8`, { signal: controller.signal })
         .then((response) => response.ok ? response.json() as Promise<{ results?: SharedCatalogHit[] }> : { results: [] })
-        .then((payload) => setSharedHits(payload.results ?? []))
-        .catch(() => setSharedHits([]));
+        .then((payload) => setSharedHits(payload.results ?? [])).catch(() => setSharedHits([]));
     }, 180);
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [query, session.kind]);
-  const first =
-    (session.kind === "local" || session.kind === "auth") && !repository.onboardingState(session.userId).firstHoldingComplete;
   const t = useT();
-
   return (
     <>
-      <h1>{first ? t("onboard.collectFirstTitle") : t("onboard.collectTitle")}</h1>
-      <p className="onboard-lede">
-        {first ? t("onboard.collectFirstLede") : t("onboard.collectLede")}
-      </p>
-      <div className="onboard-row">
-        <label className="onboard-btn">
-          {t("onboard.takePhoto")}
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            hidden
-            disabled={looking}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void identifyPhoto(file);
-              e.target.value = "";
-            }}
-          />
-        </label>
-        <label className="onboard-btn is-ghost">
-          {t("onboard.upload")}
-          <input
-            type="file"
-            accept="image/*"
-            hidden
-            disabled={looking}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void identifyPhoto(file);
-              e.target.value = "";
-            }}
-          />
-        </label>
-      </div>
-      <p className="onboard-kicker" style={{ marginTop: 22 }}>
-        {t("onboard.trySample")}
-      </p>
-      <div className="onboard-samples">
-        {SAMPLES.map((id) => {
-          const template = repository.getTemplate(id);
-          if (!template) return null;
-          const member = template.memberId ? repository.getMember(template.memberId) : undefined;
-          return (
-            <button key={id} type="button" onClick={() => void identifySample(id)}>
-              <ObjectTile template={template} member={member} height={64} />
-              {member?.stageName ?? template.name}
-            </button>
-          );
-        })}
-      </div>
-      <div className="onboard-field">
-        <label htmlFor="onboard-search">{t("onboard.searchManual")}</label>
-        <input
-          id="onboard-search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t("onboard.searchPlaceholder")}
-        />
-      </div>
-      <ul className="onboard-search">
-        {hits.slice(0, 8).map((template) => {
-          const group = repository.getGroup(template.groupId);
-          const member = template.memberId ? repository.getMember(template.memberId) : undefined;
-          return (
-            <li key={template.id}>
-              <button type="button" onClick={() => searchPick(template.id)}>
-                <strong>{template.name}</strong>
-                <em>{[group?.name, member?.stageName, kindLabel(template.kind, t)].filter(Boolean).join(" · ")}</em>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      {sharedHits.length > 0 && (
-        <ul className="onboard-search">
-          {sharedHits.map((template) => (
-            <li key={template.id}>
-              <button type="button" onClick={() => searchPickProduction(template)}>
-                <strong>{template.name}</strong>
-                <em>{[template.groupName, template.memberName, kindLabel(template.kind, t)].filter(Boolean).join(" · ")}</em>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {query.trim() && hits.length === 0 && (
-        <button type="button" className="onboard-btn" onClick={() => startDescribe(query)}>
-          {t("catalog.addWhatYouHave")}
-        </button>
-      )}
-      <button type="button" className="onboard-btn is-ghost" onClick={() => startDescribe(query)}>
-        {t("catalog.describeMine")}
-      </button>
-      {!first && (
-        <button type="button" className="onboard-btn is-ghost" onClick={closeCollect}>
-          {t("common.cancel")}
-        </button>
-      )}
+      <h1>{t("catalog.searchCatalog")}</h1>
+      <p className="onboard-lede">{t("catalog.detailSearchLede")}</p>
+      <div className="onboard-field"><label htmlFor="catalog-detail-search">{t("catalog.detailSearchLabel")}</label><input id="catalog-detail-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("catalog.detailSearchPlaceholder")} /></div>
+      <ul className="onboard-search">{hits.slice(0, 8).map((template) => { const group = repository.getGroup(template.groupId); const member = template.memberId ? repository.getMember(template.memberId) : undefined; return <li key={template.id}><button type="button" onClick={() => searchPick(template.id)}><strong>{template.name}</strong><em>{[group?.name, member?.stageName, kindLabel(template.kind, t)].filter(Boolean).join(" · ")}</em></button></li>; })}</ul>
+      {sharedHits.length > 0 && <ul className="onboard-search">{sharedHits.map((template) => <li key={template.id}><button type="button" onClick={() => searchPickProduction(template)}><strong>{template.name}</strong><em>{[template.groupName, template.memberName, kindLabel(template.kind, t)].filter(Boolean).join(" · ")}</em></button></li>)}</ul>}
+      {query.trim() && hits.length === 0 && sharedHits.length === 0 && <p className="onboard-kicker">{t("catalog.detailNoResults")}</p>}
+      <div className="onboard-actions"><button type="button" className="onboard-btn is-ghost" onClick={() => startDescribe(query)}>Add Manually</button><button type="button" className="onboard-btn is-ghost" onClick={openCollect}>Back</button></div>
     </>
   );
 }
@@ -444,8 +388,11 @@ function DescribeForm() {
   const reviewDraft = useSession((s) => s.reviewDraft);
   const openCollect = useSession((s) => s.openCollect);
   const photo = useSession((s) => s.photo);
+  const beginManualPhoto = useSession((s) => s.beginManualPhoto);
+  const referenceImageConsent = useSession((s) => s.referenceImageConsent);
+  const setReferenceImageConsent = useSession((s) => s.setReferenceImageConsent);
   const [draft, setDraft] = useState<CatalogDraft>(
-    pending ?? { name: "", kind: "photocard", groupId: repository.listGroups()[0]!.id },
+    pending ?? { name: "", kind: "photocard", groupId: "" as GroupId },
   );
   const t = useT();
   const members = repository.listMembers(draft.groupId);
@@ -461,6 +408,7 @@ function DescribeForm() {
           <img src={photo.url} alt="" />
         </div>
       )}
+      <PhotoPicker onPhotoSelected={(file) => void beginManualPhoto(file)} takeLabel="Take Photo" libraryLabel="Choose from Library" />
       <div className="onboard-field">
         <label htmlFor="catalog-name">{t("catalog.name")}</label>
         <input
@@ -475,10 +423,11 @@ function DescribeForm() {
         <select
           id="catalog-kind"
           value={draft.kind}
-          onChange={(e) =>
-            setDraft((current) => ({ ...current, kind: e.target.value as CollectibleKind }))
-          }
+          onChange={(e) => {
+            setDraft((current) => ({ ...current, kind: e.target.value as CollectibleKind }));
+          }}
         >
+          <option value="">{t("catalog.optional")}</option>
           {COLLECTIBLE_KINDS.map((kind) => (
             <option key={kind} value={kind}>
               {kindLabel(kind, t)}
@@ -502,6 +451,7 @@ function DescribeForm() {
             }))
           }
         >
+          <option value="">{t("catalog.optional")}</option>
           {repository.listGroups().map((group) => (
             <option key={group.id} value={group.id}>
               {group.name}
@@ -573,10 +523,23 @@ function DescribeForm() {
           ))}
         </select>
       </div>
+      {photo && (
+        <div className="onboard-field">
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+            <input
+              type="checkbox"
+              checked={referenceImageConsent}
+              onChange={(event) => setReferenceImageConsent(event.target.checked)}
+            />
+            <span>
+              <strong>{t("catalog.referenceConsent")}</strong>
+              <small style={{ display: "block", marginTop: 4 }}>{t("catalog.referenceConsentLede")}</small>
+            </span>
+          </label>
+        </div>
+      )}
       <div className="onboard-actions">
-        <button type="button" className="onboard-btn" onClick={() => reviewDraft(draft)}>
-          {t("common.continue")}
-        </button>
+        <button type="button" className="onboard-btn" onClick={() => reviewDraft(draft)}>{t("common.continue")}</button>
         <button type="button" className="onboard-btn is-ghost" onClick={openCollect}>
           {t("common.back")}
         </button>
@@ -645,10 +608,7 @@ function ConfirmForm() {
         <CollectibleSummary templateId={template.id} photoUrl={photo?.url} />
         <div className="onboard-actions">
           <button type="button" className="onboard-btn" onClick={confirmHolding}>
-            {t("catalog.useThis")}
-          </button>
-          <button type="button" className="onboard-btn is-ghost" onClick={createFromDraft}>
-            {t("catalog.createNew")}
+            {t("profile.addToCollection")}
           </button>
           <button type="button" className="onboard-btn is-ghost" onClick={openCollect}>
             {t("common.back")}

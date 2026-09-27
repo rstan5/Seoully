@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { getPublicRoomByHandle } from "@/server/dal/public-room";
+import { getCurrentIdentity } from "@/server/dal/profile";
 
 export async function GET(_request: Request, context: { params: Promise<{ handle: string }> }) {
   try {
+    if (!(await getCurrentIdentity())) return NextResponse.json({ error: "authentication_required" }, { status: 401 });
     const { handle } = await context.params;
     const room = await getPublicRoomByHandle(handle);
     if (!room) return NextResponse.json({ error: "not_found" }, { status: 404 });

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { IdentityProfileDTO } from "@/domain/identity";
 import type { CollectorInterest, Profile, UserId } from "@/domain/types";
 import { normalizeHandle } from "@/domain/session";
@@ -34,6 +35,11 @@ export interface PublicProfileDTO extends IdentityProfileDTO {
 
 export async function getCurrentIdentity(): Promise<IdentityProfileDTO | null> {
   const supabase = await createSupabaseServerClient();
+  return getCurrentIdentityFromClient(supabase);
+}
+
+/** Resolve identity using the same client that just established an auth session. */
+export async function getCurrentIdentityFromClient(supabase: SupabaseClient): Promise<IdentityProfileDTO | null> {
   const { data: authResult, error: authError } = await supabase.auth.getUser();
   if (authError || !authResult.user) return null;
 

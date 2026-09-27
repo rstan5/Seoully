@@ -51,6 +51,16 @@ export default function Page() {
   } | null>(null);
   const [sharePostId, setSharePostId] = useState<PostId | null>(null);
 
+  const openProfile = (userId: UserId) => {
+    if (repository.getUser(userId)) { showProfile(userId); return; }
+    if (!isUuid(userId)) return;
+    void fetch(`/api/profiles/${encodeURIComponent(userId)}`).then(async (response) => {
+      if (!response.ok) return;
+      const profile = await response.json() as { user?: { handle?: string } };
+      if (profile.user?.handle) window.location.assign(`/@${profile.user.handle}`);
+    });
+  };
+
   useEffect(() => {
     boot();
   }, [boot]);
@@ -85,6 +95,15 @@ export default function Page() {
     const currentOwner = repository.getRoom(roomId)?.ownerId;
     if (userId === currentOwner) {
       back();
+      return;
+    }
+    if (!repository.getRoomByOwner(userId)) {
+      if (!isUuid(userId)) return;
+      void fetch(`/api/profiles/${encodeURIComponent(userId)}`).then(async (response) => {
+        if (!response.ok) return;
+        const profile = await response.json() as { user?: { handle?: string } };
+        if (profile.user?.handle) window.location.assign(`/@${profile.user.handle}/room`);
+      });
       return;
     }
     travelToRoomOf(userId);
@@ -138,24 +157,24 @@ export default function Page() {
       <Room roomId={roomId} onMessage={openMessage} />
 
       {view.kind === "profile" && (
-        <CollectorProfile
+          <CollectorProfile
           userId={view.userId}
           viewerId={viewerId}
           onEnterRoom={enterRoomOf}
-          onViewProfile={showProfile}
+          onViewProfile={openProfile}
           onMessage={openMessage}
           onShare={startShare}
         />
       )}
       {view.kind === "feed" && (
-        isUuid(viewerId) && session.kind === "auth"
-          ? <ProductionFeed viewerId={viewerId} onViewProfile={showProfile} />
-          : <CollectorFeed viewerId={viewerId} onViewProfile={showProfile} onShare={startShare} />
+          isUuid(viewerId) && session.kind === "auth"
+          ? <ProductionFeed viewerId={viewerId} onViewProfile={openProfile} />
+          : <CollectorFeed viewerId={viewerId} onViewProfile={openProfile} onShare={startShare} />
       )}
       {view.kind === "search" && (
         <CollectorSearch
           viewerId={viewerId}
-          onViewProfile={showProfile}
+          onViewProfile={openProfile}
           onEnterRoom={enterRoomOf}
           onShare={startShare}
         />
@@ -173,7 +192,7 @@ export default function Page() {
       {view.kind === "notices" && (
         <CollectorNotices
           viewerId={viewerId}
-          onViewProfile={showProfile}
+          onViewProfile={openProfile}
           onOpenThread={openMessage}
         />
       )}

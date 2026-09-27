@@ -70,8 +70,14 @@ Mobile foundation TypeScript passes and Expo config resolves. `expo-doctor` repo
 local duplicate React copy because the existing root `node_modules` is adjacent to the
 new isolated app; clean installs should be validated before release. Native device QA
 is still pending.
+- Native and web TypeScript, fixture checks, and diff checks pass after the collection
+  slices. `next build` was retried and is currently blocked by the local Turbopack
+  worker failing to bind a process port (`Operation not permitted`); retry in a clean
+  build environment.
 
 ## Next autonomous task
 
-Commit the contribution slice, then finish photo-first manual contribution with explicit
-reference-image consent and shared/personal media separation.
+Finish photo-first manual contribution with explicit reference-image consent and
+shared/personal media separation, then add native Feed production reads. Full native
+social, collection, Room, and Binder parity remain in the queue; no device QA is
+claimed.

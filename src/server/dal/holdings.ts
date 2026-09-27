@@ -65,11 +65,11 @@ export async function createMyHolding(input: unknown, client?: SupabaseClient): 
   return result;
 }
 
-export async function listMyHoldings(input?: unknown): Promise<HoldingDTO[]> {
+export async function listMyHoldings(input?: unknown, client?: SupabaseClient): Promise<HoldingDTO[]> {
   const page = pageSchema.parse(input ?? {});
-  const identity = await getCurrentIdentity();
+  const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("holdings")
     .select("id,owner_user_id,template_id,acquired_at,created_at,updated_at,trade_status")
@@ -97,11 +97,11 @@ export async function getMyHolding(input: unknown): Promise<HoldingDTO | null> {
   return result ?? null;
 }
 
-export async function setMyHoldingTradeStatus(input: unknown): Promise<HoldingDTO> {
+export async function setMyHoldingTradeStatus(input: unknown, client?: SupabaseClient): Promise<HoldingDTO> {
   const { holdingId, tradeStatus } = tradeStateSchema.parse(input);
-  const identity = await getCurrentIdentity();
+  const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? await createSupabaseServerClient();
   const { data: holding, error } = await supabase
     .from("holdings")
     .update({ trade_status: tradeStatus })

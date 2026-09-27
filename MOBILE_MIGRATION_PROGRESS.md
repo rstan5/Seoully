@@ -70,6 +70,12 @@ security, and Room/Binder data model.
   validation, RLS, and idempotent like semantics.
 - Upgraded the native Feed with production image media, localized optimistic
   like/unlike controls with rollback, expandable comments, and comment composition.
+- Added a production-backed native Collection/Wishlist surface. It renders actual
+  Holdings and signed personal-media URLs, preserves Holding identity, allows owners
+  to change the existing `trade_status`, lists real wishlist entries, and removes them.
+- Native catalog and discovery results can now add canonical templates to the
+  production wishlist through the existing idempotent wishlist DAL. Bearer-native
+  collection and wishlist routes retain server-derived actor ownership and RLS.
 
 ## Current queue
 
@@ -119,10 +125,13 @@ Native device QA is still pending.
 - Native Feed interactions pass mobile lint and strict TypeScript, web TypeScript, and
   fixture integrity checks. Media layout, optimistic touch feedback, keyboard behavior,
   and comment composition remain AWAITING DEVICE QA.
+- Native Collection/Wishlist passes mobile lint and strict TypeScript plus web strict
+  TypeScript. Personal card media sizing, long-list behavior, and touch states remain
+  AWAITING DEVICE QA.
 
 ## Next autonomous task
 
-Native Feed now supports authenticated production likes and comments. Next:
-collection/detail/wishlist/trade and Messages parity, with follow/profile navigation
-folded into the relevant collector surface. Full Room and Binder parity remain
-mandatory in the queue. No device QA is claimed.
+Native Collection/Wishlist now covers real Holding media, wishlist membership, and
+trade status. Next: Messages parity and collector follow/profile navigation, then
+integration hardening before the required Room renderer proof. Full Room and Binder
+parity remain mandatory in the queue. No device QA is claimed.

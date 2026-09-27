@@ -5,6 +5,7 @@ import {
   loadCollectibleDiscovery,
   loadCollectorDiscovery,
   searchCatalog,
+  setWishlistTemplate,
   type NativeCatalogTemplate,
   type NativeCollectibleDiscovery,
   type NativeCollectorDiscovery,
@@ -19,6 +20,7 @@ export default function SearchScreen() {
   const [results, setResults] = useState<NativeCatalogTemplate[] | null>(null);
   const [collectors, setCollectors] = useState<NativeCollectorDiscovery[]>([]);
   const [collectibles, setCollectibles] = useState<NativeCollectibleDiscovery[]>([]);
+  const [wantedIds, setWantedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,6 +77,16 @@ export default function SearchScreen() {
     if (!value.trim()) void loadExplore();
   }
 
+  async function saveWanted(templateId: string) {
+    if (wantedIds.has(templateId)) return;
+    try {
+      await setWishlistTemplate(templateId, true);
+      setWantedIds((current) => new Set(current).add(templateId));
+    } catch {
+      setError(copy.catalogUnavailable);
+    }
+  }
+
   return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
     <Text style={styles.title}>{copy.explore}</Text>
     <Text style={styles.body}>{copy.exploreLead}</Text>
@@ -87,12 +99,14 @@ export default function SearchScreen() {
 
     {results ? <>
       <Text style={styles.sectionTitle}>{copy.catalogResults}</Text>
-      {results.map((item) => <Pressable key={item.id} accessibilityRole="button" onPress={() => router.push({ pathname: "/add", params: { templateId: item.id, name: item.name, kind: item.kind } })} style={styles.result}>
+      {results.map((item) => <View key={item.id} style={styles.result}>
         <Text style={styles.resultTitle}>{item.name}</Text>
         <Text style={styles.resultMeta}>{[item.groupName, item.memberName, item.releaseName, item.kind].filter(Boolean).join(" · ")}</Text>
         {item.descriptor ? <Text style={styles.resultDescriptor}>{item.descriptor}</Text> : null}
-        <Text style={styles.actionText}>{copy.addYourCopy}</Text>
-      </Pressable>)}
+        <View style={styles.resultActions}><Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/add", params: { templateId: item.id, name: item.name, kind: item.kind } })}><Text style={styles.actionText}>{copy.addYourCopy}</Text></Pressable>
+          <Pressable accessibilityRole="button" disabled={wantedIds.has(item.id)} onPress={() => saveWanted(item.id)}><Text style={styles.actionText}>{wantedIds.has(item.id) ? copy.savedToWishlist : copy.saveToWishlist}</Text></Pressable>
+        </View>
+      </View>)}
       {!loading && results.length === 0 ? <Text style={styles.empty}>{copy.noCatalogMatches}</Text> : null}
     </> : <>
       {collectors.length > 0 ? <><Text style={styles.sectionTitle}>{copy.collectorsForYou}</Text>
@@ -103,12 +117,14 @@ export default function SearchScreen() {
         </View>)}
       </> : null}
       {collectibles.length > 0 ? <><Text style={styles.sectionTitle}>{copy.collectiblesForYou}</Text>
-        {collectibles.map(({ template, reasons }) => <Pressable key={template.id} accessibilityRole="button" onPress={() => router.push({ pathname: "/add", params: { templateId: template.id, name: template.name, kind: template.kind } })} style={styles.result}>
+        {collectibles.map(({ template, reasons }) => <View key={template.id} style={styles.result}>
           <Text style={styles.resultTitle}>{template.name}</Text>
           <Text style={styles.resultMeta}>{template.kind}</Text>
           <Text style={styles.resultDescriptor}>{reasonLabel(reasons[0]?.code, copy)}</Text>
-          <Text style={styles.actionText}>{copy.addYourCopy}</Text>
-        </Pressable>)}
+          <View style={styles.resultActions}><Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/add", params: { templateId: template.id, name: template.name, kind: template.kind } })}><Text style={styles.actionText}>{copy.addYourCopy}</Text></Pressable>
+            <Pressable accessibilityRole="button" disabled={wantedIds.has(template.id)} onPress={() => saveWanted(template.id)}><Text style={styles.actionText}>{wantedIds.has(template.id) ? copy.savedToWishlist : copy.saveToWishlist}</Text></Pressable>
+          </View>
+        </View>)}
       </> : null}
       {!loading && !error && collectors.length === 0 && collectibles.length === 0 ? <Text style={styles.empty}>{copy.exploreEmpty}</Text> : null}
     </>}
@@ -141,5 +157,6 @@ const styles = StyleSheet.create({
   resultMeta: { color: colors.plum, fontSize: 13, marginTop: spacing.xs },
   resultDescriptor: { color: colors.muted, fontSize: 13, marginTop: spacing.xs },
   actionText: { color: colors.plum, fontSize: 13, fontWeight: "700", marginTop: spacing.sm },
+  resultActions: { flexDirection: "row", gap: spacing.lg },
   empty: { color: colors.muted, paddingTop: spacing.lg },
 });

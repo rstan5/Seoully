@@ -1,7 +1,8 @@
 import "server-only";
 
 import { z } from "zod";
-import { getCurrentIdentity } from "@/server/dal/profile";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/profile";
 import { createSupabaseServerClient } from "@/server/supabase/server";
 import type { CatalogTemplateDTO } from "@/server/dal/catalog";
 
@@ -20,11 +21,11 @@ export interface WishlistEntryDTO {
   template: CatalogTemplateDTO;
 }
 
-export async function addToMyWishlist(input: unknown): Promise<WishlistEntryDTO> {
+export async function addToMyWishlist(input: unknown, client?: SupabaseClient): Promise<WishlistEntryDTO> {
   const { templateId } = templateSchema.parse(input);
-  const identity = await getCurrentIdentity();
+  const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? await createSupabaseServerClient();
   const { data: template, error: templateError } = await supabase
     .from("collectible_templates")
     .select("id,status")
@@ -74,11 +75,11 @@ export async function addToMyWishlist(input: unknown): Promise<WishlistEntryDTO>
   return entry;
 }
 
-export async function removeFromMyWishlist(input: unknown): Promise<{ removed: boolean }> {
+export async function removeFromMyWishlist(input: unknown, client?: SupabaseClient): Promise<{ removed: boolean }> {
   const { templateId } = templateSchema.parse(input);
-  const identity = await getCurrentIdentity();
+  const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("wishlist_entries")
     .delete()
@@ -89,11 +90,11 @@ export async function removeFromMyWishlist(input: unknown): Promise<{ removed: b
   return { removed: (data ?? []).length > 0 };
 }
 
-export async function listMyWishlist(input?: unknown): Promise<WishlistEntryDTO[]> {
+export async function listMyWishlist(input?: unknown, client?: SupabaseClient): Promise<WishlistEntryDTO[]> {
   const page = pageSchema.parse(input ?? {});
-  const identity = await getCurrentIdentity();
+  const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("wishlist_entries")
     .select("id,owner_user_id,template_id,created_at,updated_at")

@@ -47,6 +47,62 @@ export async function createHolding(templateId: string) {
   return response.json();
 }
 
+export type NativeHolding = {
+  id: string;
+  templateId: string;
+  acquiredAt: string;
+  tradeStatus: "not-for-trade" | "for-trade";
+  personalMediaUrl?: string;
+  template: NativeCatalogTemplate;
+};
+export type NativeWishlistEntry = {
+  id: string;
+  templateId: string;
+  template: NativeCatalogTemplate;
+};
+
+export async function loadMyHoldings(): Promise<NativeHolding[]> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/holdings`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("holding_read_failed");
+  const payload = await response.json() as { holdings?: NativeHolding[] };
+  return payload.holdings ?? [];
+}
+
+export async function updateHoldingTradeStatus(holdingId: string, tradeStatus: NativeHolding["tradeStatus"]) {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/holdings`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ holdingId, tradeStatus }),
+  });
+  if (!response.ok) throw new Error("holding_trade_update_failed");
+  const payload = await response.json() as { holding: NativeHolding };
+  return payload.holding;
+}
+
+export async function loadMyWishlist(): Promise<NativeWishlistEntry[]> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/wishlist`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("wishlist_read_failed");
+  const payload = await response.json() as { entries?: NativeWishlistEntry[] };
+  return payload.entries ?? [];
+}
+
+export async function setWishlistTemplate(templateId: string, wanted: boolean) {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/wishlist`, {
+    method: wanted ? "POST" : "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ templateId }),
+  });
+  if (!response.ok) throw new Error("wishlist_update_failed");
+}
+
 export async function uploadHoldingPhoto(holdingId: string, uri: string, mimeType = "image/jpeg") {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;

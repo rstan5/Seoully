@@ -67,3 +67,14 @@ export async function contributeCatalogItem(input: { name: string; kind: string;
   if (!response.ok) throw new Error("catalog_contribution_failed");
   return response.json() as Promise<{ contribution: { template: NativeCatalogTemplate } }>;
 }
+
+export type NativeFeedPost = { id: string; caption: string; createdAt: string; author: { displayName: string; handle: string }; likeCount: number; commentCount: number; media: Array<{ url: string; mediaType: string }> };
+export async function loadFeed(): Promise<NativeFeedPost[]> {
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+  if (!baseUrl || !accessToken) throw new Error("unauthenticated");
+  const response = await fetch(`${baseUrl}/api/mobile/feed`, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!response.ok) throw new Error("social_read_failed");
+  const payload = await response.json() as { page?: { items?: NativeFeedPost[] } };
+  return payload.page?.items ?? [];
+}

@@ -1,7 +1,8 @@
 import "server-only";
 
 import { z } from "zod";
-import { getCurrentIdentity } from "@/server/dal/profile";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/profile";
 import { createSupabaseServerClient } from "@/server/supabase/server";
 import { searchSharedCatalog, type CatalogTemplateDTO } from "@/server/dal/catalog";
 
@@ -35,10 +36,10 @@ export interface SocialSearchUser { userId: string; handle: string; displayName:
 
 type Row = Record<string, unknown>;
 
-async function actorClient() {
-  const identity = await getCurrentIdentity();
+async function actorClient(client?: SupabaseClient) {
+  const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
-  return { identity, supabase: await createSupabaseServerClient() };
+  return { identity, supabase: client ?? await createSupabaseServerClient() };
 }
 
 function encodeCursor(createdAt: string, id: string): string { return Buffer.from(JSON.stringify({ createdAt, id }), "utf8").toString("base64url"); }
@@ -94,8 +95,8 @@ async function hydratePosts(rows: Row[], actorId: string, supabase: Awaited<Retu
   });
 }
 
-async function listPosts(authorIds: string[], input: unknown): Promise<SocialPage<SocialPostDTO>> {
-  const page = pageSchema.parse(input ?? {}); const cursor = decodeCursor(page.cursor); const { identity, supabase } = await actorClient();
+async function listPosts(authorIds: string[], input: unknown, client?: SupabaseClient): Promise<SocialPage<SocialPostDTO>> {
+  const page = pageSchema.parse(input ?? {}); const cursor = decodeCursor(page.cursor); const { identity, supabase } = await actorClient(client);
   let query = supabase.from("posts").select("id,author_user_id,caption,location_text,visibility,created_at,post_likes(count),post_comments(count)").in("author_user_id", authorIds).eq("visibility", "public").order("created_at", { ascending: false }).order("id", { ascending: false }).limit(page.limit + 1);
   if (cursor) query = query.or("created_at.lt." + cursor.createdAt + ",and(created_at.eq." + cursor.createdAt + ",id.lt." + cursor.id + ")");
   const { data, error } = await query;
@@ -105,11 +106,11 @@ async function listPosts(authorIds: string[], input: unknown): Promise<SocialPag
   return { items, nextCursor: hasMore && visibleRows.length ? encodeCursor(String(visibleRows.at(-1)!.created_at), String(visibleRows.at(-1)!.id)) : null };
 }
 
-export async function getProductionFeed(input?: unknown): Promise<SocialPage<SocialPostDTO>> {
-  const { identity, supabase } = await actorClient();
+export async function getProductionFeed(input?: unknown, client?: SupabaseClient): Promise<SocialPage<SocialPostDTO>> {
+  const { identity, supabase } = await actorClient(client);
   const { data, error } = await supabase.from("follows").select("followed_user_id").eq("follower_user_id", identity.user.id).limit(100);
   if (error) throw new Error("social_read_failed");
-  return listPosts([identity.user.id, ...(data ?? []).map((row) => String(row.followed_user_id))], input);
+  return listPosts([identity.user.id, ...(data ?? []).map((row) => String(row.followed_user_id))], input, client);
 }
 
 export async function searchProductionUsers(query: unknown): Promise<SocialSearchUser[]> {

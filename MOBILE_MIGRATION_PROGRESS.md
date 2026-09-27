@@ -40,6 +40,8 @@ security, and Room/Binder data model.
 - Added a bearer-authenticated native catalog contribution endpoint and a first native
   manual-details screen. The current screen proves production contribution semantics;
   photo-first consent wiring still remains before this slice can be called complete.
+- Added a bearer-authenticated native Feed read path reusing the existing social DAL;
+  the native Feed now renders real followed/public production posts when configured.
 
 ## Current queue
 
@@ -78,6 +80,5 @@ is still pending.
 ## Next autonomous task
 
 Finish photo-first manual contribution with explicit reference-image consent and
-shared/personal media separation, then add native Feed production reads. Full native
-social, collection, Room, and Binder parity remain in the queue; no device QA is
-claimed.
+shared/personal media separation. Full native social, collection, Room, and Binder
+parity remain in the queue; no device QA is claimed.

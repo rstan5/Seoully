@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { contributeCatalogItem, createNativePost } from "../../src/api";
 import { useCopy } from "../../src/locale";
 import { colors, spacing } from "../../src/theme";
+
+const CREATE_DRAFT_KEY = "seoully.mobile.create-draft.v1";
 
 export default function CreateScreen() {
   const copy = useCopy();
@@ -19,6 +22,34 @@ export default function CreateScreen() {
   const [postMimeType, setPostMimeType] = useState("image/jpeg");
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void AsyncStorage.getItem(CREATE_DRAFT_KEY).then((stored) => {
+      if (!active || !stored) return;
+      try {
+        const draft = JSON.parse(stored) as Record<string, unknown>;
+        if (draft.mode === "post" || draft.mode === "collectible") setMode(draft.mode);
+        setName(draftText(draft.name, 200));
+        setGroupName(draftText(draft.groupName, 120));
+        setMemberName(draftText(draft.memberName, 120));
+        setReleaseName(draftText(draft.releaseName, 160));
+        setCaption(draftText(draft.caption, 2_000));
+      } catch {
+        void AsyncStorage.removeItem(CREATE_DRAFT_KEY);
+      }
+    }).finally(() => { if (active) setDraftRestored(true); });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!draftRestored) return;
+    const task = setTimeout(() => {
+      void AsyncStorage.setItem(CREATE_DRAFT_KEY, JSON.stringify({ mode, name, groupName, memberName, releaseName, caption }));
+    }, 250);
+    return () => clearTimeout(task);
+  }, [caption, draftRestored, groupName, memberName, mode, name, releaseName]);
 
   async function choosePostPhoto() {
     setMessage(null);
@@ -38,6 +69,9 @@ export default function CreateScreen() {
     setMessage(null);
     try {
       await createNativePost(postUri, caption, postMimeType);
+      await AsyncStorage.removeItem(CREATE_DRAFT_KEY);
+      setCaption("");
+      setPostUri(null);
       router.replace("/(tabs)");
     } catch {
       setMessage(copy.postCreateFailed);
@@ -51,6 +85,8 @@ export default function CreateScreen() {
     setMessage(null);
     try {
       const result = await contributeCatalogItem({ name, groupName, memberName: memberName || undefined, releaseName: releaseName || undefined, kind: "photocard" });
+      await AsyncStorage.removeItem(CREATE_DRAFT_KEY);
+      setName(""); setGroupName(""); setMemberName(""); setReleaseName("");
       router.push({ pathname: "/add", params: { templateId: result.contribution.template.id, name: result.contribution.template.name, kind: result.contribution.template.kind, newTemplate: "true" } });
     } catch {
       setMessage(copy.collectibleCreateFailed);
@@ -65,22 +101,27 @@ export default function CreateScreen() {
       <ModeButton selected={mode === "post"} label={copy.sharePost} onPress={() => setMode("post")} />
       <ModeButton selected={mode === "collectible"} label={copy.addManually} onPress={() => setMode("collectible")} />
     </View>
+    <Text style={styles.draftNote}>{copy.draftSavedLocally}</Text>
     {mode === "post" ? <>
       <Text style={styles.body}>{copy.createPostLead}</Text>
       {postUri ? <Image source={{ uri: postUri }} style={styles.preview} /> : null}
       <Pressable accessibilityRole="button" onPress={choosePostPhoto} style={styles.secondary}><Text style={styles.secondaryText}>{copy.choosePostPhoto}</Text></Pressable>
-      <TextInput placeholder={copy.captionPlaceholder} value={caption} onChangeText={setCaption} multiline style={[styles.input, styles.caption]} />
+      <TextInput maxLength={2000} placeholder={copy.captionPlaceholder} value={caption} onChangeText={setCaption} multiline style={[styles.input, styles.caption]} />
       <Pressable accessibilityRole="button" disabled={working} onPress={publishPost} style={styles.button}><Text style={styles.buttonText}>{copy.publishPost}</Text></Pressable>
     </> : <>
       <Text style={styles.body}>{copy.addManualLead}</Text>
-      <TextInput placeholder={copy.collectibleNamePlaceholder} value={name} onChangeText={setName} style={styles.input} />
-      <TextInput placeholder={copy.groupPlaceholder} value={groupName} onChangeText={setGroupName} style={styles.input} />
-      <TextInput placeholder={copy.memberOptionalPlaceholder} value={memberName} onChangeText={setMemberName} style={styles.input} />
-      <TextInput placeholder={copy.releaseOptionalPlaceholder} value={releaseName} onChangeText={setReleaseName} style={styles.input} />
+      <TextInput maxLength={200} placeholder={copy.collectibleNamePlaceholder} value={name} onChangeText={setName} style={styles.input} />
+      <TextInput maxLength={120} placeholder={copy.groupPlaceholder} value={groupName} onChangeText={setGroupName} style={styles.input} />
+      <TextInput maxLength={120} placeholder={copy.memberOptionalPlaceholder} value={memberName} onChangeText={setMemberName} style={styles.input} />
+      <TextInput maxLength={160} placeholder={copy.releaseOptionalPlaceholder} value={releaseName} onChangeText={setReleaseName} style={styles.input} />
       <Pressable accessibilityRole="button" disabled={working} onPress={submitCollectible} style={styles.button}><Text style={styles.buttonText}>{copy.continue}</Text></Pressable>
     </>}
     {message ? <Text accessibilityRole="alert" style={styles.message}>{message}</Text> : null}
   </ScrollView></SafeAreaView>;
+}
+
+function draftText(value: unknown, max: number) {
+  return typeof value === "string" ? value.slice(0, max) : "";
 }
 
 function ModeButton({ selected, label, onPress }: { selected: boolean; label: string; onPress: () => void }) {
@@ -96,6 +137,7 @@ const styles = StyleSheet.create({
   tabSelected: { backgroundColor: colors.plum, borderColor: colors.plum },
   tabText: { color: colors.ink, fontWeight: "700" },
   tabTextSelected: { color: colors.surface },
+  draftNote: { color: colors.muted, fontSize: 12 },
   body: { color: colors.muted, fontSize: 16, marginBottom: spacing.md, marginTop: spacing.sm },
   input: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 14, borderWidth: 1, color: colors.ink, minHeight: 50, paddingHorizontal: spacing.md },
   caption: { minHeight: 100, paddingTop: spacing.md, textAlignVertical: "top" },

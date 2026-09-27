@@ -166,6 +166,10 @@ security, and Room/Binder data model.
   thread now performs a bounded foreground-only refresh every ten seconds, avoids
   overlapping requests, and still supports explicit user refresh without introducing
   an unreviewed realtime or notification architecture.
+- Added Expo-compatible local draft persistence for post captions and manual catalog
+  contribution fields. Bounded drafts restore after process restart, save with a short
+  debounce, clearly disclose device-local storage, and clear after successful creation;
+  temporary picker URIs are intentionally not persisted as if they were durable media.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 
@@ -276,6 +280,9 @@ Native device QA is still pending.
 - Social refresh and thread polling pass mobile strict TypeScript and Expo lint.
   Keyboard/scroll anchoring, background suspension, and network/battery behavior remain
   AWAITING DEVICE QA.
+- Create draft restoration passes mobile strict TypeScript, Expo lint, and all 21 Expo
+  Doctor checks with the SDK-compatible AsyncStorage package. Process-kill restoration,
+  OS storage eviction, and keyboard behavior remain AWAITING DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.
@@ -289,6 +296,6 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-Continue the ordinary app parity audit with navigation/draft restoration and remaining
-detailed screen-level gaps. Pending database migrations still require review/application
-in an approved environment, and physical iOS/Android behavior remains AWAITING DEVICE QA.
+Continue the ordinary app parity audit for remaining detailed screen-level gaps.
+Pending database migrations still require review/application in an approved environment,
+and physical iOS/Android behavior remains AWAITING DEVICE QA.

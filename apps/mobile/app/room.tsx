@@ -12,7 +12,7 @@ import { NativeRoomRenderer } from "../src/room/NativeRoomRenderer";
 import { buildRoomRenderables, createInitialRoomRenderable, moveRenderable, nativeHomeForHolding, nextNativeSlot, settleRoomRenderable, toPersistedTransform, zoneIdForNativeSurface, type RoomRenderable } from "../src/room/model";
 import { colors, spacing } from "../src/theme";
 
-const ROOM_YAW_KEY = "seoully.mobile.room-yaw.v1";
+const ROOM_CAMERA_KEY = "seoully.mobile.room-camera.v1";
 
 export default function RoomScreen() {
   const copy = useCopy();
@@ -22,19 +22,27 @@ export default function RoomScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [cameraYaw, setCameraYaw] = useState(0);
+  const [cameraPitch, setCameraPitch] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const dragOrigin = useRef<RoomRenderable | null>(null);
-  const cameraOrigin = useRef(0);
+  const cameraOrigin = useRef({ yaw: 0, pitch: 0 });
   const latestItems = useRef(items);
   const editingRef = useRef(editing);
   useEffect(() => { latestItems.current = items; }, [items]);
   useEffect(() => { editingRef.current = editing; }, [editing]);
   useEffect(() => {
     const task = setTimeout(() => {
-      void AsyncStorage.getItem(ROOM_YAW_KEY).then((stored) => {
-        const yaw = Number(stored);
-        if (Number.isFinite(yaw)) setCameraYaw(Math.max(-0.38, Math.min(0.38, yaw)));
+      void AsyncStorage.getItem(ROOM_CAMERA_KEY).then((stored) => {
+        if (!stored) return;
+        try {
+          const parsed = JSON.parse(stored) as { yaw?: number; pitch?: number };
+          if (Number.isFinite(parsed.yaw)) setCameraYaw(clampCamera(parsed.yaw!, -0.38, 0.38));
+          if (Number.isFinite(parsed.pitch)) setCameraPitch(clampCamera(parsed.pitch!, -0.22, 0.28));
+        } catch {
+          const yaw = Number(stored);
+          if (Number.isFinite(yaw)) setCameraYaw(clampCamera(yaw, -0.38, 0.38));
+        }
       });
     }, 0);
     return () => clearTimeout(task);
@@ -62,11 +70,12 @@ export default function RoomScreen() {
     onMoveShouldSetPanResponder: (_, gesture) => Math.hypot(gesture.dx, gesture.dy) > 4,
     onPanResponderGrant: () => {
       if (editing && selectedId) dragOrigin.current = latestItems.current.find((item) => item.holding.id === selectedId) ?? null;
-      else cameraOrigin.current = cameraYaw;
+      else cameraOrigin.current = { yaw: cameraYaw, pitch: cameraPitch };
     },
     onPanResponderMove: (_, gesture) => {
       if (!editing || !selectedId) {
-        setCameraYaw(Math.max(-0.38, Math.min(0.38, cameraOrigin.current + gesture.dx * 0.003)));
+        setCameraYaw(clampCamera(cameraOrigin.current.yaw + gesture.dx * 0.003, -0.38, 0.38));
+        setCameraPitch(clampCamera(cameraOrigin.current.pitch - gesture.dy * 0.003, -0.22, 0.28));
         return;
       }
       const origin = dragOrigin.current;
@@ -76,7 +85,7 @@ export default function RoomScreen() {
     },
     onPanResponderRelease: () => {
       if (!editing) {
-        void AsyncStorage.setItem(ROOM_YAW_KEY, String(cameraYaw));
+        persistRoomCamera(cameraYaw, cameraPitch);
         return;
       }
       const id = selectedId;
@@ -98,7 +107,7 @@ export default function RoomScreen() {
     },
     onPanResponderTerminate: () => {
       dragOrigin.current = null;
-      if (!editing) void AsyncStorage.setItem(ROOM_YAW_KEY, String(cameraYaw));
+      if (!editing) persistRoomCamera(cameraYaw, cameraPitch);
     },
   });
   const placedIds = new Set(items.map((item) => item.holding.id));
@@ -166,7 +175,7 @@ export default function RoomScreen() {
     {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
     {!loading && !snapshot?.holdings.length ? <Text style={styles.empty}>{copy.roomEmpty}</Text> : null}
     {!loading && snapshot ? <View style={styles.stage} {...panResponder.panHandlers}>
-      <NativeRoomRenderer items={items} selectedId={selectedId} focusedId={editing ? null : selectedId} themeId={snapshot.room.themeId} cameraYaw={cameraYaw} onSelect={setSelectedId} onClearSelection={() => setSelectedId(null)} />
+      <NativeRoomRenderer items={items} selectedId={selectedId} focusedId={editing ? null : selectedId} themeId={snapshot.room.themeId} cameraYaw={cameraYaw} cameraPitch={cameraPitch} onSelect={setSelectedId} onClearSelection={() => setSelectedId(null)} />
       {editing && selectedId ? <View pointerEvents="none" style={styles.hint}><Text style={styles.hintText}>{copy.roomDragHint}</Text></View> : null}
       {!editing ? <View pointerEvents="none" style={styles.hint}><Text style={styles.hintText}>{copy.roomOrbitHint}</Text></View> : null}
     </View> : null}
@@ -218,3 +227,11 @@ const styles = StyleSheet.create({
   inspectAction: { borderColor: colors.plum, borderRadius: 10, borderWidth: 1, justifyContent: "center", minHeight: 38, paddingHorizontal: spacing.sm },
   inspectActionText: { color: colors.plum, fontSize: 12, fontWeight: "700" },
 });
+
+function clampCamera(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function persistRoomCamera(yaw: number, pitch: number) {
+  void AsyncStorage.setItem(ROOM_CAMERA_KEY, JSON.stringify({ yaw, pitch }));
+}

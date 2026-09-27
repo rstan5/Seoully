@@ -56,7 +56,11 @@ export default function AddCollectibleScreen() {
       const result = await createHolding(params.templateId) as { holding?: { id: string } };
       if (uri && result.holding?.id) await uploadHoldingPhoto(result.holding.id, uri);
       if (uri && shareReference && params.newTemplate === "true") await uploadCatalogReferencePhoto(params.templateId, uri);
-      router.replace("/(tabs)/profile");
+      if (result.holding?.id) {
+        router.replace({ pathname: "/collectible", params: { holdingId: result.holding.id } });
+        return;
+      }
+      router.replace("/collection");
     } catch { setMessage(copy.holdingCreateFailed); }
     setWorking(false);
   }

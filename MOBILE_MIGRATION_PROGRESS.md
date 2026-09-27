@@ -10,7 +10,7 @@ security, and Room/Binder data model.
 
 - Branch: `mobile-native`
 - Immutable reference checkpoint: `76be07a928ce3e9436031d7324a5cc2b1b0375ed`
-- Current task: Collection list virtualization and Binder group sections
+- Current task: Room look-around pitch and add-collectible destination
 - Overall status: IN PROGRESS — Room/Binder product behavior still closing; device QA still pending
 
 ## Completed
@@ -214,6 +214,10 @@ security, and Room/Binder data model.
   of mounting every card in one ScrollView.
 - Binder photocards without a release now open a group section when group identity
   exists, and only leftover cards fall into the general/fallback organization.
+- Native Room look-around now includes vertical pitch as well as yaw, persists both
+  locally, and still dollies to a focused object. Adding a collectible now opens that
+  Holding detail instead of dropping the collector on Profile.
+- Profile identity/editor state now refreshes when the tab regains focus.
 
 ## Current queue
 
@@ -356,6 +360,9 @@ Native device QA is still pending.
 - Collection list virtualization and Binder group-section fallback pass mobile
   TypeScript and Expo lint. Long-list memory and section page-turn feel remain
   AWAITING DEVICE QA.
+- Room pitch/yaw look-around, add-collectible Holding destination, and Profile focus
+  refresh pass mobile and web TypeScript plus Expo lint. Vertical orbit feel and
+  post-create navigation remain AWAITING DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.
@@ -369,8 +376,7 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-Continue Room/Binder physical fidelity and remaining ordinary-app gaps that do not
-require a device. Next eligible work includes richer Binder page-turn, remaining
-social/profile states, and integration hardening. Stop only on genuine blockers:
-pending migrations, avatar schema, and physical-device QA. Do not treat Room/Binder
-as finished.
+Continue remaining ordinary-app and Room/Binder gaps that do not require a device,
+especially keyboard-avoiding compose surfaces and richer Binder page-turn. Stop only
+on genuine blockers: pending migrations, avatar schema, and physical-device QA. Do
+not treat Room/Binder as finished.

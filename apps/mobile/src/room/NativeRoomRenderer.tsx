@@ -18,6 +18,7 @@ export function NativeRoomRenderer({
   focusedId,
   themeId,
   cameraYaw,
+  cameraPitch,
   onSelect,
   onClearSelection,
 }: {
@@ -26,6 +27,7 @@ export function NativeRoomRenderer({
   focusedId: string | null;
   themeId: NativeRoomThemeId;
   cameraYaw: number;
+  cameraPitch: number;
   onSelect: (holdingId: string) => void;
   onClearSelection: () => void;
 }) {
@@ -42,14 +44,14 @@ export function NativeRoomRenderer({
   >
     <ambientLight intensity={1.5} />
     <directionalLight color={theme.light} intensity={2.2} position={[-3, 6, 4]} />
-    <CameraRig yaw={cameraYaw} focused={focused} />
+    <CameraRig yaw={cameraYaw} pitch={cameraPitch} focused={focused} />
     <RoomShell theme={theme} />
     <RoomFurniture theme={theme} />
     {items.map((item) => <RoomObject key={item.holding.id} item={item} selected={selectedId === item.holding.id} loadTexture={textured.has(item.holding.id)} onSelect={onSelect} />)}
   </Canvas>;
 }
 
-function CameraRig({ yaw, focused }: { yaw: number; focused: RoomRenderable | null }) {
+function CameraRig({ yaw, pitch, focused }: { yaw: number; pitch: number; focused: RoomRenderable | null }) {
   const { camera } = useThree();
   const targetPosition = new Vector3();
   const lookAt = new Vector3(0, 0.4, -2);
@@ -61,8 +63,8 @@ function CameraRig({ yaw, focused }: { yaw: number; focused: RoomRenderable | nu
       targetPosition.set(focused.position.x, focused.position.y + (wall ? 0.05 : 0.25), focused.position.z + (wall ? 1.55 : 2.45));
       desiredLook.set(focused.position.x, focused.position.y, focused.position.z);
     } else {
-      targetPosition.set(Math.sin(yaw) * 9, 2.6, -2 + Math.cos(yaw) * 9);
-      desiredLook.set(0, 0.4, -2);
+      targetPosition.set(Math.sin(yaw) * 9 * Math.cos(pitch), 2.6 + Math.sin(pitch) * 4.2, -2 + Math.cos(yaw) * 9 * Math.cos(pitch));
+      desiredLook.set(0, 0.4 + pitch * 1.1, -2);
     }
     camera.position.lerp(targetPosition, alpha);
     lookAt.lerp(desiredLook, alpha);

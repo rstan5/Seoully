@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "expo-router";
+import { useCallback, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
 import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { resolveNativeIdentity, updateNativeProfile } from "../../src/api";
 import { RetryNotice } from "../../src/components/RetryNotice";
@@ -36,10 +36,9 @@ export default function ProfileScreen() {
       setLoading(false);
     }
   }, [copy.profileUnavailable]);
-  useEffect(() => {
-    const task = setTimeout(() => { void refresh(); }, 0);
-    return () => clearTimeout(task);
-  }, [refresh]);
+  useFocusEffect(useCallback(() => {
+    void refresh();
+  }, [refresh]));
 
   async function save() {
     if (busy) return;

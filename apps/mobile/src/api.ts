@@ -81,7 +81,7 @@ export async function contributeCatalogItem(input: { name: string; kind: string;
   return response.json() as Promise<{ contribution: { template: NativeCatalogTemplate } }>;
 }
 
-export type NativeFeedPost = { id: string; caption: string; createdAt: string; author: { displayName: string; handle: string }; likeCount: number; commentCount: number; media: Array<{ url: string; mediaType: string }> };
+export type NativeFeedPost = { id: string; caption: string; createdAt: string; author: { displayName: string; handle: string }; likeCount: number; commentCount: number; media: { url: string; mediaType: string }[] };
 export async function loadFeed(): Promise<NativeFeedPost[]> {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
@@ -97,4 +97,62 @@ export async function updateNativeProfile(input: { displayName?: string; bio?: s
   if (!baseUrl || !accessToken) throw new Error("unauthenticated");
   const response = await fetch(`${baseUrl}/api/mobile/profile`, { method: "PATCH", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify(input) });
   if (!response.ok) throw new Error("profile_update_failed"); return response.json();
+}
+
+export type NativeOnboardingStep = "group" | "bias" | "interest" | "done";
+export type NativeOnboardingGroup = {
+  id: string;
+  name: string;
+  nativeName: string;
+  memberIds: string[];
+};
+export type NativeOnboardingMember = {
+  id: string;
+  groupId: string;
+  stageName: string;
+  nativeName: string;
+};
+export type NativeOnboardingState = {
+  step: NativeOnboardingStep;
+  favoriteGroupIds: string[];
+  biasMemberIds: string[];
+  collectorInterests: string[];
+  groups: NativeOnboardingGroup[];
+  members: NativeOnboardingMember[];
+};
+export type NativeOnboardingPatch =
+  | { action: "groups"; favoriteGroupIds: string[] }
+  | { action: "bias"; biasMemberIds: string[] }
+  | { action: "interests"; collectorInterests: string[] };
+
+async function mobileAccessToken() {
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+  if (!baseUrl || !accessToken) throw new Error("unauthenticated");
+  return accessToken;
+}
+
+export async function loadNativeOnboarding(): Promise<NativeOnboardingState> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/onboarding`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("onboarding_unavailable");
+  return response.json() as Promise<NativeOnboardingState>;
+}
+
+export async function updateNativeOnboarding(
+  patch: NativeOnboardingPatch,
+): Promise<{ step: NativeOnboardingStep }> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/onboarding`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(patch),
+  });
+  if (!response.ok) throw new Error("onboarding_update_failed");
+  return response.json() as Promise<{ step: NativeOnboardingStep }>;
 }

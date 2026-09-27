@@ -10,7 +10,7 @@ security, and Room/Binder data model.
 
 - Branch: `mobile-native`
 - Immutable reference checkpoint: `76be07a928ce3e9436031d7324a5cc2b1b0375ed`
-- Current task: Phase A foundation — validate isolated Expo client and session boundary
+- Current task: native social parity — Search/Explore and social interactions
 - Overall status: IN PROGRESS
 
 ## Completed
@@ -47,14 +47,26 @@ security, and Room/Binder data model.
   and shared CatalogReferenceImage uploads remain separate server operations.
 - Added native Profile bio editing through a bearer-authenticated server boundary that
   reuses the existing validated profile patch and server-derived actor.
+- Added durable native onboarding progression for new production profiles. Existing
+  profiles are backfilled as complete while newly provisioned profiles start with the
+  group step; progress remains bound to the authenticated profile under existing RLS.
+- Added native group, bias, and collector-interest onboarding using the canonical web
+  group/member facts, resumable server state, English/Korean copy, and a tab/deep-link
+  gate that prevents incomplete accounts from bypassing onboarding.
+- Native account creation now supplies validated handle/display-name auth metadata so
+  Supabase provisions the same Seoully identity shape as the web client.
+- Added persisted English/Korean locale state and an Expo ESLint configuration; mobile
+  lint is now part of migration validation.
 
 ## Current queue
 
 1. Expo client foundation and strict TypeScript.
 2. Shared API/environment contracts and native Supabase session adapter.
 3. Native navigation/loading shell and localization adapter.
-4. Auth/onboarding vertical slice.
-5. Native social surfaces.
+4. Auth/onboarding vertical slice (group/bias/interests complete; avatar and confirmed
+   email deep-link QA remain).
+5. Native social surfaces (production Feed read exists; interactions/Search/Messages
+   remain).
 6. Native collection/media/crop vertical slice.
 7. Room/Binder platform-neutral extraction and renderer proof.
 
@@ -62,6 +74,11 @@ security, and Room/Binder data model.
 
 - Native camera, crop gestures, safe areas, haptics, Room gestures/FPS, texture memory,
   and Android behavior require physical-device validation and are not claimed yet.
+- Native onboarding layout, keyboard behavior, email-confirmation return, and locale
+  restoration are implementation-complete but AWAITING DEVICE QA.
+- `20260930000000_native_onboarding_progress.sql` must be applied through the normal
+  migration process before the new onboarding endpoint is deployed. It has not been
+  applied to production by this migration work.
 
 ## Architectural decisions
 
@@ -73,17 +90,20 @@ security, and Room/Binder data model.
 ## Latest validation
 
 Pre-migration checkpoint validation passed: typecheck, fixture checks, and diff check.
-Mobile foundation TypeScript passes and Expo config resolves. `expo-doctor` reports a
-local duplicate React copy because the existing root `node_modules` is adjacent to the
-new isolated app; clean installs should be validated before release. Native device QA
-is still pending.
+Mobile foundation TypeScript passes and Expo config resolves. After adding the Expo
+ESLint toolchain, `expo-doctor` passes all 21 checks in the current isolated app.
+Native device QA is still pending.
 - Native and web TypeScript, fixture checks, and diff checks pass after the collection
   slices. `next build` was retried and is currently blocked by the local Turbopack
   worker failing to bind a process port (`Operation not permitted`); retry in a clean
   build environment.
+- Native onboarding validation passes `expo lint`, mobile strict TypeScript, Expo config
+  resolution, web TypeScript, fixture checks, and `git diff --check`. No physical-device
+  behavior is claimed.
 
 ## Next autonomous task
 
-The native manual contribution path now has explicit consent and separate upload
-semantics. Next: native onboarding parity and production social interactions; full
-collection, Room, and Binder parity remain in the queue. No device QA is claimed.
+Native onboarding now persists and resumes group/bias/interest progress without
+replaying for existing profiles. Next: production Search/Explore and social
+interactions, followed by collection/detail/wishlist/trade and Messages parity. Full
+Room and Binder parity remain mandatory in the queue. No device QA is claimed.

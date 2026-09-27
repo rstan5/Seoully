@@ -429,6 +429,38 @@ export type NativeCollectorProfile = {
   collectionSummary?: { holdingCount: number; uniqueTemplateCount: number; groupCount: number };
 };
 
+export type NativePublicRoom = {
+  owner: { userId: string; handle: string; displayName: string };
+  private: boolean;
+  viewerUserId?: string;
+  room: {
+    id: string;
+    placements: {
+      id: string;
+      zoneId: string;
+      slot: number;
+      offset: Record<string, number> | null;
+      transform: Record<string, number> | null;
+      surfaceId: string | null;
+      holding: {
+        templateId: string;
+        tradeStatus: string;
+        template: Record<string, unknown>;
+        personalMediaUrl?: string;
+      };
+    }[];
+  } | null;
+};
+
+export async function loadCollectorRoom(userId: string): Promise<NativePublicRoom> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/collectors/${encodeURIComponent(userId)}/room`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("public_room_read_failed");
+  return response.json() as Promise<NativePublicRoom>;
+}
+
 export async function loadCollectorProfile(userId: string) {
   const accessToken = await mobileAccessToken();
   const response = await fetch(`${baseUrl}/api/mobile/collectors/${encodeURIComponent(userId)}`, {

@@ -105,7 +105,7 @@ export default function CollectorScreen() {
         {profile.collectionSummary ? <Text style={styles.stat}>{profile.collectionSummary.holdingCount} {copy.holdings}</Text> : null}
         {profile.collectionSummary ? <Text style={styles.stat}>{profile.collectionSummary.groupCount} {copy.groups}</Text> : null}
       </View>
-      {profile.roomAvailable ? <Text style={styles.roomNote}>{copy.collectorHasRoom}</Text> : null}
+      {profile.roomAvailable ? <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/collector-room", params: { userId } })}><Text style={styles.roomNote}>{copy.viewCollectorRoom}</Text></Pressable> : null}
       <View style={styles.actions}>
         <Pressable accessibilityRole="button" accessibilityState={{ selected: following }} disabled={busy} onPress={toggleFollow} style={[styles.button, following && styles.secondary]}><Text style={[styles.buttonText, following && styles.secondaryText]}>{following ? copy.following : copy.follow}</Text></Pressable>
         <Pressable accessibilityRole="button" disabled={busy} onPress={message} style={styles.button}><Text style={styles.buttonText}>{copy.messageCollector}</Text></Pressable>

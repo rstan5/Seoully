@@ -18,6 +18,56 @@ export type RoomRenderable = {
 const WORLD_SCALE = 240;
 export const ROOM_TEXTURE_BUDGET = 24;
 
+export function buildPublicRoomRenderables(roomId: string, placements: {
+  id: string;
+  zoneId: string;
+  slot: number;
+  offset: Record<string, number> | null;
+  transform: Record<string, number> | null;
+  surfaceId: string | null;
+  holding: {
+    templateId: string;
+    tradeStatus: string;
+    template: Record<string, unknown>;
+    personalMediaUrl?: string;
+  };
+}[]): RoomRenderable[] {
+  const holdings: NativeHolding[] = placements.map((placement) => {
+    const template = placement.holding.template;
+    return {
+      id: placement.id,
+      templateId: placement.holding.templateId,
+      acquiredAt: "",
+      tradeStatus: placement.holding.tradeStatus === "for-trade" ? "for-trade" : "not-for-trade",
+      ...(placement.holding.personalMediaUrl ? { personalMediaUrl: placement.holding.personalMediaUrl } : {}),
+      template: {
+        id: placement.holding.templateId,
+        groupId: stringAt(template.groupId),
+        memberId: optionalString(template.memberId),
+        releaseId: optionalString(template.releaseId),
+        kind: stringAt(template.kind, "memorabilia"),
+        name: stringAt(template.name, "Collectible"),
+        descriptor: stringAt(template.descriptor),
+        status: "active",
+        groupName: stringAt(template.groupName),
+        memberName: optionalString(template.memberName),
+        releaseName: optionalString(template.releaseName),
+      },
+    };
+  });
+  const mapped: NativeRoomPlacement[] = placements.map((placement) => ({
+    id: placement.id,
+    roomId,
+    holdingId: placement.id,
+    zoneId: placement.zoneId || `${roomId}-floor`,
+    slot: placement.slot,
+    offset: placement.offset,
+    transform: placement.transform,
+    surfaceId: placement.surfaceId,
+  }));
+  return buildRoomRenderables(holdings, mapped);
+}
+
 export function buildRoomRenderables(holdings: NativeHolding[], placements: NativeRoomPlacement[]): RoomRenderable[] {
   const placementByHolding = new Map(placements.map((placement) => [placement.holdingId, placement]));
   return holdings.filter((holding) => placementByHolding.has(holding.id)).map((holding, index) => {
@@ -201,6 +251,12 @@ function roomRenderable(holding: NativeHolding, placement: NativeRoomPlacement |
   };
 }
 
+function stringAt(value: unknown, fallback = "") {
+  return typeof value === "string" ? value : fallback;
+}
+function optionalString(value: unknown) {
+  return typeof value === "string" && value ? value : null;
+}
 function numberAt(value: unknown, fallback: number) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }

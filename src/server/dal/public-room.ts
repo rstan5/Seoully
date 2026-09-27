@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/server/supabase/server";
 import { getCurrentIdentity } from "@/server/dal/profile";
@@ -28,10 +29,12 @@ export interface PublicRoomDTO {
   viewerUserId?: string;
 }
 
-export async function getPublicRoomByHandle(input: unknown): Promise<PublicRoomDTO | null> {
+export async function getPublicRoomByHandle(input: unknown, client?: SupabaseClient): Promise<PublicRoomDTO | null> {
   const handle = handleSchema.parse(input);
-  const supabase = await createSupabaseServerClient();
-  const viewer = await getCurrentIdentity().catch(() => null);
+  const supabase = client ?? await createSupabaseServerClient();
+  const viewerUserId = client
+    ? (await supabase.auth.getUser()).data.user?.id
+    : (await getCurrentIdentity().catch(() => null))?.user.id;
   const { data, error } = await supabase.rpc("get_public_room_by_handle", { p_handle: handle });
   if (error) throw new Error("public_room_read_failed");
   if (!data || typeof data !== "object") return null;
@@ -44,7 +47,7 @@ export async function getPublicRoomByHandle(input: unknown): Promise<PublicRoomD
     owner: { userId: owner.userId, handle: owner.handle, displayName: String(owner.displayName ?? owner.handle) },
     room: null,
     private: true,
-    ...(viewer ? { viewerUserId: viewer.user.id } : {}),
+    ...(viewerUserId ? { viewerUserId } : {}),
   };
   const rows = Array.isArray(roomRaw.placements) ? roomRaw.placements : [];
   const placements: PublicRoomPlacement[] = [];
@@ -79,7 +82,7 @@ export async function getPublicRoomByHandle(input: unknown): Promise<PublicRoomD
     owner: { userId: owner.userId, handle: owner.handle, displayName: String(owner.displayName ?? owner.handle) },
     room: { id: String(roomRaw.id), placements },
     private: false,
-    ...(viewer ? { viewerUserId: viewer.user.id } : {}),
+    ...(viewerUserId ? { viewerUserId } : {}),
   };
 }
 

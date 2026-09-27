@@ -61,6 +61,13 @@ export function binderSectionStarts(spreads: NativeBinderSpread[]) {
   return sections;
 }
 
+export function spreadIndexForHolding(spreads: NativeBinderSpread[], holdingId: string) {
+  return spreads.findIndex((spread) =>
+    spread.left.pockets.some((pocket) => pocket.holding?.id === holdingId)
+    || spread.right.pockets.some((pocket) => pocket.holding?.id === holdingId),
+  );
+}
+
 export function binderSpreads(pages: NativeBinderPage[]): NativeBinderSpread[] {
   const spreads: NativeBinderSpread[] = [];
   for (let index = 0; index < pages.length; index += 2) {
@@ -90,6 +97,8 @@ function blankPage(setId: string, setName: string, pageInSet: number): NativeBin
 
 function stableHoldings(holdings: NativeHolding[]) {
   return [...holdings].sort((a, b) =>
-    a.template.name.localeCompare(b.template.name) || a.id.localeCompare(b.id),
+    (a.template.memberName ?? "").localeCompare(b.template.memberName ?? "")
+    || a.template.name.localeCompare(b.template.name)
+    || a.id.localeCompare(b.id),
   );
 }

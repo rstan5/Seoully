@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, FlatList, Image, Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { loadAllMyHoldings, type NativeHolding } from "../src/api";
-import { binderSectionStarts, binderSpreads, buildNativeBinderPages, type NativeBinderPage, type NativeBinderSpread } from "../src/binder/model";
+import { binderSectionStarts, binderSpreads, buildNativeBinderPages, spreadIndexForHolding, type NativeBinderPage, type NativeBinderSpread } from "../src/binder/model";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
 import { useCachedSignedMedia } from "../src/media/cachedMedia";
@@ -16,6 +16,8 @@ const BINDER_SPREAD_KEY = "seoully.mobile.binder-spread.v1";
 export default function BinderScreen() {
   const copy = useCopy();
   const router = useRouter();
+  const params = useLocalSearchParams<{ holdingId?: string }>();
+  const jumpedHolding = useRef<string | null>(null);
   const { width } = useWindowDimensions();
   const spreadWidth = Math.max(320, width - spacing.lg * 2);
   const [holdings, setHoldings] = useState<NativeHolding[]>([]);
@@ -24,6 +26,18 @@ export default function BinderScreen() {
   const [spreadReady, setSpreadReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cover] = useState(() => new Animated.Value(0));
+  const closing = useRef(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  useEffect(() => { void AccessibilityInfo.isReduceMotionEnabled().then(setReducedMotion); }, []);
+  useEffect(() => {
+    Animated.timing(cover, {
+      toValue: 1,
+      duration: reducedMotion ? 1 : 460,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [cover, reducedMotion]);
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
@@ -54,6 +68,15 @@ export default function BinderScreen() {
   }, [spreadIndex, spreadReady]);
   const spreads = useMemo(() => binderSpreads(buildNativeBinderPages(holdings, copy.binderGeneral)), [copy.binderGeneral, holdings]);
   const sections = useMemo(() => binderSectionStarts(spreads), [spreads]);
+  useEffect(() => {
+    const holdingId = typeof params.holdingId === "string" ? params.holdingId : "";
+    if (!spreadReady || !holdingId || jumpedHolding.current === holdingId) return;
+    const index = spreadIndexForHolding(spreads, holdingId);
+    if (index < 0) return;
+    jumpedHolding.current = holdingId;
+    const task = setTimeout(() => setSpreadIndex(index), 0);
+    return () => clearTimeout(task);
+  }, [params.holdingId, spreadReady, spreads]);
   const visibleSpread = spreads.length ? Math.min(spreadIndex, spreads.length - 1) : 0;
   useEffect(() => {
     if (!spreads.length) return;
@@ -65,8 +88,18 @@ export default function BinderScreen() {
 
   const photocards = holdings.filter((holding) => holding.template.kind === "photocard");
   const closeBinder = () => {
-    if (router.canGoBack()) router.back();
-    else router.replace("/room");
+    if (closing.current) return;
+    closing.current = true;
+    Animated.timing(cover, {
+      toValue: 0,
+      duration: reducedMotion ? 1 : 260,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (!finished) return;
+      if (router.canGoBack()) router.back();
+      else router.replace("/room");
+    });
   };
 
   return <SafeAreaView style={styles.safe}><View style={styles.container}>
@@ -77,7 +110,8 @@ export default function BinderScreen() {
     {sections.length > 1 ? <View><Text style={styles.sectionLabel}>{copy.jumpToSet}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sectionRow}>{sections.map((section) => <Pressable key={section.setId} accessibilityRole="button" accessibilityState={{ selected: spreads[visibleSpread]?.left.setId === section.setId }} onPress={() => listRef.current?.scrollToIndex({ index: section.spreadIndex, animated: true })} style={[styles.sectionChip, spreads[visibleSpread]?.left.setId === section.setId && styles.sectionChipSelected]}><Text style={[styles.sectionChipText, spreads[visibleSpread]?.left.setId === section.setId && styles.sectionChipTextSelected]}>{section.setName}</Text></Pressable>)}</ScrollView></View> : null}
     {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
     {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
-    {!loading ? <FlatList
+    {!loading ? <View style={styles.binderStage}>
+      <FlatList
       ref={listRef}
       data={spreads}
       horizontal
@@ -88,9 +122,17 @@ export default function BinderScreen() {
       snapToInterval={spreadWidth}
       decelerationRate="fast"
       onMomentumScrollEnd={(event) => setSpreadIndex(Math.round(event.nativeEvent.contentOffset.x / spreadWidth))}
-      renderItem={({ item }) => <Spread spread={item} width={spreadWidth} emptyLabel={copy.binderEmptyPocket} onSelect={setSelected} />}
+      renderItem={({ item }) => <Spread spread={item} width={spreadWidth} emptyLabel={copy.binderEmptyPocket} focusedHoldingId={typeof params.holdingId === "string" ? params.holdingId : undefined} onSelect={setSelected} />}
       style={styles.binder}
-    /> : null}
+    />
+      <Animated.View pointerEvents="none" style={[styles.cover, {
+        opacity: cover.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+        transform: [{ scale: cover.interpolate({ inputRange: [0, 1], outputRange: [1, 0.94] }) }],
+      }]}>
+        <View style={styles.coverSpine} />
+        <View style={styles.coverBoard}><Text style={styles.coverTitle}>{copy.binder}</Text></View>
+      </Animated.View>
+    </View> : null}
     <Text style={styles.pageCount}>{copy.binderPage} {visibleSpread + 1} / {spreads.length}</Text>
     <View style={styles.pageControls}>
       <Pressable accessibilityRole="button" accessibilityState={{ disabled: visibleSpread === 0 }} disabled={visibleSpread === 0} onPress={() => listRef.current?.scrollToIndex({ index: visibleSpread - 1, animated: true })} style={[styles.pageButton, visibleSpread === 0 && styles.pageButtonDisabled]}><Text style={styles.pageButtonText}>{copy.previousSpread}</Text></Pressable>
@@ -100,24 +142,24 @@ export default function BinderScreen() {
   </View></SafeAreaView>;
 }
 
-function Spread({ spread, width, emptyLabel, onSelect }: { spread: NativeBinderSpread; width: number; emptyLabel: string; onSelect: (selection: CardSelection) => void }) {
+function Spread({ spread, width, emptyLabel, focusedHoldingId, onSelect }: { spread: NativeBinderSpread; width: number; emptyLabel: string; focusedHoldingId?: string; onSelect: (selection: CardSelection) => void }) {
   return <View style={[styles.spread, { width }]}>
-    <Page page={spread.left} emptyLabel={emptyLabel} onSelect={onSelect} side="left" />
+    <Page page={spread.left} emptyLabel={emptyLabel} focusedHoldingId={focusedHoldingId} onSelect={onSelect} side="left" />
     <View style={styles.spine} />
-    <Page page={spread.right} emptyLabel={emptyLabel} onSelect={onSelect} side="right" />
+    <Page page={spread.right} emptyLabel={emptyLabel} focusedHoldingId={focusedHoldingId} onSelect={onSelect} side="right" />
   </View>;
 }
 
-function Page({ page, emptyLabel, onSelect, side }: { page: NativeBinderPage; emptyLabel: string; onSelect: (selection: CardSelection) => void; side: "left" | "right" }) {
+function Page({ page, emptyLabel, focusedHoldingId, onSelect, side }: { page: NativeBinderPage; emptyLabel: string; focusedHoldingId?: string; onSelect: (selection: CardSelection) => void; side: "left" | "right" }) {
   return <View style={[styles.page, side === "left" ? styles.pageLeft : styles.pageRight]}>
-    <Text numberOfLines={1} style={styles.setName}>{page.setName}</Text>
+    <Text numberOfLines={1} style={styles.setName}>{page.setName} · {page.pageInSet + 1}</Text>
     <View style={styles.pockets}>{page.pockets.map((pocket) =>
-      <BinderPocket key={pocket.index} holding={pocket.holding} emptyLabel={emptyLabel} onSelect={onSelect} />
+      <BinderPocket key={pocket.index} holding={pocket.holding} emptyLabel={emptyLabel} focused={Boolean(focusedHoldingId && pocket.holding?.id === focusedHoldingId)} onSelect={onSelect} />
     )}</View>
   </View>;
 }
 
-function BinderPocket({ holding, emptyLabel, onSelect }: { holding?: NativeHolding; emptyLabel: string; onSelect: (selection: CardSelection) => void }) {
+function BinderPocket({ holding, emptyLabel, focused, onSelect }: { holding?: NativeHolding; emptyLabel: string; focused?: boolean; onSelect: (selection: CardSelection) => void }) {
   const pocketRef = useRef<View>(null);
   const [imageFailed, setImageFailed] = useState(false);
   const mediaUri = useCachedSignedMedia(holding?.id, holding?.personalMediaUrl);
@@ -126,7 +168,7 @@ function BinderPocket({ holding, emptyLabel, onSelect }: { holding?: NativeHoldi
     if (!holding) return;
     pocketRef.current?.measureInWindow((x, y, width, height) => onSelect({ holding, origin: { x, y, width, height } }));
   };
-  return <Pressable ref={pocketRef} accessibilityRole={holding ? "button" : "text"} accessibilityLabel={holding?.template.name ?? emptyLabel} disabled={!holding} onPress={select} style={styles.pocket}>
+  return <Pressable ref={pocketRef} accessibilityRole={holding ? "button" : "text"} accessibilityLabel={holding?.template.name ?? emptyLabel} disabled={!holding} onPress={select} style={[styles.pocket, focused && styles.pocketFocused]}>
     {faceUri ? <Image source={{ uri: faceUri }} style={styles.cardImage} onError={() => setImageFailed(true)} /> : holding ? <View style={styles.cardFallback} /> : null}
   </Pressable>;
 }
@@ -192,7 +234,12 @@ const styles = StyleSheet.create({
   loading: { marginTop: spacing.xl },
   error: { color: colors.plum, marginTop: spacing.md },
   empty: { color: colors.muted, fontSize: 13, marginTop: spacing.sm },
-  binder: { marginTop: spacing.lg },
+  binderStage: { flex: 1, marginTop: spacing.lg },
+  binder: { flex: 1 },
+  cover: { alignItems: "center", backgroundColor: colors.canvas, bottom: 0, flexDirection: "row", justifyContent: "center", left: 0, paddingHorizontal: spacing.lg, position: "absolute", right: 0, top: 0 },
+  coverSpine: { backgroundColor: "#3a1520", borderRadius: 4, height: "72%", width: 18 },
+  coverBoard: { alignItems: "center", backgroundColor: "#5a2233", borderRadius: 12, height: "72%", justifyContent: "center", marginLeft: 4, width: "62%" },
+  coverTitle: { color: "#fff4f6", fontSize: 22, fontWeight: "700" },
   spread: { alignItems: "stretch", flexDirection: "row", paddingVertical: spacing.md },
   page: { backgroundColor: "#7d3e55", borderRadius: 10, flex: 1, padding: 7 },
   pageLeft: { borderBottomRightRadius: 4, borderTopRightRadius: 4, transform: [{ perspective: 700 }, { rotateY: "7deg" }] },
@@ -201,6 +248,7 @@ const styles = StyleSheet.create({
   setName: { color: "#fff4f6", fontSize: 10, fontWeight: "700", height: 17, textAlign: "center" },
   pockets: { flexDirection: "row", flexWrap: "wrap", gap: 5, justifyContent: "center" },
   pocket: { aspectRatio: 55 / 85, backgroundColor: "rgba(255,255,255,0.16)", borderColor: "rgba(255,255,255,0.35)", borderRadius: 4, borderWidth: 1, overflow: "hidden", width: "29%" },
+  pocketFocused: { borderColor: "#fff4f6", borderWidth: 2, transform: [{ translateY: -6 }] },
   cardImage: { height: "100%", width: "100%" },
   cardFallback: { alignItems: "center", backgroundColor: colors.blush, height: "100%", justifyContent: "center", padding: 2, width: "100%" },
   cardName: { color: colors.ink, fontSize: 8, textAlign: "center" },

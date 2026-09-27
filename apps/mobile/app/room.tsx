@@ -14,6 +14,7 @@ import { buildRoomRenderables, createInitialRoomRenderable, isSupportedRoomPlace
 import { colors, spacing } from "../src/theme";
 
 const ROOM_CAMERA_KEY = "seoully.mobile.room-camera.v1";
+const ROOM_FOCUS_KEY = "seoully.mobile.room-focus.v1";
 
 export default function RoomScreen() {
   const copy = useCopy();
@@ -32,10 +33,15 @@ export default function RoomScreen() {
   const cameraOrigin = useRef({ yaw: 0, pitch: 0 });
   const latestItems = useRef(items);
   const editingRef = useRef(editing);
+  const focusReady = useRef(false);
   useEffect(() => { latestItems.current = items; }, [items]);
   useEffect(() => { editingRef.current = editing; }, [editing]);
   useEffect(() => {
     const task = setTimeout(() => {
+      void AsyncStorage.getItem(ROOM_FOCUS_KEY).then((stored) => {
+        if (stored) setSelectedId(stored);
+        focusReady.current = true;
+      });
       void AsyncStorage.getItem(ROOM_CAMERA_KEY).then((stored) => {
         if (!stored) return;
         try {
@@ -50,6 +56,14 @@ export default function RoomScreen() {
     }, 0);
     return () => clearTimeout(task);
   }, []);
+  useEffect(() => {
+    if (focusReady.current) void AsyncStorage.setItem(ROOM_FOCUS_KEY, selectedId ?? "");
+  }, [selectedId]);
+  useEffect(() => {
+    if (!selectedId || !items.length || items.some((item) => item.holding.id === selectedId)) return;
+    const task = setTimeout(() => setSelectedId(null), 0);
+    return () => clearTimeout(task);
+  }, [items, selectedId]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -214,6 +228,15 @@ export default function RoomScreen() {
     }
   }
 
+  function openBinder() {
+    const holding = items.find((item) => item.holding.id === selectedId)?.holding;
+    if (holding?.template.kind === "photocard") {
+      router.push({ pathname: "/binder", params: { holdingId: holding.id } });
+      return;
+    }
+    router.push("/binder");
+  }
+
   function lookAtZone(target: NativeRoomVector | null) {
     setSelectedId(null);
     setLookTarget(target);
@@ -241,7 +264,7 @@ export default function RoomScreen() {
     <View style={styles.header}>
       <View style={styles.heading}>{router.canGoBack() ? <ScreenBack label={copy.back} onPress={() => router.back()} /> : null}<Text style={styles.title}>{copy.room}</Text><Text style={styles.lead}>{copy.roomLead}</Text></View>
       <View style={styles.headerActions}>
-        <Pressable accessibilityRole="button" accessibilityLabel={copy.openBinder} onPress={() => router.push("/binder")} style={styles.editButton}><Text style={styles.editButtonText}>{copy.binder}</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={copy.openBinder} onPress={openBinder} style={styles.editButton}><Text style={styles.editButtonText}>{copy.binder}</Text></Pressable>
         {editing ? <Pressable accessibilityRole="button" onPress={() => void cancelEditing()} style={styles.editButton}><Text style={styles.editButtonText}>{copy.cancelEditing}</Text></Pressable> : null}
         <Pressable accessibilityRole="button" disabled={!snapshot} onPress={() => editing ? setEditing(false) : beginEditing()} style={styles.editButton}><Text style={styles.editButtonText}>{editing ? copy.finishEditing : copy.editRoom}</Text></Pressable>
       </View>
@@ -259,7 +282,7 @@ export default function RoomScreen() {
       return <Pressable key={id} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => lookAtZone(target)} style={[styles.lookChip, selected && styles.lookChipSelected]}><Text style={[styles.lookChipText, selected && styles.lookChipTextSelected]}>{label}</Text></Pressable>;
     })}</ScrollView> : null}
     {!loading && snapshot ? <View style={styles.stage} {...panResponder.panHandlers}>
-      <NativeRoomRenderer items={items} selectedId={selectedId} focusedId={editing ? null : selectedId} themeId={snapshot.room.themeId} cameraYaw={cameraYaw} cameraPitch={cameraPitch} lookTarget={lookTarget} onSelect={setSelectedId} onClearSelection={() => setSelectedId(null)} onOpenBinder={editing ? undefined : () => router.push("/binder")} />
+      <NativeRoomRenderer items={items} selectedId={selectedId} focusedId={editing ? null : selectedId} themeId={snapshot.room.themeId} cameraYaw={cameraYaw} cameraPitch={cameraPitch} lookTarget={lookTarget} onSelect={setSelectedId} onClearSelection={() => setSelectedId(null)} onOpenBinder={editing ? undefined : openBinder} />
       {editing && selectedId ? <View pointerEvents="none" style={styles.hint}><Text style={styles.hintText}>{copy.roomDragHint}</Text></View> : null}
       {!editing ? <View pointerEvents="none" style={styles.hint}><Text style={styles.hintText}>{copy.roomOrbitHint}</Text></View> : null}
     </View> : null}

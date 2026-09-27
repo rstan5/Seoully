@@ -183,6 +183,8 @@ security, and Room/Binder data model.
 - Room inspection camera now frames wall-mounted objects more closely instead of using
   the same floor dolly offset, and collectible kinds are localized across Collection,
   Search, Room inspection, and Holding detail.
+- Restored Collection tab and Explore query locally so returning to those screens
+  preserves the last wishlist/collection view and the last catalog/collector search.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 
@@ -306,6 +308,8 @@ Native device QA is still pending.
   Camera permission sheets and kind-chip wrapping remain AWAITING DEVICE QA.
 - Wall-aware Room focus and localized collectible kinds pass mobile TypeScript. Focus
   framing across device sizes remains AWAITING DEVICE QA.
+- Collection/Explore restoration passes mobile TypeScript and Expo lint. Process-kill
+  restore and keyboard-return search remain AWAITING DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.

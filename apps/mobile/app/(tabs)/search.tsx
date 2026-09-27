@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import {
   ensureConversation,
@@ -17,6 +18,8 @@ import { collectibleKindLabel } from "../../src/i18n";
 import { useCopy } from "../../src/locale";
 import { RetryNotice } from "../../src/components/RetryNotice";
 import { colors, spacing } from "../../src/theme";
+
+const SEARCH_QUERY_KEY = "seoully.mobile.search-query.v1";
 
 export default function SearchScreen() {
   const router = useRouter();
@@ -49,32 +52,43 @@ export default function SearchScreen() {
     }
   }, [copy.exploreUnavailable]);
 
-  useEffect(() => {
-    const task = setTimeout(() => { void loadExplore(); }, 0);
-    return () => clearTimeout(task);
-  }, [loadExplore]);
-
-  async function runSearch() {
-    if (!query.trim()) return void loadExplore();
+  const runSearch = useCallback(async (nextQuery: string) => {
+    const text = nextQuery.trim().slice(0, 120);
+    if (!text) return void loadExplore();
+    setQuery(text);
     setLoading(true);
     setError(null);
     try {
       const [catalog, users] = await Promise.all([
-        searchCatalog(query),
-        searchCollectors(query),
+        searchCatalog(text),
+        searchCollectors(text),
       ]);
       setResults(catalog);
       setPeople(users);
+      void AsyncStorage.setItem(SEARCH_QUERY_KEY, text);
     } catch {
       setError(copy.catalogUnavailable);
     } finally {
       setLoading(false);
     }
-  }
+  }, [copy.catalogUnavailable, loadExplore]);
+
+  useEffect(() => {
+    let active = true;
+    void AsyncStorage.getItem(SEARCH_QUERY_KEY).then((stored) => {
+      if (!active) return;
+      if (stored?.trim()) void runSearch(stored);
+      else void loadExplore();
+    });
+    return () => { active = false; };
+  }, [loadExplore, runSearch]);
 
   function clearSearch(value: string) {
     setQuery(value);
-    if (!value.trim()) void loadExplore();
+    if (!value.trim()) {
+      void AsyncStorage.removeItem(SEARCH_QUERY_KEY);
+      void loadExplore();
+    }
   }
 
   async function saveWanted(templateId: string) {
@@ -100,11 +114,11 @@ export default function SearchScreen() {
     <Text style={styles.title}>{copy.explore}</Text>
     <Text style={styles.body}>{copy.exploreLead}</Text>
     <View style={styles.searchRow}>
-      <TextInput accessibilityLabel={copy.catalogSearchLabel} placeholder={copy.catalogSearchPlaceholder} value={query} onChangeText={clearSearch} onSubmitEditing={runSearch} returnKeyType="search" style={styles.input} />
-      <Pressable accessibilityRole="button" onPress={runSearch} style={styles.searchButton}><Text style={styles.searchButtonText}>{copy.search}</Text></Pressable>
+      <TextInput accessibilityLabel={copy.catalogSearchLabel} placeholder={copy.catalogSearchPlaceholder} value={query} onChangeText={clearSearch} onSubmitEditing={() => { void runSearch(query); }} returnKeyType="search" style={styles.input} />
+      <Pressable accessibilityRole="button" onPress={() => { void runSearch(query); }} style={styles.searchButton}><Text style={styles.searchButtonText}>{copy.search}</Text></Pressable>
     </View>
     {loading && <ActivityIndicator color={colors.plum} style={styles.loading} />}
-    {error && <RetryNotice message={error} retryLabel={copy.retry} onRetry={results ? runSearch : loadExplore} />}
+    {error && <RetryNotice message={error} retryLabel={copy.retry} onRetry={results ? () => { void runSearch(query); } : loadExplore} />}
 
     {results ? <>
       <Text style={styles.sectionTitle}>{copy.collectorResults}</Text>

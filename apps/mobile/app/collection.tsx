@@ -1,5 +1,6 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ActivityIndicator, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   loadMyHoldings,
@@ -14,6 +15,8 @@ import { useCopy } from "../src/locale";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { colors, spacing } from "../src/theme";
 
+const COLLECTION_TAB_KEY = "seoully.mobile.collection-tab.v1";
+
 export default function CollectionScreen() {
   const copy = useCopy();
   const router = useRouter();
@@ -23,6 +26,7 @@ export default function CollectionScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [tabReady, setTabReady] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -40,6 +44,18 @@ export default function CollectionScreen() {
   useFocusEffect(useCallback(() => {
     void refresh();
   }, [refresh]));
+  useEffect(() => {
+    const task = setTimeout(() => {
+      void AsyncStorage.getItem(COLLECTION_TAB_KEY).then((stored) => {
+        if (stored === "collection" || stored === "wishlist") setTab(stored);
+        setTabReady(true);
+      });
+    }, 0);
+    return () => clearTimeout(task);
+  }, []);
+  useEffect(() => {
+    if (tabReady) void AsyncStorage.setItem(COLLECTION_TAB_KEY, tab);
+  }, [tab, tabReady]);
 
   async function toggleTrade(holding: NativeHolding) {
     const nextStatus = holding.tradeStatus === "for-trade" ? "not-for-trade" : "for-trade";

@@ -7,6 +7,7 @@ import { loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomPlacement, sav
 import { collectibleKindLabel } from "../src/i18n";
 import { useCopy } from "../src/locale";
 import { RetryNotice } from "../src/components/RetryNotice";
+import { ScreenBack } from "../src/components/ScreenBack";
 import { CachedSignedImage } from "../src/media/cachedMedia";
 import { NativeRoomRenderer } from "../src/room/NativeRoomRenderer";
 import { buildRoomRenderables, createInitialRoomRenderable, moveRenderable, nativeHomeForHolding, nextNativeSlot, settleRoomRenderable, toPersistedTransform, zoneIdForNativeSurface, type RoomRenderable } from "../src/room/model";
@@ -163,7 +164,7 @@ export default function RoomScreen() {
 
   return <SafeAreaView style={styles.safe}><View style={styles.container}>
     <View style={styles.header}>
-      <View style={styles.heading}><Text style={styles.title}>{copy.room}</Text><Text style={styles.lead}>{copy.roomLead}</Text></View>
+      <View style={styles.heading}><ScreenBack label={copy.back} onPress={() => router.back()} /><Text style={styles.title}>{copy.room}</Text><Text style={styles.lead}>{copy.roomLead}</Text></View>
       <Pressable accessibilityRole="button" disabled={!snapshot} onPress={() => setEditing((value) => !value)} style={styles.editButton}><Text style={styles.editButtonText}>{editing ? copy.finishEditing : copy.editRoom}</Text></Pressable>
     </View>
     {editing && snapshot ? <View><Text style={styles.themeLabel}>{copy.roomStyle}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.themeRow}>{([

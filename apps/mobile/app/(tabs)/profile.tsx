@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Tex
 import { resolveNativeIdentity, updateNativeProfile } from "../../src/api";
 import { KeyboardScreen } from "../../src/components/KeyboardScreen";
 import { RetryNotice } from "../../src/components/RetryNotice";
-import { useCopy } from "../../src/locale";
+import { useCopy, useLocale } from "../../src/locale";
 import { supabase } from "../../src/supabase";
 import { colors, spacing } from "../../src/theme";
 
@@ -13,6 +13,7 @@ type Identity = { user?: { handle?: string; displayName?: string }; profile?: { 
 export default function ProfileScreen() {
   const router = useRouter();
   const copy = useCopy();
+  const { toggleLocale } = useLocale();
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [tagline, setTagline] = useState("");
@@ -69,7 +70,7 @@ export default function ProfileScreen() {
   }
 
   return <SafeAreaView style={styles.safe}><KeyboardScreen><ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-    <Text style={styles.title}>{copy.profile}</Text>
+    <View style={styles.titleRow}><Text style={styles.title}>{copy.profile}</Text><Pressable accessibilityRole="button" onPress={toggleLocale} style={styles.language}><Text style={styles.secondaryText}>{copy.switchLanguage}</Text></Pressable></View>
     {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
     {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
     {!loading && !error ? <>
@@ -84,4 +85,4 @@ export default function ProfileScreen() {
     </> : null}
   </ScrollView></KeyboardScreen></SafeAreaView>;
 }
-const styles = StyleSheet.create({ safe: { flex: 1, backgroundColor: colors.canvas }, container: { padding: spacing.lg, paddingBottom: 100 }, title: { color: colors.ink, fontSize: 32, fontWeight: "700" }, loading: { marginTop: spacing.lg }, handle: { color: colors.plum, fontSize: 17, fontWeight: "700", marginTop: spacing.sm }, destinationRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.lg }, destinationLink: { alignItems: "center", borderColor: colors.plum, borderRadius: 14, borderWidth: 1, flex: 1, justifyContent: "center", minHeight: 48 }, collectionLinkText: { color: colors.plum, fontWeight: "700" }, shortInput: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 14, borderWidth: 1, color: colors.ink, minHeight: 50, marginTop: spacing.md, paddingHorizontal: spacing.md }, input: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 14, borderWidth: 1, color: colors.ink, minHeight: 110, marginTop: spacing.md, padding: spacing.md, textAlignVertical: "top" }, button: { alignItems: "center", backgroundColor: colors.plum, borderRadius: 14, justifyContent: "center", marginTop: spacing.md, minHeight: 52 }, buttonText: { color: colors.surface, fontWeight: "700" }, message: { color: colors.plum, marginTop: spacing.md }, secondary: { alignItems: "center", justifyContent: "center", marginTop: spacing.lg, minHeight: 44 }, secondaryText: { color: colors.plum, fontWeight: "700" } });
+const styles = StyleSheet.create({ safe: { flex: 1, backgroundColor: colors.canvas }, container: { padding: spacing.lg, paddingBottom: 100 }, titleRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" }, title: { color: colors.ink, flex: 1, fontSize: 32, fontWeight: "700" }, language: { justifyContent: "center", minHeight: 44, paddingHorizontal: spacing.sm }, loading: { marginTop: spacing.lg }, handle: { color: colors.plum, fontSize: 17, fontWeight: "700", marginTop: spacing.sm }, destinationRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.lg }, destinationLink: { alignItems: "center", borderColor: colors.plum, borderRadius: 14, borderWidth: 1, flex: 1, justifyContent: "center", minHeight: 48 }, collectionLinkText: { color: colors.plum, fontWeight: "700" }, shortInput: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 14, borderWidth: 1, color: colors.ink, minHeight: 50, marginTop: spacing.md, paddingHorizontal: spacing.md }, input: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 14, borderWidth: 1, color: colors.ink, minHeight: 110, marginTop: spacing.md, padding: spacing.md, textAlignVertical: "top" }, button: { alignItems: "center", backgroundColor: colors.plum, borderRadius: 14, justifyContent: "center", marginTop: spacing.md, minHeight: 52 }, buttonText: { color: colors.surface, fontWeight: "700" }, message: { color: colors.plum, marginTop: spacing.md }, secondary: { alignItems: "center", justifyContent: "center", marginTop: spacing.lg, minHeight: 44 }, secondaryText: { color: colors.plum, fontWeight: "700" } });

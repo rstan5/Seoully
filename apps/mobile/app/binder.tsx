@@ -5,6 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { loadAllMyHoldings, type NativeHolding } from "../src/api";
 import { binderSpreads, buildNativeBinderPages, type NativeBinderPage, type NativeBinderSpread } from "../src/binder/model";
 import { RetryNotice } from "../src/components/RetryNotice";
+import { ScreenBack } from "../src/components/ScreenBack";
 import { useCachedSignedMedia } from "../src/media/cachedMedia";
 import { useCopy } from "../src/locale";
 import { colors, spacing } from "../src/theme";
@@ -14,6 +15,7 @@ const BINDER_SPREAD_KEY = "seoully.mobile.binder-spread.v1";
 
 export default function BinderScreen() {
   const copy = useCopy();
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const spreadWidth = Math.max(320, width - spacing.lg * 2);
   const [holdings, setHoldings] = useState<NativeHolding[]>([]);
@@ -61,6 +63,7 @@ export default function BinderScreen() {
   }, [spreads.length, visibleSpread]);
 
   return <SafeAreaView style={styles.safe}><View style={styles.container}>
+    <ScreenBack label={copy.back} onPress={() => router.back()} />
     <Text style={styles.title}>{copy.binder}</Text>
     <Text style={styles.lead}>{copy.binderLead}</Text>
     {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}

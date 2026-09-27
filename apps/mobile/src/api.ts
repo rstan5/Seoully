@@ -118,6 +118,16 @@ export async function updateHoldingTradeStatus(holdingId: string, tradeStatus: N
   return payload.holding;
 }
 
+export async function loadAllMyWishlist(): Promise<NativeWishlistEntry[]> {
+  const entries: NativeWishlistEntry[] = [];
+  for (let offset = 0; offset < 2_000; offset += 100) {
+    const page = await loadMyWishlist(offset, 100);
+    entries.push(...page);
+    if (page.length < 100) break;
+  }
+  return entries;
+}
+
 export async function loadMyWishlist(offset = 0, limit = 100): Promise<NativeWishlistEntry[]> {
   const accessToken = await mobileAccessToken();
   const response = await fetch(`${baseUrl}/api/mobile/wishlist?offset=${offset}&limit=${limit}`, {
@@ -440,6 +450,17 @@ export async function setCollectorFollowing(userId: string, following: boolean) 
   });
   if (!response.ok) throw new Error("follow_failed");
   return response.json() as Promise<{ following: boolean }>;
+}
+
+export async function loadCollectorPosts(userId: string, cursor?: string): Promise<NativeFeedPage> {
+  const accessToken = await mobileAccessToken();
+  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+  const response = await fetch(`${baseUrl}/api/mobile/collectors/${encodeURIComponent(userId)}/posts${query}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("social_read_failed");
+  const payload = await response.json() as { page?: { items?: NativeFeedPost[]; nextCursor?: string | null } };
+  return { items: payload.page?.items ?? [], nextCursor: payload.page?.nextCursor ?? null };
 }
 
 export type NativeRoomThemeId = "hearth" | "blossom" | "midnight";

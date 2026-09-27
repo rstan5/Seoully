@@ -1,13 +1,15 @@
 import { useCallback, useRef, useState } from "react";
-import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from "react-native";
 import { loadDirectMessages, sendDirectMessage, type NativeDirectMessage } from "../src/api";
 import { RetryNotice } from "../src/components/RetryNotice";
+import { ScreenBack } from "../src/components/ScreenBack";
 import { useCopy } from "../src/locale";
 import { colors, spacing } from "../src/theme";
 
 export default function ThreadScreen() {
   const copy = useCopy();
+  const router = useRouter();
   const params = useLocalSearchParams<{ conversationId?: string; displayName?: string; handle?: string }>();
   const conversationId = params.conversationId ?? "";
   const [messages, setMessages] = useState<NativeDirectMessage[]>([]);
@@ -55,7 +57,7 @@ export default function ThreadScreen() {
   }
 
   return <SafeAreaView style={styles.safe}><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.container}>
-    <View style={styles.header}><Text style={styles.title}>{params.displayName}</Text><Text style={styles.handle}>@{params.handle}</Text></View>
+    <View style={styles.header}><ScreenBack label={copy.back} onPress={() => router.back()} /><Text style={styles.title}>{params.displayName}</Text><Text style={styles.handle}>@{params.handle}</Text></View>
     {loading ? <ActivityIndicator color={colors.plum} /> : null}
     {loadError ? <RetryNotice message={loadError} retryLabel={copy.retry} onRetry={() => { void refresh(); }} /> : null}
     {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}

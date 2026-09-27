@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import {
   ensureConversation,
+  loadAllMyWishlist,
   loadCollectibleDiscovery,
   loadCollectorDiscovery,
   searchCatalog,
@@ -74,6 +75,17 @@ export default function SearchScreen() {
     }
   }, [copy.catalogUnavailable, loadExplore]);
 
+  const hydrateWishlist = useCallback(async () => {
+    try {
+      const entries = await loadAllMyWishlist();
+      setWantedIds(new Set(entries.map((entry) => entry.templateId)));
+    } catch {
+      setError(copy.wishlistUnavailable);
+    }
+  }, [copy.wishlistUnavailable]);
+  useFocusEffect(useCallback(() => {
+    void hydrateWishlist();
+  }, [hydrateWishlist]));
   useEffect(() => {
     let active = true;
     void AsyncStorage.getItem(SEARCH_QUERY_KEY).then((stored) => {
@@ -98,7 +110,7 @@ export default function SearchScreen() {
       await setWishlistTemplate(templateId, true);
       setWantedIds((current) => new Set(current).add(templateId));
     } catch {
-      setError(copy.catalogUnavailable);
+      setError(copy.wishlistUnavailable);
     }
   }
 

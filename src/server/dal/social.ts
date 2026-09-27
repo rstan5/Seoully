@@ -126,8 +126,8 @@ export async function searchProductionCollectibles(query: unknown): Promise<Cata
   return searchSharedCatalog({ query: z.string().trim().max(120).parse(query), limit: 8, offset: 0 });
 }
 
-export async function getProductionProfilePosts(userId: unknown, input?: unknown): Promise<SocialPage<SocialPostDTO>> {
-  return listPosts([uuid.parse(userId)], input);
+export async function getProductionProfilePosts(userId: unknown, input?: unknown, client?: SupabaseClient): Promise<SocialPage<SocialPostDTO>> {
+  return listPosts([uuid.parse(userId)], input, client);
 }
 
 export async function followUser(userId: unknown, client?: SupabaseClient): Promise<{ following: boolean }> {

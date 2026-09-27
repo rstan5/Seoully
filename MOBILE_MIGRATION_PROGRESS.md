@@ -10,7 +10,7 @@ security, and Room/Binder data model.
 
 - Branch: `mobile-native`
 - Immutable reference checkpoint: `76be07a928ce3e9436031d7324a5cc2b1b0375ed`
-- Current task: keyboard-avoiding compose surfaces and Binder page geometry
+- Current task: remaining ordinary-surface audit gaps (wishlist truth, collector posts, back, locale, late media)
 - Overall status: IN PROGRESS — Room/Binder product behavior still closing; device QA still pending
 
 ## Completed
@@ -221,6 +221,17 @@ security, and Room/Binder data model.
 - Auth, Feed comments, Search, Create, and Profile now sit in a shared native
   keyboard-avoiding shell. Binder spreads tilt left/right pages around the spine
   so a full spread reads as a physical book rather than two flat cards.
+- Search/Explore now hydrates production wishlist IDs on focus so already-saved
+  catalog items show as saved instead of inviting a duplicate save.
+- Collector profiles now load authored posts through a bearer
+  `GET /api/mobile/collectors/[userId]/posts` boundary reusing
+  `getProductionProfilePosts`, surface `roomAvailable` without opening a public
+  Room client, and paginate that post list.
+- Profile now has the English/Korean locale toggle. Stack screens (Collection,
+  Room, Binder, collector, thread, collectible) have an explicit back control.
+- Collectible detail can add or replace personal media later, including the
+  photocard crop stage. Email-confirmation deep links with an auth `code` are
+  exchanged in the root layout; confirmation return remains AWAITING DEVICE QA.
 
 ## Current queue
 
@@ -369,6 +380,10 @@ Native device QA is still pending.
 - Keyboard-avoiding compose surfaces and Binder page tilt pass mobile TypeScript and
   Expo lint. Keyboard overlap, Android window insets, and page-turn perspective remain
   AWAITING DEVICE QA.
+- Wishlist hydration, collector posts, locale toggle, stack back controls, late Holding
+  photos, and the auth-code deep-link handler pass mobile and web TypeScript plus Expo
+  lint. Confirmation-email return, late-media crop, and collector post media layout
+  remain AWAITING DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.
@@ -382,7 +397,6 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-Remaining non-device implementation is now thin. Continue only genuine product gaps
-that can still be closed without a device. Remaining blockers: pending SQL
-migrations, avatar schema, fixture-only notices, and physical-device QA for camera,
-GL, gestures, FPS, textures, and keyboard. Do not treat Room/Binder as finished.
+The stale ordinary-surface audit items are now implemented. Remaining blockers:
+pending SQL migrations, avatar schema, fixture-only notices, public Room viewing
+for other collectors, and physical-device QA. Do not treat Room/Binder as finished.

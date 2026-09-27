@@ -13,6 +13,7 @@ import {
 import { collectibleKindLabel } from "../src/i18n";
 import { useCopy } from "../src/locale";
 import { RetryNotice } from "../src/components/RetryNotice";
+import { ScreenBack } from "../src/components/ScreenBack";
 import { CachedSignedImage } from "../src/media/cachedMedia";
 import { colors, spacing } from "../src/theme";
 
@@ -133,6 +134,7 @@ export default function CollectionScreen() {
     onEndReached={() => { if (canPage) void loadMore(); }}
     onEndReachedThreshold={0.35}
     ListHeaderComponent={<View>
+      <ScreenBack label={copy.back} onPress={() => router.back()} />
       <Text style={styles.title}>{copy.myCollection}</Text>
       <Text style={styles.lead}>{copy.collectionLead}</Text>
       <View style={styles.tabs}>

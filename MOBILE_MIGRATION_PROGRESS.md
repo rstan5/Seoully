@@ -185,6 +185,9 @@ security, and Room/Binder data model.
   Search, Room inspection, and Holding detail.
 - Restored Collection tab and Explore query locally so returning to those screens
   preserves the last wishlist/collection view and the last catalog/collector search.
+- Room inspection and Binder card inspection now open the production Holding detail
+  screen, so trade state and personal media remain one destination rather than
+  isolated overlays.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 
@@ -310,6 +313,8 @@ Native device QA is still pending.
   framing across device sizes remains AWAITING DEVICE QA.
 - Collection/Explore restoration passes mobile TypeScript and Expo lint. Process-kill
   restore and keyboard-return search remain AWAITING DEVICE QA.
+- Room/Binder-to-detail navigation passes mobile TypeScript and Expo lint. Overlay
+  dismissal versus stack navigation remain AWAITING DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.
@@ -323,6 +328,7 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-Continue remaining non-device native gaps, then mark genuinely device-only work
-AWAITING DEVICE QA. Pending database migrations still require review/application in an
-approved environment.
+Continue any remaining non-device native gaps. Remaining blockers are pending
+migrations, physical-device QA, and product/schema decisions such as avatars. Do not
+treat Room/Binder as finished; they remain production-backed but still require device
+gesture/FPS/texture QA.

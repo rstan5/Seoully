@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, FlatList, Image, Modal, Pressable, SafeAreaView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { loadMyHoldings, type NativeHolding } from "../src/api";
 import { binderSpreads, buildNativeBinderPages, type NativeBinderPage, type NativeBinderSpread } from "../src/binder/model";
@@ -59,7 +59,7 @@ export default function BinderScreen() {
       <Pressable accessibilityRole="button" accessibilityState={{ disabled: spreadIndex === 0 }} disabled={spreadIndex === 0} onPress={() => listRef.current?.scrollToIndex({ index: spreadIndex - 1, animated: true })} style={[styles.pageButton, spreadIndex === 0 && styles.pageButtonDisabled]}><Text style={styles.pageButtonText}>{copy.previousSpread}</Text></Pressable>
       <Pressable accessibilityRole="button" accessibilityState={{ disabled: spreadIndex >= spreads.length - 1 }} disabled={spreadIndex >= spreads.length - 1} onPress={() => listRef.current?.scrollToIndex({ index: spreadIndex + 1, animated: true })} style={[styles.pageButton, spreadIndex >= spreads.length - 1 && styles.pageButtonDisabled]}><Text style={styles.pageButtonText}>{copy.nextSpread}</Text></Pressable>
     </View>
-    <CardInspection selection={selected} returnLabel={copy.returnToBinder} onClose={() => setSelected(null)} />
+    <CardInspection selection={selected} returnLabel={copy.returnToBinder} detailsLabel={copy.viewCollectible} onClose={() => setSelected(null)} />
   </View></SafeAreaView>;
 }
 
@@ -91,7 +91,8 @@ function BinderPocket({ holding, emptyLabel, onSelect }: { holding?: NativeHoldi
   </Pressable>;
 }
 
-function CardInspection({ selection, returnLabel, onClose }: { selection: CardSelection | null; returnLabel: string; onClose: () => void }) {
+function CardInspection({ selection, returnLabel, detailsLabel, onClose }: { selection: CardSelection | null; returnLabel: string; detailsLabel: string; onClose: () => void }) {
+  const router = useRouter();
   const { width, height } = useWindowDimensions();
   const [progress] = useState(() => new Animated.Value(0));
   const closing = useRef(false);
@@ -129,6 +130,7 @@ function CardInspection({ selection, returnLabel, onClose }: { selection: CardSe
         {selection?.holding.personalMediaUrl ? <Image resizeMode="contain" source={{ uri: selection.holding.personalMediaUrl }} style={styles.inspectImage} /> : <View style={styles.inspectFallback}><Text style={styles.inspectFallbackText}>{selection?.holding.template.name}</Text></View>}
         <Text style={styles.inspectTitle}>{selection?.holding.template.name}</Text>
         <Text style={styles.inspectMeta}>{[selection?.holding.template.groupName, selection?.holding.template.memberName, selection?.holding.template.releaseName].filter(Boolean).join(" · ")}</Text>
+        <Pressable accessibilityRole="button" onPress={() => { if (selection) router.push({ pathname: "/collectible", params: { holdingId: selection.holding.id } }); }} style={styles.closeButton}><Text style={styles.closeText}>{detailsLabel}</Text></Pressable>
         <Pressable accessibilityRole="button" onPress={returnCard} style={styles.closeButton}><Text style={styles.closeText}>{returnLabel}</Text></Pressable>
       </Animated.View>
     </Animated.View>

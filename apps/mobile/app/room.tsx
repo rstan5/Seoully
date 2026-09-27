@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/refs -- PanResponder reads refs only inside gesture callbacks. */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "expo-router";
 import { ActivityIndicator, PanResponder, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 import { loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomPlacement, saveNativeRoomTheme, type NativeHolding, type NativeRoomSnapshot, type NativeRoomThemeId } from "../src/api";
 import { collectibleKindLabel } from "../src/i18n";
@@ -11,6 +12,7 @@ import { colors, spacing } from "../src/theme";
 
 export default function RoomScreen() {
   const copy = useCopy();
+  const router = useRouter();
   const [snapshot, setSnapshot] = useState<NativeRoomSnapshot | null>(null);
   const [items, setItems] = useState<RoomRenderable[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -149,6 +151,7 @@ export default function RoomScreen() {
     </View> : null}
     {selectedItem && !editing ? <View style={styles.inspection}>
       <View style={styles.inspectionCopy}><Text numberOfLines={1} style={styles.inspectionTitle}>{selectedItem.holding.template.name}</Text><Text numberOfLines={1} style={styles.inspectionMeta}>{[selectedItem.holding.template.groupName, selectedItem.holding.template.memberName, selectedItem.holding.template.releaseName, collectibleKindLabel(selectedItem.holding.template.kind, copy)].filter(Boolean).join(" · ")}</Text><Text style={styles.inspectionMeta}>{selectedItem.holding.tradeStatus === "for-trade" ? copy.forTrade : copy.notForTrade}</Text></View>
+      <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/collectible", params: { holdingId: selectedItem.holding.id } })} style={styles.inspectAction}><Text style={styles.inspectActionText}>{copy.viewCollectible}</Text></Pressable>
       <Pressable accessibilityRole="button" onPress={() => setSelectedId(null)} style={styles.inspectAction}><Text style={styles.inspectActionText}>{copy.close}</Text></Pressable>
       <Pressable accessibilityRole="button" onPress={removeSelected} style={styles.inspectAction}><Text style={styles.inspectActionText}>{copy.removeFromRoom}</Text></Pressable>
     </View> : null}

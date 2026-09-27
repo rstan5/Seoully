@@ -108,6 +108,11 @@ security, and Room/Binder data model.
 - Completed English/Korean localization for Create, Add collectible, personal/shared
   photo consent, and Profile editing; Profile now initializes its editor with the
   persisted production bio instead of an empty value.
+- Deepened Room V2 beyond the proof with native one-finger camera orbit and physical
+  shelf/desk/rug geometry while retaining the GL scene, tap focus, edit drag, and
+  production placement persistence boundary.
+- Feed and Messages now refresh from production when their tabs regain focus, so newly
+  authored posts and conversations appear without restarting the app.
 
 ## Current queue
 
@@ -179,9 +184,12 @@ Native device QA is still pending.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.
+- `npm audit --omit=dev` currently reports transitive moderate advisories through the
+  Expo 57 toolchain/router. Its offered force fixes downgrade Expo/Router across major
+  versions, so no unsafe automated downgrade was applied.
 
 ## Next autonomous task
 
-Native authored posts and the remaining primary create/profile copy now have production
-and localization parity. Next: deepen Room V2 beyond the proof and continue
-cross-surface integration hardening. No device QA is claimed.
+Room V2 now has camera orbit plus physical scene geometry, and focus refresh closes
+key cross-surface stale-state gaps. Continue integration hardening where it does not
+require device/deployed-backend validation. No device QA is claimed.

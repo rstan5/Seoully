@@ -13,9 +13,11 @@ export default function RoomScreen() {
   const [items, setItems] = useState<RoomRenderable[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const [cameraYaw, setCameraYaw] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const dragOrigin = useRef<RoomRenderable | null>(null);
+  const cameraOrigin = useRef(0);
   const latestItems = useRef(items);
   useEffect(() => { latestItems.current = items; }, [items]);
 
@@ -34,17 +36,23 @@ export default function RoomScreen() {
 
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, gesture) => Boolean(editing && selectedId && Math.hypot(gesture.dx, gesture.dy) > 4),
+    onMoveShouldSetPanResponder: (_, gesture) => Math.hypot(gesture.dx, gesture.dy) > 4,
     onPanResponderGrant: () => {
-      dragOrigin.current = latestItems.current.find((item) => item.holding.id === selectedId) ?? null;
+      if (editing && selectedId) dragOrigin.current = latestItems.current.find((item) => item.holding.id === selectedId) ?? null;
+      else cameraOrigin.current = cameraYaw;
     },
     onPanResponderMove: (_, gesture) => {
+      if (!editing || !selectedId) {
+        setCameraYaw(Math.max(-0.38, Math.min(0.38, cameraOrigin.current + gesture.dx * 0.003)));
+        return;
+      }
       const origin = dragOrigin.current;
       if (!origin) return;
       const moved = moveRenderable(origin, gesture.dx * 0.008, gesture.dy * 0.008);
       setItems((current) => current.map((item) => item.holding.id === moved.holding.id ? moved : item));
     },
     onPanResponderRelease: () => {
+      if (!editing) return;
       const id = selectedId;
       const room = snapshot?.room;
       const current = latestItems.current.find((item) => item.holding.id === id);
@@ -72,8 +80,9 @@ export default function RoomScreen() {
     {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
     {!loading && items.length === 0 ? <Text style={styles.empty}>{copy.roomEmpty}</Text> : null}
     {items.length ? <View style={styles.stage} {...panResponder.panHandlers}>
-      <NativeRoomRenderer items={items} selectedId={selectedId} onSelect={setSelectedId} />
+      <NativeRoomRenderer items={items} selectedId={selectedId} cameraYaw={cameraYaw} onSelect={setSelectedId} />
       {editing && selectedId ? <View pointerEvents="none" style={styles.hint}><Text style={styles.hintText}>{copy.roomDragHint}</Text></View> : null}
+      {!editing ? <View pointerEvents="none" style={styles.hint}><Text style={styles.hintText}>{copy.roomOrbitHint}</Text></View> : null}
     </View> : null}
     {selectedId ? <Text numberOfLines={1} style={styles.selection}>{items.find((item) => item.holding.id === selectedId)?.holding.template.name}</Text> : null}
   </View></SafeAreaView>;

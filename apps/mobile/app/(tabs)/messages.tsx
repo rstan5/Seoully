@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useRouter } from "expo-router";
+import { useCallback, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
 import { loadConversations, type NativeConversation } from "../../src/api";
 import { useCopy } from "../../src/locale";
@@ -11,14 +11,14 @@ export default function MessagesScreen() {
   const [conversations, setConversations] = useState<NativeConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let active = true;
     void loadConversations()
-      .then((items) => { if (active) setConversations(items); })
+      .then((items) => { if (active) { setConversations(items); setError(null); } })
       .catch(() => { if (active) setError(copy.messagesUnavailable); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [copy.messagesUnavailable]);
+  }, [copy.messagesUnavailable]));
   return <SafeAreaView style={styles.safe}><View style={styles.container}>
     <Text style={styles.title}>{copy.messages}</Text>
     <Text style={styles.body}>{copy.messagesLead}</Text>

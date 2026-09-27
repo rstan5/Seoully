@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import { ActivityIndicator, FlatList, Image, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from "react-native";
 import { addPostComment, loadFeed, loadPostComments, setPostLiked, type NativeFeedPost, type NativePostComment } from "../../src/api";
 import { useCopy } from "../../src/locale";
@@ -10,14 +11,14 @@ export default function FeedScreen() {
   const [posts, setPosts] = useState<NativeFeedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let active = true;
     void loadFeed()
-      .then((items) => { if (active) setPosts(items); })
+      .then((items) => { if (active) { setPosts(items); setError(null); } })
       .catch(() => { if (active) setError(copy.feedUnavailable); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [copy.feedUnavailable]);
+  }, [copy.feedUnavailable]));
   return <SafeAreaView style={styles.safe}><View style={styles.container}>
     <Text style={styles.eyebrow}>{copy.brand}</Text>
     <Text style={styles.title}>{copy.feed}</Text>

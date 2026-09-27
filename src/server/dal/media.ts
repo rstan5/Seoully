@@ -1,7 +1,8 @@
 import "server-only";
 
 import { z } from "zod";
-import { getCurrentIdentity } from "@/server/dal/profile";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/profile";
 import { createSupabaseServerClient } from "@/server/supabase/server";
 
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -19,16 +20,16 @@ export interface MediaAssetDTO {
   createdAt: string;
 }
 
-export async function uploadHoldingMedia(input: { holdingId: unknown; file: File }): Promise<MediaAssetDTO> {
+export async function uploadHoldingMedia(input: { holdingId: unknown; file: File }, client?: SupabaseClient): Promise<MediaAssetDTO> {
   const holdingId = holdingSchema.parse(input.holdingId);
-  const identity = await getCurrentIdentity();
+  const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
   if (!(input.file instanceof File)) throw new Error("invalid_media");
   if (!allowedMime.has(input.file.type)) throw new Error("unsupported_media_type");
   if (input.file.size <= 0 || input.file.size > MAX_BYTES) throw new Error("media_too_large");
   if (!(await matchesImageSignature(input.file))) throw new Error("invalid_media");
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? await createSupabaseServerClient();
   const { data: holding, error: holdingError } = await supabase.from("holdings")
     .select("id").eq("id", holdingId).eq("owner_user_id", identity.user.id).maybeSingle();
   if (holdingError) throw new Error("holding_read_failed");

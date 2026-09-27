@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from "react-native";
-import { createHolding, searchCatalog, type NativeCatalogTemplate } from "../../src/api";
+import { searchCatalog, type NativeCatalogTemplate } from "../../src/api";
 import { copy } from "../../src/i18n";
 import { colors, spacing } from "../../src/theme";
 export default function SearchScreen() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NativeCatalogTemplate[]>([]);
   const [loading, setLoading] = useState(false);
@@ -21,7 +23,7 @@ export default function SearchScreen() {
     <View style={styles.searchRow}><TextInput accessibilityLabel="Search Seoully catalog" placeholder="Group, member, release..." value={query} onChangeText={setQuery} onSubmitEditing={runSearch} returnKeyType="search" style={styles.input} /><Pressable accessibilityRole="button" onPress={runSearch} style={styles.searchButton}><Text style={styles.searchButtonText}>Search</Text></Pressable></View>
     {loading && <ActivityIndicator color={colors.plum} style={styles.loading} />}
     {error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
-    {selected && <View style={styles.selection}><Text style={styles.selectionTitle}>{selected.name}</Text><Text style={styles.resultMeta}>Ready to add this catalog collectible.</Text><Pressable accessibilityRole="button" onPress={async () => { try { await createHolding(selected.id); setAdded(true); } catch { setError("Could not add this collectible yet."); } }} style={styles.addButton}><Text style={styles.searchButtonText}>{added ? "Added to collection" : "Add to collection"}</Text></Pressable></View>}
+    {selected && <View style={styles.selection}><Text style={styles.selectionTitle}>{selected.name}</Text><Text style={styles.resultMeta}>Add your personal copy to the collection.</Text><Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/add", params: { templateId: selected.id, name: selected.name, kind: selected.kind } })} style={styles.addButton}><Text style={styles.searchButtonText}>{added ? "Added to collection" : "Continue"}</Text></Pressable></View>}
     <FlatList data={results} keyExtractor={(item) => item.id} contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled" renderItem={({ item }) => <Pressable accessibilityRole="button" onPress={() => setSelected(item)} style={styles.result}><Text style={styles.resultTitle}>{item.name}</Text><Text style={styles.resultMeta}>{[item.groupName, item.memberName, item.releaseName, item.kind].filter(Boolean).join(" · ")}</Text>{item.descriptor ? <Text style={styles.resultDescriptor}>{item.descriptor}</Text> : null}</Pressable>} ListEmptyComponent={!loading && query ? <Text style={styles.empty}>No catalog matches yet.</Text> : null} />
   </View></SafeAreaView>;
 }

@@ -46,3 +46,15 @@ export async function createHolding(templateId: string) {
   if (!response.ok) throw new Error("holding_create_failed");
   return response.json();
 }
+
+export async function uploadHoldingPhoto(holdingId: string, uri: string, mimeType = "image/jpeg") {
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+  if (!baseUrl || !accessToken) throw new Error("unauthenticated");
+  const body = new FormData();
+  body.append("holdingId", holdingId);
+  body.append("file", { uri, name: "collectible.jpg", type: mimeType } as unknown as Blob);
+  const response = await fetch(`${baseUrl}/api/mobile/media`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body });
+  if (!response.ok) throw new Error("media_upload_failed");
+  return response.json();
+}

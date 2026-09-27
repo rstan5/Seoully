@@ -33,6 +33,10 @@ security, and Room/Binder data model.
 - Added a bearer-authenticated native Holding creation endpoint that reuses the
   production Holding DAL and server-derived actor, plus native catalog selection and
   Add to Collection behavior.
+- Added native camera/library acquisition with Expo ImagePicker, a persisted-safe
+  personal-media upload boundary, and a photocard aspect-ratio crop step using Expo
+  ImageManipulator. This first slice is implementation-complete for native API
+  wiring; touch-adjustable crop and physical-device validation remain pending.
 
 ## Current queue
 
@@ -66,5 +70,5 @@ is still pending.
 
 ## Next autonomous task
 
-Commit the collection-selection slice, then add native personal-media acquisition and
-photocard crop contracts without changing the existing web media semantics.
+Commit the native collection/media slice, then add a real manual-contribution endpoint
+and native Add Manually path, keeping consent and personal/reference media separate.

@@ -11,6 +11,7 @@ security, and Room/Binder data model.
 - Branch: `mobile-native`
 - Immutable reference checkpoint: `76be07a928ce3e9436031d7324a5cc2b1b0375ed`
 - Recovered from: `d2d779d`
+- Current HEAD: `09a3918`
 - Current task: Room representation, edit/camera, Binder open/close and Room jump
 - Overall status: IN PROGRESS — Room/Binder product behavior still closing; device QA still pending
 
@@ -344,6 +345,9 @@ Do not treat Room or Binder as finished. Visual/tactile/FPS/gesture quality rema
 - Opening Binder from a focused Room photocard jumps to that card's spread.
   Binder pockets sort by member inside a section. Room restores the last
   focused Holding after relaunch.
+- Collectors with a public Room can be entered from their profile through a
+  bearer `GET /api/mobile/collectors/[userId]/room` boundary that reuses
+  `getPublicRoomByHandle` and existing RLS. The viewer is read-only.
 
 ## Current queue
 
@@ -521,7 +525,6 @@ Room/Binder non-device owner loop is largely in place. Remaining work is
 classified below. Do not treat Room/Binder visual/tactile parity as finished.
 
 ### IMPLEMENTATION REMAINING
-- Public Room viewing for other collectors (no native client yet)
 - Catalog-set empty-pocket layout if production ever exposes CollectibleSet
   progress (no `collectible_sets` table exists today)
 - In-world 3D Binder open that stays inside the Room GL scene

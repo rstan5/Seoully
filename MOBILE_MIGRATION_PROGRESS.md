@@ -10,8 +10,8 @@ security, and Room/Binder data model.
 
 - Branch: `mobile-native`
 - Immutable reference checkpoint: `76be07a928ce3e9436031d7324a5cc2b1b0375ed`
-- Current task: native social parity — Search/Explore and social interactions
-- Overall status: IN PROGRESS
+- Current task: physical-device and deployed-backend QA handoff
+- Overall status: NON-DEVICE IMPLEMENTATION CHECKPOINT COMPLETE — AWAITING QA
 
 ## Completed
 
@@ -107,7 +107,7 @@ security, and Room/Binder data model.
   supports a real image post/caption flow while retaining manual catalog contribution.
 - Completed English/Korean localization for Create, Add collectible, personal/shared
   photo consent, and Profile editing; Profile now initializes its editor with the
-  persisted production bio instead of an empty value.
+  persisted production display name, tagline, and bio instead of empty values.
 - Deepened Room V2 beyond the proof with native one-finger camera orbit and physical
   shelf/desk/rug geometry while retaining the GL scene, tap focus, edit drag, and
   production placement persistence boundary.
@@ -124,15 +124,17 @@ security, and Room/Binder data model.
 
 ## Current queue
 
-1. Expo client foundation and strict TypeScript.
-2. Shared API/environment contracts and native Supabase session adapter.
-3. Native navigation/loading shell and localization adapter.
-4. Auth/onboarding vertical slice (group/bias/interests complete; avatar and confirmed
-   email deep-link QA remain).
-5. Native social surfaces (production Feed read exists; interactions/Search/Messages
-   remain).
-6. Native collection/media/crop vertical slice.
-7. Room/Binder platform-neutral extraction and renderer proof.
+1. COMPLETE — Expo client foundation and strict TypeScript.
+2. COMPLETE — shared API/environment contracts and secure native Supabase sessions.
+3. COMPLETE — native navigation/loading shell and persistent English/Korean locale.
+4. COMPLETE AT CODE BOUNDARY — auth and durable onboarding; confirmation/deep-link
+   behavior remains device QA.
+5. COMPLETE AT CODE BOUNDARY — Feed, interactions, Search/Explore, collector profiles,
+   follows, authored posts, and private Messages.
+6. COMPLETE AT CODE BOUNDARY — collection, personal media, crop, wishlist, trade
+   state, catalog contribution, and shared-reference consent.
+7. COMPLETE AT CODE/BUNDLE BOUNDARY — native Room V2 renderer/lifecycle/surfaces and
+   native Binder V2; physical renderer and gesture QA remains mandatory.
 
 ## Blocked / device QA
 
@@ -146,6 +148,9 @@ security, and Room/Binder data model.
 - `20261001000000_direct_messages.sql` must be reviewed and applied through the normal
   migration process before native Messages can be used. It has not been applied to
   production, and no production messages or conversations were created during testing.
+- Production `profiles` currently has no durable avatar/media contract; native avatar
+  upload was not fabricated against the prototype-only web avatar field. Adding it
+  requires an approved storage/schema/privacy design and migration.
 
 ## Architectural decisions
 
@@ -195,9 +200,16 @@ Native device QA is still pending.
 - `npm audit --omit=dev` currently reports transitive moderate advisories through the
   Expo 57 toolchain/router. Its offered force fixes downgrade Expo/Router across major
   versions, so no unsafe automated downgrade was applied.
+- Final cross-platform static validation passes: mobile strict TypeScript, Expo lint,
+  Expo public config resolution, all 21 Expo Doctor checks, complete iOS and Android
+  Metro production exports, web strict TypeScript, fixture integrity, and
+  `git diff --check`.
 
 ## Next autonomous task
 
-Room V2 now distinguishes owned Holdings from displayed placements and supports the
-full place → move → persist → store lifecycle. Continue integration hardening where it
-does not require device/deployed-backend validation. No device QA is claimed.
+All currently meaningful non-device implementation and static validation in the
+authoritative queue is exhausted. Next work requires review/application of the pending
+database migrations in an approved environment, authenticated deployed-backend
+integration testing, and physical iOS/Android QA for camera, media, keyboard, GL,
+textures, gestures, performance, safe areas, and navigation restoration. AWAITING
+DEVICE QA; no production mutation, push, or deployment was performed.

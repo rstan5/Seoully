@@ -108,9 +108,9 @@ export async function updateHoldingTradeStatus(holdingId: string, tradeStatus: N
   return payload.holding;
 }
 
-export async function loadMyWishlist(): Promise<NativeWishlistEntry[]> {
+export async function loadMyWishlist(offset = 0, limit = 100): Promise<NativeWishlistEntry[]> {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/wishlist`, {
+  const response = await fetch(`${baseUrl}/api/mobile/wishlist?offset=${offset}&limit=${limit}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) throw new Error("wishlist_read_failed");

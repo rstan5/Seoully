@@ -6,7 +6,11 @@ export async function GET(request: Request) {
   const client = createSupabaseBearerClient(request);
   if (!client) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   try {
-    const entries = await listMyWishlist({ limit: 100, offset: 0 }, client);
+    const url = new URL(request.url);
+    const entries = await listMyWishlist({
+      limit: Number(url.searchParams.get("limit") ?? "100"),
+      offset: Number(url.searchParams.get("offset") ?? "0"),
+    }, client);
     return NextResponse.json({ entries }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "wishlist_read_failed";

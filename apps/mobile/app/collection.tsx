@@ -28,15 +28,17 @@ export default function CollectionScreen() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [tabReady, setTabReady] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [hasMoreWishlist, setHasMoreWishlist] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [nextHoldings, nextWishlist] = await Promise.all([loadMyHoldings(0, 100), loadMyWishlist()]);
+      const [nextHoldings, nextWishlist] = await Promise.all([loadMyHoldings(0, 100), loadMyWishlist(0, 100)]);
       setHoldings(nextHoldings);
       setHasMore(nextHoldings.length === 100);
       setWishlist(nextWishlist);
+      setHasMoreWishlist(nextWishlist.length === 100);
       setError(null);
     } catch {
       setError(copy.collectionUnavailable);
@@ -52,6 +54,20 @@ export default function CollectionScreen() {
       const page = await loadMyHoldings(holdings.length, 100);
       setHoldings((current) => [...current, ...page.filter((item) => !current.some((existing) => existing.id === item.id))]);
       setHasMore(page.length === 100);
+    } catch {
+      setError(copy.collectionUnavailable);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  async function loadMoreWishlist() {
+    if (!hasMoreWishlist || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const page = await loadMyWishlist(wishlist.length, 100);
+      setWishlist((current) => [...current, ...page.filter((item) => !current.some((existing) => existing.id === item.id))]);
+      setHasMoreWishlist(page.length === 100);
     } catch {
       setError(copy.collectionUnavailable);
     } finally {
@@ -131,6 +147,7 @@ export default function CollectionScreen() {
         <Text style={styles.meta}>{[entry.template.groupName, entry.template.memberName, entry.template.releaseName, collectibleKindLabel(entry.template.kind, copy)].filter(Boolean).join(" · ")}</Text>
         <Pressable accessibilityRole="button" disabled={busyId === entry.id} onPress={() => removeWanted(entry)} style={styles.action}><Text style={styles.actionText}>{copy.removeFromWishlist}</Text></Pressable>
       </View>)}
+      {hasMoreWishlist ? <Pressable accessibilityRole="button" disabled={loadingMore} onPress={loadMoreWishlist} style={styles.action}><Text style={styles.actionText}>{loadingMore ? copy.saving : copy.loadMoreHoldings}</Text></Pressable> : null}
       {wishlist.length === 0 ? <Text style={styles.empty}>{copy.wishlistEmpty}</Text> : null}
     </> : null}
   </ScrollView></SafeAreaView>;

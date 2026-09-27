@@ -32,6 +32,7 @@ export default function CollectionScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [tabReady, setTabReady] = useState(false);
+  const [kindFilter, setKindFilter] = useState("all");
   const [hasMore, setHasMore] = useState(false);
   const [hasMoreWishlist, setHasMoreWishlist] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -122,8 +123,9 @@ export default function CollectionScreen() {
     }
   }
 
+  const kinds = [...new Set(holdings.map((holding) => holding.template.kind))];
   const rows: CollectionRow[] = tab === "collection"
-    ? holdings.map((holding) => ({ kind: "holding", id: holding.id, holding }))
+    ? holdings.filter((holding) => kindFilter === "all" || holding.template.kind === kindFilter).map((holding) => ({ kind: "holding", id: holding.id, holding }))
     : wishlist.map((entry) => ({ kind: "wishlist", id: entry.id, entry }));
   const canPage = tab === "collection" ? hasMore : hasMoreWishlist;
 
@@ -141,6 +143,7 @@ export default function CollectionScreen() {
         <Tab selected={tab === "collection"} label={`${copy.collection} (${holdings.length})`} onPress={() => setTab("collection")} />
         <Tab selected={tab === "wishlist"} label={`${copy.wishlist} (${wishlist.length})`} onPress={() => setTab("wishlist")} />
       </View>
+      {tab === "collection" && kinds.length > 1 ? <View style={styles.tabs}>{[["all", copy.allKinds] as const, ...kinds.map((kind) => [kind, collectibleKindLabel(kind, copy)] as const)].map(([id, label]) => <Tab key={id} selected={kindFilter === id} label={label} onPress={() => setKindFilter(id)} />)}</View> : null}
       {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
       {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
     </View>}
@@ -211,7 +214,7 @@ const styles = StyleSheet.create({
   container: { padding: spacing.lg, paddingBottom: 80 },
   title: { color: colors.ink, fontSize: 32, fontWeight: "700" },
   lead: { color: colors.muted, fontSize: 16, marginTop: spacing.sm },
-  tabs: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.lg },
+  tabs: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.lg },
   tab: { borderColor: colors.border, borderRadius: 999, borderWidth: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   tabSelected: { backgroundColor: colors.plum, borderColor: colors.plum },
   tabText: { color: colors.ink, fontWeight: "700" },

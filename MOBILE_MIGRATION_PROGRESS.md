@@ -239,6 +239,8 @@ security, and Room/Binder data model.
 - Completed collectors can re-edit groups, bias, and interests from Profile without
   resetting onboarding_step; the onboarding endpoint accepts those patches when the
   profile is already done.
+- Collection can filter Holdings by kind. Collector profile posts support the same
+  optimistic like/unlike path as Feed.
 
 ## Current queue
 
@@ -404,6 +406,7 @@ Native device QA is still pending.
 - Room tab, rotate/scale persistence, grouped stored tray, Binder section jump, and
   collector-taste re-edit pass mobile and web TypeScript plus Expo lint. Tab switching
   with an open Room GL context and taste-edit keyboard remain AWAITING DEVICE QA.
+- Collection kind filters and collector-post likes pass mobile TypeScript and Expo lint.
 
 ## Next autonomous task
 

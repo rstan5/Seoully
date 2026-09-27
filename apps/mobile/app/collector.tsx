@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
-import { ensureConversation, loadCollectorPosts, loadCollectorProfile, setCollectorFollowing, type NativeCollectorProfile, type NativeFeedPost } from "../src/api";
+import { ensureConversation, loadCollectorPosts, loadCollectorProfile, setCollectorFollowing, setPostLiked, type NativeCollectorProfile, type NativeFeedPost } from "../src/api";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
 import { useCopy } from "../src/locale";
@@ -112,18 +112,26 @@ export default function CollectorScreen() {
       </View>
       <Text style={styles.section}>{copy.collectorPosts}</Text>
       {postsError ? <RetryNotice message={postsError} retryLabel={copy.retry} onRetry={refresh} /> : null}
-      {posts.map((post) => <CollectorPost key={post.id} post={post} emptyCaption={copy.sharedMoment} />)}
+      {posts.map((post) => <CollectorPost key={post.id} copy={copy} post={post} onChange={(next) => setPosts((current) => current.map((item) => item.id === next.id ? next : item))} />)}
       {!loading && posts.length === 0 && !postsError ? <Text style={styles.empty}>{copy.collectorPostsEmpty}</Text> : null}
       {postCursor ? <Pressable accessibilityRole="button" disabled={loadingMore} onPress={() => { void loadMorePosts(); }} style={styles.more}><Text style={styles.moreText}>{loadingMore ? copy.saving : copy.loadMorePosts}</Text></Pressable> : null}
     </> : null}
   </ScrollView></SafeAreaView>;
 }
 
-function CollectorPost({ post, emptyCaption }: { post: NativeFeedPost; emptyCaption: string }) {
+function CollectorPost({ post, copy, onChange }: { post: NativeFeedPost; copy: ReturnType<typeof useCopy>; onChange: (post: NativeFeedPost) => void }) {
   const image = post.media.find((item) => item.mediaType === "image");
+  async function toggleLike() {
+    const nextLiked = !post.likedByMe;
+    const optimistic = { ...post, likedByMe: nextLiked, likeCount: Math.max(0, post.likeCount + (nextLiked ? 1 : -1)) };
+    onChange(optimistic);
+    try { await setPostLiked(post.id, nextLiked); }
+    catch { onChange(post); }
+  }
   return <View style={styles.post}>
     {image ? <Image accessibilityIgnoresInvertColors source={{ uri: image.url }} style={styles.media} /> : null}
-    <Text style={styles.caption}>{post.caption || emptyCaption}</Text>
+    <Text style={styles.caption}>{post.caption || copy.sharedMoment}</Text>
+    <Pressable accessibilityRole="button" accessibilityState={{ selected: post.likedByMe }} onPress={() => { void toggleLike(); }} style={styles.like}><Text style={styles.likeText}>{post.likedByMe ? copy.unlike : copy.like} · {post.likeCount}</Text></Pressable>
   </View>;
 }
 
@@ -147,6 +155,8 @@ const styles = StyleSheet.create({
   post: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, marginTop: spacing.md, overflow: "hidden" },
   media: { aspectRatio: 1, width: "100%" },
   caption: { color: colors.ink, fontSize: 15, padding: spacing.md },
+  like: { paddingHorizontal: spacing.md, paddingBottom: spacing.md },
+  likeText: { color: colors.plum, fontWeight: "700" },
   more: { alignItems: "center", borderColor: colors.plum, borderRadius: 12, borderWidth: 1, justifyContent: "center", marginTop: spacing.md, minHeight: 44 },
   moreText: { color: colors.plum, fontWeight: "700" },
 });

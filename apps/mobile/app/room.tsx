@@ -4,7 +4,7 @@ import { ActivityIndicator, PanResponder, Pressable, SafeAreaView, ScrollView, S
 import { loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomPlacement, type NativeHolding, type NativeRoomSnapshot } from "../src/api";
 import { useCopy } from "../src/locale";
 import { NativeRoomRenderer } from "../src/room/NativeRoomRenderer";
-import { buildRoomRenderables, createInitialRoomRenderable, moveRenderable, settleRoomRenderable, toPersistedTransform, type RoomRenderable } from "../src/room/model";
+import { buildRoomRenderables, createInitialRoomRenderable, moveRenderable, nativeHomeForHolding, settleRoomRenderable, toPersistedTransform, zoneIdForNativeSurface, type RoomRenderable } from "../src/room/model";
 import { colors, spacing } from "../src/theme";
 
 export default function RoomScreen() {
@@ -64,7 +64,7 @@ export default function RoomScreen() {
       void saveNativeRoomPlacement({
         roomId: room.id,
         holdingId: id,
-        zoneId: current.placement?.zoneId ?? `${room.id}-floor`,
+        zoneId: zoneIdForNativeSurface(room.id, settled.surfaceId),
         slot: Math.max(0, slot),
         transform: toPersistedTransform(settled.renderable),
         surfaceId: settled.surfaceId,
@@ -78,14 +78,16 @@ export default function RoomScreen() {
 
   async function placeHolding(holding: NativeHolding) {
     if (!snapshot || items.length >= 24) return;
-    const initial = createInitialRoomRenderable(holding, items.length);
-    const settled = settleRoomRenderable(initial, snapshot.room.id);
+    const home = nativeHomeForHolding(holding, snapshot.room.id, items.length);
+    const initial = createInitialRoomRenderable(holding, items.length, snapshot.room.id);
+    const settled = settleRoomRenderable(initial, snapshot.room.id, home.surfaceId);
+    const slot = items.filter((item) => item.placement?.zoneId === home.zoneId).length;
     try {
       const placement = await saveNativeRoomPlacement({
         roomId: snapshot.room.id,
         holdingId: holding.id,
-        zoneId: `${snapshot.room.id}-floor`,
-        slot: items.length,
+        zoneId: home.zoneId,
+        slot,
         transform: toPersistedTransform(settled.renderable),
         surfaceId: settled.surfaceId,
       });

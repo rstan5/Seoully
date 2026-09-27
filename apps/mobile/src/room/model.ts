@@ -1,7 +1,7 @@
 import type { NativeHolding, NativeRoomPlacement } from "../api";
 
 export type NativeRoomVector = { x: number; y: number; z: number };
-export type NativeRoomSurface = { id: string; x: number; y: number; z: number; width: number; depth: number };
+export type NativeRoomSurface = { id: string; kind: "horizontal" | "wall"; x: number; y: number; z: number; width: number; depth: number };
 export type RoomRenderable = {
   holding: NativeHolding;
   position: NativeRoomVector;
@@ -22,8 +22,9 @@ export function buildRoomRenderables(holdings: NativeHolding[], placements: Nati
   });
 }
 
-export function createInitialRoomRenderable(holding: NativeHolding, index: number): RoomRenderable {
-  return roomRenderable(holding, undefined, index);
+export function createInitialRoomRenderable(holding: NativeHolding, index: number, roomId: string): RoomRenderable {
+  const home = nativeHomeForHolding(holding, roomId, index);
+  return { ...roomRenderable(holding, undefined, index), position: home.position };
 }
 
 export function toPersistedTransform(renderable: RoomRenderable) {
@@ -38,37 +39,88 @@ export function toPersistedTransform(renderable: RoomRenderable) {
   };
 }
 
-export function moveRenderable(renderable: RoomRenderable, dx: number, dz: number): RoomRenderable {
+export function moveRenderable(renderable: RoomRenderable, dx: number, depthOrVertical: number): RoomRenderable {
+  if (renderable.placement?.surfaceId?.endsWith("-wall")) {
+    return {
+      ...renderable,
+      position: {
+        ...renderable.position,
+        x: clamp(renderable.position.x + dx, -4.1, 4.1),
+        y: clamp(renderable.position.y - depthOrVertical, -1.5, 2.5),
+      },
+    };
+  }
   return {
     ...renderable,
     position: {
       ...renderable.position,
       x: clamp(renderable.position.x + dx, -4.1, 4.1),
-      z: clamp(renderable.position.z + dz, -3.4, 1.5),
+      z: clamp(renderable.position.z + depthOrVertical, -3.4, 1.5),
     },
   };
 }
 
-export function settleRoomRenderable(renderable: RoomRenderable, roomId: string) {
+export function settleRoomRenderable(renderable: RoomRenderable, roomId: string, preferredSurfaceId?: string) {
   const surfaces = nativeRoomSurfaces(roomId);
-  const surface = surfaces
+  const surface = surfaces.find((candidate) => candidate.id === preferredSurfaceId) ?? surfaces
     .map((candidate) => ({ candidate, distance: footprintDistance(renderable.position, candidate) }))
     .sort((a, b) => a.distance - b.distance)[0]!.candidate;
   const halfHeight = renderable.geometry === "photocard" ? 0.52 : renderable.geometry === "album" ? 0.46 : 0.35;
   return {
-    renderable: { ...renderable, position: { ...renderable.position, y: surface.y + halfHeight } },
+    renderable: {
+      ...renderable,
+      position: surface.kind === "wall"
+        ? { ...renderable.position, z: surface.z + 0.06 }
+        : { ...renderable.position, y: surface.y + halfHeight },
+    },
     surfaceId: surface.id,
   };
 }
 
 export function nativeRoomSurfaces(roomId: string): NativeRoomSurface[] {
   return [
-    { id: `${roomId}-shelf-lower`, x: -3.15, y: -1.4, z: -3.48, width: 2.1, depth: 0.8 },
-    { id: `${roomId}-shelf-middle`, x: -3.15, y: -0.5, z: -3.48, width: 2.1, depth: 0.8 },
-    { id: `${roomId}-shelf-upper`, x: -3.15, y: 0.4, z: -3.48, width: 2.1, depth: 0.8 },
-    { id: `${roomId}-desk`, x: 1.45, y: -0.72, z: -2.85, width: 3.25, depth: 1.65 },
-    { id: `${roomId}-floor`, x: 0, y: -2.15, z: -1.2, width: 9.2, depth: 5.8 },
+    { id: `${roomId}-shelf-bay-0`, kind: "horizontal", x: -3.15, y: -1.4, z: -3.48, width: 2.1, depth: 0.8 },
+    { id: `${roomId}-shelf-bay-1`, kind: "horizontal", x: -3.15, y: -0.5, z: -3.48, width: 2.1, depth: 0.8 },
+    { id: `${roomId}-shelf-bay-2`, kind: "horizontal", x: -3.15, y: 0.4, z: -3.48, width: 2.1, depth: 0.8 },
+    { id: `${roomId}-desk`, kind: "horizontal", x: 1.45, y: -0.72, z: -2.85, width: 3.25, depth: 1.65 },
+    { id: `${roomId}-binder`, kind: "horizontal", x: 0.45, y: -0.68, z: -2.7, width: 0.95, depth: 0.72 },
+    { id: `${roomId}-display-case-shelf`, kind: "horizontal", x: 3.65, y: -0.5, z: -3.52, width: 1.45, depth: 0.72 },
+    { id: `${roomId}-display-case-top`, kind: "horizontal", x: 3.65, y: 0.48, z: -3.52, width: 1.45, depth: 0.72 },
+    { id: `${roomId}-archive`, kind: "horizontal", x: -1.2, y: -1.68, z: -0.65, width: 1.7, depth: 1.05 },
+    { id: `${roomId}-wall`, kind: "wall", x: 1.1, y: 0.75, z: -4.2, width: 3.5, depth: 2.5 },
+    { id: `${roomId}-floor`, kind: "horizontal", x: 0, y: -2.15, z: -1.2, width: 9.2, depth: 5.8 },
   ];
+}
+
+export function nativeHomeForHolding(holding: NativeHolding, roomId: string, index: number) {
+  const kind = holding.template.kind;
+  if (kind === "photocard") {
+    return { zoneId: `${roomId}-binder`, surfaceId: `${roomId}-binder`, position: { x: 0.45, y: -0.1, z: -2.7 } };
+  }
+  if (kind === "album" || kind === "vinyl" || kind === "book") {
+    const bay = index % 3;
+    return { zoneId: `${roomId}-shelf`, surfaceId: `${roomId}-shelf-bay-${bay}`, position: { x: -3.15 + ((index % 2) - 0.5) * 0.8, y: 0, z: -3.48 } };
+  }
+  if (kind === "poster") {
+    return { zoneId: `${roomId}-wall`, surfaceId: `${roomId}-wall`, position: { x: 0.2 + (index % 3) * 0.9, y: 0.4 + (index % 2) * 0.8, z: -4.14 } };
+  }
+  if (kind === "lightstick" || kind === "figure" || kind === "plushie") {
+    const upper = index % 2 === 1;
+    return { zoneId: `${roomId}-display-case`, surfaceId: `${roomId}-display-case-${upper ? "top" : "shelf"}`, position: { x: 3.65, y: 0, z: -3.52 } };
+  }
+  if (kind === "apparel" || (kind === "memorabilia" && /kit/i.test(holding.template.name))) {
+    return { zoneId: `${roomId}-archive`, surfaceId: `${roomId}-archive`, position: { x: -1.2, y: 0, z: -0.65 } };
+  }
+  return { zoneId: `${roomId}-desk`, surfaceId: `${roomId}-desk`, position: { x: 1.45, y: 0, z: -2.85 } };
+}
+
+export function zoneIdForNativeSurface(roomId: string, surfaceId: string) {
+  if (surfaceId.startsWith(`${roomId}-shelf-bay-`)) return `${roomId}-shelf`;
+  if (surfaceId.startsWith(`${roomId}-display-case-`)) return `${roomId}-display-case`;
+  for (const zone of ["binder", "desk", "archive", "wall", "floor"]) {
+    if (surfaceId === `${roomId}-${zone}`) return `${roomId}-${zone}`;
+  }
+  return `${roomId}-floor`;
 }
 
 function fallbackPosition(index: number): NativeRoomVector {
@@ -114,6 +166,10 @@ function degreesToRadians(value: number) {
 }
 function footprintDistance(point: NativeRoomVector, surface: NativeRoomSurface) {
   const outsideX = Math.max(0, Math.abs(point.x - surface.x) - surface.width / 2);
+  if (surface.kind === "wall") {
+    const outsideY = Math.max(0, Math.abs(point.y - surface.y) - surface.depth / 2);
+    return Math.hypot(outsideX, outsideY, Math.abs(point.z - surface.z));
+  }
   const outsideZ = Math.max(0, Math.abs(point.z - surface.z) - surface.depth / 2);
   return Math.hypot(outsideX, outsideZ, Math.abs(point.y - surface.y) * 0.25);
 }

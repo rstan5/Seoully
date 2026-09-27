@@ -126,6 +126,13 @@ security, and Room/Binder data model.
   now smoothly dollies the perspective camera toward the actual world object, tracks it
   as the camera settles, and presents production-backed collectible metadata and trade
   state in a dismissible inspection plate. Tapping empty world space clears focus.
+- Replaced floor-default native placement with the existing product home semantics:
+  photocards begin at the binder, albums/vinyl/books on shelf bays, posters on the wall,
+  figures/lightsticks/plushies in the display case, apparel and kits in the archive,
+  and memorabilia on the desk. Placement writes now persist the matching canonical
+  zone and native surface IDs, including vertical wall drag behavior.
+- Expanded the native Room furniture/surface adapter with visible binder, display-case,
+  and archive homes while retaining persisted web coordinate and ownership semantics.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 
@@ -206,6 +213,9 @@ Native device QA is still pending.
 - Room camera focus and inspection pass mobile strict TypeScript, Expo lint, and diff
   checks. GL raycast dismissal, focus framing across device sizes, and animation feel
   remain AWAITING DEVICE QA.
+- Native home/zone placement and the expanded Room surfaces pass mobile strict
+  TypeScript and Expo lint. Surface hit intent and vertical poster dragging remain
+  AWAITING DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.
@@ -219,8 +229,7 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-Continue Room Renderer V2 with native home/zone semantics and more faithful display
-surfaces, then add durable owner-scoped Room customization behind a reviewed migration.
-After that, deepen Binder V2 with animated card lift/return and localized fallback
-organization. Pending database migrations still require review/application in an
-approved environment, and physical iOS/Android behavior remains AWAITING DEVICE QA.
+Add durable owner-scoped Room theme customization behind a reviewed migration, then
+deepen Binder V2 with animated card lift/return and localized fallback organization.
+Pending database migrations still require review/application in an approved
+environment, and physical iOS/Android behavior remains AWAITING DEVICE QA.

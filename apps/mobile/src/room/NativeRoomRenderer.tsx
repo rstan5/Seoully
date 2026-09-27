@@ -73,6 +73,10 @@ function RoomFurniture() {
     <mesh position={[-3.15, -0.55, -3.75]}><boxGeometry args={[2.25, 3.1, 0.38]} /><meshStandardMaterial color="#56383d" roughness={0.8} /></mesh>
     {[-1.45, -0.55, 0.35].map((y) => <mesh key={y} position={[-3.15, y, -3.48]}><boxGeometry args={[2.1, 0.09, 0.62]} /><meshStandardMaterial color="#8a6261" roughness={0.75} /></mesh>)}
     <mesh position={[1.45, -0.82, -2.85]}><boxGeometry args={[3.25, 0.18, 1.65]} /><meshStandardMaterial color="#7b5654" roughness={0.72} /></mesh>
+    <mesh position={[0.45, -0.66, -2.7]} rotation={[-0.08, 0, 0]}><boxGeometry args={[1.05, 0.1, 0.78]} /><meshStandardMaterial color="#9d5b70" roughness={0.7} /></mesh>
+    <mesh position={[3.65, -0.55, -3.76]}><boxGeometry args={[1.58, 3.15, 0.34]} /><meshStandardMaterial color="#5f4147" roughness={0.78} /></mesh>
+    {[-0.55, 0.43].map((y) => <mesh key={`case-${y}`} position={[3.65, y, -3.5]}><boxGeometry args={[1.45, 0.08, 0.66]} /><meshStandardMaterial color="#936b69" roughness={0.7} /></mesh>)}
+    <mesh position={[-1.2, -1.86, -0.65]}><boxGeometry args={[1.82, 0.58, 1.16]} /><meshStandardMaterial color="#68484b" roughness={0.9} /></mesh>
     <mesh position={[0.2, -1.28, -1.15]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[1.35, 48]} /><meshStandardMaterial color="#8e5265" roughness={1} /></mesh>
   </>;
 }

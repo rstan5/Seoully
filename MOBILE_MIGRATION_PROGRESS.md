@@ -10,8 +10,96 @@ security, and Room/Binder data model.
 
 - Branch: `mobile-native`
 - Immutable reference checkpoint: `76be07a928ce3e9436031d7324a5cc2b1b0375ed`
-- Current task: Room as a first-class tab with rotate/scale and Binder section jump
+- Recovered from: `d2d779d`
+- Current task: Room representation-by-kind, zone camera, edit cancel/placement, Binder close/empty
 - Overall status: IN PROGRESS — Room/Binder product behavior still closing; device QA still pending
+
+## Current Room parity matrix
+
+Compared live `src/world` Room (zones, objects, `useRoomEdit`, camera) against
+`apps/mobile/app/room.tsx` + `NativeRoomRenderer` + `room/model.ts`.
+
+| Behavior | Status |
+| --- | --- |
+| **WORLD** | |
+| Room geometry (walls/floor/shell) | PARTIAL — native box room, not web CSS-3D stage |
+| Zones (shelf/desk/wall/case/archive/binder) | PARTIAL — surfaces and homes exist; no web zone chrome |
+| Surfaces | IMPLEMENTED — native surfaces settle placements |
+| Furniture / display areas | PARTIAL — shelf, desk, case, archive, standing binder |
+| Themes (hearth/blossom/midnight) | PARTIAL — client presets; SQL persistence HUMAN REVIEW REQUIRED |
+| Lighting / material intent | PARTIAL — theme lights; no foil/holographic materials |
+| Customization | PARTIAL — theme chips; furniture layout not user-editable |
+| **CAMERA** | |
+| Home pose | IMPLEMENTED — Home chip resets yaw/pitch/look |
+| Focus poses | IMPLEMENTED — dolly to selected Holding; wall-aware |
+| Transitions | AWAITING DEVICE QA — lerp exists; feel needs a phone |
+| Navigation between areas | IMPLEMENTED — Home/Shelf/Wall/Desk/Case/Binder looks |
+| Return / home behavior | IMPLEMENTED |
+| **COLLECTIBLES** | |
+| Real Holdings | IMPLEMENTED |
+| Personal media textures | IMPLEMENTED — budgeted signed cache; face is the photo |
+| DigitalRepresentation | IMPLEMENTED — native kind-specific geometry + personal-media source |
+| Representation by collectible kind | IMPLEMENTED — card/poster/album/vinyl/book/lightstick/plush/figure/apparel/ticket/disc-case/generic |
+| Generic fallback | IMPLEMENTED |
+| Inspection | PARTIAL — lift + detail chrome; no web hover/foil |
+| Focus | IMPLEMENTED — camera + object lift; wall posters tilt |
+| **EDITING** | |
+| Enter / exit edit mode | IMPLEMENTED |
+| Select | IMPLEMENTED |
+| Move | IMPLEMENTED — drag; wall uses vertical axis |
+| Rotate / scale | IMPLEMENTED — persist existing transform contract |
+| Placement constraints | IMPLEMENTED — snap to nearest surface |
+| Surface / zone semantics | IMPLEMENTED — `homeForKind` + `zoneIdForNativeSurface` |
+| Store | IMPLEMENTED — removes RoomPlacement only |
+| Restore | IMPLEMENTED — stored tray places back onto kind home |
+| Persistence | IMPLEMENTED — RoomPlacement save on place/move/rotate/scale |
+| Cancel / commit | IMPLEMENTED — Cancel restores baseline and rewrites placements; Done keeps saved work |
+| Invalid-placement handling | IMPLEMENTED — revert + localized error |
+| **STATE** | |
+| RoomPlacement | IMPLEMENTED |
+| Production IDs | IMPLEMENTED |
+| Relaunch restoration | PARTIAL — placements from server; camera from AsyncStorage |
+| Room customization persistence | PARTIAL — theme write exists; migration not applied |
+| Holding ownership independent from placement | IMPLEMENTED |
+| **ENTRY/EXIT** | |
+| Profile → Enter Room | IMPLEMENTED |
+| Room tab | IMPLEMENTED |
+| Room → Binder | IMPLEMENTED — header + in-world binder object |
+| Room → app navigation | IMPLEMENTED |
+| State preservation | PARTIAL — camera/placements persist; in-flight edit is local |
+
+## Current Binder parity matrix
+
+Compared live `OpenBinder` / `binderGeometry.ts` / `BinderZone` against
+`apps/mobile/app/binder.tsx` + `binder/model.ts`.
+
+| Behavior | Status |
+| --- | --- |
+| Production Holdings | IMPLEMENTED |
+| Photocard filtering | IMPLEMENTED |
+| Grouping | PARTIAL — release/group pages; not catalog CollectibleSet progress |
+| Member / set / section organization | PARTIAL — section chips by group/release |
+| Pocket indexing | IMPLEMENTED — 3×2, empty pockets retained |
+| Pages | IMPLEMENTED |
+| Spreads | IMPLEMENTED — left/right pair |
+| Left/right physical page relationship | PARTIAL — tilted pages + spine; not web CSS-3D turn |
+| Odd-page blank partner | IMPLEMENTED |
+| Fallback / Your Photocards section | IMPLEMENTED |
+| User-created catalog templates | PARTIAL — owned leftovers stay in fallback pages |
+| Personal media textures | IMPLEMENTED — personal image is the card face |
+| Missing-image isolation | IMPLEMENTED — failed/missing image keeps pocket geometry |
+| Page navigation | IMPLEMENTED — swipe + previous/next |
+| Section jump | IMPLEMENTED |
+| Card selection | IMPLEMENTED |
+| Card lift | IMPLEMENTED — spring from pocket origin |
+| Card inspection | IMPLEMENTED — chrome below the card, not on the face |
+| Card return | IMPLEMENTED |
+| Binder open / close | PARTIAL — stack open/close; not in-room 3D open |
+| Room → Binder transition | PARTIAL — route + in-world tap; not camera fly-in |
+| State restoration | IMPLEMENTED — spread index persisted |
+| Empty states | IMPLEMENTED — empty physical binder + copy |
+
+Do not treat Room or Binder as finished. Visual/tactile/FPS/gesture quality remains AWAITING DEVICE QA.
 
 ## Completed
 
@@ -241,6 +329,18 @@ security, and Room/Binder data model.
   profile is already done.
 - Collection can filter Holdings by kind. Collector profile posts support the same
   optimistic like/unlike path as Feed.
+- Native Room collectibles now use kind-specific world representations (thin
+  photocard/poster/ticket, spine-out album/book/jewel case, vinyl sleeve+disc,
+  lightstick, plush, figure standee, folded apparel, generic fallback) with
+  personal media as the object face when present.
+- Room camera has an explicit Home pose plus Shelf/Wall/Desk/Case/Binder looks.
+  The desk binder is a tappable object that opens Binder.
+- Room edit can cancel back to the pre-edit placements, rejects placements that
+  are not near a surface, and still stores/restores Holdings without deleting
+  ownership.
+- Binder close returns to Room, empty collections still render a physical
+  spread with pockets, and a failed personal image no longer paints text over
+  the card face or collapses the pocket.
 
 ## Current queue
 
@@ -407,9 +507,15 @@ Native device QA is still pending.
   collector-taste re-edit pass mobile and web TypeScript plus Expo lint. Tab switching
   with an open Room GL context and taste-edit keyboard remain AWAITING DEVICE QA.
 - Collection kind filters and collector-post likes pass mobile TypeScript and Expo lint.
+- Room representation-by-kind, zone looks, edit cancel/invalid placement, and
+  Binder close/empty/image isolation pass mobile and web TypeScript, Expo lint,
+  Expo Doctor 21/21, fixture checks, and `git diff --check`. GL appearance,
+  binder-object hit testing, and gesture feel remain AWAITING DEVICE QA.
 
 ## Next autonomous task
 
-Continue Room/Binder product fidelity and remaining ordinary-app polish. Remaining
-blockers: pending SQL migrations, avatar schema, fixture-only notices, public Room
-viewing, and physical-device QA. Do not treat Room/Binder as finished.
+Continue remaining non-device Room/Binder fidelity (catalog-set pocket gaps if a
+production set-progress boundary exists, in-room Binder open staging) and ordinary
+gaps that still block the launch loop. Remaining blockers: pending SQL migrations,
+avatar schema, fixture-only notices, public Room viewing, and physical-device QA.
+Do not treat Room/Binder as finished.

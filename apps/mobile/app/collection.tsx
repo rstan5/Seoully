@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   loadMyHoldings,
@@ -9,6 +9,7 @@ import {
   type NativeWishlistEntry,
 } from "../src/api";
 import { useCopy } from "../src/locale";
+import { RetryNotice } from "../src/components/RetryNotice";
 import { colors, spacing } from "../src/theme";
 
 export default function CollectionScreen() {
@@ -20,18 +21,23 @@ export default function CollectionScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    void Promise.all([loadMyHoldings(), loadMyWishlist()])
-      .then(([nextHoldings, nextWishlist]) => {
-        if (!active) return;
-        setHoldings(nextHoldings);
-        setWishlist(nextWishlist);
-      })
-      .catch(() => { if (active) setError(copy.collectionUnavailable); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [nextHoldings, nextWishlist] = await Promise.all([loadMyHoldings(), loadMyWishlist()]);
+      setHoldings(nextHoldings);
+      setWishlist(nextWishlist);
+      setError(null);
+    } catch {
+      setError(copy.collectionUnavailable);
+    } finally {
+      setLoading(false);
+    }
   }, [copy.collectionUnavailable]);
+  useEffect(() => {
+    const task = setTimeout(() => { void refresh(); }, 0);
+    return () => clearTimeout(task);
+  }, [refresh]);
 
   async function toggleTrade(holding: NativeHolding) {
     const nextStatus = holding.tradeStatus === "for-trade" ? "not-for-trade" : "for-trade";
@@ -66,7 +72,7 @@ export default function CollectionScreen() {
       <Tab selected={tab === "wishlist"} label={`${copy.wishlist} (${wishlist.length})`} onPress={() => setTab("wishlist")} />
     </View>
     {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
-    {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+    {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
     {!loading && tab === "collection" ? <>
       {holdings.map((holding) => <View key={holding.id} style={styles.card}>
         {holding.personalMediaUrl ? <Image source={{ uri: holding.personalMediaUrl }} style={styles.image} /> : null}

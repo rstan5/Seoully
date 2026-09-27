@@ -1,8 +1,9 @@
 /* eslint-disable react-hooks/refs -- PanResponder reads refs only inside gesture callbacks. */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, PanResponder, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 import { loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomPlacement, saveNativeRoomTheme, type NativeHolding, type NativeRoomSnapshot, type NativeRoomThemeId } from "../src/api";
 import { useCopy } from "../src/locale";
+import { RetryNotice } from "../src/components/RetryNotice";
 import { NativeRoomRenderer } from "../src/room/NativeRoomRenderer";
 import { buildRoomRenderables, createInitialRoomRenderable, moveRenderable, nativeHomeForHolding, settleRoomRenderable, toPersistedTransform, zoneIdForNativeSurface, type RoomRenderable } from "../src/room/model";
 import { colors, spacing } from "../src/theme";
@@ -21,18 +22,23 @@ export default function RoomScreen() {
   const latestItems = useRef(items);
   useEffect(() => { latestItems.current = items; }, [items]);
 
-  useEffect(() => {
-    let active = true;
-    void loadNativeRoom()
-      .then((next) => {
-        if (!active) return;
-        setSnapshot(next);
-        setItems(buildRoomRenderables(next.holdings, next.placements));
-      })
-      .catch(() => { if (active) setError(copy.roomUnavailable); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const next = await loadNativeRoom();
+      setSnapshot(next);
+      setItems(buildRoomRenderables(next.holdings, next.placements));
+      setError(null);
+    } catch {
+      setError(copy.roomUnavailable);
+    } finally {
+      setLoading(false);
+    }
   }, [copy.roomUnavailable]);
+  useEffect(() => {
+    const task = setTimeout(() => { void refresh(); }, 0);
+    return () => clearTimeout(task);
+  }, [refresh]);
 
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => false,
@@ -133,7 +139,7 @@ export default function RoomScreen() {
       ["midnight", copy.roomThemeMidnight],
     ] as const).map(([id, label]) => <Pressable key={id} accessibilityRole="button" accessibilityState={{ selected: snapshot.room.themeId === id }} onPress={() => changeTheme(id)} style={[styles.themeChoice, snapshot.room.themeId === id && styles.themeChoiceSelected]}><Text style={[styles.themeChoiceText, snapshot.room.themeId === id && styles.themeChoiceTextSelected]}>{label}</Text></Pressable>)}</ScrollView></View> : null}
     {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
-    {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+    {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
     {!loading && !snapshot?.holdings.length ? <Text style={styles.empty}>{copy.roomEmpty}</Text> : null}
     {!loading && snapshot ? <View style={styles.stage} {...panResponder.panHandlers}>
       <NativeRoomRenderer items={items} selectedId={selectedId} focusedId={editing ? null : selectedId} themeId={snapshot.room.themeId} cameraYaw={cameraYaw} onSelect={setSelectedId} onClearSelection={() => setSelectedId(null)} />

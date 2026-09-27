@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { ActivityIndicator, FlatList, Image, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from "react-native";
 import { addPostComment, loadFeed, loadPostComments, setPostLiked, type NativeFeedPost, type NativePostComment } from "../../src/api";
+import { RetryNotice } from "../../src/components/RetryNotice";
 import { useCopy } from "../../src/locale";
 import type { MobileCopy } from "../../src/i18n";
 import { colors, spacing } from "../../src/theme";
@@ -11,19 +12,25 @@ export default function FeedScreen() {
   const [posts, setPosts] = useState<NativeFeedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      setPosts(await loadFeed());
+      setError(null);
+    } catch {
+      setError(copy.feedUnavailable);
+    } finally {
+      setLoading(false);
+    }
+  }, [copy.feedUnavailable]);
   useFocusEffect(useCallback(() => {
-    let active = true;
-    void loadFeed()
-      .then((items) => { if (active) { setPosts(items); setError(null); } })
-      .catch(() => { if (active) setError(copy.feedUnavailable); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [copy.feedUnavailable]));
+    void refresh();
+  }, [refresh]));
   return <SafeAreaView style={styles.safe}><View style={styles.container}>
     <Text style={styles.eyebrow}>{copy.brand}</Text>
     <Text style={styles.title}>{copy.feed}</Text>
     {loading && <ActivityIndicator color={colors.plum} />}
-    {error && <Text accessibilityRole="alert" style={styles.body}>{error}</Text>}
+    {error && <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} />}
     <FlatList data={posts} keyExtractor={(item) => item.id} contentContainerStyle={styles.list} renderItem={({ item }) =>
       <PostCard item={item} copy={copy} onChange={(next) => setPosts((current) => current.map((post) => post.id === next.id ? next : post))} />
     } ListEmptyComponent={!loading && !error ? <Text style={styles.body}>{copy.feedEmpty}</Text> : null} />

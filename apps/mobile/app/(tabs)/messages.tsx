@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
 import { loadConversations, type NativeConversation } from "../../src/api";
+import { RetryNotice } from "../../src/components/RetryNotice";
 import { useCopy } from "../../src/locale";
 import { colors, spacing } from "../../src/theme";
 
@@ -11,19 +12,25 @@ export default function MessagesScreen() {
   const [conversations, setConversations] = useState<NativeConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      setConversations(await loadConversations());
+      setError(null);
+    } catch {
+      setError(copy.messagesUnavailable);
+    } finally {
+      setLoading(false);
+    }
+  }, [copy.messagesUnavailable]);
   useFocusEffect(useCallback(() => {
-    let active = true;
-    void loadConversations()
-      .then((items) => { if (active) { setConversations(items); setError(null); } })
-      .catch(() => { if (active) setError(copy.messagesUnavailable); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [copy.messagesUnavailable]));
+    void refresh();
+  }, [refresh]));
   return <SafeAreaView style={styles.safe}><View style={styles.container}>
     <Text style={styles.title}>{copy.messages}</Text>
     <Text style={styles.body}>{copy.messagesLead}</Text>
     {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
-    {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+    {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
     <FlatList data={conversations} keyExtractor={(item) => item.id} contentContainerStyle={styles.list} renderItem={({ item }) =>
       <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/thread", params: { conversationId: item.id, displayName: item.peer.displayName, handle: item.peer.handle } })} style={styles.conversation}>
         <Text style={styles.name}>{item.peer.displayName}</Text>

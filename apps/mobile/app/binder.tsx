@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, FlatList, Image, Modal, Pressable, SafeAreaView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { loadMyHoldings, type NativeHolding } from "../src/api";
 import { binderSpreads, buildNativeBinderPages, type NativeBinderPage, type NativeBinderSpread } from "../src/binder/model";
+import { RetryNotice } from "../src/components/RetryNotice";
 import { useCopy } from "../src/locale";
 import { colors, spacing } from "../src/theme";
 
@@ -16,14 +17,21 @@ export default function BinderScreen() {
   const [spreadIndex, setSpreadIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    let active = true;
-    void loadMyHoldings()
-      .then((items) => { if (active) setHoldings(items); })
-      .catch(() => { if (active) setError(copy.binderUnavailable); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      setHoldings(await loadMyHoldings());
+      setError(null);
+    } catch {
+      setError(copy.binderUnavailable);
+    } finally {
+      setLoading(false);
+    }
   }, [copy.binderUnavailable]);
+  useEffect(() => {
+    const task = setTimeout(() => { void refresh(); }, 0);
+    return () => clearTimeout(task);
+  }, [refresh]);
   const listRef = useRef<FlatList<NativeBinderSpread>>(null);
   const spreads = useMemo(() => binderSpreads(buildNativeBinderPages(holdings, copy.binderGeneral)), [copy.binderGeneral, holdings]);
 
@@ -31,7 +39,7 @@ export default function BinderScreen() {
     <Text style={styles.title}>{copy.binder}</Text>
     <Text style={styles.lead}>{copy.binderLead}</Text>
     {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
-    {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+    {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
     {!loading ? <FlatList
       ref={listRef}
       data={spreads}

@@ -29,6 +29,18 @@ export type NativeCatalogTemplate = {
   releaseName: string | null;
 };
 
+export type NativeSearchUser = { userId: string; handle: string; displayName: string };
+
+export async function searchCollectors(query: string): Promise<NativeSearchUser[]> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/search?q=${encodeURIComponent(query)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("social_search_failed");
+  const payload = await response.json() as { users?: NativeSearchUser[] };
+  return payload.users ?? [];
+}
+
 export async function searchCatalog(query: string): Promise<NativeCatalogTemplate[]> {
   if (!baseUrl) return [];
   const response = await fetch(`${baseUrl}/api/catalog/search?q=${encodeURIComponent(query)}&limit=24`);

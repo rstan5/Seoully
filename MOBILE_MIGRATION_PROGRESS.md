@@ -174,6 +174,9 @@ security, and Room/Binder data model.
   for failed comment reads, and validated manual catalog contribution before the server
   boundary. Collection now refreshes when it regains focus so newly created Holdings
   appear without restarting the app.
+- Added bearer-authenticated collector search through the existing production profile
+  lookup contract. Explore now returns both collectors and catalog items for a query,
+  with localized empty states and existing follow/message destinations.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 
@@ -290,6 +293,9 @@ Native device QA is still pending.
 - Feed collector navigation, comment retry, Collection focus refresh, and Create
   validation pass mobile strict TypeScript and Expo lint. Author-tap feedback and
   Collection refresh timing remain AWAITING DEVICE QA.
+- Collector search passes mobile and web strict TypeScript plus Expo lint. Keyboard
+  search, result ranking, and privacy-sensitive handle matching remain AWAITING DEVICE
+  QA / DEPLOYED BACKEND.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.
@@ -303,7 +309,6 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-Continue the ordinary app parity audit for remaining detailed screen-level gaps that
-do not require a physical device, then document any remaining AWAITING DEVICE QA items.
-Pending database migrations still require review/application in an approved environment,
-and physical iOS/Android behavior remains AWAITING DEVICE QA.
+Continue remaining non-device native gaps, then mark genuinely device-only work
+AWAITING DEVICE QA. Pending database migrations still require review/application in an
+approved environment.

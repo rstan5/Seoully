@@ -113,8 +113,8 @@ export async function getProductionFeed(input?: unknown, client?: SupabaseClient
   return listPosts([identity.user.id, ...(data ?? []).map((row) => String(row.followed_user_id))], input, client);
 }
 
-export async function searchProductionUsers(query: unknown): Promise<SocialSearchUser[]> {
-  const text = z.string().trim().max(120).parse(query); const { identity, supabase } = await actorClient();
+export async function searchProductionUsers(query: unknown, client?: SupabaseClient): Promise<SocialSearchUser[]> {
+  const text = z.string().trim().max(120).parse(query); const { identity, supabase } = await actorClient(client);
   const safeText = text.replace(/[%(),]/g, " ");
   let request = supabase.from("profiles").select("user_id,handle,display_name").neq("user_id", identity.user.id).order("display_name").limit(8);
   if (safeText) request = request.or("handle.ilike.%" + safeText + "%,display_name.ilike.%" + safeText + "%");

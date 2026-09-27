@@ -6,8 +6,10 @@ import {
   loadCollectibleDiscovery,
   loadCollectorDiscovery,
   searchCatalog,
+  searchCollectors,
   setWishlistTemplate,
   type NativeCatalogTemplate,
+  type NativeSearchUser,
   type NativeCollectibleDiscovery,
   type NativeCollectorDiscovery,
 } from "../../src/api";
@@ -20,6 +22,7 @@ export default function SearchScreen() {
   const copy = useCopy();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NativeCatalogTemplate[] | null>(null);
+  const [people, setPeople] = useState<NativeSearchUser[]>([]);
   const [collectors, setCollectors] = useState<NativeCollectorDiscovery[]>([]);
   const [collectibles, setCollectibles] = useState<NativeCollectibleDiscovery[]>([]);
   const [wantedIds, setWantedIds] = useState<Set<string>>(new Set());
@@ -30,6 +33,7 @@ export default function SearchScreen() {
     setLoading(true);
     setError(null);
     setResults(null);
+    setPeople([]);
     try {
       const [nextCollectors, nextCollectibles] = await Promise.all([
         loadCollectorDiscovery(),
@@ -54,7 +58,12 @@ export default function SearchScreen() {
     setLoading(true);
     setError(null);
     try {
-      setResults(await searchCatalog(query));
+      const [catalog, users] = await Promise.all([
+        searchCatalog(query),
+        searchCollectors(query),
+      ]);
+      setResults(catalog);
+      setPeople(users);
     } catch {
       setError(copy.catalogUnavailable);
     } finally {
@@ -97,6 +106,13 @@ export default function SearchScreen() {
     {error && <RetryNotice message={error} retryLabel={copy.retry} onRetry={results ? runSearch : loadExplore} />}
 
     {results ? <>
+      <Text style={styles.sectionTitle}>{copy.collectorResults}</Text>
+      {people.map((person) => <View key={person.userId} style={styles.result}>
+        <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/collector", params: { userId: person.userId } })}><Text style={styles.resultTitle}>{person.displayName}</Text></Pressable>
+        <Text style={styles.resultMeta}>@{person.handle}</Text>
+        <Pressable accessibilityRole="button" onPress={() => messageCollector({ userId: person.userId, displayName: person.displayName, handle: person.handle })}><Text style={styles.actionText}>{copy.messageCollector}</Text></Pressable>
+      </View>)}
+      {!loading && people.length === 0 ? <Text style={styles.empty}>{copy.noCollectorMatches}</Text> : null}
       <Text style={styles.sectionTitle}>{copy.catalogResults}</Text>
       {results.map((item) => <View key={item.id} style={styles.result}>
         <Text style={styles.resultTitle}>{item.name}</Text>

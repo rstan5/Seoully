@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { contributeCatalogItem, createNativePost } from "../../src/api";
+import { KeyboardScreen } from "../../src/components/KeyboardScreen";
 import { collectibleKindLabel } from "../../src/i18n";
 import { useCopy } from "../../src/locale";
 import { colors, spacing } from "../../src/theme";
@@ -103,7 +104,7 @@ export default function CreateScreen() {
     }
   }
 
-  return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+  return <SafeAreaView style={styles.safe}><KeyboardScreen><ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
     <Text style={styles.title}>{copy.create}</Text>
     <View style={styles.tabs}>
       <ModeButton selected={mode === "post"} label={copy.sharePost} onPress={() => setMode("post")} />
@@ -130,7 +131,7 @@ export default function CreateScreen() {
       <Pressable accessibilityRole="button" disabled={working} onPress={submitCollectible} style={styles.button}><Text style={styles.buttonText}>{copy.continue}</Text></Pressable>
     </>}
     {message ? <Text accessibilityRole="alert" style={styles.message}>{message}</Text> : null}
-  </ScrollView></SafeAreaView>;
+  </ScrollView></KeyboardScreen></SafeAreaView>;
 }
 
 function draftText(value: unknown, max: number) {

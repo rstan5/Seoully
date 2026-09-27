@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Image, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from "react-native";
 import { addPostComment, loadFeed, loadPostComments, setPostLiked, type NativeFeedPost, type NativePostComment } from "../../src/api";
+import { KeyboardScreen } from "../../src/components/KeyboardScreen";
 import { RetryNotice } from "../../src/components/RetryNotice";
 import { useCopy } from "../../src/locale";
 import type { MobileCopy } from "../../src/i18n";
@@ -44,7 +45,7 @@ export default function FeedScreen() {
       setLoadingMore(false);
     }
   }
-  return <SafeAreaView style={styles.safe}><View style={styles.container}>
+  return <SafeAreaView style={styles.safe}><KeyboardScreen><View style={styles.container}>
     <Text style={styles.eyebrow}>{copy.brand}</Text>
     <Text style={styles.title}>{copy.feed}</Text>
     {loading && <ActivityIndicator color={colors.plum} />}
@@ -52,7 +53,7 @@ export default function FeedScreen() {
     <FlatList data={posts} keyExtractor={(item) => item.id} contentContainerStyle={styles.list} refreshing={loading && posts.length > 0} onRefresh={refresh} onEndReached={loadMore} onEndReachedThreshold={0.4} renderItem={({ item }) =>
       <PostCard item={item} copy={copy} onChange={(next) => setPosts((current) => current.map((post) => post.id === next.id ? next : post))} />
     } ListEmptyComponent={!loading && !error ? <Text style={styles.body}>{copy.feedEmpty}</Text> : null} ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.plum} /> : null} />
-  </View></SafeAreaView>;
+  </View></KeyboardScreen></SafeAreaView>;
 }
 
 function PostCard({ item, copy, onChange }: { item: NativeFeedPost; copy: MobileCopy; onChange: (post: NativeFeedPost) => void }) {

@@ -16,6 +16,7 @@ import {
 } from "../../src/api";
 import { collectibleKindLabel } from "../../src/i18n";
 import { useCopy } from "../../src/locale";
+import { KeyboardScreen } from "../../src/components/KeyboardScreen";
 import { RetryNotice } from "../../src/components/RetryNotice";
 import { colors, spacing } from "../../src/theme";
 
@@ -110,7 +111,7 @@ export default function SearchScreen() {
     }
   }
 
-  return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+  return <SafeAreaView style={styles.safe}><KeyboardScreen><ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
     <Text style={styles.title}>{copy.explore}</Text>
     <Text style={styles.body}>{copy.exploreLead}</Text>
     <View style={styles.searchRow}>
@@ -159,7 +160,7 @@ export default function SearchScreen() {
       </> : null}
       {!loading && !error && collectors.length === 0 && collectibles.length === 0 ? <Text style={styles.empty}>{copy.exploreEmpty}</Text> : null}
     </>}
-  </ScrollView></SafeAreaView>;
+  </ScrollView></KeyboardScreen></SafeAreaView>;
 }
 
 type SearchCopy = ReturnType<typeof useCopy>;

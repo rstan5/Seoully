@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, SafeAreaView, StyleSheet, Text, TextInput
 import { useRouter } from "expo-router";
 import { mobileConfig } from "../src/config";
 import { loadNativeOnboarding } from "../src/api";
+import { KeyboardScreen } from "../src/components/KeyboardScreen";
 import { useCopy, useLocale } from "../src/locale";
 import { supabase } from "../src/supabase";
 import { colors, spacing } from "../src/theme";
@@ -73,6 +74,7 @@ export default function Index() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <KeyboardScreen>
       <View style={styles.container}>
         <View style={styles.topline}>
           <Text style={styles.brand}>{t.brand} ♡</Text>
@@ -100,6 +102,7 @@ export default function Index() {
           {message && <Text accessibilityRole="alert" style={styles.message}>{message}</Text>}
         </View>
       </View>
+      </KeyboardScreen>
     </SafeAreaView>
   );
 }

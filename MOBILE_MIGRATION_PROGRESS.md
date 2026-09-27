@@ -10,7 +10,7 @@ security, and Room/Binder data model.
 
 - Branch: `mobile-native`
 - Immutable reference checkpoint: `76be07a928ce3e9436031d7324a5cc2b1b0375ed`
-- Current task: Room look-around pitch and add-collectible destination
+- Current task: keyboard-avoiding compose surfaces and Binder page geometry
 - Overall status: IN PROGRESS — Room/Binder product behavior still closing; device QA still pending
 
 ## Completed
@@ -218,6 +218,9 @@ security, and Room/Binder data model.
   locally, and still dollies to a focused object. Adding a collectible now opens that
   Holding detail instead of dropping the collector on Profile.
 - Profile identity/editor state now refreshes when the tab regains focus.
+- Auth, Feed comments, Search, Create, and Profile now sit in a shared native
+  keyboard-avoiding shell. Binder spreads tilt left/right pages around the spine
+  so a full spread reads as a physical book rather than two flat cards.
 
 ## Current queue
 
@@ -363,6 +366,9 @@ Native device QA is still pending.
 - Room pitch/yaw look-around, add-collectible Holding destination, and Profile focus
   refresh pass mobile and web TypeScript plus Expo lint. Vertical orbit feel and
   post-create navigation remain AWAITING DEVICE QA.
+- Keyboard-avoiding compose surfaces and Binder page tilt pass mobile TypeScript and
+  Expo lint. Keyboard overlap, Android window insets, and page-turn perspective remain
+  AWAITING DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.
@@ -376,7 +382,7 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-Continue remaining ordinary-app and Room/Binder gaps that do not require a device,
-especially keyboard-avoiding compose surfaces and richer Binder page-turn. Stop only
-on genuine blockers: pending migrations, avatar schema, and physical-device QA. Do
-not treat Room/Binder as finished.
+Remaining non-device implementation is now thin. Continue only genuine product gaps
+that can still be closed without a device. Remaining blockers: pending SQL
+migrations, avatar schema, fixture-only notices, and physical-device QA for camera,
+GL, gestures, FPS, textures, and keyboard. Do not treat Room/Binder as finished.

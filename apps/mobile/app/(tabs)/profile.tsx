@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { resolveNativeIdentity, updateNativeProfile } from "../../src/api";
+import { KeyboardScreen } from "../../src/components/KeyboardScreen";
 import { RetryNotice } from "../../src/components/RetryNotice";
 import { useCopy } from "../../src/locale";
 import { supabase } from "../../src/supabase";
@@ -67,7 +68,7 @@ export default function ProfileScreen() {
     router.replace("/");
   }
 
-  return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+  return <SafeAreaView style={styles.safe}><KeyboardScreen><ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
     <Text style={styles.title}>{copy.profile}</Text>
     {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
     {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
@@ -81,6 +82,6 @@ export default function ProfileScreen() {
       {message ? <Text accessibilityRole="alert" style={styles.message}>{message}</Text> : null}
       <Pressable accessibilityRole="button" disabled={busy} onPress={signOut} style={styles.secondary}><Text style={styles.secondaryText}>{copy.signOut}</Text></Pressable>
     </> : null}
-  </ScrollView></SafeAreaView>;
+  </ScrollView></KeyboardScreen></SafeAreaView>;
 }
 const styles = StyleSheet.create({ safe: { flex: 1, backgroundColor: colors.canvas }, container: { padding: spacing.lg, paddingBottom: 100 }, title: { color: colors.ink, fontSize: 32, fontWeight: "700" }, loading: { marginTop: spacing.lg }, handle: { color: colors.plum, fontSize: 17, fontWeight: "700", marginTop: spacing.sm }, destinationRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.lg }, destinationLink: { alignItems: "center", borderColor: colors.plum, borderRadius: 14, borderWidth: 1, flex: 1, justifyContent: "center", minHeight: 48 }, collectionLinkText: { color: colors.plum, fontWeight: "700" }, shortInput: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 14, borderWidth: 1, color: colors.ink, minHeight: 50, marginTop: spacing.md, paddingHorizontal: spacing.md }, input: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 14, borderWidth: 1, color: colors.ink, minHeight: 110, marginTop: spacing.md, padding: spacing.md, textAlignVertical: "top" }, button: { alignItems: "center", backgroundColor: colors.plum, borderRadius: 14, justifyContent: "center", marginTop: spacing.md, minHeight: 52 }, buttonText: { color: colors.surface, fontWeight: "700" }, message: { color: colors.plum, marginTop: spacing.md }, secondary: { alignItems: "center", justifyContent: "center", marginTop: spacing.lg, minHeight: 44 }, secondaryText: { color: colors.plum, fontWeight: "700" } });

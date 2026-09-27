@@ -90,14 +90,14 @@ export default function BinderScreen() {
 
 function Spread({ spread, width, emptyLabel, onSelect }: { spread: NativeBinderSpread; width: number; emptyLabel: string; onSelect: (selection: CardSelection) => void }) {
   return <View style={[styles.spread, { width }]}>
-    <Page page={spread.left} emptyLabel={emptyLabel} onSelect={onSelect} />
+    <Page page={spread.left} emptyLabel={emptyLabel} onSelect={onSelect} side="left" />
     <View style={styles.spine} />
-    <Page page={spread.right} emptyLabel={emptyLabel} onSelect={onSelect} />
+    <Page page={spread.right} emptyLabel={emptyLabel} onSelect={onSelect} side="right" />
   </View>;
 }
 
-function Page({ page, emptyLabel, onSelect }: { page: NativeBinderPage; emptyLabel: string; onSelect: (selection: CardSelection) => void }) {
-  return <View style={styles.page}>
+function Page({ page, emptyLabel, onSelect, side }: { page: NativeBinderPage; emptyLabel: string; onSelect: (selection: CardSelection) => void; side: "left" | "right" }) {
+  return <View style={[styles.page, side === "left" ? styles.pageLeft : styles.pageRight]}>
     <Text numberOfLines={1} style={styles.setName}>{page.setName}</Text>
     <View style={styles.pockets}>{page.pockets.map((pocket) =>
       <BinderPocket key={pocket.index} holding={pocket.holding} emptyLabel={emptyLabel} onSelect={onSelect} />
@@ -174,6 +174,8 @@ const styles = StyleSheet.create({
   binder: { marginTop: spacing.lg },
   spread: { alignItems: "stretch", flexDirection: "row", paddingVertical: spacing.md },
   page: { backgroundColor: "#7d3e55", borderRadius: 10, flex: 1, padding: 7 },
+  pageLeft: { borderBottomRightRadius: 4, borderTopRightRadius: 4, transform: [{ perspective: 700 }, { rotateY: "7deg" }] },
+  pageRight: { borderBottomLeftRadius: 4, borderTopLeftRadius: 4, transform: [{ perspective: 700 }, { rotateY: "-7deg" }] },
   spine: { backgroundColor: "#4a2130", borderRadius: 4, marginHorizontal: 3, width: 10 },
   setName: { color: "#fff4f6", fontSize: 10, fontWeight: "700", height: 17, textAlign: "center" },
   pockets: { flexDirection: "row", flexWrap: "wrap", gap: 5, justifyContent: "center" },

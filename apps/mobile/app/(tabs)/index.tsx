@@ -11,11 +11,15 @@ export default function FeedScreen() {
   const copy = useCopy();
   const [posts, setPosts] = useState<NativeFeedPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      setPosts(await loadFeed());
+      const page = await loadFeed();
+      setPosts(page.items);
+      setNextCursor(page.nextCursor);
       setError(null);
     } catch {
       setError(copy.feedUnavailable);
@@ -26,14 +30,28 @@ export default function FeedScreen() {
   useFocusEffect(useCallback(() => {
     void refresh();
   }, [refresh]));
+
+  async function loadMore() {
+    if (!nextCursor || loading || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const page = await loadFeed(nextCursor);
+      setPosts((current) => [...current, ...page.items.filter((item) => !current.some((existing) => existing.id === item.id))]);
+      setNextCursor(page.nextCursor);
+    } catch {
+      setError(copy.feedUnavailable);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
   return <SafeAreaView style={styles.safe}><View style={styles.container}>
     <Text style={styles.eyebrow}>{copy.brand}</Text>
     <Text style={styles.title}>{copy.feed}</Text>
     {loading && <ActivityIndicator color={colors.plum} />}
     {error && <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} />}
-    <FlatList data={posts} keyExtractor={(item) => item.id} contentContainerStyle={styles.list} renderItem={({ item }) =>
+    <FlatList data={posts} keyExtractor={(item) => item.id} contentContainerStyle={styles.list} onEndReached={loadMore} onEndReachedThreshold={0.4} renderItem={({ item }) =>
       <PostCard item={item} copy={copy} onChange={(next) => setPosts((current) => current.map((post) => post.id === next.id ? next : post))} />
-    } ListEmptyComponent={!loading && !error ? <Text style={styles.body}>{copy.feedEmpty}</Text> : null} />
+    } ListEmptyComponent={!loading && !error ? <Text style={styles.body}>{copy.feedEmpty}</Text> : null} ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.plum} /> : null} />
   </View></SafeAreaView>;
 }
 

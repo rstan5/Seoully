@@ -142,14 +142,16 @@ export async function contributeCatalogItem(input: { name: string; kind: string;
 
 export type NativeFeedPost = { id: string; caption: string; createdAt: string; author: { displayName: string; handle: string }; likeCount: number; commentCount: number; likedByMe: boolean; media: { url: string; mediaType: string }[] };
 export type NativePostComment = { id: string; postId: string; body: string; createdAt: string; author: { displayName: string; handle: string } };
-export async function loadFeed(): Promise<NativeFeedPost[]> {
+export type NativeFeedPage = { items: NativeFeedPost[]; nextCursor: string | null };
+export async function loadFeed(cursor?: string): Promise<NativeFeedPage> {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
   if (!baseUrl || !accessToken) throw new Error("unauthenticated");
-  const response = await fetch(`${baseUrl}/api/mobile/feed`, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+  const response = await fetch(`${baseUrl}/api/mobile/feed${query}`, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!response.ok) throw new Error("social_read_failed");
-  const payload = await response.json() as { page?: { items?: NativeFeedPost[] } };
-  return payload.page?.items ?? [];
+  const payload = await response.json() as { page?: { items?: NativeFeedPost[]; nextCursor?: string | null } };
+  return { items: payload.page?.items ?? [], nextCursor: payload.page?.nextCursor ?? null };
 }
 
 export async function setPostLiked(postId: string, liked: boolean) {

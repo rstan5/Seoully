@@ -159,6 +159,9 @@ security, and Room/Binder data model.
   preserves personal media as the primary card face, shows localized acquisition and
   catalog metadata, supports trade-status changes, retries failed reads, and links into
   the native Room and Binder without changing ownership or placement.
+- Completed cursor propagation through the bearer-authenticated mobile Feed endpoint
+  and added native end-of-list pagination with deduplication, bounded loading feedback,
+  and retryable failures. Feed is no longer permanently limited to its first page.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 
@@ -263,6 +266,9 @@ Native device QA is still pending.
 - Native collectible detail passes mobile strict TypeScript and Expo lint. Personal
   media sizing, long descriptors, and locale-specific date rendering remain AWAITING
   DEVICE QA.
+- Paginated Feed passes mobile and web strict TypeScript plus Expo lint. End-of-list
+  thresholds, long-session memory, and repeated rapid scroll behavior remain AWAITING
+  DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.
@@ -276,6 +282,7 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-Continue the ordinary app parity audit with navigation/draft restoration and remaining
-detailed screen-level gaps. Pending database migrations still require review/application
-in an approved environment, and physical iOS/Android behavior remains AWAITING DEVICE QA.
+Continue the ordinary app parity audit with navigation/draft restoration, message
+refresh behavior, and remaining detailed screen-level gaps. Pending database migrations
+still require review/application in an approved environment, and physical iOS/Android
+behavior remains AWAITING DEVICE QA.

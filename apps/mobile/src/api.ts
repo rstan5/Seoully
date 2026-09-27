@@ -387,3 +387,48 @@ export async function setCollectorFollowing(userId: string, following: boolean) 
   if (!response.ok) throw new Error("follow_failed");
   return response.json() as Promise<{ following: boolean }>;
 }
+
+export type NativeRoom = { id: string; ownerUserId: string };
+export type NativeRoomPlacement = {
+  id: string;
+  roomId: string;
+  holdingId: string;
+  zoneId: string;
+  slot: number;
+  offset: Record<string, number> | null;
+  transform: Record<string, number> | null;
+  surfaceId: string | null;
+};
+export type NativeRoomSnapshot = {
+  room: NativeRoom;
+  placements: NativeRoomPlacement[];
+  holdings: NativeHolding[];
+};
+
+export async function loadNativeRoom(): Promise<NativeRoomSnapshot> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/room`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("room_read_failed");
+  return response.json() as Promise<NativeRoomSnapshot>;
+}
+
+export async function saveNativeRoomPlacement(input: {
+  roomId: string;
+  holdingId: string;
+  zoneId: string;
+  slot: number;
+  transform: { x: number; y: number; z: number; rotateX?: number; rotateY?: number; rotateZ?: number; scale?: number };
+  surfaceId?: string;
+}) {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/room`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw new Error("room_placement_write_failed");
+  const payload = await response.json() as { placement: NativeRoomPlacement };
+  return payload.placement;
+}

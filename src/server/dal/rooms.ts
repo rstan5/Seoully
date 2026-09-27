@@ -1,7 +1,8 @@
 import "server-only";
 
 import { z } from "zod";
-import { getCurrentIdentity } from "@/server/dal/profile";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/profile";
 import { createSupabaseServerClient } from "@/server/supabase/server";
 
 const uuid = z.string().uuid();
@@ -31,10 +32,10 @@ export interface RoomPlacementDTO {
   surfaceId: string | null; createdAt: string; updatedAt: string;
 }
 
-export async function ensureMyRoom(): Promise<RoomDTO> {
-  const identity = await getCurrentIdentity();
+export async function ensureMyRoom(client?: SupabaseClient): Promise<RoomDTO> {
+  const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? await createSupabaseServerClient();
   const { data: existing, error: readError } = await supabase.from("rooms")
     .select("id,owner_user_id,created_at,updated_at").eq("owner_user_id", identity.user.id).maybeSingle();
   if (readError) throw new Error("room_read_failed");
@@ -54,13 +55,13 @@ export async function ensureMyRoom(): Promise<RoomDTO> {
   return mapRoom(data);
 }
 
-export async function getMyRoom(): Promise<RoomDTO> { return ensureMyRoom(); }
+export async function getMyRoom(client?: SupabaseClient): Promise<RoomDTO> { return ensureMyRoom(client); }
 
-export async function listMyRoomPlacements(input: unknown): Promise<{ room: RoomDTO; placements: RoomPlacementDTO[] }> {
+export async function listMyRoomPlacements(input: unknown, client?: SupabaseClient): Promise<{ room: RoomDTO; placements: RoomPlacementDTO[] }> {
   const { roomId } = roomSchema.parse(input);
-  const room = await ensureMyRoom();
+  const room = await ensureMyRoom(client);
   if (room.id !== roomId) throw new Error("room_not_found");
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? await createSupabaseServerClient();
   const { data, error } = await supabase.from("room_placements")
     .select("id,room_id,holding_id,zone_id,slot,spatial_offset,transform,surface_id,created_at,updated_at")
     .eq("room_id", room.id).order("updated_at", { ascending: false }).range(0, 499);
@@ -68,11 +69,11 @@ export async function listMyRoomPlacements(input: unknown): Promise<{ room: Room
   return { room, placements: (data ?? []).map(mapPlacement) };
 }
 
-export async function upsertMyRoomPlacement(input: unknown): Promise<RoomPlacementDTO> {
+export async function upsertMyRoomPlacement(input: unknown, client?: SupabaseClient): Promise<RoomPlacementDTO> {
   const payload = placementSchema.parse(input);
-  const room = await ensureMyRoom();
+  const room = await ensureMyRoom(client);
   if (room.id !== payload.roomId) throw new Error("room_not_found");
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? await createSupabaseServerClient();
   const { data, error } = await supabase.from("room_placements").upsert({
     room_id: payload.roomId, holding_id: payload.holdingId, zone_id: payload.zoneId,
     slot: payload.slot, spatial_offset: payload.offset ?? null, transform: payload.transform ?? null,

@@ -86,6 +86,15 @@ security, and Room/Binder data model.
   including privacy-aware collection summaries, follower counts, idempotent follow/
   unfollow, and direct-message entry. Explore recommendations now navigate to these
   profiles rather than acting as inert cards.
+- Defined and implemented the first native Room renderer boundary using Expo GL,
+  Three.js, and React Three Fiber's native renderer. The proof renders a real
+  authenticated Room, a bounded set of real Holdings, photocard/album/object geometry,
+  signed personal-media textures, an actual perspective camera, lights, and room
+  planes without a WebView.
+- Added native Room tap/focus and edit gestures. A selected Holding can be dragged in
+  the native scene; coordinates are adapted to the existing web world convention and
+  persisted through the existing `RoomPlacement` transform, zone, surface, slot, and
+  Holding identity semantics under bearer auth and RLS.
 
 ## Current queue
 
@@ -147,9 +156,14 @@ Native device QA is still pending.
 - Native collector profiles and follow mutations pass mobile lint and strict TypeScript,
   web strict TypeScript, and fixture integrity checks. Navigation and optimistic follow
   touch feedback remain AWAITING DEVICE QA.
+- The native Room proof passes mobile strict TypeScript, Expo lint, all 21 Expo Doctor
+  checks, web strict TypeScript, and a complete Metro iOS production export. GL context
+  stability, signed texture appearance, raycast taps, drag feel, FPS, and memory remain
+  AWAITING DEVICE QA; simulator-only success is not claimed.
 
 ## Next autonomous task
 
-Native collector profiles now connect Explore, follows, and private messages. Next:
-integration hardening, then the required Room renderer proof. Full Room and Binder
-parity remain mandatory in the queue. No device QA is claimed.
+The native Room renderer proof is viable at the implementation/bundle boundary and
+preserves production placement semantics. Next: deepen Room V2 beyond the proof, then
+implement Binder V2 with native pages/pockets and personal photocard media. No device
+QA is claimed.

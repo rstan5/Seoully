@@ -122,6 +122,10 @@ security, and Room/Binder data model.
 - Hardened native GL texture loading by downloading each signed personal-media URL to
   an idempotent Expo cache file before handing its local URI to Three.js. This avoids
   relying on native GL loaders to consume expiring remote URLs directly.
+- Added native Room inspection focus: selecting a placed collectible outside edit mode
+  now smoothly dollies the perspective camera toward the actual world object, tracks it
+  as the camera settles, and presents production-backed collectible metadata and trade
+  state in a dismissible inspection plate. Tapping empty world space clears focus.
 - Feed and Messages now refresh from production when their tabs regain focus, so newly
   authored posts and conversations appear without restarting the app.
 
@@ -136,8 +140,10 @@ security, and Room/Binder data model.
    follows, authored posts, and private Messages.
 6. COMPLETE AT CODE BOUNDARY — collection, personal media, crop, wishlist, trade
    state, catalog contribution, and shared-reference consent.
-7. COMPLETE AT CODE/BUNDLE BOUNDARY — native Room V2 renderer/lifecycle/surfaces and
-   native Binder V2; physical renderer and gesture QA remains mandatory.
+7. IN PROGRESS — native Room V2 renderer/lifecycle/surfaces and native Binder V2 are
+   production-backed, but focus/customization fidelity, native home/zone semantics,
+   and physical Binder interactions are still being closed. Physical renderer and
+   gesture QA remains mandatory.
 
 ## Blocked / device QA
 
@@ -197,6 +203,9 @@ Native device QA is still pending.
 - Native Binder V2 passes mobile strict TypeScript and Expo lint. Responsive pocket
   sizing, page-swipe feel, signed media rendering, and inspection ergonomics remain
   AWAITING DEVICE QA.
+- Room camera focus and inspection pass mobile strict TypeScript, Expo lint, and diff
+  checks. GL raycast dismissal, focus framing across device sizes, and animation feel
+  remain AWAITING DEVICE QA.
 - Native post creation and the localization hardening pass mobile strict TypeScript,
   Expo lint, and web strict TypeScript. Image-picker, multipart upload, permission,
   and keyboard behavior remain AWAITING DEVICE QA.
@@ -210,9 +219,8 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-All currently meaningful non-device implementation and static validation in the
-authoritative queue is exhausted. Next work requires review/application of the pending
-database migrations in an approved environment, authenticated deployed-backend
-integration testing, and physical iOS/Android QA for camera, media, keyboard, GL,
-textures, gestures, performance, safe areas, and navigation restoration. AWAITING
-DEVICE QA; no production mutation, push, or deployment was performed.
+Continue Room Renderer V2 with native home/zone semantics and more faithful display
+surfaces, then add durable owner-scoped Room customization behind a reviewed migration.
+After that, deepen Binder V2 with animated card lift/return and localized fallback
+organization. Pending database migrations still require review/application in an
+approved environment, and physical iOS/Android behavior remains AWAITING DEVICE QA.

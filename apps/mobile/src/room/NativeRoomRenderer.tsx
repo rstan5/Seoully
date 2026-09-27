@@ -8,16 +8,22 @@ import type { RoomRenderable } from "./model";
 export function NativeRoomRenderer({
   items,
   selectedId,
+  focusedId,
   cameraYaw,
   onSelect,
+  onClearSelection,
 }: {
   items: RoomRenderable[];
   selectedId: string | null;
+  focusedId: string | null;
   cameraYaw: number;
   onSelect: (holdingId: string) => void;
+  onClearSelection: () => void;
 }) {
+  const focused = items.find((item) => item.holding.id === focusedId) ?? null;
   return <Canvas
     camera={{ position: [0, 2.6, 7], fov: 50 }}
+    onPointerMissed={onClearSelection}
     onCreated={({ camera, scene }) => {
       camera.lookAt(0, 0.4, -2);
       scene.background = new Color("#f4e7e5");
@@ -25,20 +31,30 @@ export function NativeRoomRenderer({
   >
     <ambientLight intensity={1.5} />
     <directionalLight color="#fff1e5" intensity={2.2} position={[-3, 6, 4]} />
-    <CameraRig yaw={cameraYaw} />
+    <CameraRig yaw={cameraYaw} focused={focused} />
     <RoomShell />
     <RoomFurniture />
     {items.map((item) => <RoomObject key={item.holding.id} item={item} selected={selectedId === item.holding.id} onSelect={onSelect} />)}
   </Canvas>;
 }
 
-function CameraRig({ yaw }: { yaw: number }) {
+function CameraRig({ yaw, focused }: { yaw: number; focused: RoomRenderable | null }) {
   const { camera } = useThree();
-  const target = new Vector3();
-  useFrame(() => {
-    target.set(Math.sin(yaw) * 9, 2.6, -2 + Math.cos(yaw) * 9);
-    camera.position.lerp(target, 0.12);
-    camera.lookAt(0, 0.4, -2);
+  const targetPosition = new Vector3();
+  const lookAt = new Vector3(0, 0.4, -2);
+  const desiredLook = new Vector3();
+  useFrame((_, delta) => {
+    const alpha = 1 - Math.exp(-7 * delta);
+    if (focused) {
+      targetPosition.set(focused.position.x, focused.position.y + 0.25, focused.position.z + 2.45);
+      desiredLook.set(focused.position.x, focused.position.y, focused.position.z);
+    } else {
+      targetPosition.set(Math.sin(yaw) * 9, 2.6, -2 + Math.cos(yaw) * 9);
+      desiredLook.set(0, 0.4, -2);
+    }
+    camera.position.lerp(targetPosition, alpha);
+    lookAt.lerp(desiredLook, alpha);
+    camera.lookAt(lookAt);
   });
   return null;
 }

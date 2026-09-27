@@ -74,6 +74,7 @@ export default function RoomScreen() {
   });
   const placedIds = new Set(items.map((item) => item.holding.id));
   const unplaced = snapshot?.holdings.filter((holding) => !placedIds.has(holding.id)) ?? [];
+  const selectedItem = items.find((item) => item.holding.id === selectedId) ?? null;
 
   async function placeHolding(holding: NativeHolding) {
     if (!snapshot || items.length >= 24) return;
@@ -115,11 +116,16 @@ export default function RoomScreen() {
     {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
     {!loading && !snapshot?.holdings.length ? <Text style={styles.empty}>{copy.roomEmpty}</Text> : null}
     {!loading && snapshot ? <View style={styles.stage} {...panResponder.panHandlers}>
-      <NativeRoomRenderer items={items} selectedId={selectedId} cameraYaw={cameraYaw} onSelect={setSelectedId} />
+      <NativeRoomRenderer items={items} selectedId={selectedId} focusedId={editing ? null : selectedId} cameraYaw={cameraYaw} onSelect={setSelectedId} onClearSelection={() => setSelectedId(null)} />
       {editing && selectedId ? <View pointerEvents="none" style={styles.hint}><Text style={styles.hintText}>{copy.roomDragHint}</Text></View> : null}
       {!editing ? <View pointerEvents="none" style={styles.hint}><Text style={styles.hintText}>{copy.roomOrbitHint}</Text></View> : null}
     </View> : null}
-    {selectedId ? <View style={styles.selectionRow}><Text numberOfLines={1} style={styles.selection}>{items.find((item) => item.holding.id === selectedId)?.holding.template.name}</Text><Pressable accessibilityRole="button" onPress={removeSelected}><Text style={styles.removeText}>{copy.removeFromRoom}</Text></Pressable></View> : null}
+    {selectedItem && !editing ? <View style={styles.inspection}>
+      <View style={styles.inspectionCopy}><Text numberOfLines={1} style={styles.inspectionTitle}>{selectedItem.holding.template.name}</Text><Text numberOfLines={1} style={styles.inspectionMeta}>{[selectedItem.holding.template.groupName, selectedItem.holding.template.memberName, selectedItem.holding.template.releaseName].filter(Boolean).join(" · ")}</Text><Text style={styles.inspectionMeta}>{selectedItem.holding.tradeStatus === "for-trade" ? copy.forTrade : copy.notForTrade}</Text></View>
+      <Pressable accessibilityRole="button" onPress={() => setSelectedId(null)} style={styles.inspectAction}><Text style={styles.inspectActionText}>{copy.close}</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={removeSelected} style={styles.inspectAction}><Text style={styles.inspectActionText}>{copy.removeFromRoom}</Text></Pressable>
+    </View> : null}
+    {selectedItem && editing ? <View style={styles.selectionRow}><Text numberOfLines={1} style={styles.selection}>{selectedItem.holding.template.name}</Text><Pressable accessibilityRole="button" onPress={removeSelected}><Text style={styles.removeText}>{copy.removeFromRoom}</Text></Pressable></View> : null}
     {unplaced.length ? <View style={styles.stored}><Text style={styles.storedTitle}>{copy.storedCollection}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storedList}>{unplaced.map((holding) => <Pressable key={holding.id} accessibilityRole="button" onPress={() => placeHolding(holding)} style={styles.storedItem}><Text numberOfLines={2} style={styles.storedItemText}>+ {holding.template.name}</Text></Pressable>)}</ScrollView></View> : null}
   </View></SafeAreaView>;
 }
@@ -147,4 +153,10 @@ const styles = StyleSheet.create({
   storedList: { gap: spacing.xs },
   storedItem: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 10, borderWidth: 1, justifyContent: "center", maxWidth: 150, minHeight: 42, paddingHorizontal: spacing.sm },
   storedItemText: { color: colors.plum, fontSize: 12, fontWeight: "600" },
+  inspection: { alignItems: "center", backgroundColor: colors.surface, borderTopColor: colors.border, borderTopWidth: 1, flexDirection: "row", gap: spacing.sm, padding: spacing.sm },
+  inspectionCopy: { flex: 1 },
+  inspectionTitle: { color: colors.ink, fontSize: 15, fontWeight: "700" },
+  inspectionMeta: { color: colors.muted, fontSize: 12, marginTop: 2 },
+  inspectAction: { borderColor: colors.plum, borderRadius: 10, borderWidth: 1, justifyContent: "center", minHeight: 38, paddingHorizontal: spacing.sm },
+  inspectActionText: { color: colors.plum, fontSize: 12, fontWeight: "700" },
 });

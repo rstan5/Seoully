@@ -76,6 +76,12 @@ security, and Room/Binder data model.
 - Native catalog and discovery results can now add canonical templates to the
   production wishlist through the existing idempotent wishlist DAL. Bearer-native
   collection and wishlist routes retain server-derived actor ownership and RLS.
+- Added a production direct-message foundation with participant-only RLS, an
+  authenticated pair-conversation RPC, bounded message bodies, and no anonymous table
+  access. The server always derives the sender from the bearer session.
+- Replaced the native Messages placeholder with production conversation and thread
+  screens, private message composition, localized loading/error/empty states, and a
+  message entry point from collector recommendations.
 
 ## Current queue
 
@@ -98,6 +104,9 @@ security, and Room/Binder data model.
 - `20260930000000_native_onboarding_progress.sql` must be applied through the normal
   migration process before the new onboarding endpoint is deployed. It has not been
   applied to production by this migration work.
+- `20261001000000_direct_messages.sql` must be reviewed and applied through the normal
+  migration process before native Messages can be used. It has not been applied to
+  production, and no production messages or conversations were created during testing.
 
 ## Architectural decisions
 
@@ -128,10 +137,13 @@ Native device QA is still pending.
 - Native Collection/Wishlist passes mobile lint and strict TypeScript plus web strict
   TypeScript. Personal card media sizing, long-list behavior, and touch states remain
   AWAITING DEVICE QA.
+- Native Messages passes mobile lint and strict TypeScript plus web strict TypeScript.
+  The production migration was not applied; RLS integration, keyboard avoidance,
+  thread scrolling, and real-time refresh remain AWAITING DEPLOYED BACKEND / DEVICE QA.
 
 ## Next autonomous task
 
-Native Collection/Wishlist now covers real Holding media, wishlist membership, and
-trade status. Next: Messages parity and collector follow/profile navigation, then
-integration hardening before the required Room renderer proof. Full Room and Binder
-parity remain mandatory in the queue. No device QA is claimed.
+Native Messages now has a secure production persistence boundary and native
+conversation UI. Next: collector follow/profile navigation and integration hardening,
+then the required Room renderer proof. Full Room and Binder parity remain mandatory in
+the queue. No device QA is claimed.

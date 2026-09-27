@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "expo-router";
 import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import {
+  ensureConversation,
   loadCollectibleDiscovery,
   loadCollectorDiscovery,
   searchCatalog,
@@ -87,6 +88,15 @@ export default function SearchScreen() {
     }
   }
 
+  async function messageCollector(collector: NativeCollectorDiscovery["collector"]) {
+    try {
+      const conversationId = await ensureConversation(collector.userId);
+      router.push({ pathname: "/thread", params: { conversationId, displayName: collector.displayName, handle: collector.handle } });
+    } catch {
+      setError(copy.messagesUnavailable);
+    }
+  }
+
   return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
     <Text style={styles.title}>{copy.explore}</Text>
     <Text style={styles.body}>{copy.exploreLead}</Text>
@@ -114,6 +124,7 @@ export default function SearchScreen() {
           <Text style={styles.resultTitle}>{collector.displayName}</Text>
           <Text style={styles.resultMeta}>@{collector.handle}</Text>
           <Text style={styles.resultDescriptor}>{reciprocal ? copy.mutualMatch : reasonLabel(reasons[0]?.code, copy)}</Text>
+          <Pressable accessibilityRole="button" onPress={() => messageCollector(collector)}><Text style={styles.actionText}>{copy.messageCollector}</Text></Pressable>
         </View>)}
       </> : null}
       {collectibles.length > 0 ? <><Text style={styles.sectionTitle}>{copy.collectiblesForYou}</Text>

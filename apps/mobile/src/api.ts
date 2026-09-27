@@ -298,3 +298,60 @@ export function loadCollectorDiscovery() {
 export function loadCollectibleDiscovery() {
   return loadDiscovery<NativeCollectibleDiscovery>("collectibles");
 }
+
+export type NativeConversation = {
+  id: string;
+  peer: { userId: string; handle: string; displayName: string };
+  lastMessage: { body: string; createdAt: string; mine: boolean } | null;
+};
+export type NativeDirectMessage = {
+  id: string;
+  conversationId: string;
+  body: string;
+  createdAt: string;
+  mine: boolean;
+};
+
+export async function loadConversations(): Promise<NativeConversation[]> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/messages`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("messages_read_failed");
+  const payload = await response.json() as { conversations?: NativeConversation[] };
+  return payload.conversations ?? [];
+}
+
+export async function ensureConversation(peerUserId: string): Promise<string> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/messages`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ peerUserId }),
+  });
+  if (!response.ok) throw new Error("conversation_create_failed");
+  const payload = await response.json() as { conversationId: string };
+  return payload.conversationId;
+}
+
+export async function loadDirectMessages(conversationId: string): Promise<NativeDirectMessage[]> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/messages/${encodeURIComponent(conversationId)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("messages_read_failed");
+  const payload = await response.json() as { messages?: NativeDirectMessage[] };
+  return payload.messages ?? [];
+}
+
+export async function sendDirectMessage(conversationId: string, body: string): Promise<NativeDirectMessage> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${baseUrl}/api/mobile/messages/${encodeURIComponent(conversationId)}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ body }),
+  });
+  if (!response.ok) throw new Error("message_send_failed");
+  const payload = await response.json() as { message: NativeDirectMessage };
+  return payload.message;
+}

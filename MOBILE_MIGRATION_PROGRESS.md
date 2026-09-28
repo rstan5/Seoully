@@ -12,7 +12,7 @@ security, and Room/Binder data model.
 - Immutable reference checkpoint: `76be07a928ce3e9436031d7324a5cc2b1b0375ed`
 - Recovered from: `d2d779d`
 - Device-QA checkpoint: `ae8e155`
-- Current HEAD: `1910bfc`
+- Current HEAD: `21b66e4`
 - Current task: Feed visual reconstruction — AWAITING PHYSICAL DEVICE VISUAL APPROVAL
 - Overall status: IN PROGRESS — native design system + Feed rebuilt from web social-app.css; user must approve Feed on a physical iPhone before Search or other screens are restyled
 

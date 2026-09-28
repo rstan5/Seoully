@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { mobileConfig } from "../src/config";
 import { loadNativeOnboarding } from "../src/api";
 import { KeyboardScreen } from "../src/components/KeyboardScreen";
 import { useCopy, useLocale } from "../src/locale";
 import { supabase } from "../src/supabase";
-import { colors, spacing } from "../src/theme";
+import { colors } from "../src/theme";
+import { BrandMark } from "../src/ui/BrandMark";
+import { SeoullyButton } from "../src/ui/SeoullyControls";
+import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
+import { SeoullyScreen } from "../src/ui/SeoullyScreen";
+import { SeoullyText } from "../src/ui/SeoullyText";
 
 export default function Index() {
   const router = useRouter();
@@ -44,7 +49,7 @@ export default function Index() {
   }, [routeAfterAuth]);
 
   if (!ready) {
-    return <View style={styles.loading}><ActivityIndicator color={colors.plum} /></View>;
+    return <SeoullyScreen><SeoullyLoadingState label={t.brand} /></SeoullyScreen>;
   }
 
   async function submit() {
@@ -73,54 +78,61 @@ export default function Index() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SeoullyScreen>
       <KeyboardScreen>
-      <View style={styles.container}>
-        <View style={styles.topline}>
-          <Text style={styles.brand}>{t.brand} ♡</Text>
-          <Pressable accessibilityRole="button" onPress={toggleLocale} style={styles.language}>
-            <Text style={styles.secondaryText}>{t.switchLanguage}</Text>
-          </Pressable>
+        <View style={styles.container}>
+          <View style={styles.topline}>
+            <BrandMark />
+            <Pressable accessibilityRole="button" onPress={toggleLocale} style={styles.language}>
+              <SeoullyText variant="button">{t.switchLanguage}</SeoullyText>
+            </Pressable>
+          </View>
+          <SeoullyText variant="secondary" style={styles.tagline}>{t.tagline}</SeoullyText>
+          {!mobileConfig.isConfigured ? (
+            <SeoullyText variant="secondary" color={colors.plum} style={styles.warning}>{t.notConfigured}</SeoullyText>
+          ) : null}
+          <View style={styles.form}>
+            {createMode ? (
+              <>
+                <TextInput autoCapitalize="none" autoCorrect={false} placeholder={t.username} placeholderTextColor={colors.muted} value={handle} onChangeText={setHandle} style={styles.input} />
+                <TextInput autoCorrect={false} placeholder={t.displayName} placeholderTextColor={colors.muted} value={displayName} onChangeText={setDisplayName} style={styles.input} />
+              </>
+            ) : null}
+            <TextInput autoCapitalize="none" autoCorrect={false} keyboardType="email-address" placeholder={t.email} placeholderTextColor={colors.muted} value={email} onChangeText={setEmail} style={styles.input} />
+            <TextInput secureTextEntry placeholder={t.password} placeholderTextColor={colors.muted} value={password} onChangeText={setPassword} style={styles.input} />
+            <SeoullyButton
+              label={createMode ? t.createAccount : t.signIn}
+              disabled={submitting || !mobileConfig.isConfigured}
+              onPress={() => { void submit(); }}
+            />
+            {submitting ? <ActivityIndicator color={colors.plum} /> : null}
+            <Pressable accessibilityRole="button" onPress={() => { setCreateMode((value) => !value); setMessage(null); }} style={styles.secondary}>
+              <SeoullyText variant="button" color={colors.plum}>{createMode ? t.signIn : t.createAccount}</SeoullyText>
+            </Pressable>
+            {message ? <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum}>{message}</SeoullyText> : null}
+          </View>
         </View>
-        <Text style={styles.tagline}>{t.tagline}</Text>
-        {!mobileConfig.isConfigured && <Text style={styles.warning}>{t.notConfigured}</Text>}
-        <View style={styles.form}>
-          {createMode && (
-            <>
-              <TextInput autoCapitalize="none" autoCorrect={false} placeholder={t.username} value={handle} onChangeText={setHandle} style={styles.input} />
-              <TextInput autoCorrect={false} placeholder={t.displayName} value={displayName} onChangeText={setDisplayName} style={styles.input} />
-            </>
-          )}
-          <TextInput autoCapitalize="none" autoCorrect={false} keyboardType="email-address" placeholder={t.email} value={email} onChangeText={setEmail} style={styles.input} />
-          <TextInput secureTextEntry placeholder={t.password} value={password} onChangeText={setPassword} style={styles.input} />
-          <Pressable accessibilityRole="button" onPress={submit} disabled={submitting || !mobileConfig.isConfigured} style={styles.primary}>
-            {submitting ? <ActivityIndicator color={colors.surface} /> : <Text style={styles.primaryText}>{createMode ? t.createAccount : t.signIn}</Text>}
-          </Pressable>
-          <Pressable accessibilityRole="button" onPress={() => { setCreateMode((value) => !value); setMessage(null); }} style={styles.secondary}>
-            <Text style={styles.secondaryText}>{createMode ? t.signIn : t.createAccount}</Text>
-          </Pressable>
-          {message && <Text accessibilityRole="alert" style={styles.message}>{message}</Text>}
-        </View>
-      </View>
       </KeyboardScreen>
-    </SafeAreaView>
+    </SeoullyScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  loading: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.canvas },
-  safe: { flex: 1, backgroundColor: colors.canvas },
-  container: { flex: 1, justifyContent: "center", padding: spacing.lg },
+  container: { flex: 1, justifyContent: "center", paddingHorizontal: 16 },
   topline: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
-  brand: { color: colors.ink, fontSize: 38, fontWeight: "700", letterSpacing: -1 },
-  language: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.sm },
-  tagline: { color: colors.muted, fontSize: 17, marginTop: spacing.xs },
-  warning: { color: colors.plum, backgroundColor: colors.blush, borderRadius: 14, marginTop: spacing.lg, padding: spacing.md, lineHeight: 20 },
-  form: { gap: spacing.sm, marginTop: spacing.xl },
-  input: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 14, borderWidth: 1, color: colors.ink, fontSize: 16, minHeight: 52, paddingHorizontal: spacing.md },
-  primary: { alignItems: "center", backgroundColor: colors.plum, borderRadius: 16, justifyContent: "center", minHeight: 54, marginTop: spacing.xs },
-  primaryText: { color: colors.surface, fontSize: 16, fontWeight: "700" },
-  secondary: { alignItems: "center", minHeight: 44, justifyContent: "center" },
-  secondaryText: { color: colors.plum, fontSize: 15, fontWeight: "600" },
-  message: { color: colors.plum, fontSize: 14, lineHeight: 20 },
+  language: { justifyContent: "center", minHeight: 44, paddingHorizontal: 4 },
+  tagline: { marginTop: 8 },
+  warning: { backgroundColor: colors.lilacSoft, borderRadius: 14, marginTop: 16, padding: 14 },
+  form: { gap: 10, marginTop: 24 },
+  input: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    color: colors.ink,
+    fontSize: 16,
+    minHeight: 48,
+    paddingHorizontal: 14,
+  },
+  secondary: { alignItems: "center", justifyContent: "center", minHeight: 44 },
 });

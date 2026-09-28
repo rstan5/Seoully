@@ -42,17 +42,19 @@ export function SeoullyButton({
 export function SeoullyChoiceChip({
   label,
   selected,
+  role = "tab",
   onPress,
 }: {
   label: string;
   selected: boolean;
+  role?: "tab" | "checkbox";
   onPress: () => void;
 }) {
   const reduceMotion = useReduceMotion();
   return (
     <Pressable
-      accessibilityRole="tab"
-      accessibilityState={{ selected }}
+      accessibilityRole={role}
+      accessibilityState={role === "checkbox" ? { checked: selected } : { selected }}
       onPress={onPress}
       style={({ pressed }) => [
         styles.choice,

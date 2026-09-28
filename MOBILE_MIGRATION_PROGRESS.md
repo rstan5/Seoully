@@ -12,9 +12,9 @@ security, and Room/Binder data model.
 - Immutable reference checkpoint: `76be07a928ce3e9436031d7324a5cc2b1b0375ed`
 - Recovered from: `d2d779d`
 - Device-QA checkpoint: `ae8e155`
-- Current HEAD: `730c9fc`
-- Current task: Collection / Create / Messages / Add collectible reconstruction — CODE PARITY COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL
-- Overall status: IN PROGRESS — social shell, Search, identity, collection, create, and messages reconstructed from current web Seoully; Room/Binder tactile QA and pending migrations remain
+- Current HEAD: `e444039`
+- Current task: Auth / onboarding chrome reconstruction — CODE PARITY COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL
+- Overall status: IN PROGRESS — social shell through identity, Search, collection, create, messages, auth, and onboarding reconstructed from current web Seoully; Room/Binder tactile QA and pending migrations remain
 
 ## Current Room parity matrix
 
@@ -396,6 +396,8 @@ Do not treat Room or Binder as finished. Visual/tactile/FPS/gesture quality rema
 
 ## Latest validation
 
+- Auth and onboarding chrome reconstruction: mobile TypeScript and Expo lint
+  pass. Visual approval is **not** claimed.
 - Collection, Collectible detail, Create, Add collectible, Messages, and thread
   chrome reconstruction: mobile TypeScript, Expo lint, Expo Doctor 21/21, root
   TypeScript, fixture checks, and `git diff --check` pass. Visual approval is
@@ -544,9 +546,10 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-Search, identity, collection, create, and messages chrome are reconstructed
-in code. Remaining non-device work is onboarding/auth polish and Room/Binder
-surrounding chrome. Room/Binder visual/tactile parity is not finished.
+Primary social, identity, collection, create, messages, auth, and onboarding
+surfaces are reconstructed in code. Remaining non-device work is Room/Binder
+surrounding chrome without restarting the GL/binder architecture.
+Room/Binder visual/tactile parity is not finished.
 
 ### IMPLEMENTATION REMAINING
 - Catalog-set empty-pocket layout if production ever exposes CollectibleSet

@@ -1,13 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   loadNativeOnboarding,
@@ -17,7 +9,12 @@ import {
 } from "../src/api";
 import { ScreenBack } from "../src/components/ScreenBack";
 import { useCopy, useLocale } from "../src/locale";
-import { colors, spacing } from "../src/theme";
+import { colors } from "../src/theme";
+import { BrandMark } from "../src/ui/BrandMark";
+import { SeoullyButton, SeoullyChoiceChip } from "../src/ui/SeoullyControls";
+import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
+import { SeoullyScreen } from "../src/ui/SeoullyScreen";
+import { SeoullyText } from "../src/ui/SeoullyText";
 
 const INTERESTS = ["photocards", "albums", "merch", "everything"] as const;
 
@@ -121,23 +118,17 @@ export default function OnboardingScreen() {
   }
 
   if (loading) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator color={colors.plum} />
-      </View>
-    );
+    return <SeoullyScreen><SeoullyLoadingState label={t.brand} /></SeoullyScreen>;
   }
 
   if (!state) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <SeoullyScreen>
         <View style={styles.centered}>
-          <Text accessibilityRole="alert" style={styles.error}>{error}</Text>
-          <Pressable accessibilityRole="button" onPress={load} style={styles.primary}>
-            <Text style={styles.primaryText}>{t.retry}</Text>
-          </Pressable>
+          <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum}>{error}</SeoullyText>
+          <SeoullyButton label={t.retry} onPress={() => { void load(); }} />
         </View>
-      </SafeAreaView>
+      </SeoullyScreen>
     );
   }
 
@@ -153,109 +144,75 @@ export default function OnboardingScreen() {
       : t.onboardingInterestLead;
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SeoullyScreen>
       <ScrollView contentContainerStyle={styles.container}>
         {editingTastes ? <ScreenBack label={t.back} onPress={() => router.back()} /> : null}
         <View style={styles.topline}>
-          <Text style={styles.brand}>{t.brand} ♡</Text>
+          <BrandMark />
           <Pressable accessibilityRole="button" onPress={toggleLocale} style={styles.language}>
-            <Text style={styles.languageText}>{t.switchLanguage}</Text>
+            <SeoullyText variant="button">{t.switchLanguage}</SeoullyText>
           </Pressable>
         </View>
-        <Text style={styles.step}>{step === "group" ? "1 / 3" : step === "bias" ? "2 / 3" : "3 / 3"}</Text>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.lead}>{lead}</Text>
+        <SeoullyText variant="caption" color={colors.plum} style={styles.step}>
+          {step === "group" ? "1 / 3" : step === "bias" ? "2 / 3" : "3 / 3"}
+        </SeoullyText>
+        <SeoullyText variant="title">{title}</SeoullyText>
+        <SeoullyText variant="secondary" style={styles.lead}>{lead}</SeoullyText>
 
         <View style={styles.chips}>
-          {step === "group" && state.groups.map((group) => {
-            const selected = groupIds.includes(group.id);
-            return (
-              <Pressable
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: selected }}
-                key={group.id}
-                onPress={() => setGroupIds((items) => toggle(items, group.id))}
-                style={[styles.chip, selected && styles.chipSelected]}
-              >
-                <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                  {locale === "ko" ? group.nativeName : group.name}
-                </Text>
-              </Pressable>
-            );
-          })}
-          {step === "bias" && members.map((member) => {
-            const selected = biasIds.includes(member.id);
-            return (
-              <Pressable
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: selected }}
-                key={member.id}
-                onPress={() => setBiasIds((items) => toggle(items, member.id))}
-                style={[styles.chip, selected && styles.chipSelected]}
-              >
-                <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                  {locale === "ko" ? member.nativeName : member.stageName}
-                </Text>
-              </Pressable>
-            );
-          })}
-          {step === "interest" && INTERESTS.map((interest) => {
-            const selected = interests.includes(interest);
-            return (
-              <Pressable
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: selected }}
-                key={interest}
-                onPress={() => setInterests((items) => toggle(items, interest))}
-                style={[styles.chip, selected && styles.chipSelected]}
-              >
-                <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                  {t[interest]}
-                </Text>
-              </Pressable>
-            );
-          })}
+          {step === "group" && state.groups.map((group) => (
+            <SeoullyChoiceChip
+              key={group.id}
+              role="checkbox"
+              selected={groupIds.includes(group.id)}
+              label={locale === "ko" ? group.nativeName : group.name}
+              onPress={() => setGroupIds((items) => toggle(items, group.id))}
+            />
+          ))}
+          {step === "bias" && members.map((member) => (
+            <SeoullyChoiceChip
+              key={member.id}
+              role="checkbox"
+              selected={biasIds.includes(member.id)}
+              label={locale === "ko" ? member.nativeName : member.stageName}
+              onPress={() => setBiasIds((items) => toggle(items, member.id))}
+            />
+          ))}
+          {step === "interest" && INTERESTS.map((interest) => (
+            <SeoullyChoiceChip
+              key={interest}
+              role="checkbox"
+              selected={interests.includes(interest)}
+              label={t[interest]}
+              onPress={() => setInterests((items) => toggle(items, interest))}
+            />
+          ))}
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          disabled={saving || (step === "interest" && interests.length === 0)}
-          onPress={advance}
-          style={[styles.primary, (saving || (step === "interest" && interests.length === 0)) && styles.disabled]}
-        >
-          {saving
-            ? <ActivityIndicator color={colors.surface} />
-            : <Text style={styles.primaryText}>
-                {(step === "group" && groupIds.length === 0) || (step === "bias" && biasIds.length === 0)
-                  ? t.skipForNow
-                  : t.continue}
-              </Text>}
-        </Pressable>
-        {error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
+        <View style={styles.footer}>
+          <SeoullyButton
+            label={saving
+              ? t.saving
+              : ((step === "group" && groupIds.length === 0) || (step === "bias" && biasIds.length === 0)
+                ? t.skipForNow
+                : t.continue)}
+            disabled={saving || (step === "interest" && interests.length === 0)}
+            onPress={() => { void advance(); }}
+          />
+          {error ? <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum}>{error}</SeoullyText> : null}
+        </View>
       </ScrollView>
-    </SafeAreaView>
+    </SeoullyScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.canvas },
-  loading: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.canvas },
-  centered: { flex: 1, justifyContent: "center", padding: spacing.lg },
-  container: { flexGrow: 1, padding: spacing.lg },
+  container: { flexGrow: 1, paddingBottom: 40, paddingHorizontal: 16 },
+  centered: { flex: 1, gap: 16, justifyContent: "center", paddingHorizontal: 16 },
   topline: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
-  brand: { color: colors.ink, fontSize: 20, fontWeight: "700" },
-  language: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.sm },
-  languageText: { color: colors.plum, fontWeight: "700" },
-  step: { color: colors.plum, fontSize: 13, fontWeight: "700", marginTop: spacing.xl },
-  title: { color: colors.ink, fontSize: 34, fontWeight: "700", letterSpacing: -0.8, marginTop: spacing.xs },
-  lead: { color: colors.muted, fontSize: 16, lineHeight: 23, marginTop: spacing.sm },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.xl },
-  chip: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 999, borderWidth: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  chipSelected: { backgroundColor: colors.plum, borderColor: colors.plum },
-  chipText: { color: colors.ink, fontSize: 15, fontWeight: "600" },
-  chipTextSelected: { color: colors.surface },
-  primary: { alignItems: "center", backgroundColor: colors.plum, borderRadius: 16, justifyContent: "center", minHeight: 54, marginTop: "auto" },
-  primaryText: { color: colors.surface, fontSize: 16, fontWeight: "700" },
-  disabled: { opacity: 0.45 },
-  error: { color: colors.plum, lineHeight: 20, marginTop: spacing.md, textAlign: "center" },
+  language: { justifyContent: "center", minHeight: 44, paddingHorizontal: 4 },
+  step: { marginTop: 24 },
+  lead: { marginTop: 6, maxWidth: 320 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 24 },
+  footer: { gap: 12, marginTop: "auto", paddingTop: 24 },
 });

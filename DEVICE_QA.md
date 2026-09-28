@@ -113,6 +113,16 @@ Check on the physical iPhone:
 - [ ] Create photo/caption and Add crop still complete
 - [ ] Messages rows and thread composer avoid keyboard overlap
 
+## Physical iPhone — Auth / onboarding
+
+- Date: 2026-09-27
+- Branch: `mobile-native`
+
+### AUTH / ONBOARDING: AWAITING PHYSICAL DEVICE VISUAL APPROVAL
+- [ ] Sign-in shows BrandMark, not a giant text wordmark
+- [ ] Onboarding chips and continue/skip still save production tastes
+- [ ] Email confirmation still returns into the app
+
 ## Remaining physical checks
 
 - [ ] iOS launch and safe-area layout

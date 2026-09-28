@@ -12,9 +12,9 @@ security, and Room/Binder data model.
 - Immutable reference checkpoint: `76be07a928ce3e9436031d7324a5cc2b1b0375ed`
 - Recovered from: `d2d779d`
 - Device-QA checkpoint: `ae8e155`
-- Current HEAD: Room import-time crash fix on `mobile-native`
-- Current task: physical iPhone Room startup crash
-- Overall status: IN PROGRESS — Room/Binder product behavior still closing; device QA still pending
+- Current HEAD: `1910bfc`
+- Current task: Feed visual reconstruction — AWAITING PHYSICAL DEVICE VISUAL APPROVAL
+- Overall status: IN PROGRESS — native design system + Feed rebuilt from web social-app.css; user must approve Feed on a physical iPhone before Search or other screens are restyled
 
 ## Current Room parity matrix
 
@@ -372,9 +372,10 @@ Do not treat Room or Binder as finished. Visual/tactile/FPS/gesture quality rema
   and Android behavior require physical-device validation and are not claimed yet.
 - Native onboarding layout, keyboard behavior, email-confirmation return, and locale
   restoration are implementation-complete but AWAITING DEVICE QA.
-- `20260930000000_native_onboarding_progress.sql` must be applied through the normal
-  migration process before the new onboarding endpoint is deployed. It has not been
-  applied to production by this migration work.
+- `20260930000000_native_onboarding_progress.sql` was applied to production Seoully
+  on 2026-09-27 (column-only, existing rows `done`). `GET /api/mobile/onboarding`
+  can now resolve. Device confirmation of the post-apply onboarding path remains
+  AWAITING DEVICE QA.
 - `20261001000000_direct_messages.sql` must be reviewed and applied through the normal
   migration process before native Messages can be used. It has not been applied to
   production, and no production messages or conversations were created during testing.
@@ -394,6 +395,10 @@ Do not treat Room or Binder as finished. Visual/tactile/FPS/gesture quality rema
 - Do not change Room/Binder until the native renderer proof is viable.
 
 ## Latest validation
+
+- Feed visual reconstruction (this pass): mobile TypeScript, Expo lint, Expo Doctor
+  21/21, iOS Metro export, root TypeScript, fixture checks, and `git diff --check`
+  pass. Visual approval is **not** claimed.
 
 Pre-migration checkpoint validation passed: typecheck, fixture checks, and diff check.
 Mobile foundation TypeScript passes and Expo config resolves. After adding the Expo
@@ -538,13 +543,16 @@ classified below. Do not treat Room/Binder visual/tactile parity as finished.
 - In-world 3D Binder open that stays inside the Room GL scene
 
 ### AWAITING DEVICE QA
+- **FEED VISUAL RECONSTRUCTION: AWAITING PHYSICAL DEVICE VISUAL APPROVAL**
+  Do not treat Feed as visually complete from TypeScript/Expo/lint. The user
+  reviews the reconstructed Feed and tab chrome on a physical iPhone first.
+  Do not start Search restyle until that approval.
 - Physical iPhone Expo Go relaunch after the Room import-time crash fix
 - Room GL canvas mount, FPS, texture memory, raycast hits, drag/orbit feel
 - Binder swipe, cover open/close, card lift springs, page perspective
 - Camera, crop, keyboard, safe areas, Android
 
 ### HUMAN REVIEW REQUIRED
-- `20260930000000_native_onboarding_progress.sql`
 - `20261001000000_direct_messages.sql`
 - `20261002000000_native_room_theme.sql`
 - Durable profiles avatar/media contract

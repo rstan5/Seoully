@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Stack } from "expo-router";
 import * as Linking from "expo-linking";
 import { StatusBar } from "expo-status-bar";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { LocaleProvider } from "../src/locale";
 import { supabase } from "../src/supabase";
 
@@ -20,9 +21,11 @@ export default function RootLayout() {
     return () => subscription.remove();
   }, []);
   return (
-    <LocaleProvider>
-      <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false, animation: "fade" }} />
-    </LocaleProvider>
+    <SafeAreaProvider>
+      <LocaleProvider>
+        <StatusBar style="dark" />
+        <Stack screenOptions={{ headerShown: false, animation: "fade" }} />
+      </LocaleProvider>
+    </SafeAreaProvider>
   );
 }

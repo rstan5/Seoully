@@ -57,6 +57,28 @@ retest this specific failure.
 - [ ] Feed / Search / Profile still open if Room is not visited
 - [ ] SafeAreaView deprecation is unrelated and still pending layout QA
 
+## Physical iPhone — Feed visual reconstruction
+
+- Date: 2026-09-27
+- Branch: `mobile-native`
+- Scope: native design-system tokens/primitives + Feed + tab bar only
+- Web references: `src/design/social-app.css`, `CollectorFeed`, `ProductionFeed`,
+  `ProductionPostCard`, `SocialShell`, `SocialNav`, `SocialIcons`, `BrandMark`
+- Production data path unchanged: `GET /api/mobile/feed` with bearer session
+
+### FEED VISUAL RECONSTRUCTION: AWAITING PHYSICAL DEVICE VISUAL APPROVAL
+
+Do not mark this approved from TypeScript, Expo Doctor, or Metro export.
+
+Check on the physical iPhone:
+
+- [ ] Feed looks like Seoully (cream paper, brand mark, post hierarchy) — not a prototype list
+- [ ] Empty Feed is a finished product state, not a giant heading over leftover copy
+- [ ] Posts show collector identity, media prominence, like/comment, caption
+- [ ] Tab bar uses Seoully icons and active treatment; Create is the raised plus
+- [ ] Safe area, scroll, pull-to-refresh, like, comment, collector tap still work
+- [ ] Search / Room / Create / Messages / Profile *contents* were not restyled this pass
+
 ## Remaining physical checks
 
 - [ ] iOS launch and safe-area layout

@@ -183,7 +183,20 @@ export async function contributeCatalogItem(input: { name: string; kind: string;
 }
 
 export type NativeSocialAuthor = { userId: string; displayName: string; handle: string };
-export type NativeFeedPost = { id: string; caption: string; createdAt: string; author: NativeSocialAuthor; likeCount: number; commentCount: number; likedByMe: boolean; media: { url: string; mediaType: string }[] };
+export type NativeCollectibleTag = { templateId: string; name: string; kind: string };
+export type NativeFeedPost = {
+  id: string;
+  caption: string;
+  createdAt: string;
+  location?: string | null;
+  author: NativeSocialAuthor;
+  likeCount: number;
+  commentCount: number;
+  likedByMe: boolean;
+  media: { url: string; mediaType: string }[];
+  taggedUsers?: NativeSocialAuthor[];
+  taggedCollectibles?: NativeCollectibleTag[];
+};
 export type NativePostComment = { id: string; postId: string; body: string; createdAt: string; author: NativeSocialAuthor };
 export type NativeFeedPage = { items: NativeFeedPost[]; nextCursor: string | null };
 export async function loadFeed(cursor?: string): Promise<NativeFeedPage> {

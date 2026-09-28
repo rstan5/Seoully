@@ -10,7 +10,7 @@ export function RetryNotice({ message, retryLabel, onRetry }: { message: string;
 
 const styles = StyleSheet.create({
   notice: { alignItems: "flex-start", backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 14, borderWidth: 1, gap: spacing.sm, marginTop: spacing.md, padding: spacing.md },
-  message: { color: colors.plum, lineHeight: 20 },
-  button: { borderColor: colors.plum, borderRadius: 10, borderWidth: 1, minHeight: 40, justifyContent: "center", paddingHorizontal: spacing.md },
-  label: { color: colors.plum, fontWeight: "700" },
+  message: { color: colors.ink, lineHeight: 20 },
+  button: { backgroundColor: colors.lilacSoft, borderColor: colors.lilac, borderRadius: 12, borderWidth: 1, justifyContent: "center", minHeight: 40, paddingHorizontal: spacing.md },
+  label: { color: colors.plum, fontWeight: "600" },
 });

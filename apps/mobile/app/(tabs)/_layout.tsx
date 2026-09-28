@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
 import { loadNativeOnboarding } from "../../src/api";
 import { useCopy } from "../../src/locale";
 import { supabase } from "../../src/supabase";
 import { colors } from "../../src/theme";
+import { SeoullyTabBar } from "../../src/ui/SeoullyTabBar";
+import { SeoullyText } from "../../src/ui/SeoullyText";
 
 type Gate = "loading" | "ready" | "auth" | "onboarding" | "error";
 
@@ -46,20 +48,25 @@ export default function TabsLayout() {
   if (gate === "error") {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.canvas, padding: 24 }}>
-        <Text style={{ color: colors.plum, textAlign: "center" }}>{t.onboardingUnavailable}</Text>
+        <SeoullyText variant="secondary" color={colors.plum} style={{ textAlign: "center" }}>{t.onboardingUnavailable}</SeoullyText>
         <Pressable accessibilityRole="button" onPress={checkGate} style={{ marginTop: 18, minHeight: 44, justifyContent: "center" }}>
-          <Text style={{ color: colors.plum, fontWeight: "700" }}>{t.retry}</Text>
+          <SeoullyText variant="button" color={colors.plum}>{t.retry}</SeoullyText>
         </Pressable>
       </View>
     );
   }
 
-  return <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.plum, tabBarInactiveTintColor: colors.muted, tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border } }}>
-    <Tabs.Screen name="index" options={{ title: t.feed }} />
-    <Tabs.Screen name="search" options={{ title: t.search }} />
-    <Tabs.Screen name="room" options={{ title: t.room }} />
-    <Tabs.Screen name="create" options={{ title: t.create }} />
-    <Tabs.Screen name="messages" options={{ title: t.messages }} />
-    <Tabs.Screen name="profile" options={{ title: t.profile }} />
-  </Tabs>;
+  return (
+    <Tabs
+      tabBar={(props) => <SeoullyTabBar {...props} />}
+      screenOptions={{ headerShown: false, tabBarShowLabel: false }}
+    >
+      <Tabs.Screen name="index" options={{ title: t.feed, tabBarAccessibilityLabel: t.feed }} />
+      <Tabs.Screen name="search" options={{ title: t.search, tabBarAccessibilityLabel: t.search }} />
+      <Tabs.Screen name="room" options={{ title: t.room, tabBarAccessibilityLabel: t.room }} />
+      <Tabs.Screen name="create" options={{ title: t.create, tabBarAccessibilityLabel: t.create }} />
+      <Tabs.Screen name="messages" options={{ title: t.messages, tabBarAccessibilityLabel: t.messages }} />
+      <Tabs.Screen name="profile" options={{ title: t.profile, tabBarAccessibilityLabel: t.profile }} />
+    </Tabs>
+  );
 }

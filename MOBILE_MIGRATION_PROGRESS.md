@@ -557,6 +557,10 @@ Room/Binder visual/tactile parity is not finished.
 - In-world 3D Binder open that stays inside the Room GL scene
 
 ### AWAITING DEVICE QA
+- **AUTH / ONBOARDING: CODE PARITY COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL**
+  Sign-in and taste onboarding now use BrandMark, 22px titles, and lilac chips
+  instead of giant generic headings. Email confirmation return and keyboard
+  behavior remain device checks.
 - **COLLECTION / CREATE / MESSAGES: CODE PARITY COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL**
   Owned/wishlist now use shelf rows instead of giant catalog cards. Collectible
   detail keeps personal photocard media as the face. Create/Add and Messages

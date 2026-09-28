@@ -81,6 +81,26 @@ Check on the physical iPhone:
 - [ ] Safe area, scroll, pull-to-refresh, like, comment, collector tap still work
 - [ ] Search / Room / Create / Messages / Profile *contents* were not restyled this pass
 
+## Physical iPhone — Search / Explore + identity profiles
+
+- Date: 2026-09-27
+- Branch: `mobile-native`
+- Scope: Search destination IA, own Profile identity card, public collector profile
+- Web references: `CollectorSearch`, `CollectorProfile`, `social-app.css` `.s-search` / `.s-explore` / `.s-profile`
+
+### SEARCH / EXPLORE: AWAITING PHYSICAL DEVICE VISUAL APPROVAL
+- [ ] Home shows Search / Explore, lede, field, and five destination cards
+- [ ] People / Rooms / Collectibles / Groups return real production results
+- [ ] Rooms Enter Room opens the established collector Room path
+- [ ] Posts destination stays empty until a production post-search exists
+- [ ] Keyboard, clear, back-to-destinations, and locale still work
+
+### PROFILE / COLLECTOR: AWAITING PHYSICAL DEVICE VISUAL APPROVAL
+- [ ] Own Profile looks like identity, not a settings form
+- [ ] Counts, chips, Enter Room, posts/owned/wishlist shelves are readable
+- [ ] Public collector Follow / Message / Enter Room still work
+- [ ] Edit Profile remains a separate screen and still saves
+
 ## Remaining physical checks
 
 - [ ] iOS launch and safe-area layout

@@ -12,9 +12,9 @@ security, and Room/Binder data model.
 - Immutable reference checkpoint: `76be07a928ce3e9436031d7324a5cc2b1b0375ed`
 - Recovered from: `d2d779d`
 - Device-QA checkpoint: `ae8e155`
-- Current HEAD: `e246471`
-- Current task: Feed visual reconstruction — AWAITING PHYSICAL DEVICE VISUAL APPROVAL — CORRECTION PASS 01
-- Overall status: IN PROGRESS — native design system + Feed rebuilt from web social-app.css; user must approve Feed on a physical iPhone before Search or other screens are restyled
+- Current HEAD: `28b4fed` plus uncommitted Search/Profile reconstruction
+- Current task: Search / Explore + identity Profile/collector — CODE PARITY COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL
+- Overall status: IN PROGRESS — Feed correction remains device-pending; Search/Explore and identity profiles reconstructed from current web Seoully
 
 ## Current Room parity matrix
 
@@ -396,6 +396,9 @@ Do not treat Room or Binder as finished. Visual/tactile/FPS/gesture quality rema
 
 ## Latest validation
 
+- Search / Explore + identity Profile/collector reconstruction: mobile
+  TypeScript, Expo lint, Expo Doctor 21/21, iOS Metro export, root TypeScript,
+  fixture checks, and `git diff --check` pass. Visual approval is **not** claimed.
 - Feed correction pass 01: mobile TypeScript, Expo lint, Expo Doctor 21/21, iOS
   Metro export, root TypeScript, fixture checks, and `git diff --check` pass.
   Visual approval is **not** claimed.
@@ -537,8 +540,10 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-Room/Binder non-device owner loop is largely in place. Remaining work is
-classified below. Do not treat Room/Binder visual/tactile parity as finished.
+Search/Explore and identity profiles are reconstructed in code. Continue the
+inner parity loop through Collection, Collectible detail, Create, Messages,
+and remaining unfinished chrome. Room/Binder visual/tactile parity is not
+finished.
 
 ### IMPLEMENTATION REMAINING
 - Catalog-set empty-pocket layout if production ever exposes CollectibleSet
@@ -546,12 +551,21 @@ classified below. Do not treat Room/Binder visual/tactile parity as finished.
 - In-world 3D Binder open that stays inside the Room GL scene
 
 ### AWAITING DEVICE QA
+- **SEARCH / EXPLORE: CODE PARITY COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL**
+  Native Search now follows web destination IA (People, Rooms, Posts,
+  Collectibles, Groups & Members). Rooms use production discovery + collector
+  search and Enter Room. Posts have no production search API, so a query still
+  shows the honest empty state. Keyboard, suggestion highlight, and result
+  density need a phone.
+- **PROFILE / COLLECTOR: CODE PARITY COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL**
+  Own Profile is an identity card (avatar, counts, bio, chips, Enter Room,
+  posts/owned/wishlist shelves) instead of an always-on settings form. Public
+  collector profiles share that chrome with Follow / Message / Enter Room.
 - **FEED VISUAL RECONSTRUCTION: AWAITING PHYSICAL DEVICE VISUAL APPROVAL — CORRECTION PASS 01**
   First device pass was not approved. Room was removed from the primary tab bar
   (web SocialNav is Feed / Search / Create / Messages / Profile). Empty Feed
-  matched production following-only data (one public post; signed-in account
-  had no eligible followed/authored items). Header/locale/empty-state corrections
-  await a second physical review. Do not start Search.
+  matched production following-only data. Header/locale/empty-state corrections
+  await a second physical review.
 - Physical iPhone Expo Go relaunch after the Room import-time crash fix
 - Room GL canvas mount, FPS, texture memory, raycast hits, drag/orbit feel
 - Binder swipe, cover open/close, card lift springs, page perspective

@@ -258,7 +258,21 @@ export async function createNativePost(uri: string, caption: string, mimeType = 
   return response.json() as Promise<{ post: NativeFeedPost }>;
 }
 
-export async function updateNativeProfile(input: { displayName?: string; bio?: string; tagline?: string }) {
+export type NativeIdentity = {
+  user: { id: string; handle: string; displayName: string; joinedAt: string };
+  profile: {
+    tagline: string;
+    bio: string;
+    location?: string;
+    favoriteGroupIds: string[];
+    biasMemberIds: string[];
+    favoriteEraIds: string[];
+    collectorInterests: string[];
+    collectorType?: string;
+  };
+};
+
+export async function updateNativeProfile(input: { displayName?: string; bio?: string; tagline?: string; location?: string }) {
   const { data } = await supabase.auth.getSession(); const accessToken = data.session?.access_token;
   if (!baseUrl || !accessToken) throw new Error("unauthenticated");
   const response = await fetch(`${baseUrl}/api/mobile/profile`, { method: "PATCH", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify(input) });
@@ -352,8 +366,16 @@ export type NativeCollectibleDiscovery = {
   rankScore: number;
   reasons: NativeDiscoveryReason[];
 };
+export type NativeRoomDiscovery = {
+  roomId: string;
+  collector: { userId: string; handle: string; displayName: string };
+  rankScore: number;
+  displayedHoldingCount: number;
+  relevantDisplayedCount: number;
+  reasons: NativeDiscoveryReason[];
+};
 
-async function loadDiscovery<T>(surface: "collectors" | "collectibles"): Promise<T[]> {
+async function loadDiscovery<T>(surface: "collectors" | "collectibles" | "rooms"): Promise<T[]> {
   const accessToken = await mobileAccessToken();
   const response = await fetch(`${baseUrl}/api/mobile/discovery/${surface}`, {
     method: "POST",
@@ -374,6 +396,10 @@ export function loadCollectorDiscovery() {
 
 export function loadCollectibleDiscovery() {
   return loadDiscovery<NativeCollectibleDiscovery>("collectibles");
+}
+
+export function loadRoomDiscovery() {
+  return loadDiscovery<NativeRoomDiscovery>("rooms");
 }
 
 export type NativeConversation = {

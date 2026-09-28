@@ -1,19 +1,39 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ActivityIndicator, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
-import { ensureConversation, loadCollectorPosts, loadCollectorProfile, setCollectorFollowing, setPostLiked, type NativeCollectorProfile, type NativeFeedPost } from "../src/api";
+import { Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import {
+  ensureConversation,
+  loadCollectorPosts,
+  loadCollectorProfile,
+  setCollectorFollowing,
+  setPostLiked,
+  type NativeCollectorProfile,
+  type NativeFeedPost,
+} from "../src/api";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
-import { useCopy } from "../src/locale";
-import { colors, spacing } from "../src/theme";
+import { useCopy, useLocale } from "../src/locale";
+import { colors } from "../src/theme";
+import { SeoullyButton, SeoullyChip, SeoullyShelf } from "../src/ui/SeoullyControls";
+import { SeoullyEmptyState } from "../src/ui/SeoullyEmptyState";
+import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
+import {
+  formatCollectingSince,
+  SeoullyProfileHead,
+  SeoullyProfileMeta,
+} from "../src/ui/SeoullyProfile";
+import { SeoullyScreen } from "../src/ui/SeoullyScreen";
+import { SeoullyText } from "../src/ui/SeoullyText";
 
 export default function CollectorScreen() {
   const copy = useCopy();
+  const { locale, toggleLocale } = useLocale();
   const router = useRouter();
   const { userId = "" } = useLocalSearchParams<{ userId?: string }>();
   const [profile, setProfile] = useState<NativeCollectorProfile | null>(null);
   const [following, setFollowing] = useState(false);
   const [followers, setFollowers] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
   const [posts, setPosts] = useState<NativeFeedPost[]>([]);
   const [postCursor, setPostCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,6 +52,7 @@ export default function CollectorScreen() {
       setProfile(result.profile);
       setFollowing(result.follow.following);
       setFollowers(result.follow.followers);
+      setFollowingCount(result.follow.followingCount);
       setPosts(page.items);
       setPostCursor(page.nextCursor);
       setError(null);
@@ -42,6 +63,7 @@ export default function CollectorScreen() {
       setLoading(false);
     }
   }, [copy.collectorUnavailable, userId]);
+
   useEffect(() => {
     const task = setTimeout(() => { void refresh(); }, 0);
     return () => clearTimeout(task);
@@ -68,8 +90,9 @@ export default function CollectorScreen() {
     setFollowing(next);
     setFollowers((count) => Math.max(0, count + (next ? 1 : -1)));
     setBusy(true);
-    try { await setCollectorFollowing(userId, next); }
-    catch {
+    try {
+      await setCollectorFollowing(userId, next);
+    } catch {
       setFollowing(!next);
       setFollowers((count) => Math.max(0, count + (next ? -1 : 1)));
     } finally {
@@ -90,73 +113,141 @@ export default function CollectorScreen() {
     }
   }
 
-  return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.container}>
-    <ScreenBack label={copy.back} onPress={() => router.back()} />
-    {loading ? <ActivityIndicator color={colors.plum} /> : null}
-    {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
-    {profile ? <>
-      <Text style={styles.title}>{profile.user.displayName}</Text>
-      <Text style={styles.handle}>@{profile.user.handle}</Text>
-      {profile.profile.tagline ? <Text style={styles.tagline}>{profile.profile.tagline}</Text> : null}
-      {profile.profile.bio ? <Text style={styles.bio}>{profile.profile.bio}</Text> : null}
-      <View style={styles.stats}>
-        <Text style={styles.stat}>{followers} {copy.followers}</Text>
-        <Text style={styles.stat}>{profile.followingCount} {copy.following.toLowerCase()}</Text>
-        {profile.collectionSummary ? <Text style={styles.stat}>{profile.collectionSummary.holdingCount} {copy.holdings}</Text> : null}
-        {profile.collectionSummary ? <Text style={styles.stat}>{profile.collectionSummary.groupCount} {copy.groups}</Text> : null}
+  return (
+    <SeoullyScreen>
+      <View style={styles.top}>
+        <ScreenBack label={copy.back} onPress={() => router.back()} />
+        <Pressable accessibilityRole="button" onPress={toggleLocale} style={styles.lang}>
+          <SeoullyText variant="button">{copy.switchLanguage}</SeoullyText>
+        </Pressable>
       </View>
-      {profile.roomAvailable ? <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/collector-room", params: { userId } })}><Text style={styles.roomNote}>{copy.viewCollectorRoom}</Text></Pressable> : null}
-      <View style={styles.actions}>
-        <Pressable accessibilityRole="button" accessibilityState={{ selected: following }} disabled={busy} onPress={toggleFollow} style={[styles.button, following && styles.secondary]}><Text style={[styles.buttonText, following && styles.secondaryText]}>{following ? copy.following : copy.follow}</Text></Pressable>
-        <Pressable accessibilityRole="button" disabled={busy} onPress={message} style={styles.button}><Text style={styles.buttonText}>{copy.messageCollector}</Text></Pressable>
-      </View>
-      <Text style={styles.section}>{copy.collectorPosts}</Text>
-      {postsError ? <RetryNotice message={postsError} retryLabel={copy.retry} onRetry={refresh} /> : null}
-      {posts.map((post) => <CollectorPost key={post.id} copy={copy} post={post} onChange={(next) => setPosts((current) => current.map((item) => item.id === next.id ? next : item))} />)}
-      {!loading && posts.length === 0 && !postsError ? <Text style={styles.empty}>{copy.collectorPostsEmpty}</Text> : null}
-      {postCursor ? <Pressable accessibilityRole="button" disabled={loadingMore} onPress={() => { void loadMorePosts(); }} style={styles.more}><Text style={styles.moreText}>{loadingMore ? copy.saving : copy.loadMorePosts}</Text></Pressable> : null}
-    </> : null}
-  </ScrollView></SafeAreaView>;
+      {loading && !profile ? <SeoullyLoadingState label={copy.profile} /> : null}
+      {error ? <View style={styles.notice}><RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /></View> : null}
+      {profile ? (
+        <ScrollView contentContainerStyle={styles.container}>
+          <View style={styles.card}>
+            <SeoullyProfileHead
+              name={profile.user.displayName}
+              handle={profile.user.handle}
+              counts={[
+                { value: posts.length, label: copy.profilePosts },
+                { value: followers, label: copy.profileFollowers },
+                { value: followingCount, label: copy.profileFollowingCount },
+                { value: profile.collectionSummary?.holdingCount ?? 0, label: copy.profileCollected },
+              ]}
+            />
+            <SeoullyProfileMeta
+              bio={profile.profile.bio || profile.profile.tagline}
+              location={profile.profile.location}
+              since={profile.user.joinedAt ? copy.profileCollectingSince.replace("{date}", formatCollectingSince(profile.user.joinedAt, locale)) : undefined}
+            />
+            {profile.profile.collectorInterests.length > 0 ? (
+              <View style={styles.chips}>
+                {profile.profile.collectorInterests.map((interest) => (
+                  <SeoullyChip key={interest} label={interest} />
+                ))}
+              </View>
+            ) : null}
+            <View style={styles.actions}>
+              <SeoullyButton
+                label={following ? copy.following : copy.follow}
+                variant={following ? "ghost" : "primary"}
+                disabled={busy}
+                onPress={() => { void toggleFollow(); }}
+              />
+              <SeoullyButton label={copy.messageCollector} variant="ghost" disabled={busy} onPress={() => { void message(); }} />
+            </View>
+            <SeoullyButton
+              label={copy.viewCollectorRoom}
+              variant="enter"
+              onPress={() => router.push({ pathname: "/collector-room", params: { userId } })}
+            />
+          </View>
+
+          <SeoullyShelf title={copy.profilePostsTitle} empty={posts.length === 0 && !postsError ? copy.profileEmptyPosts : undefined}>
+            {postsError ? <RetryNotice message={postsError} retryLabel={copy.retry} onRetry={refresh} /> : null}
+            {posts.map((post) => (
+              <CollectorPost
+                key={post.id}
+                copy={copy}
+                post={post}
+                onChange={(next) => setPosts((current) => current.map((item) => item.id === next.id ? next : item))}
+              />
+            ))}
+            {postCursor ? (
+              <Pressable accessibilityRole="button" disabled={loadingMore} onPress={() => { void loadMorePosts(); }} style={styles.more}>
+                <SeoullyText variant="button" color={colors.plum}>{loadingMore ? copy.saving : copy.loadMorePosts}</SeoullyText>
+              </Pressable>
+            ) : null}
+          </SeoullyShelf>
+
+          <SeoullyText variant="secondary" style={styles.connect}>
+            {copy.profileConnect.replace("{name}", profile.user.displayName)}
+          </SeoullyText>
+        </ScrollView>
+      ) : !loading && !error ? <SeoullyEmptyState align="start" body={copy.collectorUnavailable} /> : null}
+    </SeoullyScreen>
+  );
 }
 
-function CollectorPost({ post, copy, onChange }: { post: NativeFeedPost; copy: ReturnType<typeof useCopy>; onChange: (post: NativeFeedPost) => void }) {
+function CollectorPost({
+  post,
+  copy,
+  onChange,
+}: {
+  post: NativeFeedPost;
+  copy: ReturnType<typeof useCopy>;
+  onChange: (post: NativeFeedPost) => void;
+}) {
   const image = post.media.find((item) => item.mediaType === "image");
   async function toggleLike() {
     const nextLiked = !post.likedByMe;
     const optimistic = { ...post, likedByMe: nextLiked, likeCount: Math.max(0, post.likeCount + (nextLiked ? 1 : -1)) };
     onChange(optimistic);
-    try { await setPostLiked(post.id, nextLiked); }
-    catch { onChange(post); }
+    try {
+      await setPostLiked(post.id, nextLiked);
+    } catch {
+      onChange(post);
+    }
   }
-  return <View style={styles.post}>
-    {image ? <Image accessibilityIgnoresInvertColors source={{ uri: image.url }} style={styles.media} /> : null}
-    <Text style={styles.caption}>{post.caption || copy.sharedMoment}</Text>
-    <Pressable accessibilityRole="button" accessibilityState={{ selected: post.likedByMe }} onPress={() => { void toggleLike(); }} style={styles.like}><Text style={styles.likeText}>{post.likedByMe ? copy.unlike : copy.like} · {post.likeCount}</Text></Pressable>
-  </View>;
+  const likeLabel = post.likeCount === 1 ? copy.likeOne : copy.likeMany.replace("{count}", String(post.likeCount));
+  return (
+    <View style={styles.post}>
+      {image ? <Image accessibilityIgnoresInvertColors source={{ uri: image.url }} style={styles.media} /> : null}
+      <Pressable accessibilityRole="button" accessibilityState={{ selected: post.likedByMe }} onPress={() => { void toggleLike(); }}>
+        <SeoullyText variant="handle">{post.likedByMe ? copy.unlike : copy.like}</SeoullyText>
+      </Pressable>
+      {post.likeCount > 0 ? <SeoullyText variant="handle">{likeLabel}</SeoullyText> : null}
+      <SeoullyText variant="body">
+        <SeoullyText variant="handle">{post.author.handle}</SeoullyText>
+        {"  "}
+        {post.caption || copy.sharedMoment}
+      </SeoullyText>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  safe: { backgroundColor: colors.canvas, flex: 1 },
-  container: { padding: spacing.lg, paddingBottom: 80 },
-  title: { color: colors.ink, fontSize: 32, fontWeight: "700" },
-  handle: { color: colors.plum, fontSize: 16, marginTop: spacing.xs },
-  tagline: { color: colors.ink, fontSize: 18, fontWeight: "600", marginTop: spacing.lg },
-  bio: { color: colors.muted, fontSize: 16, lineHeight: 23, marginTop: spacing.sm },
-  stats: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.lg },
-  stat: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 999, borderWidth: 1, color: colors.ink, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
-  roomNote: { color: colors.muted, fontSize: 13, marginTop: spacing.md },
-  actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.xl },
-  button: { alignItems: "center", backgroundColor: colors.plum, borderColor: colors.plum, borderRadius: 14, borderWidth: 1, flex: 1, justifyContent: "center", minHeight: 50 },
-  buttonText: { color: colors.surface, fontWeight: "700" },
-  secondary: { backgroundColor: colors.surface },
-  secondaryText: { color: colors.plum },
-  section: { color: colors.ink, fontSize: 20, fontWeight: "700", marginTop: spacing.xl },
-  empty: { color: colors.muted, marginTop: spacing.md },
-  post: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, marginTop: spacing.md, overflow: "hidden" },
-  media: { aspectRatio: 1, width: "100%" },
-  caption: { color: colors.ink, fontSize: 15, padding: spacing.md },
-  like: { paddingHorizontal: spacing.md, paddingBottom: spacing.md },
-  likeText: { color: colors.plum, fontWeight: "700" },
-  more: { alignItems: "center", borderColor: colors.plum, borderRadius: 12, borderWidth: 1, justifyContent: "center", marginTop: spacing.md, minHeight: 44 },
-  moreText: { color: colors.plum, fontWeight: "700" },
+  top: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+  },
+  lang: { justifyContent: "center", minHeight: 44, paddingHorizontal: 4 },
+  container: { paddingBottom: 48 },
+  card: { paddingHorizontal: 16, paddingTop: 8 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
+  actions: { flexDirection: "row", gap: 8, marginTop: 14 },
+  notice: { paddingHorizontal: 16, paddingTop: 12 },
+  connect: { marginTop: 20, paddingHorizontal: 16 },
+  post: {
+    borderBottomColor: colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 8,
+    paddingBottom: 16,
+    paddingTop: 12,
+  },
+  media: { aspectRatio: 4 / 3, borderRadius: 14, width: "100%" },
+  more: { alignItems: "center", justifyContent: "center", minHeight: 44, marginTop: 8 },
 });

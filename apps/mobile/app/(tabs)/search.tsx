@@ -1,79 +1,133 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import {
-  ensureConversation,
   loadAllMyWishlist,
-  loadCollectibleDiscovery,
-  loadCollectorDiscovery,
+  loadRoomDiscovery,
   searchCatalog,
   searchCollectors,
   setWishlistTemplate,
   type NativeCatalogTemplate,
+  type NativeRoomDiscovery,
   type NativeSearchUser,
-  type NativeCollectibleDiscovery,
-  type NativeCollectorDiscovery,
 } from "../../src/api";
-import { collectibleKindLabel } from "../../src/i18n";
-import { useCopy } from "../../src/locale";
 import { KeyboardScreen } from "../../src/components/KeyboardScreen";
 import { RetryNotice } from "../../src/components/RetryNotice";
+import { collectibleKindLabel, type MobileCopy } from "../../src/i18n";
+import { useCopy, useLocale } from "../../src/locale";
 import { colors, spacing } from "../../src/theme";
+import { IconCard, IconDoor, IconGroup, IconPhoto, IconUser } from "../../src/ui/icons";
+import { SeoullyAvatar } from "../../src/ui/SeoullyAvatar";
+import { SeoullyEmptyState } from "../../src/ui/SeoullyEmptyState";
+import { SeoullyHeader } from "../../src/ui/SeoullyHeader";
+import { SeoullyLoadingState } from "../../src/ui/SeoullyLoadingState";
+import { SeoullyScreen } from "../../src/ui/SeoullyScreen";
+import {
+  SeoullyCollectibleMark,
+  SeoullyExploreDest,
+  SeoullyExploreRoom,
+  SeoullySearchField,
+  SeoullySearchRow,
+} from "../../src/ui/SeoullySearch";
+import { SeoullyText } from "../../src/ui/SeoullyText";
 
+const SEARCH_STATE_KEY = "seoully.mobile.search-state.v2";
 const SEARCH_QUERY_KEY = "seoully.mobile.search-query.v1";
+const DEBOUNCE_MS = 200;
+
+export const EXPLORE_DESTINATIONS = ["people", "rooms", "posts", "collectibles", "entities"] as const;
+export type ExploreDestination = (typeof EXPLORE_DESTINATIONS)[number];
+
+type SearchEntity = {
+  id: string;
+  kind: "group" | "member";
+  title: string;
+  subtitle?: string;
+  query: string;
+};
+
+function looksLikeHandle(query: string) {
+  return /^@?[a-z0-9._]{2,}$/i.test(query.trim());
+}
+
+function matchesQuery(value: string, query: string) {
+  const needle = query.trim().replace(/^@+/, "").toLowerCase();
+  return value.toLowerCase().includes(needle);
+}
+
+function entitiesFromCatalog(items: NativeCatalogTemplate[]): SearchEntity[] {
+  const groups = new Map<string, SearchEntity>();
+  const members = new Map<string, SearchEntity>();
+  for (const item of items) {
+    if (item.groupId && item.groupName && !groups.has(item.groupId)) {
+      groups.set(item.groupId, {
+        id: item.groupId,
+        kind: "group",
+        title: item.groupName,
+        query: item.groupName,
+      });
+    }
+    if (item.memberId && item.memberName && !members.has(item.memberId)) {
+      members.set(item.memberId, {
+        id: item.memberId,
+        kind: "member",
+        title: item.memberName,
+        subtitle: item.groupName,
+        query: item.memberName,
+      });
+    }
+  }
+  return [...groups.values(), ...members.values()].slice(0, 24);
+}
+
+function roomsForQuery(rooms: NativeRoomDiscovery[], people: NativeSearchUser[], query: string) {
+  const discovered = rooms.filter((room) => (
+    matchesQuery(room.collector.displayName, query) || matchesQuery(room.collector.handle, query)
+  ));
+  const byUser = new Map(discovered.map((room) => [room.collector.userId, room]));
+  for (const person of people) {
+    if (byUser.has(person.userId)) continue;
+    if (!matchesQuery(person.displayName, query) && !matchesQuery(person.handle, query)) continue;
+    byUser.set(person.userId, {
+      roomId: person.userId,
+      collector: person,
+      rankScore: 0,
+      displayedHoldingCount: 0,
+      relevantDisplayedCount: 0,
+      reasons: [],
+    });
+  }
+  return [...byUser.values()];
+}
 
 export default function SearchScreen() {
   const router = useRouter();
   const copy = useCopy();
+  const { toggleLocale } = useLocale();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<NativeCatalogTemplate[] | null>(null);
+  const [destination, setDestination] = useState<ExploreDestination | null>(null);
   const [people, setPeople] = useState<NativeSearchUser[]>([]);
-  const [collectors, setCollectors] = useState<NativeCollectorDiscovery[]>([]);
-  const [collectibles, setCollectibles] = useState<NativeCollectibleDiscovery[]>([]);
+  const [rooms, setRooms] = useState<NativeRoomDiscovery[]>([]);
+  const [catalog, setCatalog] = useState<NativeCatalogTemplate[]>([]);
   const [wantedIds, setWantedIds] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadExplore = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setResults(null);
-    setPeople([]);
-    try {
-      const [nextCollectors, nextCollectibles] = await Promise.all([
-        loadCollectorDiscovery(),
-        loadCollectibleDiscovery(),
-      ]);
-      setCollectors(nextCollectors);
-      setCollectibles(nextCollectibles);
-    } catch {
-      setError(copy.exploreUnavailable);
-    } finally {
-      setLoading(false);
-    }
-  }, [copy.exploreUnavailable]);
+  const activeQuery = query.trim();
+  const handleQuery = looksLikeHandle(query);
+  const showingResults = destination !== null;
+  const entities = useMemo(() => entitiesFromCatalog(catalog), [catalog]);
+  const roomHits = useMemo(() => roomsForQuery(rooms, people, query), [rooms, people, query]);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const runSearch = useCallback(async (nextQuery: string) => {
-    const text = nextQuery.trim().slice(0, 120);
-    if (!text) return void loadExplore();
-    setQuery(text);
-    setLoading(true);
-    setError(null);
-    try {
-      const [catalog, users] = await Promise.all([
-        searchCatalog(text),
-        searchCollectors(text),
-      ]);
-      setResults(catalog);
-      setPeople(users);
-      void AsyncStorage.setItem(SEARCH_QUERY_KEY, text);
-    } catch {
-      setError(copy.catalogUnavailable);
-    } finally {
-      setLoading(false);
-    }
-  }, [copy.catalogUnavailable, loadExplore]);
+  useEffect(() => {
+    void AsyncStorage.setItem(SEARCH_STATE_KEY, JSON.stringify({ query, destination }));
+  }, [query, destination]);
+
+  useEffect(() => () => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+  }, []);
 
   const hydrateWishlist = useCallback(async () => {
     try {
@@ -83,25 +137,89 @@ export default function SearchScreen() {
       setError(copy.wishlistUnavailable);
     }
   }, [copy.wishlistUnavailable]);
+
   useFocusEffect(useCallback(() => {
     void hydrateWishlist();
   }, [hydrateWishlist]));
+
+  const runSearch = useCallback(async (nextQuery: string, nextDestination: ExploreDestination) => {
+    const text = nextQuery.trim().slice(0, 120);
+    if (!text || nextDestination === "posts") {
+      setPeople([]);
+      setRooms([]);
+      setCatalog([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      if (nextDestination === "people") {
+        setPeople(await searchCollectors(text));
+        setRooms([]);
+        setCatalog([]);
+      } else if (nextDestination === "rooms") {
+        const [nextRooms, nextPeople] = await Promise.all([loadRoomDiscovery(), searchCollectors(text)]);
+        setRooms(nextRooms);
+        setPeople(nextPeople);
+        setCatalog([]);
+      } else {
+        setCatalog(await searchCatalog(text));
+        setPeople([]);
+        setRooms([]);
+      }
+    } catch {
+      setError(nextDestination === "people" || nextDestination === "rooms" ? copy.exploreUnavailable : copy.catalogUnavailable);
+    } finally {
+      setLoading(false);
+    }
+  }, [copy.catalogUnavailable, copy.exploreUnavailable]);
+
   useEffect(() => {
     let active = true;
-    void AsyncStorage.getItem(SEARCH_QUERY_KEY).then((stored) => {
+    void (async () => {
+      const stored = await AsyncStorage.getItem(SEARCH_STATE_KEY);
+      const legacy = await AsyncStorage.getItem(SEARCH_QUERY_KEY);
       if (!active) return;
-      if (stored?.trim()) void runSearch(stored);
-      else void loadExplore();
-    });
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored) as { query?: string; destination?: ExploreDestination | null };
+          if (parsed.query) setQuery(parsed.query);
+          if (parsed.destination && EXPLORE_DESTINATIONS.includes(parsed.destination)) {
+            setDestination(parsed.destination);
+            if (parsed.query?.trim()) void runSearch(parsed.query, parsed.destination);
+          }
+          return;
+        } catch {
+          // Fall through to the previous query key.
+        }
+      }
+      if (legacy?.trim()) setQuery(legacy);
+    })();
     return () => { active = false; };
-  }, [loadExplore, runSearch]);
+  }, [runSearch]);
 
-  function clearSearch(value: string) {
-    setQuery(value);
-    if (!value.trim()) {
-      void AsyncStorage.removeItem(SEARCH_QUERY_KEY);
-      void loadExplore();
-    }
+  function changeQuery(next: string) {
+    setQuery(next);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      if (destination) void runSearch(next, destination);
+    }, DEBOUNCE_MS);
+  }
+
+  function chooseDestination(id: ExploreDestination) {
+    setDestination(id);
+    void runSearch(query, id);
+  }
+
+  function clearSearch() {
+    setQuery("");
+    setPeople([]);
+    setRooms([]);
+    setCatalog([]);
+    setError(null);
+    void AsyncStorage.removeItem(SEARCH_QUERY_KEY);
   }
 
   async function saveWanted(templateId: string) {
@@ -114,93 +232,375 @@ export default function SearchScreen() {
     }
   }
 
-  async function messageCollector(collector: NativeCollectorDiscovery["collector"]) {
-    try {
-      const conversationId = await ensureConversation(collector.userId);
-      router.push({ pathname: "/thread", params: { conversationId, displayName: collector.displayName, handle: collector.handle } });
-    } catch {
-      setError(copy.messagesUnavailable);
-    }
-  }
+  return (
+    <SeoullyScreen>
+      <KeyboardScreen>
+        <SeoullyHeader languageLabel={copy.switchLanguage} onToggleLanguage={toggleLocale} />
+        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+          <SeoullyText variant="title">{copy.searchTitle}</SeoullyText>
+          {!showingResults ? <SeoullyText variant="secondary" style={styles.lede}>{copy.searchLede}</SeoullyText> : null}
 
-  return <SafeAreaView style={styles.safe}><KeyboardScreen><ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-    <Text style={styles.title}>{copy.explore}</Text>
-    <Text style={styles.body}>{copy.exploreLead}</Text>
-    <View style={styles.searchRow}>
-      <TextInput accessibilityLabel={copy.catalogSearchLabel} placeholder={copy.catalogSearchPlaceholder} value={query} onChangeText={clearSearch} onSubmitEditing={() => { void runSearch(query); }} returnKeyType="search" style={styles.input} />
-      <Pressable accessibilityRole="button" onPress={() => { void runSearch(query); }} style={styles.searchButton}><Text style={styles.searchButtonText}>{copy.search}</Text></Pressable>
-    </View>
-    {loading && <ActivityIndicator color={colors.plum} style={styles.loading} />}
-    {error && <RetryNotice message={error} retryLabel={copy.retry} onRetry={results ? () => { void runSearch(query); } : loadExplore} />}
+          <SeoullySearchField
+            value={query}
+            placeholder={copy.searchPlaceholder}
+            label={copy.search}
+            clearLabel={copy.searchClear}
+            onChange={changeQuery}
+            onSubmit={() => { if (destination) void runSearch(query, destination); }}
+            onClear={clearSearch}
+          />
 
-    {results ? <>
-      <Text style={styles.sectionTitle}>{copy.collectorResults}</Text>
-      {people.map((person) => <View key={person.userId} style={styles.result}>
-        <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/collector", params: { userId: person.userId } })}><Text style={styles.resultTitle}>{person.displayName}</Text></Pressable>
-        <Text style={styles.resultMeta}>@{person.handle}</Text>
-        <Pressable accessibilityRole="button" onPress={() => messageCollector({ userId: person.userId, displayName: person.displayName, handle: person.handle })}><Text style={styles.actionText}>{copy.messageCollector}</Text></Pressable>
-      </View>)}
-      {!loading && people.length === 0 ? <Text style={styles.empty}>{copy.noCollectorMatches}</Text> : null}
-      <Text style={styles.sectionTitle}>{copy.catalogResults}</Text>
-      {results.map((item) => <View key={item.id} style={styles.result}>
-        <Text style={styles.resultTitle}>{item.name}</Text>
-        <Text style={styles.resultMeta}>{[item.groupName, item.memberName, item.releaseName, collectibleKindLabel(item.kind, copy)].filter(Boolean).join(" · ")}</Text>
-        {item.descriptor ? <Text style={styles.resultDescriptor}>{item.descriptor}</Text> : null}
-        <View style={styles.resultActions}><Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/add", params: { templateId: item.id, name: item.name, kind: item.kind } })}><Text style={styles.actionText}>{copy.addYourCopy}</Text></Pressable>
-          <Pressable accessibilityRole="button" disabled={wantedIds.has(item.id)} onPress={() => saveWanted(item.id)}><Text style={styles.actionText}>{wantedIds.has(item.id) ? copy.savedToWishlist : copy.saveToWishlist}</Text></Pressable>
-        </View>
-      </View>)}
-      {!loading && results.length === 0 ? <Text style={styles.empty}>{copy.noCatalogMatches}</Text> : null}
-    </> : <>
-      {collectors.length > 0 ? <><Text style={styles.sectionTitle}>{copy.collectorsForYou}</Text>
-        {collectors.map(({ collector, reciprocal, reasons }) => <View key={collector.userId} style={styles.result}>
-          <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/collector", params: { userId: collector.userId } })}><Text style={styles.resultTitle}>{collector.displayName}</Text></Pressable>
-          <Text style={styles.resultMeta}>@{collector.handle}</Text>
-          <Text style={styles.resultDescriptor}>{reciprocal ? copy.mutualMatch : reasonLabel(reasons[0]?.code, copy)}</Text>
-          <Pressable accessibilityRole="button" onPress={() => messageCollector(collector)}><Text style={styles.actionText}>{copy.messageCollector}</Text></Pressable>
-        </View>)}
-      </> : null}
-      {collectibles.length > 0 ? <><Text style={styles.sectionTitle}>{copy.collectiblesForYou}</Text>
-        {collectibles.map(({ template, reasons }) => <View key={template.id} style={styles.result}>
-          <Text style={styles.resultTitle}>{template.name}</Text>
-          <Text style={styles.resultMeta}>{collectibleKindLabel(template.kind, copy)}</Text>
-          <Text style={styles.resultDescriptor}>{reasonLabel(reasons[0]?.code, copy)}</Text>
-          <View style={styles.resultActions}><Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/add", params: { templateId: template.id, name: template.name, kind: template.kind } })}><Text style={styles.actionText}>{copy.addYourCopy}</Text></Pressable>
-            <Pressable accessibilityRole="button" disabled={wantedIds.has(template.id)} onPress={() => saveWanted(template.id)}><Text style={styles.actionText}>{wantedIds.has(template.id) ? copy.savedToWishlist : copy.saveToWishlist}</Text></Pressable>
-          </View>
-        </View>)}
-      </> : null}
-      {!loading && !error && collectors.length === 0 && collectibles.length === 0 ? <Text style={styles.empty}>{copy.exploreEmpty}</Text> : null}
-    </>}
-  </ScrollView></KeyboardScreen></SafeAreaView>;
+          {!showingResults ? (
+            <>
+              <SeoullyText variant="caption" style={styles.prompt}>{copy.searchPrompt}</SeoullyText>
+              <View style={styles.dests}>
+                {EXPLORE_DESTINATIONS.map((id) => (
+                  <SeoullyExploreDest
+                    key={id}
+                    title={destinationTitle(id, copy)}
+                    hint={handleQuery && id === "people" ? copy.searchHandleHint : destinationHint(id, copy)}
+                    icon={destinationIcon(id)}
+                    iconBackground={destinationColor(id)}
+                    suggested={handleQuery && id === "people"}
+                    onPress={() => chooseDestination(id)}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
+
+          {showingResults && destination ? (
+            <View style={styles.results}>
+              <View style={styles.toolbar}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={copy.searchBack}
+                  onPress={() => setDestination(null)}
+                  style={styles.back}
+                >
+                  <SeoullyText variant="button" color={colors.plum}>{copy.back}</SeoullyText>
+                </Pressable>
+                <View style={styles.heading}>
+                  {activeQuery ? <SeoullyText variant="title" numberOfLines={1}>{activeQuery.replace(/^@+/, "")}</SeoullyText> : null}
+                  <SeoullyText variant="secondary" color={colors.plum}>{destinationTitle(destination, copy)}</SeoullyText>
+                </View>
+              </View>
+
+              {!activeQuery ? <SeoullyEmptyState align="start" body={copy.searchNeedQuery} /> : null}
+              {activeQuery && loading ? <SeoullyLoadingState label={copy.search} /> : null}
+              {error ? (
+                <RetryNotice
+                  message={error}
+                  retryLabel={copy.retry}
+                  onRetry={() => { if (destination) void runSearch(query, destination); }}
+                />
+              ) : null}
+
+              {activeQuery && !loading && destination === "people" ? (
+                <PeopleResults
+                  hits={people}
+                  heading={copy.resultsPeople}
+                  empty={copy.searchNone}
+                  onOpen={(userId) => router.push({ pathname: "/collector", params: { userId } })}
+                />
+              ) : null}
+
+              {activeQuery && !loading && destination === "rooms" ? (
+                <RoomResults
+                  hits={roomHits}
+                  heading={copy.resultsRooms}
+                  empty={copy.searchNone}
+                  matchLabel={(score) => copy.searchMatch.replace("{score}", String(score))}
+                  enterLabel={copy.viewCollectorRoom}
+                  reasonText={(codes) => reasonLabel(codes[0], copy)}
+                  onEnter={(userId) => router.push({ pathname: "/collector-room", params: { userId } })}
+                />
+              ) : null}
+
+              {activeQuery && !loading && destination === "posts" ? (
+                <SeoullyEmptyState align="start" body={copy.searchNone} />
+              ) : null}
+
+              {activeQuery && !loading && destination === "collectibles" ? (
+                <CollectibleResults
+                  hits={catalog}
+                  heading={copy.resultsCollectibles}
+                  empty={copy.searchNone}
+                  kindText={(kind) => collectibleKindLabel(kind, copy)}
+                  addLabel={copy.addYourCopy}
+                  saveLabel={copy.saveToWishlist}
+                  savedLabel={copy.savedToWishlist}
+                  wantedIds={wantedIds}
+                  onAdd={(item) => router.push({ pathname: "/add", params: { templateId: item.id, name: item.name, kind: item.kind } })}
+                  onSave={saveWanted}
+                />
+              ) : null}
+
+              {activeQuery && !loading && destination === "entities" ? (
+                <EntityResults
+                  hits={entities}
+                  heading={copy.resultsEntities}
+                  empty={copy.searchNone}
+                  seeCollectors={copy.searchSeeCollectors}
+                  onExplore={(next) => {
+                    setQuery(next);
+                    setDestination("people");
+                    void runSearch(next, "people");
+                  }}
+                />
+              ) : null}
+            </View>
+          ) : null}
+        </ScrollView>
+      </KeyboardScreen>
+    </SeoullyScreen>
+  );
 }
 
-type SearchCopy = ReturnType<typeof useCopy>;
-function reasonLabel(code: string | undefined, copy: SearchCopy) {
+function PeopleResults({
+  hits,
+  heading,
+  empty,
+  onOpen,
+}: {
+  hits: NativeSearchUser[];
+  heading: string;
+  empty: string;
+  onOpen: (userId: string) => void;
+}) {
+  if (hits.length === 0) return <SeoullyEmptyState align="start" body={empty} />;
+  return (
+    <View>
+      <SeoullyText style={styles.section}>{heading}</SeoullyText>
+      {hits.map((person) => (
+        <SeoullySearchRow
+          key={person.userId}
+          title={person.displayName}
+          meta={`@${person.handle}`}
+          leading={<SeoullyAvatar name={person.displayName} size={40} />}
+          onPress={() => onOpen(person.userId)}
+        />
+      ))}
+    </View>
+  );
+}
+
+function RoomResults({
+  hits,
+  heading,
+  empty,
+  matchLabel,
+  enterLabel,
+  reasonText,
+  onEnter,
+}: {
+  hits: NativeRoomDiscovery[];
+  heading: string;
+  empty: string;
+  matchLabel: (score: number) => string;
+  enterLabel: string;
+  reasonText: (codes: string[]) => string;
+  onEnter: (userId: string) => void;
+}) {
+  if (hits.length === 0) return <SeoullyEmptyState align="start" body={empty} />;
+  return (
+    <View style={styles.roomList}>
+      <SeoullyText style={styles.section}>{heading}</SeoullyText>
+      {hits.map((hit) => (
+        <SeoullyExploreRoom
+          key={`${hit.roomId}-${hit.collector.userId}`}
+          name={hit.collector.displayName}
+          identity={`@${hit.collector.handle}`}
+          match={hit.rankScore > 0 ? matchLabel(hit.rankScore) : undefined}
+          reason={hit.reasons[0] ? reasonText(hit.reasons.map((reason) => reason.code)) : undefined}
+          enterLabel={enterLabel}
+          onEnter={() => onEnter(hit.collector.userId)}
+        />
+      ))}
+    </View>
+  );
+}
+
+function CollectibleResults({
+  hits,
+  heading,
+  empty,
+  kindText,
+  addLabel,
+  saveLabel,
+  savedLabel,
+  wantedIds,
+  onAdd,
+  onSave,
+}: {
+  hits: NativeCatalogTemplate[];
+  heading: string;
+  empty: string;
+  kindText: (kind: string) => string;
+  addLabel: string;
+  saveLabel: string;
+  savedLabel: string;
+  wantedIds: Set<string>;
+  onAdd: (item: NativeCatalogTemplate) => void;
+  onSave: (templateId: string) => void;
+}) {
+  if (hits.length === 0) return <SeoullyEmptyState align="start" body={empty} />;
+  return (
+    <View>
+      <SeoullyText style={styles.section}>{heading}</SeoullyText>
+      {hits.map((item) => {
+        const line = [item.groupName, item.memberName, kindText(item.kind)].filter(Boolean).join(" · ");
+        return (
+          <View key={item.id}>
+            <SeoullySearchRow
+              title={item.name}
+              meta={line}
+              leading={<SeoullyCollectibleMark />}
+              staticRow
+            />
+            <View style={styles.actions}>
+              <Pressable accessibilityRole="button" onPress={() => onAdd(item)}>
+                <SeoullyText variant="button" color={colors.plum}>{addLabel}</SeoullyText>
+              </Pressable>
+              <Pressable accessibilityRole="button" disabled={wantedIds.has(item.id)} onPress={() => onSave(item.id)}>
+                <SeoullyText variant="button" color={wantedIds.has(item.id) ? colors.muted : colors.plum}>
+                  {wantedIds.has(item.id) ? savedLabel : saveLabel}
+                </SeoullyText>
+              </Pressable>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function EntityResults({
+  hits,
+  heading,
+  empty,
+  seeCollectors,
+  onExplore,
+}: {
+  hits: SearchEntity[];
+  heading: string;
+  empty: string;
+  seeCollectors: string;
+  onExplore: (query: string) => void;
+}) {
+  if (hits.length === 0) return <SeoullyEmptyState align="start" body={empty} />;
+  return (
+    <View>
+      <SeoullyText style={styles.section}>{heading}</SeoullyText>
+      {hits.map((hit) => (
+        <SeoullySearchRow
+          key={`${hit.kind}-${hit.id}`}
+          title={hit.title}
+          meta={hit.subtitle}
+          leading={<View style={styles.dot} />}
+          trailing={<SeoullyText variant="caption" color={colors.plum}>{seeCollectors}</SeoullyText>}
+          onPress={() => onExplore(hit.query)}
+        />
+      ))}
+    </View>
+  );
+}
+
+function destinationTitle(id: ExploreDestination, copy: MobileCopy) {
+  switch (id) {
+    case "people":
+      return copy.destPeople;
+    case "rooms":
+      return copy.destRooms;
+    case "posts":
+      return copy.destPosts;
+    case "collectibles":
+      return copy.destCollectibles;
+    case "entities":
+      return copy.destEntities;
+  }
+}
+
+function destinationHint(id: ExploreDestination, copy: MobileCopy) {
+  switch (id) {
+    case "people":
+      return copy.destPeopleHint;
+    case "rooms":
+      return copy.destRoomsHint;
+    case "posts":
+      return copy.destPostsHint;
+    case "collectibles":
+      return copy.destCollectiblesHint;
+    case "entities":
+      return copy.destEntitiesHint;
+  }
+}
+
+function destinationColor(id: ExploreDestination) {
+  switch (id) {
+    case "people":
+      return colors.lilacSoft;
+    case "rooms":
+      return colors.peach;
+    case "posts":
+      return colors.pinkSoft;
+    case "collectibles":
+      return colors.blueSoft;
+    case "entities":
+      return colors.mintSoft;
+  }
+}
+
+function destinationIcon(id: ExploreDestination) {
+  const color = colors.plum;
+  switch (id) {
+    case "people":
+      return <IconUser color={color} />;
+    case "rooms":
+      return <IconDoor color={color} />;
+    case "posts":
+      return <IconPhoto color={color} />;
+    case "collectibles":
+      return <IconCard color={color} />;
+    case "entities":
+      return <IconGroup color={color} />;
+  }
+}
+
+function reasonLabel(code: string | undefined, copy: MobileCopy) {
   const normalized = code?.toLowerCase();
-  if (normalized?.includes("wishlist")) return copy.basedOnWishlist;
+  if (normalized?.includes("wishlist")) return copy.searchReasonWishlist;
   if (normalized?.includes("bias")) return copy.basedOnBias;
   if (normalized?.includes("group")) return copy.basedOnGroups;
   return copy.recommendedForYou;
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.canvas },
-  container: { padding: spacing.lg, paddingBottom: 120 },
-  title: { color: colors.ink, fontSize: 32, fontWeight: "700" },
-  body: { color: colors.muted, fontSize: 16, marginTop: spacing.md },
-  searchRow: { alignItems: "center", flexDirection: "row", gap: spacing.xs, marginTop: spacing.lg },
-  input: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 14, borderWidth: 1, color: colors.ink, flex: 1, minHeight: 50, paddingHorizontal: spacing.md },
-  searchButton: { alignItems: "center", backgroundColor: colors.plum, borderRadius: 14, justifyContent: "center", minHeight: 50, paddingHorizontal: spacing.md },
-  searchButtonText: { color: colors.surface, fontWeight: "700" },
-  loading: { marginTop: spacing.md },
-  error: { color: colors.plum, marginTop: spacing.md },
-  sectionTitle: { color: colors.ink, fontSize: 19, fontWeight: "700", marginBottom: spacing.sm, marginTop: spacing.xl },
-  result: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, marginBottom: spacing.sm, padding: spacing.md },
-  resultTitle: { color: colors.ink, fontSize: 16, fontWeight: "700" },
-  resultMeta: { color: colors.plum, fontSize: 13, marginTop: spacing.xs },
-  resultDescriptor: { color: colors.muted, fontSize: 13, marginTop: spacing.xs },
-  actionText: { color: colors.plum, fontSize: 13, fontWeight: "700", marginTop: spacing.sm },
-  resultActions: { flexDirection: "row", gap: spacing.lg },
-  empty: { color: colors.muted, paddingTop: spacing.lg },
+  container: { paddingBottom: 120, paddingHorizontal: 16, paddingTop: 12 },
+  lede: { marginTop: 6, maxWidth: 280 },
+  prompt: { marginBottom: 10, marginTop: 18, maxWidth: 320 },
+  dests: { gap: 8 },
+  results: { marginTop: 8 },
+  toolbar: { alignItems: "flex-start", flexDirection: "row", gap: 10, marginBottom: 10, marginTop: 16 },
+  back: {
+    alignItems: "center",
+    backgroundColor: colors.mist,
+    borderRadius: 12,
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: 10,
+  },
+  heading: { flex: 1, gap: 2, minWidth: 0, paddingTop: 6 },
+  section: {
+    color: colors.plum,
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: -0.3,
+    lineHeight: 20,
+    marginBottom: 8,
+    marginTop: 18,
+  },
+  roomList: { gap: 12 },
+  actions: { flexDirection: "row", gap: spacing.md, paddingBottom: 8, paddingHorizontal: 8 },
+  dot: { backgroundColor: colors.lilacSoft, borderRadius: 20, height: 40, width: 40 },
 });

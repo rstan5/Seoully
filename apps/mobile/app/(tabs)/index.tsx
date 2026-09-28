@@ -74,7 +74,7 @@ export default function FeedScreen() {
               onChange={(next) => setPosts((current) => current.map((post) => post.id === next.id ? next : post))}
             />
           )}
-          ListEmptyComponent={!loading && !error ? <SeoullyEmptyState title={copy.brand} body={`${copy.feedEmpty}\n\n${copy.feedEmptyLead}`} /> : null}
+          ListEmptyComponent={!loading && !error ? <SeoullyEmptyState body={copy.feedEmpty} /> : null}
           ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.plum} style={styles.more} /> : null}
         />
       </KeyboardScreen>

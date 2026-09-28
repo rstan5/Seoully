@@ -22,11 +22,11 @@ export function SeoullyHeader({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={languageLabel}
-          hitSlop={8}
+          hitSlop={10}
           onPress={onToggleLanguage}
           style={({ pressed }) => [styles.lang, pressShift(pressed, reduceMotion)]}
         >
-          <SeoullyText variant="button" color={colors.ink} style={styles.langMuted}>{languageLabel}</SeoullyText>
+          <SeoullyText variant="button" color={colors.ink}>{languageLabel}</SeoullyText>
         </Pressable>
         {trailing}
       </View>
@@ -40,11 +40,21 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
-    height: sizes.topBar,
     justifyContent: "space-between",
+    minHeight: sizes.topBar,
+    overflow: "visible",
     paddingHorizontal: 16,
+    zIndex: 2,
   },
-  end: { alignItems: "center", flexDirection: "row" },
-  lang: { justifyContent: "center", minHeight: 44, paddingHorizontal: 6 },
-  langMuted: { fontSize: 13, opacity: 0.7 },
+  end: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexShrink: 0,
+    marginLeft: 12,
+  },
+  lang: {
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: 4,
+  },
 });

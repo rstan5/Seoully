@@ -66,9 +66,11 @@ retest this specific failure.
   `ProductionPostCard`, `SocialShell`, `SocialNav`, `SocialIcons`, `BrandMark`
 - Production data path unchanged: `GET /api/mobile/feed` with bearer session
 
-### FEED VISUAL RECONSTRUCTION: AWAITING PHYSICAL DEVICE VISUAL APPROVAL
+### FEED VISUAL RECONSTRUCTION: AWAITING PHYSICAL DEVICE VISUAL APPROVAL — CORRECTION PASS 01
 
-Do not mark this approved from TypeScript, Expo Doctor, or Metro export.
+First physical review was **not approved**. Correction pass 01 is implemented
+and must be re-reviewed on the iPhone. Do not mark this approved from
+TypeScript, Expo Doctor, or Metro export.
 
 Check on the physical iPhone:
 

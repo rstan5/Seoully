@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, elevation, radii, sizes } from "../theme";
-import { IconChat, IconDoor, IconHome, IconPlus, IconSearch, IconUser } from "./icons";
+import { IconChat, IconHome, IconPlus, IconSearch, IconUser } from "./icons";
 import { pressShift, useReduceMotion } from "./motion";
 
 type TabRoute = { key: string; name: string; params?: object };
@@ -19,7 +19,6 @@ type SeoullyTabBarProps = {
 const icons = {
   index: IconHome,
   search: IconSearch,
-  room: IconDoor,
   create: IconPlus,
   messages: IconChat,
   profile: IconUser,
@@ -31,8 +30,8 @@ export function SeoullyTabBar({ state, descriptors, navigation }: SeoullyTabBarP
 
   return (
     <View style={[styles.bar, { paddingBottom: insets.bottom }]}>
-      {state.routes.map((route, index) => {
-        const focused = state.index === index;
+      {state.routes.filter((route) => route.name !== "room").map((route) => {
+        const focused = state.routes[state.index]?.name === route.name;
         const { options } = descriptors[route.key];
         const label = options.tabBarAccessibilityLabel ?? options.title ?? route.name;
         const Icon = icons[route.name as keyof typeof icons] ?? IconHome;

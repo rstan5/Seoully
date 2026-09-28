@@ -13,7 +13,7 @@ security, and Room/Binder data model.
 - Recovered from: `d2d779d`
 - Device-QA checkpoint: `ae8e155`
 - Current HEAD: `21b66e4`
-- Current task: Feed visual reconstruction — AWAITING PHYSICAL DEVICE VISUAL APPROVAL
+- Current task: Feed visual reconstruction — AWAITING PHYSICAL DEVICE VISUAL APPROVAL — CORRECTION PASS 01
 - Overall status: IN PROGRESS — native design system + Feed rebuilt from web social-app.css; user must approve Feed on a physical iPhone before Search or other screens are restyled
 
 ## Current Room parity matrix
@@ -396,7 +396,10 @@ Do not treat Room or Binder as finished. Visual/tactile/FPS/gesture quality rema
 
 ## Latest validation
 
-- Feed visual reconstruction (this pass): mobile TypeScript, Expo lint, Expo Doctor
+- Feed correction pass 01: mobile TypeScript, Expo lint, Expo Doctor 21/21, iOS
+  Metro export, root TypeScript, fixture checks, and `git diff --check` pass.
+  Visual approval is **not** claimed.
+- Feed visual reconstruction (prior pass): mobile TypeScript, Expo lint, Expo Doctor
   21/21, iOS Metro export, root TypeScript, fixture checks, and `git diff --check`
   pass. Visual approval is **not** claimed.
 
@@ -543,10 +546,12 @@ classified below. Do not treat Room/Binder visual/tactile parity as finished.
 - In-world 3D Binder open that stays inside the Room GL scene
 
 ### AWAITING DEVICE QA
-- **FEED VISUAL RECONSTRUCTION: AWAITING PHYSICAL DEVICE VISUAL APPROVAL**
-  Do not treat Feed as visually complete from TypeScript/Expo/lint. The user
-  reviews the reconstructed Feed and tab chrome on a physical iPhone first.
-  Do not start Search restyle until that approval.
+- **FEED VISUAL RECONSTRUCTION: AWAITING PHYSICAL DEVICE VISUAL APPROVAL — CORRECTION PASS 01**
+  First device pass was not approved. Room was removed from the primary tab bar
+  (web SocialNav is Feed / Search / Create / Messages / Profile). Empty Feed
+  matched production following-only data (one public post; signed-in account
+  had no eligible followed/authored items). Header/locale/empty-state corrections
+  await a second physical review. Do not start Search.
 - Physical iPhone Expo Go relaunch after the Room import-time crash fix
 - Room GL canvas mount, FPS, texture memory, raycast hits, drag/orbit feel
 - Binder swipe, cover open/close, card lift springs, page perspective

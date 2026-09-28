@@ -16,17 +16,19 @@ export function SeoullyProfileHead({
   counts,
   editLabel,
   onEdit,
+  imageUrl,
 }: {
   name: string;
   handle: string;
   counts: { label: string; value: number }[];
   editLabel?: string;
   onEdit?: () => void;
+  imageUrl?: string;
 }) {
   return (
     <View style={styles.head}>
       <View style={styles.avatarRing}>
-        <SeoullyAvatar name={name} size={86} />
+        <SeoullyAvatar name={name} size={86} imageUrl={imageUrl} />
       </View>
       <View style={styles.copy}>
         <SeoullyText variant="title">{name}</SeoullyText>

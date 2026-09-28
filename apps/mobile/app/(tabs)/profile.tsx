@@ -3,13 +3,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import {
-  loadCollectorPosts,
-  loadCollectorProfile,
-  loadMyHoldings,
-  loadMyWishlist,
   loadNativeOnboarding,
-  resolveNativeIdentity,
-  setWishlistTemplate,
   updateHoldingTradeStatus,
   type NativeFeedPost,
   type NativeHolding,
@@ -17,6 +11,7 @@ import {
   type NativeOnboardingState,
   type NativeWishlistEntry,
 } from "../../src/api";
+import { useSocialRepository } from "../../src/data";
 import { RetryNotice } from "../../src/components/RetryNotice";
 import { collectibleKindLabel } from "../../src/i18n";
 import { useCopy, useLocale } from "../../src/locale";
@@ -52,7 +47,9 @@ export default function ProfileScreen() {
   const router = useRouter();
   const copy = useCopy();
   const { locale, toggleLocale } = useLocale();
+  const social = useSocialRepository();
   const [identity, setIdentity] = useState<NativeIdentity | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | undefined>();
   const [followers, setFollowers] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [holdingCount, setHoldingCount] = useState(0);
@@ -60,54 +57,78 @@ export default function ProfileScreen() {
   const [holdings, setHoldings] = useState<NativeHolding[]>([]);
   const [wishlist, setWishlist] = useState<NativeWishlistEntry[]>([]);
   const [onboarding, setOnboarding] = useState<NativeOnboardingState | null>(null);
+  const [demoGroups, setDemoGroups] = useState<{ id: string; name: string }[]>([]);
+  const [demoBiases, setDemoBiases] = useState<{ id: string; name: string }[]>([]);
   const [ownedExpanded, setOwnedExpanded] = useState(false);
   const [wishlistExpanded, setWishlistExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const live = social.kind === "production";
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const nextIdentity = await resolveNativeIdentity<NativeIdentity>();
+      const nextIdentity = await social.loadIdentity();
       if (!nextIdentity?.user.id) throw new Error("identity_unavailable");
-      const [publicProfile, page, nextHoldings, nextWishlist, tastes] = await Promise.all([
-        loadCollectorProfile(nextIdentity.user.id),
-        loadCollectorPosts(nextIdentity.user.id),
-        loadMyHoldings(0, 100),
-        loadMyWishlist(0, 100),
-        loadNativeOnboarding().catch(() => null),
-      ]);
-      setIdentity(nextIdentity);
-      setFollowers(publicProfile.follow.followers);
-      setFollowingCount(publicProfile.follow.followingCount);
-      setHoldingCount(publicProfile.profile.collectionSummary?.holdingCount ?? nextHoldings.length);
-      setPosts(page.items);
-      setHoldings(nextHoldings);
-      setWishlist(nextWishlist);
-      setOnboarding(tastes);
+      if (social.kind === "demo") {
+        const collector = await social.loadCollector(nextIdentity.user.id);
+        setIdentity(nextIdentity);
+        setAvatarUrl(collector.avatarUrl);
+        setFollowers(collector.follow.followers);
+        setFollowingCount(collector.follow.followingCount);
+        setHoldingCount(collector.holdings.length);
+        setPosts(collector.posts);
+        setHoldings(collector.holdings);
+        setWishlist(collector.wishlist);
+        setDemoGroups(collector.groups);
+        setDemoBiases(collector.biases);
+        setOnboarding(null);
+      } else {
+        const [counts, page, nextHoldings, nextWishlist, tastes] = await Promise.all([
+          social.loadFollowCounts(),
+          social.loadCollectorPosts(nextIdentity.user.id),
+          social.loadMyHoldings(),
+          social.loadMyWishlist(),
+          loadNativeOnboarding().catch(() => null),
+        ]);
+        setIdentity(nextIdentity);
+        setAvatarUrl(undefined);
+        setFollowers(counts.followers);
+        setFollowingCount(counts.followingCount);
+        setHoldingCount(nextHoldings.length);
+        setPosts(page.items);
+        setHoldings(nextHoldings);
+        setWishlist(nextWishlist);
+        setDemoGroups([]);
+        setDemoBiases([]);
+        setOnboarding(tastes);
+      }
       setError(null);
     } catch {
       setError(copy.profileUnavailable);
     } finally {
       setLoading(false);
     }
-  }, [copy.profileUnavailable]);
+  }, [copy.profileUnavailable, social]);
 
   useFocusEffect(useCallback(() => {
     void refresh();
   }, [refresh]));
 
   const groups = useMemo(() => {
+    if (demoGroups.length) return demoGroups;
     const ids = identity?.profile.favoriteGroupIds ?? [];
-    return (onboarding?.groups ?? []).filter((group) => ids.includes(group.id));
-  }, [identity, onboarding]);
+    return (onboarding?.groups ?? []).filter((group) => ids.includes(group.id)).map((group) => ({ id: group.id, name: group.name }));
+  }, [demoGroups, identity, onboarding]);
   const biases = useMemo(() => {
+    if (demoBiases.length) return demoBiases;
     const ids = identity?.profile.biasMemberIds ?? [];
-    return (onboarding?.members ?? []).filter((member) => ids.includes(member.id));
-  }, [identity, onboarding]);
+    return (onboarding?.members ?? []).filter((member) => ids.includes(member.id)).map((member) => ({ id: member.id, name: member.stageName }));
+  }, [demoBiases, identity, onboarding]);
   const highlights = useMemo(() => highlightsFromHoldings(holdings), [holdings]);
 
   async function toggleTrade(holding: NativeHolding) {
+    if (!live) return;
     const next = holding.tradeStatus === "for-trade" ? "not-for-trade" : "for-trade";
     setHoldings((current) => current.map((item) => item.id === holding.id ? { ...item, tradeStatus: next } : item));
     try {
@@ -120,13 +141,14 @@ export default function ProfileScreen() {
   async function removeWanted(templateId: string) {
     setWishlist((current) => current.filter((entry) => entry.templateId !== templateId));
     try {
-      await setWishlistTemplate(templateId, false);
+      await social.setWishlist(templateId, false);
     } catch {
       await refresh();
     }
   }
 
   async function openCollection(tab: "collection" | "wishlist") {
+    if (!live) return;
     await AsyncStorage.setItem(COLLECTION_TAB_KEY, tab);
     router.push("/collection");
   }
@@ -142,8 +164,9 @@ export default function ProfileScreen() {
             <SeoullyProfileHead
               name={identity.user.displayName}
               handle={identity.user.handle}
-              editLabel={copy.profileEdit}
-              onEdit={() => router.push("/edit-profile")}
+              imageUrl={avatarUrl}
+              editLabel={live ? copy.profileEdit : undefined}
+              onEdit={live ? () => router.push("/edit-profile") : undefined}
               counts={[
                 { value: posts.length, label: copy.profilePosts },
                 { value: followers, label: copy.profileFollowers },
@@ -158,21 +181,25 @@ export default function ProfileScreen() {
               since={identity.user.joinedAt ? copy.profileCollectingSince.replace("{date}", formatCollectingSince(identity.user.joinedAt, locale)) : undefined}
               collectorType={identity.profile.collectorType}
             />
-            <SeoullyButton label={copy.viewCollectorRoom} variant="enter" onPress={() => router.push("/room")} />
-            <View style={styles.collectAction}>
-              <SeoullyButton
-                label={copy.profileAddToCollection}
-                variant="ghost"
-                block
-                onPress={() => router.push("/collect")}
-              />
-            </View>
+            {live ? (
+              <>
+                <SeoullyButton label={copy.viewCollectorRoom} variant="enter" onPress={() => router.push("/room")} />
+                <View style={styles.collectAction}>
+                  <SeoullyButton
+                    label={copy.profileAddToCollection}
+                    variant="ghost"
+                    block
+                    onPress={() => router.push("/collect")}
+                  />
+                </View>
+              </>
+            ) : null}
           </View>
 
           {groups.length > 0 || biases.length > 0 ? (
             <View style={styles.chips}>
               {groups.map((group) => <SeoullyChip key={group.id} label={group.name} />)}
-              {biases.map((member) => <SeoullyChip key={member.id} label={member.stageName} tone="bias" />)}
+              {biases.map((member) => <SeoullyChip key={member.id} label={member.name} tone="bias" />)}
             </View>
           ) : null}
 
@@ -216,24 +243,26 @@ export default function ProfileScreen() {
                   title={holding.template.name}
                   meta={[holding.template.groupName, holding.template.memberName, collectibleKindLabel(holding.template.kind, copy)].filter(Boolean).join(" · ")}
                   imageUrl={holding.personalMediaUrl}
-                  onPress={() => router.push({ pathname: "/collectible", params: { holdingId: holding.id } })}
+                  onPress={live ? () => router.push({ pathname: "/collectible", params: { holdingId: holding.id } }) : undefined}
                 />
-                <Pressable accessibilityRole="button" onPress={() => { void toggleTrade(holding); }} style={styles.shelfAction}>
-                  <SeoullyText variant="caption" color={colors.plum}>
-                    {holding.tradeStatus === "for-trade" ? copy.forTrade : copy.notForTrade}
-                  </SeoullyText>
-                </Pressable>
+                {live ? (
+                  <Pressable accessibilityRole="button" onPress={() => { void toggleTrade(holding); }} style={styles.shelfAction}>
+                    <SeoullyText variant="caption" color={colors.plum}>
+                      {holding.tradeStatus === "for-trade" ? copy.forTrade : copy.notForTrade}
+                    </SeoullyText>
+                  </Pressable>
+                ) : null}
               </View>
             ))}
-            {holdings.length === 0 ? (
+            {live && holdings.length === 0 ? (
               <Pressable accessibilityRole="button" onPress={() => router.push("/collect")} style={styles.shelfAction}>
                 <SeoullyText variant="button" color={colors.plum}>{copy.profileAddToCollection}</SeoullyText>
               </Pressable>
-            ) : (
+            ) : live ? (
               <Pressable accessibilityRole="button" onPress={() => { void openCollection("collection"); }}>
                 <SeoullyText variant="button" color={colors.plum}>{copy.profileSeeAll}</SeoullyText>
               </Pressable>
-            )}
+            ) : null}
           </SeoullyShelf>
 
           <SeoullyShelf
@@ -252,7 +281,7 @@ export default function ProfileScreen() {
                 onPress={() => { void removeWanted(entry.templateId); }}
               />
             ))}
-            {wishlist.length > 0 ? (
+            {live && wishlist.length > 0 ? (
               <Pressable accessibilityRole="button" onPress={() => { void openCollection("wishlist"); }}>
                 <SeoullyText variant="button" color={colors.plum}>{copy.profileSeeAll}</SeoullyText>
               </Pressable>

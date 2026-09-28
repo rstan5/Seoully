@@ -4,6 +4,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import { Image, ScrollView, StyleSheet, View } from "react-native";
 import { loadMyHolding, updateHoldingTradeStatus, uploadHoldingPhoto, type NativeHolding } from "../src/api";
+import { useSocialRepository } from "../src/data";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
 import { collectibleKindLabel } from "../src/i18n";
@@ -27,6 +28,7 @@ export default function CollectibleDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [cropAsset, setCropAsset] = useState<{ uri: string; width: number; height: number } | null>(null);
   const mediaUri = useCachedSignedMedia(holding?.id, holding?.personalMediaUrl);
+  const social = useSocialRepository();
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -74,6 +76,7 @@ export default function CollectibleDetailScreen() {
   }
 
   async function savePhoto(uri: string) {
+    if (social.kind === "demo") { setError(copy.demoWriteBlocked); return; }
     if (!holding) return;
     setBusy(true);
     try {
@@ -88,6 +91,7 @@ export default function CollectibleDetailScreen() {
   }
 
   async function toggleTrade() {
+    if (social.kind === "demo") { setError(copy.demoWriteBlocked); return; }
     if (!holding || busy) return;
     setBusy(true);
     try {

@@ -1,12 +1,14 @@
-import { View } from "react-native";
+import { Image, View } from "react-native";
 import { avatarPalette, sizes } from "../theme";
 
 export function SeoullyAvatar({
   name,
   size = sizes.avatarSm,
+  imageUrl,
 }: {
   name: string;
   size?: number;
+  imageUrl?: string;
 }) {
   const seed = [...name].reduce((sum, char) => sum + char.charCodeAt(0), 0);
   return (
@@ -19,6 +21,10 @@ export function SeoullyAvatar({
         overflow: "hidden",
         width: size,
       }}
-    />
+    >
+      {imageUrl ? (
+        <Image accessibilityIgnoresInvertColors source={{ uri: imageUrl }} style={{ height: size, width: size }} />
+      ) : null}
+    </View>
   );
 }

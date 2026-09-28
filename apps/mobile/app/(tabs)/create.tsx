@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { contributeCatalogItem, createNativePost } from "../../src/api";
+import { useSocialRepository } from "../../src/data";
 import { KeyboardScreen } from "../../src/components/KeyboardScreen";
 import { collectibleKindLabel } from "../../src/i18n";
 import { useCopy, useLocale } from "../../src/locale";
@@ -20,6 +21,7 @@ export default function CreateScreen() {
   const copy = useCopy();
   const { toggleLocale } = useLocale();
   const router = useRouter();
+  const social = useSocialRepository();
   const [mode, setMode] = useState<"post" | "collectible">("post");
   const [name, setName] = useState("");
   const [groupName, setGroupName] = useState("");
@@ -76,6 +78,7 @@ export default function CreateScreen() {
   }
 
   async function publishPost() {
+    if (social.kind === "demo") return setMessage(copy.demoWriteBlocked);
     if (!postUri) return setMessage(copy.postPhotoRequired);
     setWorking(true);
     setMessage(null);
@@ -93,6 +96,7 @@ export default function CreateScreen() {
   }
 
   async function submitCollectible() {
+    if (social.kind === "demo") return setMessage(copy.demoWriteBlocked);
     if (!name.trim()) return setMessage(copy.collectibleNameRequired);
     if (!groupName.trim()) return setMessage(copy.groupNameRequired);
     setWorking(true);

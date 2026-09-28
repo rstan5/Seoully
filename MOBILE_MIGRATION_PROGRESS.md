@@ -13,8 +13,9 @@ security, and Room/Binder data model.
 - Recovered from: `d2d779d`
 - Device-QA checkpoint: `ae8e155`
 - Prior reconstruction HEAD (presentation rejected on device): `b4469d5`
-- Current task: Vertical Slice 01 — Collector Ownership — CODE COMPLETE — AWAITING PHYSICAL IPHONE QA
-- Overall status: Proven infrastructure preserved. Rejected Profile / Edit / Add presentation rebuilt. Do not expand to Feed / Search / Messages / Room / Binder until this slice is physically approved.
+- Current task: Vertical Expansion 02 — The Living Social World — CODE COMPLETE — AWAITING PHYSICAL IPHONE QA
+- Slice 01 (Profile / Edit Profile / Add Collectible) was physically approved on iPhone and is the native visual calibration baseline.
+- Overall status: Development-only demo/fixture world is available on native. Feed, Search/Explore, Collector Profile, and social post interactions are reconstructed against that world. Room, Binder, and Messages were not rebuilt this pass.
 
 ## Current Room parity matrix
 
@@ -566,21 +567,12 @@ Room/Binder visual/tactile parity is not finished.
   detail keeps personal photocard media as the face. Create/Add and Messages
   use the shared Seoully shell. Keyboard, crop, and thread polling remain
   device checks.
-- **SEARCH / EXPLORE: CODE PARITY COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL**
-  Native Search now follows web destination IA (People, Rooms, Posts,
-  Collectibles, Groups & Members). Rooms use production discovery + collector
-  search and Enter Room. Posts have no production search API, so a query still
-  shows the honest empty state. Keyboard, suggestion highlight, and result
-  density need a phone.
-- **PROFILE / COLLECTOR: CODE PARITY COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL**
-  Own Profile is an identity card (avatar, counts, bio, chips, Enter Room,
-  posts/owned/wishlist shelves) instead of an always-on settings form. Public
-  collector profiles share that chrome with Follow / Message / Enter Room.
-- **FEED VISUAL RECONSTRUCTION: AWAITING PHYSICAL DEVICE VISUAL APPROVAL — CORRECTION PASS 01**
-  First device pass was not approved. Room was removed from the primary tab bar
-  (web SocialNav is Feed / Search / Create / Messages / Profile). Empty Feed
-  matched production following-only data. Header/locale/empty-state corrections
-  await a second physical review.
+- **SEARCH / EXPLORE: CODE COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL (Expansion 02)**
+  Destinations reconstructed as discovery cards. Demo populates People / Rooms / Posts / Collectibles / Groups from web fixtures. Production People/Rooms/Collectibles/Groups still use real APIs; Posts search has no production endpoint (honest empty).
+- **PROFILE / COLLECTOR: CODE COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL (Expansion 02)**
+  Own Profile Slice 01 remains the calibration. Collector Profile now uses the same identity language plus fixture collection/compatibility/posts in demo. Production collector shelves for holdings/wishlist/groups remain an API gap.
+- **FEED VISUAL RECONSTRUCTION: AWAITING PHYSICAL DEVICE VISUAL APPROVAL — EXPANSION 02**
+  Populated Feed is now evaluable in Demo via web fixtures. Production Feed is still following + self and may be empty. Discover/suggested are demo-only.
 - Physical iPhone Expo Go relaunch after the Room import-time crash fix
 - Room GL canvas mount, FPS, texture memory, raycast hits, drag/orbit feel
 - Binder swipe, cover open/close, card lift springs, page perspective
@@ -595,6 +587,48 @@ Room/Binder visual/tactile parity is not finished.
 ### ENVIRONMENT BLOCKED
 - Known unrelated Turbopack process-binding issue (do not re-investigate)
 - Expo toolchain moderate advisories that require unsafe major downgrades
+
+## Vertical Expansion 02 — The Living Social World
+
+Physical iPhone QA of Vertical Slice 01 was **positive**. That Profile / Edit / Add language is the native calibration baseline and was not reverted.
+
+### Demo / fixture world
+
+Native social screens read through `SocialRepository`:
+
+- UI → `useSocialRepository()` → production implementation **or** development fixture implementation
+- Production implementation wraps existing `/api/mobile/*` and catalog search
+- Demo implementation reads canonical web fixtures (`src/domain/fixtures/collectors.ts`, `social.ts`, `catalog.ts`) plus `computeCompatibility`
+- Identities reused: **SOOMIN** (`u-soo`, handle `soo`) and **MINJI** (`u-minji`). Nara is not in the current fixture source and was not invented
+- Demo viewer is SOOMIN. Fixture `FOLLOWS` is Minji → Soo only, so Following starts empty until the developer follows Minji in-session
+- Demo likes, comments, follows, and wishlist live in the `DemoSocialRepository` singleton (Metro process memory)
+- Reload / restart Metro **resets** demo mutations. SecureStore only remembers Demo vs Live
+- `__DEV__` is required. Release builds cannot activate demo. Demo fixture modules are `require()`d only when demo is allowed
+- Header chip **Demo** / **Live** (development only). Missing SecureStore key defaults to Demo in `__DEV__`. Store `"0"` for Live production data
+- Demo never writes fixture users/posts/holdings/follows/likes/comments to Supabase. Create / Add / Edit / collectible photo / trade are blocked while Demo is on
+
+### Surfaces reconstructed this pass
+
+- **Feed:** Following / Discover (demo), suggested collectors, `SeoullyPost` with fixture media, likes, comments, collector navigation
+- **Search / Explore:** People, Rooms, Posts, Collectibles, Groups & Members populated from fixtures in demo. Destinations are discovery cards, not giant bordered table rows. Demo Rooms go to Collector Profile, not production GL
+- **Collector Profile:** identity, chips, compatibility, follow, posts, owned/wishlist. Message stays blocked (unapplied DM migration). Enter Room is the spatial CTA but does not open production Rooms for fixture collectors
+- **Own Profile in demo:** SOOMIN’s fixture identity/collection/posts. Production Edit / Add / Enter Room / collection detail remain Live-only so demo cannot conceal those production paths
+
+### Production functionality (not proven by demo)
+
+- Production Feed is still following + self via `GET /api/mobile/feed`. Discover/suggested/post-search have **no** production APIs yet (honest empty)
+- Production collector holdings/wishlist/groups are not returned by the public collector payload (count may exist; shelves stay empty)
+- Production post create, holding create, profile save, and follow still require **Live**
+- Messages remain blocked by `20261001000000_direct_messages.sql`
+
+### Old presentation replaced
+
+- Sparse/empty-only Feed as the only way to evaluate social product
+- Search as a search bar plus giant generic bordered destination rows
+- Collector Profile as a thin follow/message card without collection identity or `SeoullyPost`
+- Fake records hardcoded inside Feed/Search/Profile JSX (none; data stays behind the repository)
+
+Do not mark this expansion approved from TypeScript, Expo Doctor, or Metro export.
 
 ## Vertical Slice 01 — Collector Ownership
 

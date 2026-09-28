@@ -77,7 +77,7 @@ export function SeoullyExploreDest({
     >
       <View style={[styles.destIcon, { backgroundColor: iconBackground }]}>{icon}</View>
       <View style={styles.destCopy}>
-        <SeoullyText variant="handle" style={styles.destTitle}>{title}</SeoullyText>
+        <SeoullyText variant="title" style={styles.destTitle} numberOfLines={1}>{title}</SeoullyText>
         <SeoullyText variant="caption" numberOfLines={2} style={styles.destHint}>{hint}</SeoullyText>
       </View>
     </Pressable>
@@ -195,9 +195,7 @@ const styles = StyleSheet.create({
   dest: {
     alignItems: "center",
     backgroundColor: colors.mist,
-    borderColor: colors.border,
     borderRadius: 16,
-    borderWidth: 1,
     flexDirection: "row",
     gap: 12,
     minHeight: 64,
@@ -205,11 +203,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   destSuggested: {
-    borderColor: colors.lilac,
-    shadowColor: colors.ink,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.08,
-    shadowRadius: 0,
+    backgroundColor: colors.lilacSoft,
   },
   destIcon: {
     alignItems: "center",
@@ -219,8 +213,8 @@ const styles = StyleSheet.create({
     width: 44,
   },
   destCopy: { flex: 1, gap: 2, minWidth: 0 },
-  destTitle: { fontSize: 15, fontWeight: "700", letterSpacing: -0.2 },
-  destHint: { fontSize: 13, lineHeight: 17 },
+  destTitle: { fontSize: 22, letterSpacing: -0.6, lineHeight: 26 },
+  destHint: { lineHeight: 17 },
   row: {
     alignItems: "center",
     borderRadius: 14,
@@ -234,9 +228,7 @@ const styles = StyleSheet.create({
   rowCopy: { flex: 1, gap: 2, minWidth: 0 },
   room: {
     backgroundColor: colors.mist,
-    borderColor: colors.border,
     borderRadius: 18,
-    borderWidth: 1,
     padding: 14,
   },
   who: { flexDirection: "row", gap: 12 },

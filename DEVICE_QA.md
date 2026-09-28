@@ -128,7 +128,7 @@ Check on the physical iPhone:
 - Date: 2026-09-27
 - Branch: `mobile-native`
 - Scope: typography (Baloo 2 / Noto Sans KR), rebuilt Profile, Edit Profile, Add Collectible
-- Status: **CODE COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL**
+- Status: **PHYSICALLY APPROVED** — this is the native visual calibration baseline for later surfaces
 - Do not approve from TypeScript, Expo Doctor, or Metro export.
 
 ### Exact iPhone test sequence
@@ -181,3 +181,35 @@ Check on the physical iPhone:
 - [ ] Feed/search/profile scrolling and native navigation gestures
 - [ ] Room renderer proof FPS, texture memory, gestures, and thermal behavior
 - [ ] Binder lift/return gestures and personal image textures
+
+## Physical iPhone — Vertical Expansion 02 (Living Social World)
+
+- Date: 2026-09-27
+- Branch: `mobile-native`
+- Scope: development-only demo/fixture world + reconstructed Feed, Search/Explore, Collector Profile, post/social interactions
+- Calibration: Vertical Slice 01 (physically approved)
+- Status: **CODE COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL**
+- Do not approve from TypeScript, Expo Doctor, or Metro export.
+
+### Demo mode (development only)
+
+- Header chip **Demo** (lilac) vs **Live**
+- Default in Expo Go / `__DEV__`: Demo **on** unless SecureStore `seoully.mobile.demo-world.v1` is `"0"`
+- Switch to Live: tap **Demo** in the header until it reads **Live**
+- Switch back to Demo: tap **Live** until it reads **Demo**
+- Demo mutations (like, comment, follow, wishlist) persist until Metro reload
+- Production writes are blocked while Demo is on
+
+### Exact iPhone test sequence
+
+1. Cold launch Expo Go on `mobile-native`. Confirm the header chip reads **Demo**.
+2. Open **Feed**. Confirm Discover shows Minji’s inhabited posts (concert, haul, Seoul, unbox) with avatars, media, captions, likes, comments.
+3. Like a post. Confirm the heart and count change. Open comments, add one, confirm it appears.
+4. Tap Minji’s identity. Confirm Collector Profile answers *who is this collector?* — avatar, bio, groups/biases, compatibility, owned/wishlist, posts. Follow, then unfollow, confirm the button/count change.
+5. Confirm **Enter Room** is the spatial CTA and does **not** open a production Room for Minji. Confirm **Message** explains it is blocked.
+6. Open **Search**. Confirm destinations feel like discovering Seoully, not picking database tables. Search `minji` in People, `IVE` or `concert` in Posts, `SWITCH` in Collectibles, a group in Groups & Members.
+7. Save a collectible to wishlist in Search. Confirm it does not hit production. Check Profile wishlist.
+8. On Feed, switch **Following**. It should be empty until you followed Minji; after follow, Minji’s posts appear.
+9. Open **Profile**. Confirm you are SOOMIN in Demo, with fixture collection/posts. Confirm Edit / Add / Enter Room are not offered (those are Live production paths).
+10. Tap **Demo** → **Live**. Confirm Feed/Search/Profile return to the signed-in production account and empty production social graph is honest, not filled with fixtures.
+11. Reject if Feed/Search/Collector still feel like generic React Native lists, or if Demo content appears after switching to Live.

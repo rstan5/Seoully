@@ -4,6 +4,7 @@ import * as Linking from "expo-linking";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { FontProvider } from "../src/fonts";
+import { DataModeProvider } from "../src/data";
 import { LocaleProvider } from "../src/locale";
 import { supabase } from "../src/supabase";
 
@@ -24,10 +25,12 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <LocaleProvider>
-        <FontProvider>
-          <StatusBar style="dark" />
-          <Stack screenOptions={{ headerShown: false, animation: "fade" }} />
-        </FontProvider>
+        <DataModeProvider>
+          <FontProvider>
+            <StatusBar style="dark" />
+            <Stack screenOptions={{ headerShown: false, animation: "fade" }} />
+          </FontProvider>
+        </DataModeProvider>
       </LocaleProvider>
     </SafeAreaProvider>
   );

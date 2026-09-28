@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import { createHolding, uploadCatalogReferencePhoto, uploadHoldingPhoto } from "../src/api";
+import { useSocialRepository } from "../src/data";
 import { ScreenBack } from "../src/components/ScreenBack";
 import { useCopy } from "../src/locale";
 import { PhotocardCropper, type CropRect } from "../src/media/PhotocardCropper";
@@ -15,6 +16,7 @@ import { SeoullyText } from "../src/ui/SeoullyText";
 export default function AddCollectibleScreen() {
   const copy = useCopy();
   const router = useRouter();
+  const social = useSocialRepository();
   const params = useLocalSearchParams<{ templateId: string; name: string; kind: string; newTemplate?: string }>();
   const [uri, setUri] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
@@ -57,6 +59,7 @@ export default function AddCollectibleScreen() {
   }
 
   async function add() {
+    if (social.kind === "demo") { setMessage(copy.demoWriteBlocked); return; }
     if (!params.templateId) { setMessage(copy.chooseCatalogFirst); return; }
     setWorking(true);
     setMessage(null);

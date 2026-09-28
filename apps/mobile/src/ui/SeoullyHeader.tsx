@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
+import { isDemoWorldAllowed, useDataMode } from "../data";
+import { useCopy } from "../locale";
 import { colors, sizes } from "../theme";
 import { BrandMark } from "./BrandMark";
 import { pressShift, useReduceMotion } from "./motion";
@@ -14,11 +16,27 @@ export function SeoullyHeader({
   onToggleLanguage: () => void;
   trailing?: ReactNode;
 }) {
+  const copy = useCopy();
   const reduceMotion = useReduceMotion();
+  const { demo, setDemo } = useDataMode();
+  const allowed = isDemoWorldAllowed();
   return (
     <View style={styles.top}>
       <BrandMark />
       <View style={styles.end}>
+        {allowed ? (
+          <Pressable
+            accessibilityRole="switch"
+            accessibilityState={{ checked: demo }}
+            accessibilityLabel={demo ? copy.demoWorld : copy.productionData}
+            onPress={() => setDemo(!demo)}
+            style={({ pressed }) => [styles.demo, demo && styles.demoOn, pressShift(pressed, reduceMotion)]}
+          >
+            <SeoullyText variant="caption" color={demo ? colors.plum : colors.muted}>
+              {demo ? copy.demoWorld : copy.productionData}
+            </SeoullyText>
+          </Pressable>
+        ) : null}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={languageLabel}
@@ -51,6 +69,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexShrink: 0,
     marginLeft: 12,
+  },
+  demo: {
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    justifyContent: "center",
+    marginRight: 6,
+    minHeight: 28,
+    paddingHorizontal: 8,
+  },
+  demoOn: {
+    backgroundColor: colors.lilacSoft,
+    borderColor: colors.lilac,
   },
   lang: {
     justifyContent: "center",

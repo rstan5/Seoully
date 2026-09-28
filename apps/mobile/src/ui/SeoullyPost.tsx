@@ -23,12 +23,16 @@ export function SeoullyMedia({ url, label }: { url: string; label?: string }) {
 }
 
 export function SeoullyCollectorIdentity({
+  name,
   handle,
   location,
+  imageUrl,
   onPress,
 }: {
+  name: string;
   handle: string;
   location?: string | null;
+  imageUrl?: string;
   onPress: () => void;
 }) {
   const reduceMotion = useReduceMotion();
@@ -38,10 +42,10 @@ export function SeoullyCollectorIdentity({
       onPress={onPress}
       style={({ pressed }) => [styles.who, pressShift(pressed, reduceMotion)]}
     >
-      <SeoullyAvatar name={handle} />
+      <SeoullyAvatar name={name} imageUrl={imageUrl} />
       <View>
-        <SeoullyText variant="handle">{handle}</SeoullyText>
-        {location ? <SeoullyText variant="metadata">{location}</SeoullyText> : null}
+        <SeoullyText variant="handle">{name}</SeoullyText>
+        <SeoullyText variant="metadata">@{handle}{location ? ` · ${location}` : ""}</SeoullyText>
       </View>
     </Pressable>
   );
@@ -99,8 +103,10 @@ export function SeoullyPost({
     <View style={styles.post}>
       <View style={styles.head}>
         <SeoullyCollectorIdentity
+          name={item.author.displayName}
           handle={item.author.handle}
           location={item.location}
+          imageUrl={item.authorAvatarUrl}
           onPress={() => onOpenCollector(item.author.userId)}
         />
         <SeoullyText variant="metadata">{formatPostTime(item.createdAt, locale)}</SeoullyText>

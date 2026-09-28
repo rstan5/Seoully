@@ -1,17 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import {
-  loadAllMyWishlist,
-  loadRoomDiscovery,
-  searchCatalog,
-  searchCollectors,
-  setWishlistTemplate,
   type NativeCatalogTemplate,
+  type NativeFeedPost,
   type NativeRoomDiscovery,
   type NativeSearchUser,
 } from "../../src/api";
+import { useSocialRepository, type SocialEntity } from "../../src/data";
 import { KeyboardScreen } from "../../src/components/KeyboardScreen";
 import { RetryNotice } from "../../src/components/RetryNotice";
 import { collectibleKindLabel, type MobileCopy } from "../../src/i18n";
@@ -22,6 +19,7 @@ import { SeoullyAvatar } from "../../src/ui/SeoullyAvatar";
 import { SeoullyEmptyState } from "../../src/ui/SeoullyEmptyState";
 import { SeoullyHeader } from "../../src/ui/SeoullyHeader";
 import { SeoullyLoadingState } from "../../src/ui/SeoullyLoadingState";
+import { SeoullyPost } from "../../src/ui/SeoullyPost";
 import { SeoullyScreen } from "../../src/ui/SeoullyScreen";
 import {
   SeoullyCollectibleMark,
@@ -39,77 +37,24 @@ const DEBOUNCE_MS = 200;
 export const EXPLORE_DESTINATIONS = ["people", "rooms", "posts", "collectibles", "entities"] as const;
 export type ExploreDestination = (typeof EXPLORE_DESTINATIONS)[number];
 
-type SearchEntity = {
-  id: string;
-  kind: "group" | "member";
-  title: string;
-  subtitle?: string;
-  query: string;
-};
+type SearchEntity = SocialEntity;
 
 function looksLikeHandle(query: string) {
   return /^@?[a-z0-9._]{2,}$/i.test(query.trim());
-}
-
-function matchesQuery(value: string, query: string) {
-  const needle = query.trim().replace(/^@+/, "").toLowerCase();
-  return value.toLowerCase().includes(needle);
-}
-
-function entitiesFromCatalog(items: NativeCatalogTemplate[]): SearchEntity[] {
-  const groups = new Map<string, SearchEntity>();
-  const members = new Map<string, SearchEntity>();
-  for (const item of items) {
-    if (item.groupId && item.groupName && !groups.has(item.groupId)) {
-      groups.set(item.groupId, {
-        id: item.groupId,
-        kind: "group",
-        title: item.groupName,
-        query: item.groupName,
-      });
-    }
-    if (item.memberId && item.memberName && !members.has(item.memberId)) {
-      members.set(item.memberId, {
-        id: item.memberId,
-        kind: "member",
-        title: item.memberName,
-        subtitle: item.groupName,
-        query: item.memberName,
-      });
-    }
-  }
-  return [...groups.values(), ...members.values()].slice(0, 24);
-}
-
-function roomsForQuery(rooms: NativeRoomDiscovery[], people: NativeSearchUser[], query: string) {
-  const discovered = rooms.filter((room) => (
-    matchesQuery(room.collector.displayName, query) || matchesQuery(room.collector.handle, query)
-  ));
-  const byUser = new Map(discovered.map((room) => [room.collector.userId, room]));
-  for (const person of people) {
-    if (byUser.has(person.userId)) continue;
-    if (!matchesQuery(person.displayName, query) && !matchesQuery(person.handle, query)) continue;
-    byUser.set(person.userId, {
-      roomId: person.userId,
-      collector: person,
-      rankScore: 0,
-      displayedHoldingCount: 0,
-      relevantDisplayedCount: 0,
-      reasons: [],
-    });
-  }
-  return [...byUser.values()];
 }
 
 export default function SearchScreen() {
   const router = useRouter();
   const copy = useCopy();
   const { toggleLocale } = useLocale();
+  const social = useSocialRepository();
   const [query, setQuery] = useState("");
   const [destination, setDestination] = useState<ExploreDestination | null>(null);
   const [people, setPeople] = useState<NativeSearchUser[]>([]);
   const [rooms, setRooms] = useState<NativeRoomDiscovery[]>([]);
   const [catalog, setCatalog] = useState<NativeCatalogTemplate[]>([]);
+  const [posts, setPosts] = useState<NativeFeedPost[]>([]);
+  const [entities, setEntities] = useState<SearchEntity[]>([]);
   const [wantedIds, setWantedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -117,8 +62,6 @@ export default function SearchScreen() {
   const activeQuery = query.trim();
   const handleQuery = looksLikeHandle(query);
   const showingResults = destination !== null;
-  const entities = useMemo(() => entitiesFromCatalog(catalog), [catalog]);
-  const roomHits = useMemo(() => roomsForQuery(rooms, people, query), [rooms, people, query]);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -131,12 +74,12 @@ export default function SearchScreen() {
 
   const hydrateWishlist = useCallback(async () => {
     try {
-      const entries = await loadAllMyWishlist();
+      const entries = await social.loadMyWishlist();
       setWantedIds(new Set(entries.map((entry) => entry.templateId)));
     } catch {
       setError(copy.wishlistUnavailable);
     }
-  }, [copy.wishlistUnavailable]);
+  }, [copy.wishlistUnavailable, social]);
 
   useFocusEffect(useCallback(() => {
     void hydrateWishlist();
@@ -144,10 +87,12 @@ export default function SearchScreen() {
 
   const runSearch = useCallback(async (nextQuery: string, nextDestination: ExploreDestination) => {
     const text = nextQuery.trim().slice(0, 120);
-    if (!text || nextDestination === "posts") {
+    if (!text) {
       setPeople([]);
       setRooms([]);
       setCatalog([]);
+      setPosts([]);
+      setEntities([]);
       setLoading(false);
       setError(null);
       return;
@@ -156,25 +101,27 @@ export default function SearchScreen() {
     setError(null);
     try {
       if (nextDestination === "people") {
-        setPeople(await searchCollectors(text));
-        setRooms([]);
-        setCatalog([]);
+        setPeople(await social.searchCollectors(text));
+        setRooms([]); setCatalog([]); setPosts([]); setEntities([]);
       } else if (nextDestination === "rooms") {
-        const [nextRooms, nextPeople] = await Promise.all([loadRoomDiscovery(), searchCollectors(text)]);
-        setRooms(nextRooms);
-        setPeople(nextPeople);
-        setCatalog([]);
+        setRooms(await social.searchRooms(text));
+        setPeople([]); setCatalog([]); setPosts([]); setEntities([]);
+      } else if (nextDestination === "posts") {
+        setPosts(await social.searchPosts(text));
+        setPeople([]); setRooms([]); setCatalog([]); setEntities([]);
+      } else if (nextDestination === "entities") {
+        setEntities(await social.searchEntities(text));
+        setPeople([]); setRooms([]); setCatalog([]); setPosts([]);
       } else {
-        setCatalog(await searchCatalog(text));
-        setPeople([]);
-        setRooms([]);
+        setCatalog(await social.searchCatalog(text));
+        setPeople([]); setRooms([]); setPosts([]); setEntities([]);
       }
     } catch {
       setError(nextDestination === "people" || nextDestination === "rooms" ? copy.exploreUnavailable : copy.catalogUnavailable);
     } finally {
       setLoading(false);
     }
-  }, [copy.catalogUnavailable, copy.exploreUnavailable]);
+  }, [copy.catalogUnavailable, copy.exploreUnavailable, social]);
 
   useEffect(() => {
     let active = true;
@@ -218,6 +165,8 @@ export default function SearchScreen() {
     setPeople([]);
     setRooms([]);
     setCatalog([]);
+    setPosts([]);
+    setEntities([]);
     setError(null);
     void AsyncStorage.removeItem(SEARCH_QUERY_KEY);
   }
@@ -225,7 +174,7 @@ export default function SearchScreen() {
   async function saveWanted(templateId: string) {
     if (wantedIds.has(templateId)) return;
     try {
-      await setWishlistTemplate(templateId, true);
+      await social.setWishlist(templateId, true);
       setWantedIds((current) => new Set(current).add(templateId));
     } catch {
       setError(copy.wishlistUnavailable);
@@ -307,18 +256,24 @@ export default function SearchScreen() {
 
               {activeQuery && !loading && destination === "rooms" ? (
                 <RoomResults
-                  hits={roomHits}
+                  hits={rooms}
                   heading={copy.resultsRooms}
                   empty={copy.searchNone}
                   matchLabel={(score) => copy.searchMatch.replace("{score}", String(score))}
                   enterLabel={copy.viewCollectorRoom}
                   reasonText={(codes) => reasonLabel(codes[0], copy)}
-                  onEnter={(userId) => router.push({ pathname: "/collector-room", params: { userId } })}
+                  onEnter={(userId) => social.kind === "demo"
+                    ? router.push({ pathname: "/collector", params: { userId } })
+                    : router.push({ pathname: "/collector-room", params: { userId } })}
                 />
               ) : null}
 
               {activeQuery && !loading && destination === "posts" ? (
-                <SeoullyEmptyState align="start" body={copy.searchNone} />
+                <PostResults
+                  hits={posts}
+                  heading={copy.resultsPosts}
+                  empty={copy.searchNone}
+                />
               ) : null}
 
               {activeQuery && !loading && destination === "collectibles" ? (
@@ -331,7 +286,9 @@ export default function SearchScreen() {
                   saveLabel={copy.saveToWishlist}
                   savedLabel={copy.savedToWishlist}
                   wantedIds={wantedIds}
-                  onAdd={(item) => router.push({ pathname: "/add", params: { templateId: item.id, name: item.name, kind: item.kind } })}
+                  onAdd={social.kind === "production"
+                    ? (item) => router.push({ pathname: "/add", params: { templateId: item.id, name: item.name, kind: item.kind } })
+                    : undefined}
                   onSave={saveWanted}
                 />
               ) : null}
@@ -371,17 +328,94 @@ function PeopleResults({
   if (hits.length === 0) return <SeoullyEmptyState align="start" body={empty} />;
   return (
     <View>
-      <SeoullyText style={styles.section}>{heading}</SeoullyText>
+      <SeoullyText variant="section" style={styles.section}>{heading}</SeoullyText>
       {hits.map((person) => (
         <SeoullySearchRow
           key={person.userId}
           title={person.displayName}
           meta={`@${person.handle}`}
-          leading={<SeoullyAvatar name={person.displayName} size={40} />}
+          leading={<SeoullyAvatar name={person.displayName} size={40} imageUrl={person.avatarUrl} />}
           onPress={() => onOpen(person.userId)}
         />
       ))}
     </View>
+  );
+}
+
+function PostResults({
+  hits,
+  heading,
+  empty,
+}: {
+  hits: NativeFeedPost[];
+  heading: string;
+  empty: string;
+}) {
+  const copy = useCopy();
+  const { locale } = useLocale();
+  const router = useRouter();
+  if (hits.length === 0) return <SeoullyEmptyState align="start" body={empty} />;
+  return (
+    <View>
+      <SeoullyText variant="section" style={styles.section}>{heading}</SeoullyText>
+      {hits.map((item) => (
+        <SearchPost key={item.id} item={item} copy={copy} locale={locale} onOpen={(userId) => router.push({ pathname: "/collector", params: { userId } })} />
+      ))}
+    </View>
+  );
+}
+
+function SearchPost({
+  item,
+  copy,
+  locale,
+  onOpen,
+}: {
+  item: NativeFeedPost;
+  copy: MobileCopy;
+  locale: "en" | "ko";
+  onOpen: (userId: string) => void;
+}) {
+  const social = useSocialRepository();
+  const [comments, setComments] = useState<import("../../src/api").NativePostComment[] | null>(null);
+  const [commentBody, setCommentBody] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [post, setPost] = useState(item);
+
+  async function toggleLike() {
+    const nextLiked = !post.likedByMe;
+    const optimistic = { ...post, likedByMe: nextLiked, likeCount: Math.max(0, post.likeCount + (nextLiked ? 1 : -1)) };
+    setPost(optimistic);
+    try { await social.setPostLiked(post.id, nextLiked); } catch { setPost(post); }
+  }
+
+  return (
+    <SeoullyPost
+      item={post}
+      copy={copy}
+      locale={locale}
+      comments={comments}
+      commentCursor={null}
+      commentBody={commentBody}
+      commentError={null}
+      busy={busy}
+      onOpenCollector={(userId) => { if (userId) onOpen(userId); }}
+      onToggleLike={() => { void toggleLike(); }}
+      onToggleComments={() => { void social.loadPostComments(post.id).then((page) => setComments(page.items)); }}
+      onLoadMoreComments={() => undefined}
+      onChangeComment={setCommentBody}
+      onSubmitComment={() => {
+        const body = commentBody.trim();
+        if (!body) return;
+        setBusy(true);
+        void social.addPostComment(post.id, body).then((comment) => {
+          setComments((current) => [...(current ?? []), comment]);
+          setCommentBody("");
+          setPost((current) => ({ ...current, commentCount: current.commentCount + 1 }));
+        }).finally(() => setBusy(false));
+      }}
+      onRetryComments={() => undefined}
+    />
   );
 }
 
@@ -405,7 +439,7 @@ function RoomResults({
   if (hits.length === 0) return <SeoullyEmptyState align="start" body={empty} />;
   return (
     <View style={styles.roomList}>
-      <SeoullyText style={styles.section}>{heading}</SeoullyText>
+      <SeoullyText variant="section" style={styles.section}>{heading}</SeoullyText>
       {hits.map((hit) => (
         <SeoullyExploreRoom
           key={`${hit.roomId}-${hit.collector.userId}`}
@@ -441,13 +475,13 @@ function CollectibleResults({
   saveLabel: string;
   savedLabel: string;
   wantedIds: Set<string>;
-  onAdd: (item: NativeCatalogTemplate) => void;
+  onAdd?: (item: NativeCatalogTemplate) => void;
   onSave: (templateId: string) => void;
 }) {
   if (hits.length === 0) return <SeoullyEmptyState align="start" body={empty} />;
   return (
     <View>
-      <SeoullyText style={styles.section}>{heading}</SeoullyText>
+      <SeoullyText variant="section" style={styles.section}>{heading}</SeoullyText>
       {hits.map((item) => {
         const line = [item.groupName, item.memberName, kindText(item.kind)].filter(Boolean).join(" · ");
         return (
@@ -459,9 +493,11 @@ function CollectibleResults({
               staticRow
             />
             <View style={styles.actions}>
-              <Pressable accessibilityRole="button" onPress={() => onAdd(item)}>
-                <SeoullyText variant="button" color={colors.plum}>{addLabel}</SeoullyText>
-              </Pressable>
+              {onAdd ? (
+                <Pressable accessibilityRole="button" onPress={() => onAdd(item)}>
+                  <SeoullyText variant="button" color={colors.plum}>{addLabel}</SeoullyText>
+                </Pressable>
+              ) : null}
               <Pressable accessibilityRole="button" disabled={wantedIds.has(item.id)} onPress={() => onSave(item.id)}>
                 <SeoullyText variant="button" color={wantedIds.has(item.id) ? colors.muted : colors.plum}>
                   {wantedIds.has(item.id) ? savedLabel : saveLabel}
@@ -491,7 +527,7 @@ function EntityResults({
   if (hits.length === 0) return <SeoullyEmptyState align="start" body={empty} />;
   return (
     <View>
-      <SeoullyText style={styles.section}>{heading}</SeoullyText>
+      <SeoullyText variant="section" style={styles.section}>{heading}</SeoullyText>
       {hits.map((hit) => (
         <SeoullySearchRow
           key={`${hit.kind}-${hit.id}`}
@@ -591,15 +627,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   heading: { flex: 1, gap: 2, minWidth: 0, paddingTop: 6 },
-  section: {
-    color: colors.plum,
-    fontSize: 16,
-    fontWeight: "700",
-    letterSpacing: -0.3,
-    lineHeight: 20,
-    marginBottom: 8,
-    marginTop: 18,
-  },
+  section: { marginBottom: 8, marginTop: 18 },
   roomList: { gap: 12 },
   actions: { flexDirection: "row", gap: spacing.md, paddingBottom: 8, paddingHorizontal: 8 },
   dot: { backgroundColor: colors.lilacSoft, borderRadius: 20, height: 40, width: 40 },

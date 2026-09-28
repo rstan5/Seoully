@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "expo-router";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { contributeCatalogItem, searchCatalog, type NativeCatalogTemplate } from "../src/api";
+import { useSocialRepository } from "../src/data";
 import { KeyboardScreen } from "../src/components/KeyboardScreen";
 import { ScreenBack } from "../src/components/ScreenBack";
 import { collectibleKindLabel } from "../src/i18n";
@@ -20,6 +21,7 @@ type Step = "entry" | "search" | "manual";
 export default function CollectScreen() {
   const copy = useCopy();
   const router = useRouter();
+  const social = useSocialRepository();
   const [step, setStep] = useState<Step>("entry");
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<NativeCatalogTemplate[]>([]);
@@ -71,6 +73,7 @@ export default function CollectScreen() {
   }
 
   async function submitManual() {
+    if (social.kind === "demo") return setMessage(copy.demoWriteBlocked);
     if (!name.trim()) return setMessage(copy.collectibleNameRequired);
     if (!groupName.trim()) return setMessage(copy.groupNameRequired);
     setWorking(true);

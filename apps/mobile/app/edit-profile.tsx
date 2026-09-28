@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { resolveNativeIdentity, updateNativeProfile, type NativeIdentity } from "../src/api";
+import { useSocialRepository } from "../src/data";
 import { KeyboardScreen } from "../src/components/KeyboardScreen";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { useCopy, useLocale } from "../src/locale";
@@ -26,6 +27,7 @@ export default function EditProfileScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const social = useSocialRepository();
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -50,6 +52,7 @@ export default function EditProfileScreen() {
   }, [refresh]));
 
   async function save() {
+    if (social.kind === "demo") { setMessage(copy.demoWriteBlocked); return; }
     if (busy || !displayName.trim()) return;
     setBusy(true);
     setMessage(null);

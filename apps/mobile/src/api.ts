@@ -29,7 +29,7 @@ export type NativeCatalogTemplate = {
   releaseName: string | null;
 };
 
-export type NativeSearchUser = { userId: string; handle: string; displayName: string };
+export type NativeSearchUser = { userId: string; handle: string; displayName: string; avatarUrl?: string };
 
 export async function searchCollectors(query: string): Promise<NativeSearchUser[]> {
   const accessToken = await mobileAccessToken();
@@ -190,6 +190,7 @@ export type NativeFeedPost = {
   createdAt: string;
   location?: string | null;
   author: NativeSocialAuthor;
+  authorAvatarUrl?: string;
   likeCount: number;
   commentCount: number;
   likedByMe: boolean;

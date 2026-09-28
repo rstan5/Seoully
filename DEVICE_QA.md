@@ -123,6 +123,52 @@ Check on the physical iPhone:
 - [ ] Onboarding chips and continue/skip still save production tastes
 - [ ] Email confirmation still returns into the app
 
+## Physical iPhone — Vertical Slice 01 (Collector Ownership)
+
+- Date: 2026-09-27
+- Branch: `mobile-native`
+- Scope: typography (Baloo 2 / Noto Sans KR), rebuilt Profile, Edit Profile, Add Collectible
+- Status: **CODE COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL**
+- Do not approve from TypeScript, Expo Doctor, or Metro export.
+
+### Exact iPhone test sequence
+
+1. Cold launch Expo Go on `mobile-native`. Confirm session restores or sign in.
+2. Open **Profile**. Confirm it reads as *who is this collector?* — avatar, name, handle, counts, bio, groups/biases, collection/wishlist/posts.
+3. Confirm **Enter Room** is the main spatial CTA. **Edit Profile** is a secondary text link. Sign out is not on Profile.
+4. Tap **Add to collection**. Confirm the fork: **Search Seoully's Catalog** or **Add Manually**.
+5. Catalog path: search a known group/member, pick a result, photograph or choose a library image.
+6. If the item is a photocard: crop/pan/zoom, then **Use this crop**.
+7. Tap **Add to collection**. Confirm you land on the collectible and the Holding id is stable.
+8. Back to **Profile**. Confirm the new item appears in Owned / collected count after refresh.
+9. Open **Collection**. Confirm the same Holding is there with personal media if you added a photo.
+10. Manual path: Add Manually → name + group + type → photo → Add to collection. Confirm it appears the same way.
+11. Open **Edit Profile**. Change display name or bio. Save. Confirm Profile shows the change. Sign out from Edit, then restore session.
+12. Photocard: open **Binder**. Confirm the new card is eligible (in a pocket if `kind === photocard`). GL feel is separate.
+13. Any new Holding: open **Room**. Confirm it is eligible in the stored tray until placed. Do not expect finished Room/Binder visuals this slice.
+14. Reject if Profile/Edit/Add still feel like generic React Native forms, or if type still looks like system San Francisco.
+
+### PROFILE: AWAITING PHYSICAL DEVICE VISUAL APPROVAL
+- [ ] Baloo 2 (EN) / Noto Sans KR (KO) is visibly loaded — not system UI type
+- [ ] Identity hierarchy matches Seoully: 86px avatar ring, name, @handle, counts
+- [ ] Enter Room is important; Edit is secondary; no settings-row of equal pills
+- [ ] Owned / wishlist / posts refresh after adding a collectible
+
+### EDIT PROFILE: AWAITING PHYSICAL DEVICE VISUAL APPROVAL
+- [ ] Cancel | Edit Profile | Save chrome
+- [ ] Labeled fields, not a stack of giant bordered placeholders
+- [ ] Production save of display name / tagline / bio / location
+- [ ] Avatar upload is *not* claimed (production media path is not ready)
+- [ ] Sign out lives here
+
+### ADD COLLECTIBLE: AWAITING PHYSICAL DEVICE VISUAL APPROVAL
+- [ ] Search Catalog vs Add Manually is immediately understandable
+- [ ] Catalog search hits production `/api/catalog/search`
+- [ ] Manual contribute hits production catalog contribution
+- [ ] Photo/crop feels like “this is my copy”
+- [ ] Add to collection creates a Holding that Profile and Collection then show
+- [ ] Photocards become Binder-eligible; all new holdings become Room stored-tray eligible
+
 ## Remaining physical checks
 
 - [ ] iOS launch and safe-area layout

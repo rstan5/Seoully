@@ -135,20 +135,22 @@ export default function CollectibleDetailScreen() {
               <SeoullyButton
                 label={holding.tradeStatus === "for-trade" ? copy.keepInCollection : copy.markForTrade}
                 disabled={busy}
+                block
                 onPress={() => { void toggleTrade(); }}
               />
               <View style={styles.row}>
-                <SeoullyButton label={copy.takePhoto} variant="ghost" disabled={busy} onPress={() => { void choosePhoto("camera"); }} />
+                <SeoullyButton label={copy.takePhoto} variant="ghost" disabled={busy} fill onPress={() => { void choosePhoto("camera"); }} />
                 <SeoullyButton
                   label={holding.personalMediaUrl ? copy.replacePersonalPhoto : copy.addPersonalPhoto}
                   variant="ghost"
                   disabled={busy}
+                  fill
                   onPress={() => { void choosePhoto("library"); }}
                 />
               </View>
               <View style={styles.row}>
-                <SeoullyButton label={copy.viewRoom} variant="ghost" onPress={() => router.push("/room")} />
-                <SeoullyButton label={copy.viewBinder} variant="ghost" onPress={() => router.push("/binder")} />
+                <SeoullyButton label={copy.viewRoom} variant="ghost" fill onPress={() => router.push("/room")} />
+                <SeoullyButton label={copy.viewBinder} variant="ghost" fill onPress={() => router.push("/binder")} />
               </View>
             </View>
           </>

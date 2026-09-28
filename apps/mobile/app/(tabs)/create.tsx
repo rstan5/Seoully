@@ -125,8 +125,8 @@ export default function CreateScreen() {
               <SeoullyText variant="secondary">{copy.createPostLead}</SeoullyText>
               {postUri ? <Image source={{ uri: postUri }} style={styles.preview} /> : null}
               <View style={styles.row}>
-                <SeoullyButton label={copy.takePostPhoto} variant="ghost" onPress={() => { void choosePostPhoto("camera"); }} />
-                <SeoullyButton label={copy.choosePostPhoto} variant="ghost" onPress={() => { void choosePostPhoto("library"); }} />
+                <SeoullyButton label={copy.takePostPhoto} variant="ghost" fill onPress={() => { void choosePostPhoto("camera"); }} />
+                <SeoullyButton label={copy.choosePostPhoto} variant="ghost" fill onPress={() => { void choosePostPhoto("library"); }} />
               </View>
               <TextInput
                 maxLength={2000}
@@ -137,7 +137,7 @@ export default function CreateScreen() {
                 multiline
                 style={[styles.input, styles.caption]}
               />
-              <SeoullyButton label={copy.publishPost} disabled={working} onPress={() => { void publishPost(); }} />
+              <SeoullyButton label={copy.publishPost} disabled={working} block onPress={() => { void publishPost(); }} />
             </>
           ) : (
             <>
@@ -157,7 +157,7 @@ export default function CreateScreen() {
                   />
                 ))}
               </View>
-              <SeoullyButton label={copy.continue} disabled={working} onPress={() => { void submitCollectible(); }} />
+              <SeoullyButton label={copy.continue} disabled={working} block onPress={() => { void submitCollectible(); }} />
             </>
           )}
           {message ? <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum}>{message}</SeoullyText> : null}

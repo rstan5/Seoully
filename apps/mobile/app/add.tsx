@@ -79,9 +79,9 @@ export default function AddCollectibleScreen() {
     <SeoullyScreen>
       <ScrollView contentContainerStyle={styles.container}>
         <ScreenBack label={copy.back} onPress={() => router.back()} />
-        <SeoullyText variant="title">{copy.addCollectible}</SeoullyText>
+        <SeoullyText variant="title" style={styles.headline}>{copy.myCopyTitle}</SeoullyText>
         <SeoullyText variant="handle" color={colors.plum}>{params.name ?? copy.catalogItemFallback}</SeoullyText>
-        <SeoullyText variant="secondary">{copy.addPhotoLead}</SeoullyText>
+        <SeoullyText variant="secondary" style={styles.lede}>{copy.myCopyLede}</SeoullyText>
         {uri ? (
           <Image
             accessibilityLabel={copy.personalPreview}
@@ -95,8 +95,8 @@ export default function AddCollectibleScreen() {
           </View>
         )}
         <View style={styles.row}>
-          <SeoullyButton label={copy.takePhoto} variant="ghost" onPress={() => { void choose("camera"); }} />
-          <SeoullyButton label={copy.chooseFromLibrary} variant="ghost" onPress={() => { void choose("library"); }} />
+          <SeoullyButton label={copy.takePhoto} variant="ghost" fill onPress={() => { void choose("camera"); }} />
+          <SeoullyButton label={copy.chooseFromLibrary} variant="ghost" fill onPress={() => { void choose("library"); }} />
         </View>
         {params.newTemplate === "true" ? (
           <Pressable
@@ -108,7 +108,12 @@ export default function AddCollectibleScreen() {
             <SeoullyText variant="body">{shareReference ? "☑" : "☐"} {copy.shareCatalogPhoto}</SeoullyText>
           </Pressable>
         ) : null}
-        <SeoullyButton label={working ? copy.saving : copy.addToCollection} disabled={working} onPress={() => { void add(); }} />
+        <SeoullyButton
+          label={working ? copy.saving : copy.addToCollection}
+          disabled={working}
+          block
+          onPress={() => { void add(); }}
+        />
         {message ? <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum}>{message}</SeoullyText> : null}
       </ScrollView>
       <PhotocardCropper
@@ -127,15 +132,15 @@ export default function AddCollectibleScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { gap: 12, paddingBottom: 80, paddingHorizontal: 16 },
+  container: { gap: 14, paddingBottom: 80, paddingHorizontal: 16 },
+  headline: { letterSpacing: -0.8, marginTop: 8 },
+  lede: { lineHeight: 21 },
   preview: { alignSelf: "center", borderRadius: 14, height: 240, width: 180 },
-  cardPreview: { alignSelf: "center", aspectRatio: 55 / 85, borderRadius: 14, width: "62%" },
+  cardPreview: { alignSelf: "center", aspectRatio: 55 / 85, borderRadius: 10, width: "58%" },
   empty: {
     alignItems: "center",
     backgroundColor: colors.mist,
-    borderColor: colors.border,
     borderRadius: 16,
-    borderWidth: 1,
     justifyContent: "center",
     minHeight: 160,
     padding: 18,

@@ -126,7 +126,7 @@ export default function OnboardingScreen() {
       <SeoullyScreen>
         <View style={styles.centered}>
           <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum}>{error}</SeoullyText>
-          <SeoullyButton label={t.retry} onPress={() => { void load(); }} />
+          <SeoullyButton label={t.retry} block onPress={() => { void load(); }} />
         </View>
       </SeoullyScreen>
     );
@@ -197,6 +197,7 @@ export default function OnboardingScreen() {
                 ? t.skipForNow
                 : t.continue)}
             disabled={saving || (step === "interest" && interests.length === 0)}
+            block
             onPress={() => { void advance(); }}
           />
           {error ? <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum}>{error}</SeoullyText> : null}

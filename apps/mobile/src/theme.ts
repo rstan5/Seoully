@@ -39,16 +39,32 @@ export const spacing = {
   compact: 6,
 } as const;
 
+export type TypeFace = "regular" | "semibold" | "bold";
+
+/** Named files from @expo-google-fonts. Do not also set fontWeight — iOS will miss the face. */
+export const faces = {
+  en: {
+    regular: "Baloo2_400Regular",
+    semibold: "Baloo2_600SemiBold",
+    bold: "Baloo2_700Bold",
+  },
+  ko: {
+    regular: "NotoSansKR_400Regular",
+    semibold: "NotoSansKR_600SemiBold",
+    bold: "NotoSansKR_700Bold",
+  },
+} as const;
+
 export const type = {
-  display: { fontSize: 20, fontWeight: "700" as const, letterSpacing: -0.8, lineHeight: 24 },
-  title: { fontSize: 22, fontWeight: "700" as const, letterSpacing: -0.6, lineHeight: 26 },
-  section: { fontSize: 13, fontWeight: "700" as const, letterSpacing: 0.4, lineHeight: 16 },
-  body: { fontSize: 14, fontWeight: "400" as const, lineHeight: 20 },
-  secondary: { fontSize: 14, fontWeight: "400" as const, lineHeight: 20 },
-  caption: { fontSize: 12, fontWeight: "400" as const, lineHeight: 16 },
-  button: { fontSize: 14, fontWeight: "600" as const, letterSpacing: -0.2, lineHeight: 18 },
-  metadata: { fontSize: 12, fontWeight: "400" as const, lineHeight: 16 },
-  handle: { fontSize: 14, fontWeight: "600" as const, letterSpacing: -0.2, lineHeight: 18 },
+  display: { fontSize: 20, letterSpacing: -0.8, lineHeight: 24, face: "bold" as const },
+  title: { fontSize: 22, letterSpacing: -0.6, lineHeight: 26, face: "bold" as const },
+  section: { fontSize: 13, letterSpacing: 0.4, lineHeight: 16, face: "bold" as const },
+  body: { fontSize: 14, lineHeight: 20, face: "regular" as const },
+  secondary: { fontSize: 14, lineHeight: 20, face: "regular" as const },
+  caption: { fontSize: 12, lineHeight: 16, face: "regular" as const },
+  button: { fontSize: 14, letterSpacing: -0.2, lineHeight: 18, face: "semibold" as const },
+  metadata: { fontSize: 12, lineHeight: 16, face: "regular" as const },
+  handle: { fontSize: 14, letterSpacing: -0.2, lineHeight: 18, face: "semibold" as const },
 } as const;
 
 export const radii = {

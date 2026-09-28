@@ -103,6 +103,7 @@ export default function Index() {
             <SeoullyButton
               label={createMode ? t.createAccount : t.signIn}
               disabled={submitting || !mobileConfig.isConfigured}
+              block
               onPress={() => { void submit(); }}
             />
             {submitting ? <ActivityIndicator color={colors.plum} /> : null}

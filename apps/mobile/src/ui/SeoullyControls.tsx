@@ -8,11 +8,15 @@ export function SeoullyButton({
   label,
   variant = "primary",
   disabled = false,
+  block = false,
+  fill = false,
   onPress,
 }: {
   label: string;
   variant?: "primary" | "ghost" | "enter";
   disabled?: boolean;
+  block?: boolean;
+  fill?: boolean;
   onPress: () => void;
 }) {
   const reduceMotion = useReduceMotion();
@@ -26,6 +30,8 @@ export function SeoullyButton({
         styles.button,
         variant === "ghost" && styles.ghost,
         variant === "enter" && styles.enter,
+        block && styles.block,
+        fill && styles.fill,
         pressShift(pressed, reduceMotion),
       ]}
     >
@@ -107,13 +113,13 @@ export function SeoullyShelf({
           onPress={onToggle}
           style={({ pressed }) => [styles.shelfToggle, pressShift(pressed, reduceMotion)]}
         >
-          <SeoullyText style={styles.shelfTitle}>{title}</SeoullyText>
+          <SeoullyText variant="handle" color={colors.plum}>{title}</SeoullyText>
           <View style={styles.shelfCount}>
             <SeoullyText variant="caption" color={colors.plum}>{count}</SeoullyText>
           </View>
         </Pressable>
       ) : (
-        <SeoullyText style={styles.shelfTitle}>{title}</SeoullyText>
+        <SeoullyText variant="handle" color={colors.plum}>{title}</SeoullyText>
       )}
       {(!collapsible || expanded) ? (
         <View style={styles.shelfBody}>
@@ -130,10 +136,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.action,
     borderRadius: radii.button,
-    flex: 1,
     justifyContent: "center",
     minHeight: 40,
+    paddingHorizontal: 14,
     ...elevation.raise,
+  },
+  block: {
+    alignSelf: "stretch",
+    width: "100%",
+  },
+  fill: {
+    flex: 1,
   },
   ghost: {
     backgroundColor: colors.lilacSoft,
@@ -176,12 +189,6 @@ const styles = StyleSheet.create({
     gap: 8,
     justifyContent: "space-between",
     minHeight: 44,
-  },
-  shelfTitle: {
-    color: colors.plum,
-    fontSize: 16,
-    fontWeight: "700",
-    letterSpacing: -0.3,
   },
   shelfBody: { paddingTop: 6 },
   shelfEmpty: { marginTop: 10 },

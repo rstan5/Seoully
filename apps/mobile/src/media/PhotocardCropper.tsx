@@ -1,7 +1,8 @@
 /* eslint-disable react-hooks/refs -- Gesture refs are read and written only inside PanResponder callbacks. */
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Image, Modal, PanResponder, Pressable, SafeAreaView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Image, Modal, PanResponder, Pressable, SafeAreaView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { colors, spacing } from "../theme";
+import { SeoullyText } from "../ui/SeoullyText";
 
 const CARD_RATIO = 660 / 1020;
 const MIN_ZOOM = 1;
@@ -92,19 +93,27 @@ export function PhotocardCropper({
 
   return <Modal animationType="slide" visible onRequestClose={onCancel}>
     <SafeAreaView style={styles.screen}>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.hint}>{hint}</Text>
+      <SeoullyText variant="title">{title}</SeoullyText>
+      <SeoullyText variant="secondary" style={styles.hint}>{hint}</SeoullyText>
       <View {...panResponder.panHandlers} style={[styles.viewport, { width: viewportWidth, height: viewportHeight }]}>
         <Image source={{ uri: asset.uri }} style={{ position: "absolute", width: displayWidth, height: displayHeight, left: (viewportWidth - displayWidth) / 2 + transform.x, top: (viewportHeight - displayHeight) / 2 + transform.y }} />
         <View pointerEvents="none" style={styles.frame} />
       </View>
       <View style={styles.zoomRow}>
-        <Pressable accessibilityRole="button" accessibilityLabel={zoomOutLabel} onPress={() => adjustZoom(-0.2)} style={styles.zoomButton}><Text style={styles.zoomText}>−</Text></Pressable>
-        <Text style={styles.zoomValue}>{Math.round(transform.zoom * 100)}%</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel={zoomInLabel} onPress={() => adjustZoom(0.2)} style={styles.zoomButton}><Text style={styles.zoomText}>+</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={zoomOutLabel} onPress={() => adjustZoom(-0.2)} style={styles.zoomButton}>
+          <SeoullyText variant="title" color={colors.plum}>−</SeoullyText>
+        </Pressable>
+        <SeoullyText variant="caption" style={styles.zoomValue}>{Math.round(transform.zoom * 100)}%</SeoullyText>
+        <Pressable accessibilityRole="button" accessibilityLabel={zoomInLabel} onPress={() => adjustZoom(0.2)} style={styles.zoomButton}>
+          <SeoullyText variant="title" color={colors.plum}>+</SeoullyText>
+        </Pressable>
       </View>
-      <Pressable accessibilityRole="button" onPress={useCrop} style={styles.primary}><Text style={styles.primaryText}>{useLabel}</Text></Pressable>
-      <Pressable accessibilityRole="button" onPress={onCancel} style={styles.back}><Text style={styles.backText}>{backLabel}</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={useCrop} style={styles.primary}>
+        <SeoullyText variant="button" color={colors.onPrimary}>{useLabel}</SeoullyText>
+      </Pressable>
+      <Pressable accessibilityRole="button" onPress={onCancel} style={styles.back}>
+        <SeoullyText variant="button" color={colors.muted}>{backLabel}</SeoullyText>
+      </Pressable>
     </SafeAreaView>
   </Modal>;
 }
@@ -121,16 +130,12 @@ function clamp(value: number, min: number, max: number) {
 
 const styles = StyleSheet.create({
   screen: { alignItems: "center", backgroundColor: colors.canvas, flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.xl },
-  title: { color: colors.ink, fontSize: 26, fontWeight: "700" },
-  hint: { color: colors.muted, fontSize: 14, marginBottom: spacing.lg, marginTop: spacing.xs, textAlign: "center" },
+  hint: { marginBottom: spacing.lg, marginTop: spacing.xs, textAlign: "center" },
   viewport: { backgroundColor: colors.ink, borderRadius: 18, overflow: "hidden" },
   frame: { borderColor: colors.surface, borderRadius: 18, borderWidth: 2, bottom: 0, left: 0, position: "absolute", right: 0, top: 0 },
   zoomRow: { alignItems: "center", flexDirection: "row", gap: spacing.md, marginTop: spacing.md },
   zoomButton: { alignItems: "center", borderColor: colors.border, borderRadius: 999, borderWidth: 1, height: 44, justifyContent: "center", width: 44 },
-  zoomText: { color: colors.plum, fontSize: 24, fontWeight: "700" },
-  zoomValue: { color: colors.muted, minWidth: 52, textAlign: "center" },
+  zoomValue: { minWidth: 52, textAlign: "center" },
   primary: { alignItems: "center", backgroundColor: colors.plum, borderRadius: 14, justifyContent: "center", marginTop: spacing.lg, minHeight: 52, width: "100%" },
-  primaryText: { color: colors.surface, fontWeight: "700" },
   back: { padding: spacing.md },
-  backText: { color: colors.muted, fontWeight: "600" },
 });

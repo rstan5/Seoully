@@ -12,9 +12,9 @@ security, and Room/Binder data model.
 - Immutable reference checkpoint: `76be07a928ce3e9436031d7324a5cc2b1b0375ed`
 - Recovered from: `d2d779d`
 - Device-QA checkpoint: `ae8e155`
-- Current HEAD: `e444039`
-- Current task: Auth / onboarding chrome reconstruction — CODE PARITY COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL
-- Overall status: IN PROGRESS — social shell through identity, Search, collection, create, messages, auth, and onboarding reconstructed from current web Seoully; Room/Binder tactile QA and pending migrations remain
+- Prior reconstruction HEAD (presentation rejected on device): `b4469d5`
+- Current task: Vertical Slice 01 — Collector Ownership — CODE COMPLETE — AWAITING PHYSICAL IPHONE QA
+- Overall status: Proven infrastructure preserved. Rejected Profile / Edit / Add presentation rebuilt. Do not expand to Feed / Search / Messages / Room / Binder until this slice is physically approved.
 
 ## Current Room parity matrix
 
@@ -595,3 +595,26 @@ Room/Binder visual/tactile parity is not finished.
 ### ENVIRONMENT BLOCKED
 - Known unrelated Turbopack process-binding issue (do not re-investigate)
 - Expo toolchain moderate advisories that require unsafe major downgrades
+
+## Vertical Slice 01 — Collector Ownership
+
+Strategy: preserve proven infrastructure; rebuild rejected Profile / Edit / Add presentation; prove the ownership journey; stop for physical iPhone QA. Feed, Search, Messages, Room, and Binder visuals were not rebuilt this run.
+
+### Presentation rebuilt
+- Native type system now loads web faces: Baloo 2 (EN) and Noto Sans KR (KO) via `expo-font`
+- Profile reconstructed as collector identity: Enter Room primary, Edit secondary, Add to collection → `/collect`
+- Edit Profile extracted to `/edit-profile` (Cancel | title | Save, labeled mist fields, tastes, sign out)
+- Add Collectible reconstructed as `/collect` (Search Catalog | Add Manually) then `/add` (this is my copy / crop)
+
+### Old native presentation removed
+- In-tab Profile edit form (giant bordered TextInputs)
+- Three equal Profile pills (Edit / Add / Sign out) competing with Enter Room
+- `/add` as a standalone CRUD title stack without the catalog/manual fork
+
+### Ownership → world eligibility (data contract)
+- `createHolding` → `POST /api/mobile/holdings` → `createMyHolding` inserts a Holding
+- Personal media: `uploadHoldingPhoto` → Holding.personalMediaUrl
+- Digital representation: `representationForHolding` uses personal media when present
+- Binder eligibility: `buildNativeBinderPages` includes holdings where `template.kind === "photocard"`
+- Room eligibility: Room `unplaced` = holdings without a RoomPlacement (stored tray). Ownership ≠ placement
+- GL Binder/Room feel remains DEVICE QA REQUIRED and was not visually rebuilt this slice

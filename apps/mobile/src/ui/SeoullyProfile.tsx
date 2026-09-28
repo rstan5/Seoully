@@ -14,17 +14,28 @@ export function SeoullyProfileHead({
   name,
   handle,
   counts,
+  editLabel,
+  onEdit,
 }: {
   name: string;
   handle: string;
   counts: { label: string; value: number }[];
+  editLabel?: string;
+  onEdit?: () => void;
 }) {
   return (
     <View style={styles.head}>
-      <SeoullyAvatar name={name} size={86} />
+      <View style={styles.avatarRing}>
+        <SeoullyAvatar name={name} size={86} />
+      </View>
       <View style={styles.copy}>
         <SeoullyText variant="title">{name}</SeoullyText>
         <SeoullyText variant="handle" color={colors.muted} style={styles.handle}>@{handle}</SeoullyText>
+        {editLabel && onEdit ? (
+          <Pressable accessibilityRole="button" hitSlop={8} onPress={onEdit} style={styles.edit}>
+            <SeoullyText variant="caption" color={colors.plum}>{editLabel}</SeoullyText>
+          </Pressable>
+        ) : null}
         <View style={styles.counts}>
           {counts.map((count) => (
             <SeoullyText key={count.label} variant="caption" color="#555555">
@@ -125,9 +136,17 @@ export function SeoullyShelfRow({
 
 const styles = StyleSheet.create({
   head: { alignItems: "center", flexDirection: "row", gap: 16 },
+  avatarRing: {
+    backgroundColor: colors.surface,
+    borderColor: colors.lilac,
+    borderRadius: 47,
+    borderWidth: 2,
+    padding: 2,
+  },
   copy: { flex: 1, minWidth: 0 },
-  handle: { marginBottom: 10, marginTop: 2 },
-  counts: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  handle: { marginTop: 2 },
+  edit: { alignSelf: "flex-start", justifyContent: "center", minHeight: 32, paddingVertical: 4 },
+  counts: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 8 },
   bio: { lineHeight: 20, marginTop: 14 },
   meta: { marginTop: 4 },
   archetype: { marginTop: 14 },

@@ -1,5 +1,6 @@
 import { Text, type StyleProp, type TextProps, type TextStyle } from "react-native";
-import { colors, type } from "../theme";
+import { useLocale } from "../locale";
+import { colors, faces, type } from "../theme";
 
 export type SeoullyTextVariant = keyof typeof type;
 
@@ -21,5 +22,22 @@ export function SeoullyText({
   style,
   ...props
 }: TextProps & { variant?: SeoullyTextVariant; color?: string; style?: StyleProp<TextStyle> }) {
-  return <Text {...props} style={[type[variant], { color: color ?? variantColor[variant] }, style]} />;
+  const { locale } = useLocale();
+  const spec = type[variant];
+  return (
+    <Text
+      {...props}
+      style={[
+        {
+          fontFamily: faces[locale][spec.face],
+          fontSize: spec.fontSize,
+          includeFontPadding: false,
+          letterSpacing: "letterSpacing" in spec ? spec.letterSpacing : 0,
+          lineHeight: spec.lineHeight,
+        },
+        { color: color ?? variantColor[variant] },
+        style,
+      ]}
+    />
+  );
 }

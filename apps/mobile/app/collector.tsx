@@ -153,9 +153,10 @@ export default function CollectorScreen() {
                 label={following ? copy.following : copy.follow}
                 variant={following ? "ghost" : "primary"}
                 disabled={busy}
+                fill
                 onPress={() => { void toggleFollow(); }}
               />
-              <SeoullyButton label={copy.messageCollector} variant="ghost" disabled={busy} onPress={() => { void message(); }} />
+              <SeoullyButton label={copy.messageCollector} variant="ghost" disabled={busy} fill onPress={() => { void message(); }} />
             </View>
             <SeoullyButton
               label={copy.viewCollectorRoom}

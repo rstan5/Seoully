@@ -1,12 +1,16 @@
 import { useState } from "react";
-import { Image, Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import { createHolding, uploadCatalogReferencePhoto, uploadHoldingPhoto } from "../src/api";
+import { ScreenBack } from "../src/components/ScreenBack";
 import { useCopy } from "../src/locale";
 import { PhotocardCropper, type CropRect } from "../src/media/PhotocardCropper";
-import { colors, spacing } from "../src/theme";
+import { colors } from "../src/theme";
+import { SeoullyButton } from "../src/ui/SeoullyControls";
+import { SeoullyScreen } from "../src/ui/SeoullyScreen";
+import { SeoullyText } from "../src/ui/SeoullyText";
 
 export default function AddCollectibleScreen() {
   const copy = useCopy();
@@ -17,6 +21,7 @@ export default function AddCollectibleScreen() {
   const [message, setMessage] = useState<string | null>(null);
   const [shareReference, setShareReference] = useState(false);
   const [cropAsset, setCropAsset] = useState<{ uri: string; width: number; height: number } | null>(null);
+  const photocard = params.kind === "photocard";
 
   async function choose(source: "camera" | "library") {
     setMessage(null);
@@ -29,10 +34,12 @@ export default function AddCollectibleScreen() {
     const asset = result.assets[0];
     setWorking(true);
     try {
-      if (params.kind === "photocard" && asset.width && asset.height) {
+      if (photocard && asset.width && asset.height) {
         setCropAsset({ uri: asset.uri, width: asset.width, height: asset.height });
       } else setUri(asset.uri);
-    } catch { setMessage(copy.photoPrepareFailed); }
+    } catch {
+      setMessage(copy.photoPrepareFailed);
+    }
     setWorking(false);
   }
 
@@ -51,7 +58,8 @@ export default function AddCollectibleScreen() {
 
   async function add() {
     if (!params.templateId) { setMessage(copy.chooseCatalogFirst); return; }
-    setWorking(true); setMessage(null);
+    setWorking(true);
+    setMessage(null);
     try {
       const result = await createHolding(params.templateId) as { holding?: { id: string } };
       if (uri && result.holding?.id) await uploadHoldingPhoto(result.holding.id, uri);
@@ -61,11 +69,78 @@ export default function AddCollectibleScreen() {
         return;
       }
       router.replace("/collection");
-    } catch { setMessage(copy.holdingCreateFailed); }
+    } catch {
+      setMessage(copy.holdingCreateFailed);
+    }
     setWorking(false);
   }
 
-  return <SafeAreaView style={styles.safe}><View style={styles.container}><Text style={styles.title}>{copy.addCollectible}</Text><Text style={styles.name}>{params.name ?? copy.catalogItemFallback}</Text><Text style={styles.body}>{copy.addPhotoLead}</Text>{uri ? <Image accessibilityLabel={copy.personalPreview} source={{ uri }} style={styles.preview} /> : <View style={styles.empty}><Text style={styles.emptyText}>{copy.personalPhotoOptional}</Text></View>}<View style={styles.actions}><Pressable accessibilityRole="button" onPress={() => choose("camera")} style={styles.secondary}><Text style={styles.secondaryText}>{copy.takePhoto}</Text></Pressable><Pressable accessibilityRole="button" onPress={() => choose("library")} style={styles.secondary}><Text style={styles.secondaryText}>{copy.chooseFromLibrary}</Text></Pressable></View>{params.newTemplate === "true" && <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: shareReference }} onPress={() => setShareReference((value) => !value)} style={styles.consent}><Text style={styles.consentText}>{shareReference ? "☑" : "☐"} {copy.shareCatalogPhoto}</Text></Pressable>}<Pressable accessibilityRole="button" disabled={working} onPress={add} style={styles.primary}><Text style={styles.primaryText}>{working ? copy.saving : copy.addToCollection}</Text></Pressable>{message && <Text accessibilityRole="alert" style={styles.message}>{message}</Text>}<Pressable accessibilityRole="button" onPress={() => router.back()}><Text style={styles.cancel}>{copy.back}</Text></Pressable></View><PhotocardCropper asset={cropAsset} title={copy.cropPhotocard} hint={copy.cropPhotocardHint} useLabel={copy.useCrop} backLabel={copy.back} zoomInLabel={copy.zoomIn} zoomOutLabel={copy.zoomOut} onUse={useCrop} onCancel={() => setCropAsset(null)} /></SafeAreaView>;
+  return (
+    <SeoullyScreen>
+      <ScrollView contentContainerStyle={styles.container}>
+        <ScreenBack label={copy.back} onPress={() => router.back()} />
+        <SeoullyText variant="title">{copy.addCollectible}</SeoullyText>
+        <SeoullyText variant="handle" color={colors.plum}>{params.name ?? copy.catalogItemFallback}</SeoullyText>
+        <SeoullyText variant="secondary">{copy.addPhotoLead}</SeoullyText>
+        {uri ? (
+          <Image
+            accessibilityLabel={copy.personalPreview}
+            resizeMode="contain"
+            source={{ uri }}
+            style={photocard ? styles.cardPreview : styles.preview}
+          />
+        ) : (
+          <View style={styles.empty}>
+            <SeoullyText variant="secondary" style={styles.emptyText}>{copy.personalPhotoOptional}</SeoullyText>
+          </View>
+        )}
+        <View style={styles.row}>
+          <SeoullyButton label={copy.takePhoto} variant="ghost" onPress={() => { void choose("camera"); }} />
+          <SeoullyButton label={copy.chooseFromLibrary} variant="ghost" onPress={() => { void choose("library"); }} />
+        </View>
+        {params.newTemplate === "true" ? (
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: shareReference }}
+            onPress={() => setShareReference((value) => !value)}
+            style={styles.consent}
+          >
+            <SeoullyText variant="body">{shareReference ? "☑" : "☐"} {copy.shareCatalogPhoto}</SeoullyText>
+          </Pressable>
+        ) : null}
+        <SeoullyButton label={working ? copy.saving : copy.addToCollection} disabled={working} onPress={() => { void add(); }} />
+        {message ? <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum}>{message}</SeoullyText> : null}
+      </ScrollView>
+      <PhotocardCropper
+        asset={cropAsset}
+        title={copy.cropPhotocard}
+        hint={copy.cropPhotocardHint}
+        useLabel={copy.useCrop}
+        backLabel={copy.back}
+        zoomInLabel={copy.zoomIn}
+        zoomOutLabel={copy.zoomOut}
+        onUse={useCrop}
+        onCancel={() => setCropAsset(null)}
+      />
+    </SeoullyScreen>
+  );
 }
 
-const styles = StyleSheet.create({ safe: { flex: 1, backgroundColor: colors.canvas }, container: { flex: 1, padding: spacing.lg }, title: { color: colors.ink, fontSize: 32, fontWeight: "700" }, name: { color: colors.plum, fontSize: 18, fontWeight: "700", marginTop: spacing.sm }, body: { color: colors.muted, fontSize: 16, marginTop: spacing.xs }, preview: { alignSelf: "center", borderRadius: 16, height: 280, marginVertical: spacing.lg, resizeMode: "contain", width: 182 }, empty: { alignItems: "center", backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 16, borderWidth: 1, justifyContent: "center", marginVertical: spacing.lg, minHeight: 180, padding: spacing.lg }, emptyText: { color: colors.muted, lineHeight: 21, textAlign: "center" }, actions: { gap: spacing.sm }, secondary: { alignItems: "center", borderColor: colors.plum, borderRadius: 14, borderWidth: 1, justifyContent: "center", minHeight: 48 }, secondaryText: { color: colors.plum, fontWeight: "700" }, consent: { marginTop: spacing.md, paddingVertical: spacing.sm }, consentText: { color: colors.ink, lineHeight: 20 }, primary: { alignItems: "center", backgroundColor: colors.plum, borderRadius: 14, justifyContent: "center", marginTop: spacing.md, minHeight: 52 }, primaryText: { color: colors.surface, fontWeight: "700" }, message: { color: colors.plum, marginTop: spacing.md }, cancel: { color: colors.muted, paddingVertical: spacing.md, textAlign: "center" } });
+const styles = StyleSheet.create({
+  container: { gap: 12, paddingBottom: 80, paddingHorizontal: 16 },
+  preview: { alignSelf: "center", borderRadius: 14, height: 240, width: 180 },
+  cardPreview: { alignSelf: "center", aspectRatio: 55 / 85, borderRadius: 14, width: "62%" },
+  empty: {
+    alignItems: "center",
+    backgroundColor: colors.mist,
+    borderColor: colors.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 160,
+    padding: 18,
+  },
+  emptyText: { textAlign: "center" },
+  row: { flexDirection: "row", gap: 8 },
+  consent: { minHeight: 44, justifyContent: "center" },
+});

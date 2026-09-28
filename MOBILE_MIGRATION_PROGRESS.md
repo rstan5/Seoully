@@ -12,9 +12,9 @@ security, and Room/Binder data model.
 - Immutable reference checkpoint: `76be07a928ce3e9436031d7324a5cc2b1b0375ed`
 - Recovered from: `d2d779d`
 - Device-QA checkpoint: `ae8e155`
-- Current HEAD: `28b4fed` plus uncommitted Search/Profile reconstruction
-- Current task: Search / Explore + identity Profile/collector — CODE PARITY COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL
-- Overall status: IN PROGRESS — Feed correction remains device-pending; Search/Explore and identity profiles reconstructed from current web Seoully
+- Current HEAD: `730c9fc`
+- Current task: Collection / Create / Messages / Add collectible reconstruction — CODE PARITY COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL
+- Overall status: IN PROGRESS — social shell, Search, identity, collection, create, and messages reconstructed from current web Seoully; Room/Binder tactile QA and pending migrations remain
 
 ## Current Room parity matrix
 
@@ -396,6 +396,10 @@ Do not treat Room or Binder as finished. Visual/tactile/FPS/gesture quality rema
 
 ## Latest validation
 
+- Collection, Collectible detail, Create, Add collectible, Messages, and thread
+  chrome reconstruction: mobile TypeScript, Expo lint, Expo Doctor 21/21, root
+  TypeScript, fixture checks, and `git diff --check` pass. Visual approval is
+  **not** claimed.
 - Search / Explore + identity Profile/collector reconstruction: mobile
   TypeScript, Expo lint, Expo Doctor 21/21, iOS Metro export, root TypeScript,
   fixture checks, and `git diff --check` pass. Visual approval is **not** claimed.
@@ -540,10 +544,9 @@ Native device QA is still pending.
 
 ## Next autonomous task
 
-Search/Explore and identity profiles are reconstructed in code. Continue the
-inner parity loop through Collection, Collectible detail, Create, Messages,
-and remaining unfinished chrome. Room/Binder visual/tactile parity is not
-finished.
+Search, identity, collection, create, and messages chrome are reconstructed
+in code. Remaining non-device work is onboarding/auth polish and Room/Binder
+surrounding chrome. Room/Binder visual/tactile parity is not finished.
 
 ### IMPLEMENTATION REMAINING
 - Catalog-set empty-pocket layout if production ever exposes CollectibleSet
@@ -551,6 +554,11 @@ finished.
 - In-world 3D Binder open that stays inside the Room GL scene
 
 ### AWAITING DEVICE QA
+- **COLLECTION / CREATE / MESSAGES: CODE PARITY COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL**
+  Owned/wishlist now use shelf rows instead of giant catalog cards. Collectible
+  detail keeps personal photocard media as the face. Create/Add and Messages
+  use the shared Seoully shell. Keyboard, crop, and thread polling remain
+  device checks.
 - **SEARCH / EXPLORE: CODE PARITY COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL**
   Native Search now follows web destination IA (People, Rooms, Posts,
   Collectibles, Groups & Members). Rooms use production discovery + collector

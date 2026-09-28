@@ -1,19 +1,24 @@
 import { useEffect, useState } from "react";
-import { Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Image, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { contributeCatalogItem, createNativePost } from "../../src/api";
 import { KeyboardScreen } from "../../src/components/KeyboardScreen";
 import { collectibleKindLabel } from "../../src/i18n";
-import { useCopy } from "../../src/locale";
-import { colors, spacing } from "../../src/theme";
+import { useCopy, useLocale } from "../../src/locale";
+import { colors } from "../../src/theme";
+import { SeoullyButton, SeoullyChoiceChip } from "../../src/ui/SeoullyControls";
+import { SeoullyHeader } from "../../src/ui/SeoullyHeader";
+import { SeoullyScreen } from "../../src/ui/SeoullyScreen";
+import { SeoullyText } from "../../src/ui/SeoullyText";
 
 const CREATE_DRAFT_KEY = "seoully.mobile.create-draft.v1";
 const COLLECTIBLE_KINDS = ["photocard", "album", "vinyl", "poster", "lightstick", "plushie", "figure", "book", "apparel", "memorabilia"] as const;
 
 export default function CreateScreen() {
   const copy = useCopy();
+  const { toggleLocale } = useLocale();
   const router = useRouter();
   const [mode, setMode] = useState<"post" | "collectible">("post");
   const [name, setName] = useState("");
@@ -104,68 +109,83 @@ export default function CreateScreen() {
     }
   }
 
-  return <SafeAreaView style={styles.safe}><KeyboardScreen><ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-    <Text style={styles.title}>{copy.create}</Text>
-    <View style={styles.tabs}>
-      <ModeButton selected={mode === "post"} label={copy.sharePost} onPress={() => setMode("post")} />
-      <ModeButton selected={mode === "collectible"} label={copy.addManually} onPress={() => setMode("collectible")} />
-    </View>
-    <Text style={styles.draftNote}>{copy.draftSavedLocally}</Text>
-    {mode === "post" ? <>
-      <Text style={styles.body}>{copy.createPostLead}</Text>
-      {postUri ? <Image source={{ uri: postUri }} style={styles.preview} /> : null}
-      <View style={styles.photoActions}>
-        <Pressable accessibilityRole="button" onPress={() => choosePostPhoto("camera")} style={styles.secondary}><Text style={styles.secondaryText}>{copy.takePostPhoto}</Text></Pressable>
-        <Pressable accessibilityRole="button" onPress={() => choosePostPhoto("library")} style={styles.secondary}><Text style={styles.secondaryText}>{copy.choosePostPhoto}</Text></Pressable>
-      </View>
-      <TextInput maxLength={2000} placeholder={copy.captionPlaceholder} value={caption} onChangeText={setCaption} multiline style={[styles.input, styles.caption]} />
-      <Pressable accessibilityRole="button" disabled={working} onPress={publishPost} style={styles.button}><Text style={styles.buttonText}>{copy.publishPost}</Text></Pressable>
-    </> : <>
-      <Text style={styles.body}>{copy.addManualLead}</Text>
-      <TextInput maxLength={200} placeholder={copy.collectibleNamePlaceholder} value={name} onChangeText={setName} style={styles.input} />
-      <TextInput maxLength={120} placeholder={copy.groupPlaceholder} value={groupName} onChangeText={setGroupName} style={styles.input} />
-      <TextInput maxLength={120} placeholder={copy.memberOptionalPlaceholder} value={memberName} onChangeText={setMemberName} style={styles.input} />
-      <TextInput maxLength={160} placeholder={copy.releaseOptionalPlaceholder} value={releaseName} onChangeText={setReleaseName} style={styles.input} />
-      <Text style={styles.kindLabel}>{copy.collectibleKind}</Text>
-      <View style={styles.kinds}>{COLLECTIBLE_KINDS.map((id) => <Pressable key={id} accessibilityRole="button" accessibilityState={{ selected: kind === id }} onPress={() => setKind(id)} style={[styles.kind, kind === id && styles.kindSelected]}><Text style={[styles.kindText, kind === id && styles.kindTextSelected]}>{collectibleKindLabel(id, copy)}</Text></Pressable>)}</View>
-      <Pressable accessibilityRole="button" disabled={working} onPress={submitCollectible} style={styles.button}><Text style={styles.buttonText}>{copy.continue}</Text></Pressable>
-    </>}
-    {message ? <Text accessibilityRole="alert" style={styles.message}>{message}</Text> : null}
-  </ScrollView></KeyboardScreen></SafeAreaView>;
+  return (
+    <SeoullyScreen>
+      <KeyboardScreen>
+        <SeoullyHeader languageLabel={copy.switchLanguage} onToggleLanguage={toggleLocale} />
+        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+          <SeoullyText variant="title">{copy.create}</SeoullyText>
+          <View style={styles.tabs}>
+            <SeoullyChoiceChip selected={mode === "post"} label={copy.sharePost} onPress={() => setMode("post")} />
+            <SeoullyChoiceChip selected={mode === "collectible"} label={copy.addManually} onPress={() => setMode("collectible")} />
+          </View>
+          <SeoullyText variant="caption">{copy.draftSavedLocally}</SeoullyText>
+          {mode === "post" ? (
+            <>
+              <SeoullyText variant="secondary">{copy.createPostLead}</SeoullyText>
+              {postUri ? <Image source={{ uri: postUri }} style={styles.preview} /> : null}
+              <View style={styles.row}>
+                <SeoullyButton label={copy.takePostPhoto} variant="ghost" onPress={() => { void choosePostPhoto("camera"); }} />
+                <SeoullyButton label={copy.choosePostPhoto} variant="ghost" onPress={() => { void choosePostPhoto("library"); }} />
+              </View>
+              <TextInput
+                maxLength={2000}
+                placeholder={copy.captionPlaceholder}
+                placeholderTextColor={colors.muted}
+                value={caption}
+                onChangeText={setCaption}
+                multiline
+                style={[styles.input, styles.caption]}
+              />
+              <SeoullyButton label={copy.publishPost} disabled={working} onPress={() => { void publishPost(); }} />
+            </>
+          ) : (
+            <>
+              <SeoullyText variant="secondary">{copy.addManualLead}</SeoullyText>
+              <TextInput maxLength={200} placeholder={copy.collectibleNamePlaceholder} placeholderTextColor={colors.muted} value={name} onChangeText={setName} style={styles.input} />
+              <TextInput maxLength={120} placeholder={copy.groupPlaceholder} placeholderTextColor={colors.muted} value={groupName} onChangeText={setGroupName} style={styles.input} />
+              <TextInput maxLength={120} placeholder={copy.memberOptionalPlaceholder} placeholderTextColor={colors.muted} value={memberName} onChangeText={setMemberName} style={styles.input} />
+              <TextInput maxLength={160} placeholder={copy.releaseOptionalPlaceholder} placeholderTextColor={colors.muted} value={releaseName} onChangeText={setReleaseName} style={styles.input} />
+              <SeoullyText variant="caption">{copy.collectibleKind}</SeoullyText>
+              <View style={styles.kinds}>
+                {COLLECTIBLE_KINDS.map((id) => (
+                  <SeoullyChoiceChip
+                    key={id}
+                    selected={kind === id}
+                    label={collectibleKindLabel(id, copy)}
+                    onPress={() => setKind(id)}
+                  />
+                ))}
+              </View>
+              <SeoullyButton label={copy.continue} disabled={working} onPress={() => { void submitCollectible(); }} />
+            </>
+          )}
+          {message ? <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum}>{message}</SeoullyText> : null}
+        </ScrollView>
+      </KeyboardScreen>
+    </SeoullyScreen>
+  );
 }
 
 function draftText(value: unknown, max: number) {
   return typeof value === "string" ? value.slice(0, max) : "";
 }
 
-function ModeButton({ selected, label, onPress }: { selected: boolean; label: string; onPress: () => void }) {
-  return <Pressable accessibilityRole="tab" accessibilityState={{ selected }} onPress={onPress} style={[styles.tab, selected && styles.tabSelected]}><Text style={[styles.tabText, selected && styles.tabTextSelected]}>{label}</Text></Pressable>;
-}
-
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.canvas },
-  container: { padding: spacing.lg, gap: spacing.sm, paddingBottom: 100 },
-  title: { color: colors.ink, fontSize: 32, fontWeight: "700" },
-  tabs: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
-  tab: { borderColor: colors.border, borderRadius: 999, borderWidth: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  tabSelected: { backgroundColor: colors.plum, borderColor: colors.plum },
-  tabText: { color: colors.ink, fontWeight: "700" },
-  tabTextSelected: { color: colors.surface },
-  draftNote: { color: colors.muted, fontSize: 12 },
-  body: { color: colors.muted, fontSize: 16, marginBottom: spacing.md, marginTop: spacing.sm },
-  input: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 14, borderWidth: 1, color: colors.ink, minHeight: 50, paddingHorizontal: spacing.md },
-  caption: { minHeight: 100, paddingTop: spacing.md, textAlignVertical: "top" },
-  preview: { aspectRatio: 4 / 3, borderRadius: 16, width: "100%" },
-  photoActions: { gap: spacing.sm },
-  secondary: { alignItems: "center", borderColor: colors.plum, borderRadius: 14, borderWidth: 1, justifyContent: "center", minHeight: 50 },
-  secondaryText: { color: colors.plum, fontWeight: "700" },
-  kindLabel: { color: colors.muted, fontSize: 12, fontWeight: "700", marginTop: spacing.xs },
-  kinds: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
-  kind: { borderColor: colors.border, borderRadius: 999, borderWidth: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
-  kindSelected: { backgroundColor: colors.plum, borderColor: colors.plum },
-  kindText: { color: colors.ink, fontSize: 13, fontWeight: "700" },
-  kindTextSelected: { color: colors.surface },
-  button: { alignItems: "center", backgroundColor: colors.plum, borderRadius: 14, justifyContent: "center", marginTop: spacing.sm, minHeight: 52 },
-  buttonText: { color: colors.surface, fontWeight: "700" },
-  message: { color: colors.plum, marginTop: spacing.sm },
+  container: { gap: 12, paddingBottom: 120, paddingHorizontal: 16, paddingTop: 12 },
+  tabs: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  row: { flexDirection: "row", gap: 8 },
+  input: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    color: colors.ink,
+    fontSize: 16,
+    minHeight: 48,
+    paddingHorizontal: 14,
+  },
+  caption: { minHeight: 100, paddingTop: 12, textAlignVertical: "top" },
+  preview: { aspectRatio: 4 / 3, borderRadius: 14, width: "100%" },
+  kinds: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
 });

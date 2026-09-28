@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
-import { ActivityIndicator, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, ScrollView, StyleSheet, View } from "react-native";
 import { loadMyHolding, updateHoldingTradeStatus, uploadHoldingPhoto, type NativeHolding } from "../src/api";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
@@ -10,7 +10,11 @@ import { collectibleKindLabel } from "../src/i18n";
 import { useCopy, useLocale } from "../src/locale";
 import { useCachedSignedMedia } from "../src/media/cachedMedia";
 import { PhotocardCropper, type CropRect } from "../src/media/PhotocardCropper";
-import { colors, spacing } from "../src/theme";
+import { colors } from "../src/theme";
+import { SeoullyButton } from "../src/ui/SeoullyControls";
+import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
+import { SeoullyScreen } from "../src/ui/SeoullyScreen";
+import { SeoullyText } from "../src/ui/SeoullyText";
 
 export default function CollectibleDetailScreen() {
   const copy = useCopy();
@@ -96,47 +100,94 @@ export default function CollectibleDetailScreen() {
     }
   }
 
-  return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.container}>
-    <ScreenBack label={copy.back} onPress={() => router.back()} />
-    {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
-    {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
-    {holding ? <>
-      {mediaUri ? <Image accessibilityLabel={copy.personalPreview} resizeMode="contain" source={{ uri: mediaUri }} style={styles.image} /> : <View style={styles.fallback}><Text style={styles.fallbackText}>{holding.template.name}</Text></View>}
-      <Text style={styles.kind}>{collectibleKindLabel(holding.template.kind, copy)}</Text>
-      <Text style={styles.title}>{holding.template.name}</Text>
-      <Text style={styles.meta}>{[holding.template.groupName, holding.template.memberName, holding.template.releaseName].filter(Boolean).join(" · ")}</Text>
-      {holding.template.descriptor ? <Text style={styles.descriptor}>{holding.template.descriptor}</Text> : null}
-      <View style={styles.statusRow}><Text style={styles.status}>{holding.tradeStatus === "for-trade" ? copy.forTrade : copy.notForTrade}</Text><Text style={styles.acquired}>{copy.acquired} {new Date(holding.acquiredAt).toLocaleDateString(locale === "ko" ? "ko-KR" : "en-US")}</Text></View>
-      <Pressable accessibilityRole="button" accessibilityState={{ selected: holding.tradeStatus === "for-trade", disabled: busy }} disabled={busy} onPress={toggleTrade} style={styles.primary}><Text style={styles.primaryText}>{holding.tradeStatus === "for-trade" ? copy.keepInCollection : copy.markForTrade}</Text></Pressable>
-      <View style={styles.photoActions}>
-        <Pressable accessibilityRole="button" disabled={busy} onPress={() => { void choosePhoto("camera"); }} style={styles.destination}><Text style={styles.destinationText}>{copy.takePhoto}</Text></Pressable>
-        <Pressable accessibilityRole="button" disabled={busy} onPress={() => { void choosePhoto("library"); }} style={styles.destination}><Text style={styles.destinationText}>{holding.personalMediaUrl ? copy.replacePersonalPhoto : copy.addPersonalPhoto}</Text></Pressable>
-      </View>
-      <View style={styles.destinations}><Pressable accessibilityRole="button" onPress={() => router.push("/room")} style={styles.destination}><Text style={styles.destinationText}>{copy.viewRoom}</Text></Pressable><Pressable accessibilityRole="button" onPress={() => router.push("/binder")} style={styles.destination}><Text style={styles.destinationText}>{copy.viewBinder}</Text></Pressable></View>
-    </> : null}
-  </ScrollView>
-    <PhotocardCropper asset={cropAsset} title={copy.cropPhotocard} hint={copy.cropPhotocardHint} useLabel={copy.useCrop} backLabel={copy.back} zoomInLabel={copy.zoomIn} zoomOutLabel={copy.zoomOut} onUse={useCrop} onCancel={() => setCropAsset(null)} />
-  </SafeAreaView>;
+  return (
+    <SeoullyScreen>
+      <ScrollView contentContainerStyle={styles.container}>
+        <ScreenBack label={copy.back} onPress={() => router.back()} />
+        {loading ? <SeoullyLoadingState label={copy.viewCollectible} /> : null}
+        {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
+        {holding ? (
+          <>
+            {mediaUri ? (
+              <Image accessibilityLabel={copy.personalPreview} resizeMode="contain" source={{ uri: mediaUri }} style={styles.image} />
+            ) : (
+              <View style={styles.fallback}>
+                <SeoullyText variant="title" style={styles.fallbackText}>{holding.template.name}</SeoullyText>
+              </View>
+            )}
+            <SeoullyText variant="caption" color={colors.plum} style={styles.kind}>
+              {collectibleKindLabel(holding.template.kind, copy)}
+            </SeoullyText>
+            <SeoullyText variant="title">{holding.template.name}</SeoullyText>
+            <SeoullyText variant="secondary" style={styles.meta}>
+              {[holding.template.groupName, holding.template.memberName, holding.template.releaseName].filter(Boolean).join(" · ")}
+            </SeoullyText>
+            {holding.template.descriptor ? <SeoullyText variant="body" style={styles.descriptor}>{holding.template.descriptor}</SeoullyText> : null}
+            <View style={styles.statusRow}>
+              <SeoullyText variant="handle" color={colors.plum}>
+                {holding.tradeStatus === "for-trade" ? copy.forTrade : copy.notForTrade}
+              </SeoullyText>
+              <SeoullyText variant="metadata">
+                {copy.acquired} {new Date(holding.acquiredAt).toLocaleDateString(locale === "ko" ? "ko-KR" : "en-US")}
+              </SeoullyText>
+            </View>
+            <View style={styles.stack}>
+              <SeoullyButton
+                label={holding.tradeStatus === "for-trade" ? copy.keepInCollection : copy.markForTrade}
+                disabled={busy}
+                onPress={() => { void toggleTrade(); }}
+              />
+              <View style={styles.row}>
+                <SeoullyButton label={copy.takePhoto} variant="ghost" disabled={busy} onPress={() => { void choosePhoto("camera"); }} />
+                <SeoullyButton
+                  label={holding.personalMediaUrl ? copy.replacePersonalPhoto : copy.addPersonalPhoto}
+                  variant="ghost"
+                  disabled={busy}
+                  onPress={() => { void choosePhoto("library"); }}
+                />
+              </View>
+              <View style={styles.row}>
+                <SeoullyButton label={copy.viewRoom} variant="ghost" onPress={() => router.push("/room")} />
+                <SeoullyButton label={copy.viewBinder} variant="ghost" onPress={() => router.push("/binder")} />
+              </View>
+            </View>
+          </>
+        ) : null}
+      </ScrollView>
+      <PhotocardCropper
+        asset={cropAsset}
+        title={copy.cropPhotocard}
+        hint={copy.cropPhotocardHint}
+        useLabel={copy.useCrop}
+        backLabel={copy.back}
+        zoomInLabel={copy.zoomIn}
+        zoomOutLabel={copy.zoomOut}
+        onUse={useCrop}
+        onCancel={() => setCropAsset(null)}
+      />
+    </SeoullyScreen>
+  );
 }
 
 const styles = StyleSheet.create({
-  safe: { backgroundColor: colors.canvas, flex: 1 },
-  container: { padding: spacing.lg, paddingBottom: 80 },
-  loading: { marginTop: spacing.xl },
-  image: { alignSelf: "center", aspectRatio: 55 / 85, maxHeight: 500, width: "82%" },
-  fallback: { alignItems: "center", alignSelf: "center", aspectRatio: 55 / 85, backgroundColor: colors.blush, borderRadius: 18, justifyContent: "center", padding: spacing.lg, width: "82%" },
-  fallbackText: { color: colors.ink, fontSize: 22, fontWeight: "700", textAlign: "center" },
-  kind: { color: colors.plum, fontSize: 12, fontWeight: "700", marginTop: spacing.lg, textTransform: "uppercase" },
-  title: { color: colors.ink, fontSize: 28, fontWeight: "700", marginTop: spacing.xs },
-  meta: { color: colors.muted, fontSize: 15, marginTop: spacing.xs },
-  descriptor: { color: colors.ink, fontSize: 16, lineHeight: 23, marginTop: spacing.md },
-  statusRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.lg },
-  status: { color: colors.plum, fontWeight: "700" },
-  acquired: { color: colors.muted },
-  primary: { alignItems: "center", backgroundColor: colors.plum, borderRadius: 14, justifyContent: "center", marginTop: spacing.lg, minHeight: 52 },
-  primaryText: { color: colors.surface, fontWeight: "700" },
-  photoActions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
-  destinations: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
-  destination: { alignItems: "center", borderColor: colors.plum, borderRadius: 14, borderWidth: 1, flex: 1, justifyContent: "center", minHeight: 48 },
-  destinationText: { color: colors.plum, fontWeight: "700" },
+  container: { paddingBottom: 80, paddingHorizontal: 16 },
+  image: { alignSelf: "center", aspectRatio: 55 / 85, marginTop: 16, maxHeight: 500, width: "78%" },
+  fallback: {
+    alignItems: "center",
+    alignSelf: "center",
+    aspectRatio: 55 / 85,
+    backgroundColor: colors.lilacSoft,
+    borderRadius: 18,
+    justifyContent: "center",
+    marginTop: 16,
+    padding: 18,
+    width: "78%",
+  },
+  fallbackText: { textAlign: "center" },
+  kind: { letterSpacing: 0.4, marginTop: 18, textTransform: "uppercase" },
+  meta: { marginTop: 4 },
+  descriptor: { lineHeight: 20, marginTop: 12 },
+  statusRow: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 16 },
+  stack: { gap: 10, marginTop: 18 },
+  row: { flexDirection: "row", gap: 8 },
 });

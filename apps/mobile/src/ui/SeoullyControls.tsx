@@ -39,6 +39,32 @@ export function SeoullyButton({
   );
 }
 
+export function SeoullyChoiceChip({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const reduceMotion = useReduceMotion();
+  return (
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.choice,
+        selected && styles.choiceSelected,
+        pressShift(pressed, reduceMotion),
+      ]}
+    >
+      <SeoullyText variant="caption" color={selected ? colors.plum : colors.ink}>{label}</SeoullyText>
+    </Pressable>
+  );
+}
+
 export function SeoullyChip({
   label,
   tone = "group",
@@ -127,6 +153,20 @@ const styles = StyleSheet.create({
   },
   chipBias: { backgroundColor: colors.peach },
   chipType: { backgroundColor: colors.pinkSoft, paddingHorizontal: 12, paddingVertical: 6 },
+  choice: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    minHeight: 36,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  choiceSelected: {
+    backgroundColor: colors.lilacSoft,
+    borderColor: colors.lilac,
+  },
   shelf: { marginTop: 18, paddingHorizontal: 16 },
   shelfToggle: {
     alignItems: "center",

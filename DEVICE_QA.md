@@ -101,6 +101,18 @@ Check on the physical iPhone:
 - [ ] Public collector Follow / Message / Enter Room still work
 - [ ] Edit Profile remains a separate screen and still saves
 
+## Physical iPhone — Collection / Create / Messages
+
+- Date: 2026-09-27
+- Branch: `mobile-native`
+- Scope: Collection shelves, collectible detail, Create/Add, Messages/thread
+
+### COLLECTION / CREATE / MESSAGES: AWAITING PHYSICAL DEVICE VISUAL APPROVAL
+- [ ] Owned/wishlist read as Seoully shelves, not giant shop cards
+- [ ] Collectible detail shows personal photocard media as the card face
+- [ ] Create photo/caption and Add crop still complete
+- [ ] Messages rows and thread composer avoid keyboard overlap
+
 ## Remaining physical checks
 
 - [ ] iOS launch and safe-area layout

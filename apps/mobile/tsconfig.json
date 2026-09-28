@@ -1,7 +1,13 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true
+    "strict": true,
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "seoully-domain/*": ["../../src/domain/*"],
+      "seoully-public/*": ["../../public/*"]
+    }
   },
   "include": [
     "**/*.ts",

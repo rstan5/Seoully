@@ -1,4 +1,4 @@
-import { computeCompatibility } from "../../../../../src/domain/compatibility";
+import { computeCompatibility } from "seoully-domain/compatibility";
 import {
   COLLECTIBLE_TEMPLATES,
   ERA_BY_ID,
@@ -8,7 +8,7 @@ import {
   MEMBERS,
   RELEASE_BY_ID,
   TEMPLATE_BY_ID,
-} from "../../../../../src/domain/fixtures/catalog";
+} from "seoully-domain/fixtures/catalog";
 import {
   FOLLOWS,
   HOLDINGS_FIXTURE,
@@ -16,9 +16,9 @@ import {
   SOO,
   USERS,
   WISHLIST,
-} from "../../../../../src/domain/fixtures/collectors";
-import { POST_COMMENTS, POST_LIKES, POSTS } from "../../../../../src/domain/fixtures/social";
-import type { CollectibleTemplate, Follow, Holding, PostComment, PostLike, UserId, WishlistItem } from "../../../../../src/domain/types";
+} from "seoully-domain/fixtures/collectors";
+import { POST_COMMENTS, POST_LIKES, POSTS } from "seoully-domain/fixtures/social";
+import type { CollectibleTemplate, Follow, Holding, PostComment, PostLike, UserId, WishlistItem } from "seoully-domain/types";
 import type { NativeCatalogTemplate, NativeFeedPost, NativeHolding, NativeIdentity, NativeWishlistEntry } from "../../api";
 import { isDemoWorldAllowed } from "../mode";
 import type { FeedMode, SocialCollector, SocialRepository, SocialSuggested } from "../types";

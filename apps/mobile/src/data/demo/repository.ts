@@ -208,6 +208,18 @@ export class DemoSocialRepository implements SocialRepository {
     }).slice(0, 24).map(nativeTemplate);
   }
 
+  async searchDiscoverCollectibles(query: string) {
+    const templates = await this.searchCatalog(query);
+    return templates.map((template) => {
+      const holding = this.holdings.find((item) => item.templateId === template.id && item.ownerId !== VIEWER);
+      const owner = holding ? USERS.find((user) => user.id === holding.ownerId) : undefined;
+      return {
+        template,
+        ...(owner ? { owner: { userId: owner.id, handle: owner.handle, displayName: owner.displayName } } : {}),
+      };
+    });
+  }
+
   async searchPosts(query: string) {
     const q = needle(query);
     if (!q) return [];
@@ -239,17 +251,18 @@ export class DemoSocialRepository implements SocialRepository {
 
   async searchRooms(query: string) {
     const people = await this.searchCollectors(query);
-    return people.map((person) => {
-      const compat = person.userId === VIEWER ? undefined : this.compatibility(VIEWER, person.userId);
+    return people.flatMap((person) => {
       const profile = PROFILES.find((item) => item.userId === person.userId);
-      return {
-        roomId: profile?.roomId ?? person.userId,
+      if (!profile?.roomId) return [];
+      const compat = person.userId === VIEWER ? undefined : this.compatibility(VIEWER, person.userId);
+      return [{
+        roomId: profile.roomId,
         collector: person,
         rankScore: compat?.score ?? 0,
         displayedHoldingCount: this.holdings.filter((holding) => holding.ownerId === person.userId).length,
         relevantDisplayedCount: 0,
         reasons: compat?.theyOwnYourWants.length ? [{ code: "wishlist" as const, label: "Contains items from your wishlist" }] : [],
-      };
+      }];
     });
   }
 

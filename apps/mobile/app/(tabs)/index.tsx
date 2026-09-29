@@ -20,7 +20,8 @@ export default function FeedScreen() {
   const copy = useCopy();
   const { locale, toggleLocale } = useLocale();
   const social = useSocialRepository();
-  const [modes, setModes] = useState<{ production: FeedMode; demo: FeedMode }>({ production: "following", demo: "discover" });
+  const router = useRouter();
+  const [modes, setModes] = useState<{ production: FeedMode; demo: FeedMode }>({ production: "discover", demo: "discover" });
   const mode = social.capabilities.discoverFeed ? modes[social.kind] : "following";
   const [posts, setPosts] = useState<NativeFeedPost[]>([]);
   const [suggested, setSuggested] = useState<SocialSuggested[]>([]);
@@ -114,7 +115,23 @@ export default function FeedScreen() {
               onChange={(next) => setPosts((current) => current.map((post) => post.id === next.id ? next : post))}
             />
           )}
-          ListEmptyComponent={!loading && !error ? <SeoullyEmptyState body={empty} /> : null}
+          ListEmptyComponent={!loading && !error ? (
+            <View>
+              <SeoullyEmptyState body={empty} />
+              {mode === "following" ? (
+                <View style={styles.emptyActions}>
+                  {social.capabilities.discoverFeed ? (
+                    <Pressable accessibilityRole="button" onPress={() => changeMode("discover")} style={styles.emptyAction}>
+                      <SeoullyText variant="button" color={colors.plum}>{copy.feedOpenDiscover}</SeoullyText>
+                    </Pressable>
+                  ) : null}
+                  <Pressable accessibilityRole="button" onPress={() => router.push("/search")} style={styles.emptyAction}>
+                    <SeoullyText variant="button" color={colors.plum}>{copy.feedOpenSearch}</SeoullyText>
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
           ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.plum} style={styles.more} /> : null}
         />
       </KeyboardScreen>
@@ -135,7 +152,13 @@ function SuggestedPerson({ person, copy }: { person: SocialSuggested; copy: Mobi
       <View style={styles.personScore}>
         <SeoullyText variant="caption" color={colors.plum}>{copy.feedMatchScore.replace("{score}", String(person.score))}</SeoullyText>
       </View>
-      {person.subtitle ? <SeoullyText variant="caption" numberOfLines={2} style={styles.personMeta}>{person.subtitle}</SeoullyText> : null}
+      {person.subtitleKind === "reciprocal" ? (
+        <SeoullyText variant="caption" numberOfLines={2} style={styles.personMeta}>{copy.feedSuggestedReciprocal}</SeoullyText>
+      ) : person.subtitleKind === "wishlist" ? (
+        <SeoullyText variant="caption" numberOfLines={2} style={styles.personMeta}>{copy.feedSuggestedWishlist}</SeoullyText>
+      ) : person.subtitle ? (
+        <SeoullyText variant="caption" numberOfLines={2} style={styles.personMeta}>{person.subtitle}</SeoullyText>
+      ) : null}
     </Pressable>
   );
 }
@@ -175,4 +198,6 @@ const styles = StyleSheet.create({
   mode: { alignItems: "center", flex: 1, paddingBottom: 10, paddingTop: 11 },
   modeLine: { backgroundColor: "transparent", height: 2, marginTop: 8, width: "100%" },
   modeLineOn: { backgroundColor: colors.ink },
+  emptyActions: { alignItems: "center", gap: 10, marginTop: 16, paddingHorizontal: 20 },
+  emptyAction: { minHeight: 44, justifyContent: "center" },
 });

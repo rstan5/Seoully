@@ -1,6 +1,6 @@
 # Native road to ship
 
-**Status:** Slice 1 implemented in tree — **CODE VERIFIED / DEVICE QA PENDING**. Slices 2–8 not started.  
+**Status:** Slices 1–4 implemented in tree — **SLICE 4 — CODE VERIFIED / DEVICE QA PENDING**. Slices 5–8 not started.  
 **Canonical spec:** `docs/web-native-parity-contract.md`  
 **Connectivity evidence:** `docs/native-backend-connectivity-audit.md`  
 **Tree:** `mobile-native` `bdde759` + dirty working tree.  
@@ -17,7 +17,7 @@ Done is a complete user-experience slice (web behavior + native UI + backend + p
 ### What exists
 
 - Expo Router tabs matching web’s five peers; Room is **not** a visible tab.
-- Bearer `/api/mobile/*` to real RLS-backed tables for session, onboarding step, own holdings/wishlist, media, catalog contribute/reference, following feed, likes, comments, image posts, follow, people search, catalog search, discovery collectors/rooms, public room RPC, pair match, Ask assistant.
+- Bearer `/api/mobile/*` to real RLS-backed tables for session, onboarding step, own holdings/wishlist, media, catalog contribute/reference, following feed, **Discover** (public posts outside Following), likes, comments, image posts, follow, people search, catalog search, **post search** (caption/location/author/tagged catalog ILIKE), discovery collectors/rooms, public room RPC, pair match, Ask assistant.
 - Native collect flow that **creates a Holding immediately** (hard rule).
 - Own Profile can list own holdings/wishlist and toggle trade/remove.
 - Token map from `social-app.css` (colors, type, 52/58/48/42 metrics).
@@ -31,19 +31,17 @@ Done is a complete user-experience slice (web behavior + native UI + backend + p
 - Web onboarding after tastes: avatar, first collectible, room reveal, meet collectors.
 - Production notifications.
 - Production messages with post share, trade templates, unread (pending SQL is body-only and unapplied).
-- Production Discover feed query (also absent on **production web**).
-- Public collector owned/wishlist **rows** (count without rows).
 - Avatars in production.
 - Web binder-as-object, zone docking, doorway, card flight, undo/redo.
 - Own Room GET against current production schema (`theme_id` selected, column unapplied).
-- Ask card navigation that preserves search query; Ask context beyond `{ surface: "home" }`.
+- Ask context beyond `{ surface: "home" }` (Search can now be opened with `q` / `dest`; Ask still always sends home context).
 - Honest Demo isolation (`collection`/`binder`/`room`/`messages` still call Live APIs).
 - Passing `npm run mobile:verify` (Expo Doctor patch skew).
 - Physical-device proof of any Live journey.
 
 ### What web itself does not persist (so native must not fake it as “already done”)
 
-Messages, notices, Discover, post search, repost, share, save, Postgres avatar — these are **fixture-complete on web** and **absent in production**. Shipping native Live chrome for them without contracts is fake parity.
+Messages, notices, repost, share, general post save, Postgres avatar — these are **fixture-complete on web** and **absent in production**. Native Live Discover and post search now have production queries even though production web `ProductionFeed` is still following-only.
 
 ---
 
@@ -205,6 +203,8 @@ Order is dependency-shaped. **Slice 1 is first.**
 **Acceptance:** Following feed like+comment persist. Discover either works or is absent. Search people UUID → collector. Rooms → public room. Posts dest honest. Collectibles match web destination rules.
 
 **Device QA:** Follow from slice 3 → post appears in Following. Search `@handle`, a room, a collectible owned by someone else, a group name.
+
+**Implementation (2026-09-29):** SLICE 4 — CODE VERIFIED / DEVICE QA PENDING. Native first tab copy is **Discover** (web `nav.discover`). Live Discover is public posts whose authors are outside Following+self, recency-ordered, no fixture fallback. Following remains `getProductionFeed`. Suggested collectors stay on `graph_discovery_candidates` / compatibility+trade signals with EN/KO copy. Post search is a bounded ILIKE over caption, location, author identity, and tagged catalog names (no tsvector/migration). Collectible search opens the public owner collector profile, not Add; Add/wishlist stay secondary. Room search returns only rooms that `get_public_room_by_handle` exposes as public. Search accepts `q`/`dest` so later Ask cards can preserve the query. `20261001` and `20261002` were not applied.
 
 ---
 

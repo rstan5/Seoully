@@ -13,14 +13,14 @@ export type SocialCapabilities = {
 
 /** Live production: only claim capabilities that have a real contract today. */
 export const LIVE_CAPABILITIES: SocialCapabilities = {
-  discoverFeed: false,
+  discoverFeed: true,
   persistRepost: false,
   persistSave: false,
   deliverShare: false,
   persistMessages: false,
   persistNotices: false,
   publicCollectionRows: true,
-  searchPosts: false,
+  searchPosts: true,
   persistRoom: true,
   persistRoomTheme: false,
 };

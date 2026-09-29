@@ -5,6 +5,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/profile";
 import { createSupabaseServerClient } from "@/server/supabase/server";
 import { searchSharedCatalog, type CatalogTemplateDTO } from "@/server/dal/catalog";
+import { findOwnersOfTemplate } from "@/server/dal/collection-graph";
+import { excludedDiscoverAuthorIds, sanitizeSearchNeedle } from "@/server/social/discover-contract";
 
 const uuid = z.string().uuid();
 const pageSchema = z.object({ limit: z.number().int().min(1).max(25).default(20), cursor: z.string().trim().max(300).optional() }).strict();
@@ -33,6 +35,10 @@ export interface SocialPostDTO {
 }
 export interface SocialPage<T> { items: T[]; nextCursor: string | null; }
 export interface SocialSearchUser { userId: string; handle: string; displayName: string; }
+export interface SocialDiscoverCollectible {
+  template: CatalogTemplateDTO;
+  owner: SocialSearchUser | null;
+}
 
 type Row = Record<string, unknown>;
 
@@ -111,6 +117,67 @@ export async function getProductionFeed(input?: unknown, client?: SupabaseClient
   const { data, error } = await supabase.from("follows").select("followed_user_id").eq("follower_user_id", identity.user.id).limit(100);
   if (error) throw new Error("social_read_failed");
   return listPosts([identity.user.id, ...(data ?? []).map((row) => String(row.followed_user_id))], input, client);
+}
+
+async function listDiscoverPosts(excludedAuthorIds: string[], input: unknown, client?: SupabaseClient): Promise<SocialPage<SocialPostDTO>> {
+  const page = pageSchema.parse(input ?? {}); const cursor = decodeCursor(page.cursor); const { identity, supabase } = await actorClient(client);
+  const excluded = excludedDiscoverAuthorIds(identity.user.id, excludedAuthorIds);
+  let query = supabase.from("posts").select("id,author_user_id,caption,location_text,visibility,created_at,post_likes(count),post_comments(count)").eq("visibility", "public").not("author_user_id", "in", `(${excluded.join(",")})`).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(page.limit + 1);
+  if (cursor) query = query.or("created_at.lt." + cursor.createdAt + ",and(created_at.eq." + cursor.createdAt + ",id.lt." + cursor.id + ")");
+  const { data, error } = await query;
+  if (error) throw new Error("social_read_failed");
+  const rows = (data ?? []) as unknown as Row[]; const hasMore = rows.length > page.limit; const visibleRows = rows.slice(0, page.limit);
+  const items = await hydratePosts(visibleRows, identity.user.id, supabase);
+  return { items, nextCursor: hasMore && visibleRows.length ? encodeCursor(String(visibleRows.at(-1)!.created_at), String(visibleRows.at(-1)!.id)) : null };
+}
+
+export async function getProductionDiscoverFeed(input?: unknown, client?: SupabaseClient): Promise<SocialPage<SocialPostDTO>> {
+  const { identity, supabase } = await actorClient(client);
+  const { data, error } = await supabase.from("follows").select("followed_user_id").eq("follower_user_id", identity.user.id).limit(100);
+  if (error) throw new Error("social_read_failed");
+  return listDiscoverPosts((data ?? []).map((row) => String(row.followed_user_id)), input, client);
+}
+
+export async function searchProductionPosts(query: unknown, client?: SupabaseClient): Promise<SocialPostDTO[]> {
+  const needle = sanitizeSearchNeedle(z.string().max(120).parse(query));
+  if (!needle) return [];
+  const { identity, supabase } = await actorClient(client);
+  const like = `%${needle}%`;
+  const [authorsResult, templatesResult] = await Promise.all([
+    supabase.from("profiles").select("user_id").or("handle.ilike." + like + ",display_name.ilike." + like).limit(25),
+    supabase.from("collectible_templates").select("id").ilike("search_text", like).neq("status", "restricted").limit(25),
+  ]);
+  if (authorsResult.error || templatesResult.error) throw new Error("social_search_failed");
+  const authorIds = [...new Set((authorsResult.data ?? []).map((row) => String(row.user_id)))];
+  const templateIds = [...new Set((templatesResult.data ?? []).map((row) => String(row.id)))];
+  let taggedPostIds: string[] = [];
+  if (templateIds.length) {
+    const tagsResult = await supabase.from("post_collectible_tags").select("post_id").in("template_id", templateIds).limit(50);
+    if (tagsResult.error) throw new Error("social_search_failed");
+    taggedPostIds = [...new Set((tagsResult.data ?? []).map((row) => String(row.post_id)))];
+  }
+  const orParts = ["caption.ilike." + like, "location_text.ilike." + like];
+  if (authorIds.length) orParts.push("author_user_id.in.(" + authorIds.join(",") + ")");
+  if (taggedPostIds.length) orParts.push("id.in.(" + taggedPostIds.join(",") + ")");
+  const { data, error } = await supabase.from("posts").select("id,author_user_id,caption,location_text,visibility,created_at,post_likes(count),post_comments(count)").eq("visibility", "public").or(orParts.join(",")).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(20);
+  if (error) throw new Error("social_search_failed");
+  return hydratePosts((data ?? []) as unknown as Row[], identity.user.id, supabase);
+}
+
+export async function searchProductionDiscoverCollectibles(query: unknown): Promise<SocialDiscoverCollectible[]> {
+  const needle = sanitizeSearchNeedle(z.string().max(120).parse(query));
+  if (!needle) return [];
+  const templates = await searchSharedCatalog({ query: needle, limit: 12, offset: 0 });
+  const hits: SocialDiscoverCollectible[] = [];
+  for (const template of templates) {
+    const owners = await findOwnersOfTemplate({ templateId: template.id, limit: 1, offset: 0 });
+    const owner = owners[0];
+    hits.push({
+      template,
+      owner: owner ? { userId: owner.userId, handle: owner.handle, displayName: owner.displayName } : null,
+    });
+  }
+  return hits;
 }
 
 export async function searchProductionUsers(query: unknown, client?: SupabaseClient): Promise<SocialSearchUser[]> {

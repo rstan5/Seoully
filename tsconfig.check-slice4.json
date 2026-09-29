@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "outDir": ".tmp/build",
+    "skipLibCheck": true,
+    "strict": false,
+    "esModuleInterop": true
+  },
+  "include": [
+    "scripts/check-slice4.ts",
+    "src/server/social/discover-contract.ts",
+    "apps/mobile/src/data/capabilities.ts",
+    "apps/mobile/src/explore.ts"
+  ]
+}

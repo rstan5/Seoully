@@ -38,13 +38,13 @@ assertContains(configSource, "productApiConfigured", "config.ts");
 assertContains(configSource, "isSeoullyProductReady", "config.ts");
 assertContains(configSource, "authConfigured", "config.ts");
 
-assert.equal(LIVE_CAPABILITIES.discoverFeed, false);
+assert.equal(LIVE_CAPABILITIES.discoverFeed, true);
 assert.equal(LIVE_CAPABILITIES.persistRepost, false);
 assert.equal(LIVE_CAPABILITIES.deliverShare, false);
 assert.equal(LIVE_CAPABILITIES.persistMessages, false);
 assert.equal(LIVE_CAPABILITIES.persistNotices, false);
 assert.equal(LIVE_CAPABILITIES.publicCollectionRows, true);
-assert.equal(LIVE_CAPABILITIES.searchPosts, false);
+assert.equal(LIVE_CAPABILITIES.searchPosts, true);
 assert.equal(LIVE_CAPABILITIES.persistRoom, true);
 assert.equal(LIVE_CAPABILITIES.persistRoomTheme, false);
 

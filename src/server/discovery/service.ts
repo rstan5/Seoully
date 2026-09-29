@@ -6,6 +6,8 @@ import { getDiscoveryCandidateBatch, getDiscoveryCatalog, asPairPerson, type Dis
 import type { PairPerson } from "@/server/dal/collection-graph-pair";
 import { computeCompatibilityPeople } from "@/server/compatibility/service";
 import { computeTradeOpportunity } from "@/server/trade/service";
+import { getPublicRoomByHandle } from "@/server/dal/public-room";
+import { sanitizeSearchNeedle } from "@/server/social/discover-contract";
 
 const optionsSchema = z.object({ limit: z.number().int().min(1).max(25).default(25) }).strict();
 
@@ -77,6 +79,26 @@ export async function discoverRooms(input?: unknown, client?: SupabaseClient): P
     return { roomId: room.room_id, collector: collector.collector, rankScore, displayedHoldingCount: room.displayed_holding_count, relevantDisplayedCount, reasons };
   }).sort((a, b) => b.rankScore - a.rankScore || b.relevantDisplayedCount - a.relevantDisplayedCount || a.roomId.localeCompare(b.roomId));
   return results.slice(0, limit);
+}
+
+export async function searchProductionRooms(query: unknown, client?: SupabaseClient): Promise<RoomDiscoveryResult[]> {
+  const needle = sanitizeSearchNeedle(z.string().max(120).parse(query)).toLowerCase().replace(/^@+/, "");
+  if (!needle) return [];
+  const rooms = await discoverRooms({ limit: 25 }, client);
+  const matches = rooms.filter((room) => (
+    room.collector.displayName.toLowerCase().includes(needle)
+    || room.collector.handle.toLowerCase().includes(needle)
+  ));
+  const visible: RoomDiscoveryResult[] = [];
+  for (const room of matches) {
+    try {
+      const pub = await getPublicRoomByHandle(room.collector.handle, client);
+      if (pub && !pub.private && pub.room) visible.push(room);
+    } catch {
+      continue;
+    }
+  }
+  return visible;
 }
 
 export async function discoverCollectibles(input?: unknown, client?: SupabaseClient): Promise<CollectibleDiscoveryResult[]> {

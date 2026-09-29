@@ -11,11 +11,13 @@ import {
   loadMyWishlist,
   loadNativeOnboarding,
   loadPostComments,
-  loadRoomDiscovery,
   removeHolding,
   resolveNativeIdentity,
   searchCatalog,
   searchCollectors,
+  searchDiscoverCollectibles,
+  searchPosts,
+  searchRooms,
   setCollectorFollowing,
   setPostLiked,
   setWishlistTemplate,
@@ -61,8 +63,7 @@ export const productionRepository: SocialRepository = {
     return resolveNativeIdentity<NativeIdentity>();
   },
   async loadFeed(mode, cursor) {
-    if (mode === "discover") return { items: [], nextCursor: null };
-    return loadFeed(cursor);
+    return loadFeed(cursor, mode);
   },
   async loadSuggested() {
     try {
@@ -75,11 +76,7 @@ export const productionRepository: SocialRepository = {
         },
         score: item.compatibilityScore,
         meta: `${item.compatibilityScore}% match`,
-        subtitle: item.reciprocal
-          ? "You may have something for each other."
-          : item.wishlistItemsOwnedCount
-            ? "Contains items from your wishlist"
-            : undefined,
+        subtitleKind: item.reciprocal ? "reciprocal" as const : item.wishlistItemsOwnedCount ? "wishlist" as const : undefined,
       }));
     } catch {
       return [];
@@ -98,9 +95,9 @@ export const productionRepository: SocialRepository = {
   addPostComment,
   searchCollectors,
   searchCatalog,
-  async searchPosts() {
-    return [];
-  },
+  searchDiscoverCollectibles,
+  searchPosts,
+  searchRooms,
   async searchEntities(query) {
     const catalog = await searchCatalog(query);
     const groups = new Map<string, { id: string; kind: "group"; title: string; query: string }>();
@@ -120,27 +117,6 @@ export const productionRepository: SocialRepository = {
       }
     }
     return [...groups.values(), ...members.values()].slice(0, 24);
-  },
-  async searchRooms(query) {
-    const [rooms, people] = await Promise.all([loadRoomDiscovery(), searchCollectors(query)]);
-    const needle = query.trim().toLowerCase().replace(/^@+/, "");
-    const matches = rooms.filter((room) => (
-      room.collector.displayName.toLowerCase().includes(needle)
-      || room.collector.handle.toLowerCase().includes(needle)
-    ));
-    const byUser = new Map(matches.map((room) => [room.collector.userId, room]));
-    for (const person of people) {
-      if (byUser.has(person.userId)) continue;
-      byUser.set(person.userId, {
-        roomId: person.userId,
-        collector: person,
-        rankScore: 0,
-        displayedHoldingCount: 0,
-        relevantDisplayedCount: 0,
-        reasons: [],
-      });
-    }
-    return [...byUser.values()];
   },
   async loadCollector(userId) {
     const [result, page, tastes, match, collection] = await Promise.all([

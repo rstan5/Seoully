@@ -1,5 +1,6 @@
 import type {
   NativeCatalogTemplate,
+  NativeCollectibleSearchHit,
   NativeCommentPage,
   NativeFeedPage,
   NativeFeedPost,
@@ -19,6 +20,7 @@ export type SocialSuggested = {
   score: number;
   meta: string;
   subtitle?: string;
+  subtitleKind?: "reciprocal" | "wishlist";
   avatarUrl?: string;
 };
 
@@ -134,6 +136,7 @@ export interface SocialRepository {
   addPostComment(postId: string, body: string): Promise<NativePostComment>;
   searchCollectors(query: string): Promise<NativeSearchUser[]>;
   searchCatalog(query: string): Promise<NativeCatalogTemplate[]>;
+  searchDiscoverCollectibles(query: string): Promise<NativeCollectibleSearchHit[]>;
   searchPosts(query: string): Promise<NativeFeedPost[]>;
   searchEntities(query: string): Promise<SocialEntity[]>;
   searchRooms(query: string): Promise<NativeRoomDiscovery[]>;

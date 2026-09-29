@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getProductionFeed } from "@/server/dal/social";
+import { getProductionDiscoverFeed, getProductionFeed } from "@/server/dal/social";
 import { createSupabaseBearerClient } from "@/server/supabase/bearer";
 
 export async function GET(request: Request) {
@@ -8,7 +8,10 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const cursor = url.searchParams.get("cursor") || undefined;
-    const page = await getProductionFeed({ limit: Number(url.searchParams.get("limit") ?? "20"), ...(cursor ? { cursor } : {}) }, client);
+    const input = { limit: Number(url.searchParams.get("limit") ?? "20"), ...(cursor ? { cursor } : {}) };
+    const page = url.searchParams.get("mode") === "discover"
+      ? await getProductionDiscoverFeed(input, client)
+      : await getProductionFeed(input, client);
     return NextResponse.json({ page }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "social_read_failed";

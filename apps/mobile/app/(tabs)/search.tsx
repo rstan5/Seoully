@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import {
   type NativeCatalogTemplate,
+  type NativeCollectibleSearchHit,
   type NativeFeedPost,
   type NativeRoomDiscovery,
   type NativeSearchUser,
 } from "../../src/api";
 import { useSocialRepository, type SocialEntity } from "../../src/data";
+import { EXPLORE_DESTINATIONS, isExploreDestination, type ExploreDestination } from "../../src/explore";
 import { KeyboardScreen } from "../../src/components/KeyboardScreen";
 import { RetryNotice } from "../../src/components/RetryNotice";
 import { collectibleKindLabel, type MobileCopy } from "../../src/i18n";
@@ -32,10 +34,7 @@ import { SeoullyText } from "../../src/ui/SeoullyText";
 
 const SEARCH_STATE_KEY = "seoully.mobile.search-state.v2";
 const SEARCH_QUERY_KEY = "seoully.mobile.search-query.v1";
-const DEBOUNCE_MS = 200;
-
-export const EXPLORE_DESTINATIONS = ["people", "rooms", "posts", "collectibles", "entities"] as const;
-export type ExploreDestination = (typeof EXPLORE_DESTINATIONS)[number];
+const DEBOUNCE_MS = 280;
 
 type SearchEntity = SocialEntity;
 
@@ -43,8 +42,13 @@ function looksLikeHandle(query: string) {
   return /^@?[a-z0-9._]{2,}$/i.test(query.trim());
 }
 
+function paramValue(value?: string | string[]) {
+  return (Array.isArray(value) ? value[0] : value)?.trim() ?? "";
+}
+
 export default function SearchScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ q?: string | string[]; dest?: string | string[] }>();
   const copy = useCopy();
   const { toggleLocale } = useLocale();
   const social = useSocialRepository();
@@ -52,7 +56,7 @@ export default function SearchScreen() {
   const [destination, setDestination] = useState<ExploreDestination | null>(null);
   const [people, setPeople] = useState<NativeSearchUser[]>([]);
   const [rooms, setRooms] = useState<NativeRoomDiscovery[]>([]);
-  const [catalog, setCatalog] = useState<NativeCatalogTemplate[]>([]);
+  const [catalog, setCatalog] = useState<NativeCollectibleSearchHit[]>([]);
   const [posts, setPosts] = useState<NativeFeedPost[]>([]);
   const [entities, setEntities] = useState<SearchEntity[]>([]);
   const [wantedIds, setWantedIds] = useState<Set<string>>(new Set());
@@ -63,6 +67,8 @@ export default function SearchScreen() {
   const handleQuery = looksLikeHandle(query);
   const showingResults = destination !== null;
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchGeneration = useRef(0);
+  const appliedParams = useRef("");
 
   useEffect(() => {
     void AsyncStorage.setItem(SEARCH_STATE_KEY, JSON.stringify({ query, destination }));
@@ -87,6 +93,7 @@ export default function SearchScreen() {
 
   const runSearch = useCallback(async (nextQuery: string, nextDestination: ExploreDestination) => {
     const text = nextQuery.trim().slice(0, 120);
+    const generation = ++searchGeneration.current;
     if (!text) {
       setPeople([]);
       setRooms([]);
@@ -101,38 +108,66 @@ export default function SearchScreen() {
     setError(null);
     try {
       if (nextDestination === "people") {
-        setPeople(await social.searchCollectors(text));
+        const hits = await social.searchCollectors(text);
+        if (generation !== searchGeneration.current) return;
+        setPeople(hits);
         setRooms([]); setCatalog([]); setPosts([]); setEntities([]);
       } else if (nextDestination === "rooms") {
-        setRooms(await social.searchRooms(text));
+        const hits = await social.searchRooms(text);
+        if (generation !== searchGeneration.current) return;
+        setRooms(hits);
         setPeople([]); setCatalog([]); setPosts([]); setEntities([]);
       } else if (nextDestination === "posts") {
         if (!social.capabilities.searchPosts) {
+          if (generation !== searchGeneration.current) return;
           setPosts([]);
           setPeople([]); setRooms([]); setCatalog([]); setEntities([]);
           setError(copy.searchPostsUnavailable);
           setLoading(false);
           return;
         }
-        setPosts(await social.searchPosts(text));
+        const hits = await social.searchPosts(text);
+        if (generation !== searchGeneration.current) return;
+        setPosts(hits);
         setPeople([]); setRooms([]); setCatalog([]); setEntities([]);
       } else if (nextDestination === "entities") {
-        setEntities(await social.searchEntities(text));
+        const hits = await social.searchEntities(text);
+        if (generation !== searchGeneration.current) return;
+        setEntities(hits);
         setPeople([]); setRooms([]); setCatalog([]); setPosts([]);
       } else {
-        setCatalog(await social.searchCatalog(text));
+        const hits = await social.searchDiscoverCollectibles(text);
+        if (generation !== searchGeneration.current) return;
+        setCatalog(hits);
         setPeople([]); setRooms([]); setPosts([]); setEntities([]);
       }
     } catch {
+      if (generation !== searchGeneration.current) return;
       setError(nextDestination === "people" || nextDestination === "rooms" ? copy.exploreUnavailable : copy.catalogUnavailable);
     } finally {
-      setLoading(false);
+      if (generation === searchGeneration.current) setLoading(false);
     }
   }, [copy.catalogUnavailable, copy.exploreUnavailable, copy.searchPostsUnavailable, social]);
 
   useEffect(() => {
+    const nextQuery = paramValue(params.q);
+    const destParam = paramValue(params.dest);
+    const nextDest = isExploreDestination(destParam) ? destParam : null;
+    const key = `${nextQuery}|${nextDest ?? ""}`;
+    if (!nextQuery || key === appliedParams.current) return;
+    appliedParams.current = key;
+    const task = setTimeout(() => {
+      setQuery(nextQuery);
+      setDestination(nextDest);
+      if (nextDest) void runSearch(nextQuery, nextDest);
+    }, 0);
+    return () => clearTimeout(task);
+  }, [params.dest, params.q, runSearch]);
+
+  useEffect(() => {
     let active = true;
     void (async () => {
+      if (paramValue(params.q)) return;
       const stored = await AsyncStorage.getItem(SEARCH_STATE_KEY);
       const legacy = await AsyncStorage.getItem(SEARCH_QUERY_KEY);
       if (!active) return;
@@ -152,7 +187,7 @@ export default function SearchScreen() {
       if (legacy?.trim()) setQuery(legacy);
     })();
     return () => { active = false; };
-  }, [runSearch]);
+  }, [params.q, runSearch]);
 
   function changeQuery(next: string) {
     setQuery(next);
@@ -269,9 +304,7 @@ export default function SearchScreen() {
                   matchLabel={(score) => copy.searchMatch.replace("{score}", String(score))}
                   enterLabel={copy.viewCollectorRoom}
                   reasonText={(codes) => reasonLabel(codes[0], copy)}
-                  onEnter={(userId) => social.kind === "demo"
-                    ? router.push({ pathname: "/collector", params: { userId } })
-                    : router.push({ pathname: "/collector-room", params: { userId } })}
+                  onEnter={(userId) => router.push({ pathname: "/collector-room", params: { userId } })}
                 />
               ) : null}
 
@@ -293,20 +326,21 @@ export default function SearchScreen() {
                   addLabel={copy.addYourCopy}
                   saveLabel={copy.saveToWishlist}
                   savedLabel={copy.savedToWishlist}
+                  ownedBy={(handle) => copy.searchOwnedBy.replace("{handle}", handle)}
+                  noOwner={copy.searchCollectibleNoOwner}
                   wantedIds={wantedIds}
-                  onAdd={social.kind === "production"
-                    ? (item) => router.push({
-                      pathname: "/add",
-                      params: {
-                        templateId: item.id,
-                        name: item.name,
-                        kind: item.kind,
-                        groupName: item.groupName,
-                        memberName: item.memberName ?? "",
-                        releaseName: item.releaseName ?? "",
-                      },
-                    })
-                    : undefined}
+                  onOpenOwner={(userId) => router.push({ pathname: "/collector", params: { userId } })}
+                  onAdd={(item) => router.push({
+                    pathname: "/add",
+                    params: {
+                      templateId: item.id,
+                      name: item.name,
+                      kind: item.kind,
+                      groupName: item.groupName,
+                      memberName: item.memberName ?? "",
+                      releaseName: item.releaseName ?? "",
+                    },
+                  })}
                   onSave={saveWanted}
                 />
               ) : null}
@@ -434,41 +468,49 @@ function CollectibleResults({
   addLabel,
   saveLabel,
   savedLabel,
+  ownedBy,
+  noOwner,
   wantedIds,
+  onOpenOwner,
   onAdd,
   onSave,
 }: {
-  hits: NativeCatalogTemplate[];
+  hits: NativeCollectibleSearchHit[];
   heading: string;
   empty: string;
   kindText: (kind: string) => string;
   addLabel: string;
   saveLabel: string;
   savedLabel: string;
+  ownedBy: (handle: string) => string;
+  noOwner: string;
   wantedIds: Set<string>;
-  onAdd?: (item: NativeCatalogTemplate) => void;
+  onOpenOwner: (userId: string) => void;
+  onAdd: (item: NativeCatalogTemplate) => void;
   onSave: (templateId: string) => void;
 }) {
   if (hits.length === 0) return <SeoullyEmptyState align="start" body={empty} />;
   return (
     <View>
       <SeoullyText variant="section" style={styles.section}>{heading}</SeoullyText>
-      {hits.map((item) => {
+      {hits.map((hit) => {
+        const item = hit.template;
         const line = [item.groupName, item.memberName, kindText(item.kind)].filter(Boolean).join(" · ");
+        const ownerLine = hit.owner ? ownedBy(hit.owner.handle) : noOwner;
         return (
           <View key={item.id}>
             <SeoullySearchRow
               title={item.name}
               meta={line}
+              reason={ownerLine}
               leading={<SeoullyCollectibleMark />}
-              staticRow
+              onPress={hit.owner ? () => onOpenOwner(hit.owner!.userId) : undefined}
+              staticRow={!hit.owner}
             />
             <View style={styles.actions}>
-              {onAdd ? (
-                <Pressable accessibilityRole="button" onPress={() => onAdd(item)}>
-                  <SeoullyText variant="button" color={colors.plum}>{addLabel}</SeoullyText>
-                </Pressable>
-              ) : null}
+              <Pressable accessibilityRole="button" onPress={() => onAdd(item)}>
+                <SeoullyText variant="button" color={colors.plum}>{addLabel}</SeoullyText>
+              </Pressable>
               <Pressable accessibilityRole="button" disabled={wantedIds.has(item.id)} onPress={() => onSave(item.id)}>
                 <SeoullyText variant="button" color={wantedIds.has(item.id) ? colors.muted : colors.plum}>
                   {wantedIds.has(item.id) ? savedLabel : saveLabel}

@@ -16,6 +16,7 @@ import { usePathname, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "../supabase";
 import { useSocialRepository, type NativeAskCard } from "../data";
+import { isExploreDestination } from "../explore";
 import { useCopy, useLocale } from "../locale";
 import { colors, elevation, radii, sizes } from "../theme";
 import { pressShift, useReduceMotion } from "./motion";
@@ -89,7 +90,14 @@ export function SeoullyCompanion() {
     const action = card.action;
     if (!action) return;
     if (action.type === "search") {
-      setError(copy.askSearchQueryDropped);
+      const nextQuery = action.query?.trim();
+      if (!nextQuery) {
+        setError(copy.askSearchQueryDropped);
+        return;
+      }
+      setOpen(false);
+      const dest = isExploreDestination(action.destination) ? action.destination : undefined;
+      router.push({ pathname: "/search", params: dest ? { q: nextQuery, dest } : { q: nextQuery } });
       return;
     }
     setOpen(false);

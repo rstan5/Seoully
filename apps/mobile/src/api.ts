@@ -41,6 +41,10 @@ export type NativeCatalogTemplate = {
 };
 
 export type NativeSearchUser = { userId: string; handle: string; displayName: string; avatarUrl?: string };
+export type NativeCollectibleSearchHit = {
+  template: NativeCatalogTemplate;
+  owner?: NativeSearchUser;
+};
 
 export async function searchCollectors(query: string): Promise<NativeSearchUser[]> {
   const accessToken = await mobileAccessToken();
@@ -50,6 +54,36 @@ export async function searchCollectors(query: string): Promise<NativeSearchUser[
   if (!response.ok) throw new Error("social_search_failed");
   const payload = await response.json() as { users?: NativeSearchUser[] };
   return payload.users ?? [];
+}
+
+export async function searchPosts(query: string): Promise<NativeFeedPost[]> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/search?dest=posts&q=${encodeURIComponent(query)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("social_search_failed");
+  const payload = await response.json() as { posts?: NativeFeedPost[] };
+  return payload.posts ?? [];
+}
+
+export async function searchDiscoverCollectibles(query: string): Promise<NativeCollectibleSearchHit[]> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/search?dest=collectibles&q=${encodeURIComponent(query)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("social_search_failed");
+  const payload = await response.json() as { collectibles?: NativeCollectibleSearchHit[] };
+  return payload.collectibles ?? [];
+}
+
+export async function searchRooms(query: string): Promise<NativeRoomDiscovery[]> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/search?dest=rooms&q=${encodeURIComponent(query)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("social_search_failed");
+  const payload = await response.json() as { rooms?: NativeRoomDiscovery[] };
+  return payload.rooms ?? [];
 }
 
 export async function searchCatalog(query: string): Promise<NativeCatalogTemplate[]> {
@@ -265,11 +299,14 @@ export type NativeFeedPost = {
 };
 export type NativePostComment = { id: string; postId: string; body: string; createdAt: string; author: NativeSocialAuthor };
 export type NativeFeedPage = { items: NativeFeedPost[]; nextCursor: string | null };
-export async function loadFeed(cursor?: string): Promise<NativeFeedPage> {
+export async function loadFeed(cursor?: string, mode: "following" | "discover" = "following"): Promise<NativeFeedPage> {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
   if (!accessToken) throw new Error("unauthenticated");
-  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+  const params = new URLSearchParams();
+  if (cursor) params.set("cursor", cursor);
+  if (mode === "discover") params.set("mode", "discover");
+  const query = params.toString() ? `?${params.toString()}` : "";
   const response = await fetch(`${productApiBase()}/api/mobile/feed${query}`, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!response.ok) throw new Error("social_read_failed");
   const payload = await response.json() as { page?: { items?: NativeFeedPost[]; nextCursor?: string | null } };

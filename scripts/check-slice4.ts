@@ -23,7 +23,7 @@ assert.equal(LIVE_CAPABILITIES.discoverFeed, true);
 assert.equal(LIVE_CAPABILITIES.searchPosts, true);
 assert.equal(LIVE_CAPABILITIES.persistRepost, false);
 assert.equal(LIVE_CAPABILITIES.persistSave, false);
-assert.equal(LIVE_CAPABILITIES.deliverShare, false);
+assert.equal(LIVE_CAPABILITIES.deliverShare, true);
 assert.equal(DEMO_CAPABILITIES.discoverFeed, true);
 assert.equal(DEMO_CAPABILITIES.searchPosts, true);
 assert.deepEqual([...EXPLORE_DESTINATIONS], ["people", "rooms", "posts", "collectibles", "entities"]);

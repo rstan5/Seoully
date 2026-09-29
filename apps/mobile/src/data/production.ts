@@ -6,11 +6,16 @@ import {
   loadCollectorPosts,
   loadCollectorProfile,
   loadCollectorCollection,
+  loadConversations as loadProductionConversations,
+  loadDirectMessages,
   loadFeed,
   loadMyHoldings,
+  loadProductionNotices,
   loadMyWishlist,
   loadNativeOnboarding,
   loadPostComments,
+  markConversationRead as markProductionConversationRead,
+  markProductionNoticesRead,
   removeHolding,
   resolveNativeIdentity,
   searchCatalog,
@@ -18,6 +23,7 @@ import {
   searchDiscoverCollectibles,
   searchPosts,
   searchRooms,
+  sendDirectMessage as sendProductionDirectMessage,
   setCollectorFollowing,
   setPostLiked,
   setWishlistTemplate,
@@ -26,8 +32,8 @@ import {
   type NativeIdentity,
 } from "../api";
 import { LIVE_CAPABILITIES } from "./capabilities";
-import { liveRepostResult, liveSaveResult, liveShareResult } from "./honesty";
-import type { NativeAskResult, SocialCompatibility, SocialNotice, SocialRepository, SocialShareRecipient, SocialTradeItem } from "./types";
+import { liveNoticePage, liveRepostResult, liveSaveResult, liveShareResult } from "./honesty";
+import type { NativeAskResult, SocialCompatibility, SocialConversation, SocialMessage, SocialNotice, SocialRepository, SocialSendMessageInput, SocialShareRecipient, SocialTradeItem } from "./types";
 
 function matchItems(items: NativeCollectorMatch["trade"]["theyOwnYourWants"], side: "they" | "you"): SocialTradeItem[] {
   return items.map((item) => ({
@@ -177,21 +183,69 @@ export const productionRepository: SocialRepository = {
     return { followers: result.follow.followers, followingCount: result.follow.followingCount };
   },
   async loadNotices(): Promise<{ items: SocialNotice[]; persisted: boolean }> {
-    return { items: [], persisted: false };
+    if (!LIVE_CAPABILITIES.persistNotices) return liveNoticePage();
+    const page = await loadProductionNotices();
+    return {
+      items: page.items.map((item) => ({
+        ...item,
+        headline: item.kind,
+      })),
+      persisted: true,
+    };
   },
   async unreadNoticeCount() {
-    return 0;
+    if (!LIVE_CAPABILITIES.persistNotices) return 0;
+    const page = await loadProductionNotices();
+    return page.unreadCount;
   },
   async markNoticesRead() {
-    return;
+    if (!LIVE_CAPABILITIES.persistNotices) return;
+    await markProductionNoticesRead();
   },
   async searchShareRecipients(query: string): Promise<SocialShareRecipient[]> {
     const needle = query.trim();
     if (!needle) return [];
     return searchCollectors(needle);
   },
-  async sendShare() {
-    return liveShareResult();
+  async sendShare(postId: string, peerUserId: string, body: string) {
+    if (!LIVE_CAPABILITIES.deliverShare || !LIVE_CAPABILITIES.persistMessages) return liveShareResult();
+    await sendProductionDirectMessage({ peerUserId, postId, body });
+    return { delivered: true };
+  },
+  async loadConversations(): Promise<SocialConversation[]> {
+    if (!LIVE_CAPABILITIES.persistMessages) return [];
+    const items = await loadProductionConversations();
+    return items.map((item) => ({ ...item, unread: Boolean(item.unread) }));
+  },
+  async loadMessages(conversationId: string): Promise<SocialMessage[]> {
+    if (!LIVE_CAPABILITIES.persistMessages) return [];
+    const items = await loadDirectMessages(conversationId);
+    return items.map((item) => ({
+      id: item.id,
+      conversationId: item.conversationId,
+      body: item.body,
+      createdAt: item.createdAt,
+      mine: item.mine,
+      post: item.post ?? null,
+      collectibles: item.collectibles ?? [],
+    }));
+  },
+  async sendMessage(input: SocialSendMessageInput): Promise<SocialMessage> {
+    if (!LIVE_CAPABILITIES.persistMessages) throw new Error("messages_unavailable");
+    const item = await sendProductionDirectMessage(input);
+    return {
+      id: item.id,
+      conversationId: item.conversationId,
+      body: item.body,
+      createdAt: item.createdAt,
+      mine: item.mine,
+      post: item.post ?? null,
+      collectibles: item.collectibles ?? [],
+    };
+  },
+  async markConversationRead(conversationId: string) {
+    if (!LIVE_CAPABILITIES.persistMessages) return;
+    await markProductionConversationRead(conversationId);
   },
   async askSeoully(question: string, locale: "en" | "ko", history: { role: "user" | "assistant"; content: string }[]): Promise<NativeAskResult> {
     const payload = await askSeoullyNative({ locale, question, history, context: { surface: "home" } });

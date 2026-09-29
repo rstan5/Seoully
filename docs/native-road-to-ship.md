@@ -1,6 +1,6 @@
 # Native road to ship
 
-**Status:** Slices 1–4 implemented in tree — **SLICE 4 — CODE VERIFIED / DEVICE QA PENDING**. Slices 5–8 not started.  
+**Status:** Slices 1–5 implemented in tree — **SLICE 5 — CODE VERIFIED / DEVICE QA PENDING**. Slices 6–8 not started.  
 **Canonical spec:** `docs/web-native-parity-contract.md`  
 **Connectivity evidence:** `docs/native-backend-connectivity-audit.md`  
 **Tree:** `mobile-native` `bdde759` + dirty working tree.  
@@ -229,6 +229,8 @@ Order is dependency-shaped. **Slice 1 is first.**
 **Acceptance:** Send text; relaunch thread. Share a post from Feed → recipient sees post context. Trade CTA carries templates. Unread on list + tab. Notices either real or hidden.
 
 **Device QA:** Two accounts (or fixture-impossible: two Live users) — message, share, trade ping, badge, tap notice.
+
+**Implementation (2026-09-29):** SLICE 5 — CODE VERIFIED / DEVICE QA PENDING. `20261001000000_direct_messages.sql` applied to linked production (`ttmynanbwxlvcczeobgj`). `20261002` remains unapplied. Live `persistMessages` / `persistNotices` / `deliverShare` are true. Demo stays local. Production notices are like/comment/follow only.
 
 ---
 

@@ -152,13 +152,36 @@ export default function CollectorScreen() {
 
   async function message() {
     if (!collector || busy) return;
-    setNotice(social.kind === "demo" ? copy.messagesBlocked : copy.messagesUnavailable);
+    if (!social.capabilities.persistMessages) {
+      setNotice(copy.messagesUnavailable);
+      return;
+    }
+    router.push({
+      pathname: "/thread",
+      params: {
+        userId: collector.user.id,
+        displayName: collector.user.displayName,
+        handle: collector.user.handle,
+      },
+    });
   }
 
   function messageAboutTrade(templateIds: string[]) {
-    // Reserved for DM prefill after 20261001000000_direct_messages.sql.
-    void templateIds;
-    setNotice(social.kind === "demo" ? copy.messagesBlocked : copy.messagesTradeUnavailable);
+    if (!collector) return;
+    if (!social.capabilities.persistMessages) {
+      setNotice(copy.messagesTradeUnavailable);
+      return;
+    }
+    router.push({
+      pathname: "/thread",
+      params: {
+        userId: collector.user.id,
+        displayName: collector.user.displayName,
+        handle: collector.user.handle,
+        templateIds: templateIds.join(","),
+        trade: "1",
+      },
+    });
   }
 
   function enterRoom() {

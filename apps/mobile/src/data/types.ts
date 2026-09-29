@@ -108,6 +108,52 @@ export type SocialShareRecipient = NativeSearchUser;
 
 export type SocialShareResult = { delivered: boolean };
 
+export type SocialConversation = {
+  id: string;
+  peer: { userId: string; handle: string; displayName: string; avatarUrl?: string };
+  lastMessage: {
+    body: string;
+    createdAt: string;
+    mine: boolean;
+    postId?: string;
+    templateCount?: number;
+  } | null;
+  unread: boolean;
+};
+
+export type SocialMessagePost = {
+  id: string;
+  authorUserId: string;
+  authorHandle: string;
+  caption: string;
+  mediaUrl?: string;
+};
+
+export type SocialMessageCollectible = {
+  templateId: string;
+  name: string;
+  kind: string;
+  colorway?: { base: string; accent: string; ink: string };
+};
+
+export type SocialMessage = {
+  id: string;
+  conversationId: string;
+  body: string;
+  createdAt: string;
+  mine: boolean;
+  post: SocialMessagePost | null;
+  collectibles: SocialMessageCollectible[];
+};
+
+export type SocialSendMessageInput = {
+  conversationId?: string;
+  peerUserId: string;
+  body: string;
+  postId?: string;
+  templateIds?: string[];
+};
+
 export type NativeAskCard = {
   kind: "collector" | "collectible" | "room" | "holding";
   id: string;
@@ -154,5 +200,9 @@ export interface SocialRepository {
   markNoticesRead(): Promise<void>;
   searchShareRecipients(query: string): Promise<SocialShareRecipient[]>;
   sendShare(postId: string, peerUserId: string, body: string): Promise<SocialShareResult>;
+  loadConversations(): Promise<SocialConversation[]>;
+  loadMessages(conversationId: string): Promise<SocialMessage[]>;
+  sendMessage(input: SocialSendMessageInput): Promise<SocialMessage>;
+  markConversationRead(conversationId: string): Promise<void>;
   askSeoully(question: string, locale: "en" | "ko", history: { role: "user" | "assistant"; content: string }[]): Promise<NativeAskResult>;
 }

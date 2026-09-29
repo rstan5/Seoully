@@ -18,13 +18,14 @@ import {
   USERS,
   WISHLIST,
 } from "seoully-domain/fixtures/collectors";
-import { POST_COMMENTS, POST_LIKES, POSTS, NOTICES } from "seoully-domain/fixtures/social";
+import { POST_COMMENTS, POST_LIKES, POSTS, MESSAGES, NOTICES, THREADS } from "seoully-domain/fixtures/social";
 import { resolveProfileTheme } from "seoully-domain/profile-theme";
-import type { CollectibleTemplate, Follow, Holding, Notice, Post, PostComment, PostLike, UserId, WishlistItem } from "seoully-domain/types";
+import type { CollectibleTemplate, Follow, Holding, Message, Notice, Post, PostComment, PostLike, Thread, UserId, WishlistItem } from "seoully-domain/types";
 import type { NativeCatalogTemplate, NativeFeedPost, NativeHolding, NativeIdentity, NativeWishlistEntry } from "../../api";
+import { conversationIsUnread, conversationPairKey, messageHasSendableContext, sanitizeMessageBody, shouldNotifyRecipient } from "../../comms";
 import { DEMO_CAPABILITIES } from "../capabilities";
 import { isDemoWorldAllowed } from "../mode";
-import type { FeedMode, NativeAskResult, SocialCollector, SocialNotice, SocialRepository, SocialShareRecipient, SocialSuggested, SocialTradeItem } from "../types";
+import type { FeedMode, NativeAskResult, SocialCollector, SocialConversation, SocialMessage, SocialNotice, SocialRepository, SocialSendMessageInput, SocialShareRecipient, SocialSuggested, SocialTradeItem } from "../types";
 import { demoAssetUri } from "./assets";
 
 const VIEWER = SOO;
@@ -71,9 +72,15 @@ export class DemoSocialRepository implements SocialRepository {
   private wishlist: WishlistItem[];
   private holdings: Holding[];
   private notices: Notice[];
+  private threads: Thread[];
+  private storedMessages: Message[];
+  private lastReadAt = new Map<string, string | null>();
   private shares: { postId: string; peerUserId: string; body: string; createdAt: string }[] = [];
   private reposts = new Set<string>();
   private commentSerial = 100;
+  private messageSerial = 300;
+  private noticeSerial = 500;
+  private threadSerial = 40;
 
   constructor() {
     this.follows = copy(FOLLOWS);
@@ -82,6 +89,8 @@ export class DemoSocialRepository implements SocialRepository {
     this.wishlist = copy(WISHLIST);
     this.holdings = copy(HOLDINGS_FIXTURE);
     this.notices = copy(NOTICES);
+    this.threads = copy(THREADS);
+    this.storedMessages = copy(MESSAGES);
   }
 
   viewerId() {
@@ -144,7 +153,11 @@ export class DemoSocialRepository implements SocialRepository {
 
   async setPostLiked(postId: string, liked: boolean) {
     this.likes = this.likes.filter((like) => !(like.postId === postId && like.userId === VIEWER));
-    if (liked) this.likes.push({ postId: postId as PostLike["postId"], userId: VIEWER });
+    if (liked) {
+      this.likes.push({ postId: postId as PostLike["postId"], userId: VIEWER });
+      const post = POSTS.find((item) => item.id === postId);
+      if (post) this.emitNotice("like", post.authorId, { postId });
+    }
   }
 
   async setPostReposted(postId: string, reposted: boolean) {
@@ -178,6 +191,8 @@ export class DemoSocialRepository implements SocialRepository {
       createdAt: new Date().toISOString().slice(0, 10) as PostComment["createdAt"],
     };
     this.comments.push(comment);
+    const post = POSTS.find((item) => item.id === postId);
+    if (post) this.emitNotice("comment", post.authorId, { postId });
     return this.toComment(comment);
   }
 
@@ -314,7 +329,10 @@ export class DemoSocialRepository implements SocialRepository {
 
   async setFollowing(userId: string, following: boolean) {
     this.follows = this.follows.filter((follow) => !(follow.followerId === VIEWER && follow.followeeId === userId));
-    if (following) this.follows.push({ followerId: VIEWER, followeeId: userId as UserId, createdAt: "2026-09-27" });
+    if (following) {
+      this.follows.push({ followerId: VIEWER, followeeId: userId as UserId, createdAt: "2026-09-27" });
+      this.emitNotice("follow", userId);
+    }
   }
 
   async loadCollectorPosts(userId: string) {
@@ -398,7 +416,47 @@ export class DemoSocialRepository implements SocialRepository {
 
   async sendShare(postId: string, peerUserId: string, body: string) {
     this.shares.push({ postId, peerUserId, body, createdAt: new Date().toISOString() });
+    await this.sendMessage({ peerUserId, body, postId });
     return { delivered: true };
+  }
+
+  async loadConversations(): Promise<SocialConversation[]> {
+    return this.threads
+      .filter((thread) => thread.participantIds.includes(VIEWER))
+      .map((thread) => this.toConversation(thread))
+      .filter((item): item is SocialConversation => item !== null)
+      .sort((a, b) => (b.lastMessage?.createdAt ?? "").localeCompare(a.lastMessage?.createdAt ?? ""));
+  }
+
+  async loadMessages(conversationId: string): Promise<SocialMessage[]> {
+    const thread = this.threadById(conversationId);
+    if (!thread?.participantIds.includes(VIEWER)) throw new Error("conversation_forbidden");
+    return this.messagesFor(thread.id).map((message) => this.toMessage(message));
+  }
+
+  async sendMessage(input: SocialSendMessageInput): Promise<SocialMessage> {
+    const body = sanitizeMessageBody(input.body);
+    const templateIds = [...new Set(input.templateIds ?? [])];
+    if (!messageHasSendableContext({ body, postId: input.postId, templateIds })) throw new Error("message_empty");
+    if (input.peerUserId === VIEWER) throw new Error("invalid_peer");
+    const thread = this.threadFor(input.peerUserId, input.conversationId);
+    const message: Message = {
+      id: `m-demo-${this.messageSerial++}` as Message["id"],
+      threadId: thread.id,
+      senderId: VIEWER,
+      createdAt: new Date().toISOString(),
+      body,
+      ...(templateIds.length ? { templateIds: templateIds as Message["templateIds"] } : {}),
+      ...(input.postId ? { postId: input.postId as Message["postId"] } : {}),
+    };
+    this.storedMessages.push(message);
+    return this.toMessage(message);
+  }
+
+  async markConversationRead(conversationId: string) {
+    const thread = this.threadById(conversationId);
+    if (!thread?.participantIds.includes(VIEWER)) throw new Error("conversation_forbidden");
+    this.lastReadAt.set(thread.id, new Date().toISOString());
   }
 
   listDemoShares() {
@@ -591,6 +649,117 @@ export class DemoSocialRepository implements SocialRepository {
       body: comment.body,
       createdAt: comment.createdAt,
       author: { userId: author.id, displayName: author.displayName, handle: author.handle },
+    };
+  }
+
+  private emitNotice(kind: Notice["kind"], recipientId: string, extra?: { postId?: string; templateIds?: string[] }) {
+    if (!shouldNotifyRecipient(VIEWER, recipientId)) return;
+    const duplicate = this.notices.some((notice) => (
+      notice.kind === kind
+      && notice.actorId === VIEWER
+      && notice.recipientId === recipientId
+      && notice.postId === extra?.postId
+    ));
+    if (duplicate) return;
+    this.notices.unshift({
+      id: `n-demo-${this.noticeSerial++}` as Notice["id"],
+      recipientId: recipientId as Notice["recipientId"],
+      kind,
+      actorId: VIEWER,
+      createdAt: new Date().toISOString().slice(0, 10) as Notice["createdAt"],
+      headline: kind,
+      read: false,
+      ...(extra?.postId ? { postId: extra.postId as Notice["postId"] } : {}),
+      ...(extra?.templateIds ? { templateIds: extra.templateIds as Notice["templateIds"] } : {}),
+    });
+  }
+
+  private threadById(conversationId: string) {
+    return this.threads.find((thread) => thread.id === conversationId);
+  }
+
+  private threadFor(peerUserId: string, conversationId?: string): Thread {
+    if (conversationId) {
+      const existing = this.threadById(conversationId);
+      if (!existing?.participantIds.includes(VIEWER) || !existing.participantIds.includes(peerUserId as UserId)) {
+        throw new Error("conversation_forbidden");
+      }
+      return existing;
+    }
+    const key = conversationPairKey(VIEWER, peerUserId);
+    const existing = this.threads.find((thread) => conversationPairKey(thread.participantIds[0], thread.participantIds[1]) === key);
+    if (existing) return existing;
+    const thread: Thread = {
+      id: `th-demo-${this.threadSerial++}` as Thread["id"],
+      participantIds: [VIEWER, peerUserId as UserId],
+    };
+    this.threads.push(thread);
+    return thread;
+  }
+
+  private messagesFor(threadId: string) {
+    return this.storedMessages
+      .filter((message) => message.threadId === threadId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+  }
+
+  private peerId(thread: Thread) {
+    return thread.participantIds.find((id) => id !== VIEWER) ?? thread.participantIds[0]!;
+  }
+
+  private toConversation(thread: Thread): SocialConversation | null {
+    const peer = USERS.find((user) => user.id === this.peerId(thread));
+    if (!peer) return null;
+    const last = this.messagesFor(thread.id).at(-1);
+    const avatarUrl = demoAssetUri(PROFILES.find((profile) => profile.userId === peer.id)?.avatarUrl);
+    return {
+      id: thread.id,
+      peer: {
+        userId: peer.id,
+        handle: peer.handle,
+        displayName: peer.displayName,
+        ...(avatarUrl ? { avatarUrl } : {}),
+      },
+      lastMessage: last ? {
+        body: last.body,
+        createdAt: last.createdAt,
+        mine: last.senderId === VIEWER,
+        ...(last.postId ? { postId: last.postId } : {}),
+        ...(last.templateIds?.length ? { templateCount: last.templateIds.length } : {}),
+      } : null,
+      unread: conversationIsUnread({
+        lastMessageCreatedAt: last?.createdAt ?? null,
+        lastMessageFromPeer: Boolean(last && last.senderId !== VIEWER),
+        lastReadAt: this.lastReadAt.get(thread.id) ?? null,
+      }),
+    };
+  }
+
+  private toMessage(message: Message): SocialMessage {
+    const post = message.postId ? this.toPost(message.postId) : null;
+    return {
+      id: message.id,
+      conversationId: message.threadId,
+      body: message.body,
+      createdAt: message.createdAt,
+      mine: message.senderId === VIEWER,
+      post: post ? {
+        id: post.id,
+        authorUserId: post.author.userId,
+        authorHandle: post.author.handle,
+        caption: post.caption ?? "",
+        ...(post.media[0]?.url ? { mediaUrl: post.media[0].url } : {}),
+      } : null,
+      collectibles: (message.templateIds ?? []).flatMap((templateId) => {
+        const template = TEMPLATE_BY_ID.get(templateId);
+        if (!template) return [];
+        return [{
+          templateId,
+          name: template.name,
+          kind: template.kind,
+          colorway: template.colorway,
+        }];
+      }),
     };
   }
 

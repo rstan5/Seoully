@@ -1,9 +1,8 @@
 import { useCallback, useMemo, useState } from "react";
 import { FlatList, Image, StyleSheet, View } from "react-native";
-import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { KeyboardScreen } from "../../src/components/KeyboardScreen";
 import { useSocialRepository, type SocialShareRecipient } from "../../src/data";
-import { shareStatusCopyKey } from "../../src/data/honesty";
 import { useCopy, useLocale } from "../../src/locale";
 import { colors, radii } from "../../src/theme";
 import { SeoullyAvatar } from "../../src/ui/SeoullyAvatar";
@@ -16,6 +15,7 @@ import { SeoullyText } from "../../src/ui/SeoullyText";
 export default function SendToScreen() {
   const copy = useCopy();
   const { toggleLocale } = useLocale();
+  const router = useRouter();
   const social = useSocialRepository();
   const params = useLocalSearchParams<{ postId?: string; caption?: string; handle?: string; displayName?: string; mediaUrl?: string }>();
   const postId = typeof params.postId === "string" ? params.postId : "";
@@ -43,13 +43,22 @@ export default function SendToScreen() {
     setBusy(true);
     setStatus(null);
     try {
-      if (!social.capabilities.deliverShare) {
+      if (!social.capabilities.persistMessages || !social.capabilities.deliverShare) {
         setStatus(copy.sendToBlocked);
         return;
       }
-      const body = previewCaption || `@${previewHandle}`;
-      const result = await social.sendShare(postId, peer.userId, body);
-      setStatus(copy[shareStatusCopyKey(result.delivered)]);
+      router.push({
+        pathname: "/thread",
+        params: {
+          userId: peer.userId,
+          displayName: peer.displayName,
+          handle: peer.handle,
+          postId,
+          caption: previewCaption,
+          mediaUrl,
+          previewHandle,
+        },
+      });
     } catch {
       setStatus(copy.sendToBlocked);
     } finally {

@@ -40,16 +40,17 @@ assertContains(configSource, "authConfigured", "config.ts");
 
 assert.equal(LIVE_CAPABILITIES.discoverFeed, true);
 assert.equal(LIVE_CAPABILITIES.persistRepost, false);
-assert.equal(LIVE_CAPABILITIES.deliverShare, false);
-assert.equal(LIVE_CAPABILITIES.persistMessages, false);
-assert.equal(LIVE_CAPABILITIES.persistNotices, false);
+assert.equal(LIVE_CAPABILITIES.deliverShare, true);
+assert.equal(LIVE_CAPABILITIES.persistMessages, true);
+assert.equal(LIVE_CAPABILITIES.persistNotices, true);
 assert.equal(LIVE_CAPABILITIES.publicCollectionRows, true);
 assert.equal(LIVE_CAPABILITIES.searchPosts, true);
 assert.equal(LIVE_CAPABILITIES.persistRoom, true);
 assert.equal(LIVE_CAPABILITIES.persistRoomTheme, false);
 
 assert.equal(DEMO_CAPABILITIES.discoverFeed, true);
-assert.equal(DEMO_CAPABILITIES.persistMessages, false);
+assert.equal(DEMO_CAPABILITIES.persistMessages, true);
+assert.equal(DEMO_CAPABILITIES.deliverShare, true);
 assert.equal(DEMO_CAPABILITIES.persistRoom, false);
 assert.equal(DEMO_CAPABILITIES.publicCollectionRows, true);
 
@@ -82,10 +83,11 @@ assertContains(binder, "social.loadMyHoldings", "binder.tsx");
 assertNotContains(binder, "loadAllMyHoldings", "binder.tsx");
 
 const messages = read("apps/mobile/app/(tabs)/messages.tsx");
-assertNotContains(messages, "loadConversations", "messages.tsx");
+assertContains(messages, "social.loadConversations", "messages.tsx");
+assertContains(messages, "persistMessages", "messages.tsx");
 
 const thread = read("apps/mobile/app/thread.tsx");
-assertNotContains(thread, "loadDirectMessages", "thread.tsx");
+assertContains(thread, "social.sendMessage", "thread.tsx");
 assertNotContains(thread, "sendDirectMessage", "thread.tsx");
 
 const collect = read("apps/mobile/app/collect.tsx");
@@ -103,6 +105,7 @@ assertNotContains(collectible, "updateHoldingTradeStatus", "collectible.tsx");
 
 const collector = read("apps/mobile/app/collector.tsx");
 assertNotContains(collector, "ensureConversation", "collector.tsx");
+assertContains(collector, "persistMessages", "collector.tsx");
 assertContains(collector, "collectionPrivate", "collector.tsx");
 
 const feedPost = read("apps/mobile/src/ui/SeoullyFeedPost.tsx");
@@ -111,7 +114,9 @@ assertContains(feedPost, "deliverShare", "SeoullyFeedPost.tsx");
 
 const production = read("apps/mobile/src/data/production.ts");
 assertContains(production, "liveShareResult", "production.ts");
+assertContains(production, "liveNoticePage", "production.ts");
 assertContains(production, "LIVE_CAPABILITIES", "production.ts");
+assertContains(production, "messages_unavailable", "production.ts");
 
 const api = read("apps/mobile/src/api.ts");
 assertContains(api, "product_api_unconfigured", "api.ts");

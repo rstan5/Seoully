@@ -534,7 +534,26 @@ export function loadRoomDiscovery() {
 export type NativeConversation = {
   id: string;
   peer: { userId: string; handle: string; displayName: string };
-  lastMessage: { body: string; createdAt: string; mine: boolean } | null;
+  lastMessage: {
+    body: string;
+    createdAt: string;
+    mine: boolean;
+    postId?: string;
+    templateCount?: number;
+  } | null;
+  unread?: boolean;
+};
+export type NativeDirectMessagePost = {
+  id: string;
+  authorUserId: string;
+  authorHandle: string;
+  caption: string;
+  mediaUrl?: string;
+};
+export type NativeDirectMessageCollectible = {
+  templateId: string;
+  name: string;
+  kind: string;
 };
 export type NativeDirectMessage = {
   id: string;
@@ -542,14 +561,30 @@ export type NativeDirectMessage = {
   body: string;
   createdAt: string;
   mine: boolean;
+  post?: NativeDirectMessagePost | null;
+  collectibles?: NativeDirectMessageCollectible[];
 };
+export type NativeNotice = {
+  id: string;
+  kind: "like" | "comment" | "follow" | "trade" | "activity" | "repost";
+  actor: { userId: string; handle: string; displayName: string };
+  createdAt: string;
+  read: boolean;
+  postId?: string;
+  templateIds?: string[];
+};
+
+function throwIfMessagesUnavailable(response: Response, fallback: string) {
+  if (response.ok) return;
+  throw new Error(response.status === 503 ? "messages_unavailable" : fallback);
+}
 
 export async function loadConversations(): Promise<NativeConversation[]> {
   const accessToken = await mobileAccessToken();
   const response = await fetch(`${productApiBase()}/api/mobile/messages`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!response.ok) throw new Error("messages_read_failed");
+  throwIfMessagesUnavailable(response, "messages_read_failed");
   const payload = await response.json() as { conversations?: NativeConversation[] };
   return payload.conversations ?? [];
 }
@@ -561,7 +596,7 @@ export async function ensureConversation(peerUserId: string): Promise<string> {
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({ peerUserId }),
   });
-  if (!response.ok) throw new Error("conversation_create_failed");
+  throwIfMessagesUnavailable(response, "conversation_create_failed");
   const payload = await response.json() as { conversationId: string };
   return payload.conversationId;
 }
@@ -571,21 +606,63 @@ export async function loadDirectMessages(conversationId: string): Promise<Native
   const response = await fetch(`${productApiBase()}/api/mobile/messages/${encodeURIComponent(conversationId)}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!response.ok) throw new Error("messages_read_failed");
+  throwIfMessagesUnavailable(response, "messages_read_failed");
   const payload = await response.json() as { messages?: NativeDirectMessage[] };
   return payload.messages ?? [];
 }
 
-export async function sendDirectMessage(conversationId: string, body: string): Promise<NativeDirectMessage> {
+export async function sendDirectMessage(input: {
+  conversationId?: string;
+  peerUserId?: string;
+  body?: string;
+  postId?: string;
+  templateIds?: string[];
+}): Promise<NativeDirectMessage> {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${productApiBase()}/api/mobile/messages/${encodeURIComponent(conversationId)}`, {
+  const path = input.conversationId
+    ? `${productApiBase()}/api/mobile/messages/${encodeURIComponent(input.conversationId)}`
+    : `${productApiBase()}/api/mobile/messages`;
+  const response = await fetch(path, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ body }),
+    body: JSON.stringify({
+      peerUserId: input.peerUserId,
+      body: input.body,
+      postId: input.postId,
+      templateIds: input.templateIds,
+    }),
   });
-  if (!response.ok) throw new Error("message_send_failed");
+  throwIfMessagesUnavailable(response, "message_send_failed");
   const payload = await response.json() as { message: NativeDirectMessage };
   return payload.message;
+}
+
+export async function markConversationRead(conversationId: string): Promise<void> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/messages/${encodeURIComponent(conversationId)}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  throwIfMessagesUnavailable(response, "messages_read_failed");
+}
+
+export async function loadProductionNotices(): Promise<{ items: NativeNotice[]; unreadCount: number }> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/notices`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error(response.status === 503 ? "notices_unavailable" : "notices_read_failed");
+  const payload = await response.json() as { notices?: NativeNotice[]; unreadCount?: number };
+  return { items: payload.notices ?? [], unreadCount: payload.unreadCount ?? 0 };
+}
+
+export async function markProductionNoticesRead(): Promise<void> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/notices`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error(response.status === 503 ? "notices_unavailable" : "notices_read_failed");
 }
 
 export type NativeCollectorProfile = {

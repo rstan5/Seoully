@@ -6,6 +6,7 @@ import { getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/p
 import { createSupabaseServerClient } from "@/server/supabase/server";
 import { searchSharedCatalog, type CatalogTemplateDTO } from "@/server/dal/catalog";
 import { findOwnersOfTemplate } from "@/server/dal/collection-graph";
+import { emitCommentNotice, emitFollowNotice, emitLikeNotice } from "@/server/dal/notices";
 import { excludedDiscoverAuthorIds, sanitizeSearchNeedle } from "@/server/social/discover-contract";
 
 const uuid = z.string().uuid();
@@ -203,7 +204,9 @@ export async function followUser(userId: unknown, client?: SupabaseClient): Prom
   const { data: profile, error: profileError } = await supabase.from("profiles").select("user_id").eq("user_id", target).maybeSingle();
   if (profileError) throw new Error("follow_failed"); if (!profile) throw new Error("collector_not_found");
   const { error } = await supabase.from("follows").upsert({ follower_user_id: identity.user.id, followed_user_id: target }, { onConflict: "follower_user_id,followed_user_id", ignoreDuplicates: true });
-  if (error) throw new Error("follow_failed"); return { following: true };
+  if (error) throw new Error("follow_failed");
+  try { await emitFollowNotice(target, supabase); } catch { /* notices optional until communications schema is applied */ }
+  return { following: true };
 }
 
 export async function unfollowUser(userId: unknown, client?: SupabaseClient): Promise<{ following: boolean }> {
@@ -226,7 +229,9 @@ export async function getFollowState(userId: unknown, client?: SupabaseClient): 
 export async function likePost(postId: unknown, client?: SupabaseClient): Promise<{ liked: boolean }> {
   const id = postIdSchema.parse(postId); const { identity, supabase } = await actorClient(client);
   const { error } = await supabase.from("post_likes").upsert({ post_id: id, user_id: identity.user.id }, { onConflict: "post_id,user_id", ignoreDuplicates: true });
-  if (error) throw new Error("like_failed"); return { liked: true };
+  if (error) throw new Error("like_failed");
+  try { await emitLikeNotice(id, supabase); } catch { /* notices optional until communications schema is applied */ }
+  return { liked: true };
 }
 
 export async function unlikePost(postId: unknown, client?: SupabaseClient): Promise<{ liked: boolean }> {
@@ -277,6 +282,7 @@ export async function createComment(postId: unknown, body: unknown, client?: Sup
   const id = postIdSchema.parse(postId); const text = z.string().trim().min(1).max(1_000).parse(body); const { identity, supabase } = await actorClient(client);
   const { data, error } = await supabase.from("post_comments").insert({ post_id: id, author_user_id: identity.user.id, body: text }).select("id,post_id,author_user_id,body,created_at").single();
   if (error || !data) throw new Error("comment_create_failed");
+  try { await emitCommentNotice(data.id, supabase); } catch { /* notices optional until communications schema is applied */ }
   const { data: profile, error: profileError } = await supabase.from("profiles").select("user_id,handle,display_name").eq("user_id", identity.user.id).single();
   if (profileError || !profile) throw new Error("comment_read_failed");
   return { id: String(data.id), postId: String(data.post_id), author: profileSummary(profile), body: String(data.body), createdAt: String(data.created_at) };

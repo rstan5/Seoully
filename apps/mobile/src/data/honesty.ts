@@ -9,6 +9,10 @@ export function liveShareResult(): { delivered: false } {
   return { delivered: false };
 }
 
+export function liveNoticePage(): { items: []; persisted: false } {
+  return { items: [], persisted: false };
+}
+
 export function liveRepostResult(): { persisted: false } {
   return { persisted: false };
 }

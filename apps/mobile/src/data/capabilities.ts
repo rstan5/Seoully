@@ -16,22 +16,22 @@ export const LIVE_CAPABILITIES: SocialCapabilities = {
   discoverFeed: true,
   persistRepost: false,
   persistSave: false,
-  deliverShare: false,
-  persistMessages: false,
-  persistNotices: false,
+  deliverShare: true,
+  persistMessages: true,
+  persistNotices: true,
   publicCollectionRows: true,
   searchPosts: true,
   persistRoom: true,
   persistRoomTheme: false,
 };
 
-/** Demo fixtures: local-only. Messages and Room stay honestly unavailable. */
+/** Demo fixtures: local-only. Room stays honestly unavailable. Messages stay on this device. */
 export const DEMO_CAPABILITIES: SocialCapabilities = {
   discoverFeed: true,
   persistRepost: true,
   persistSave: true,
   deliverShare: true,
-  persistMessages: false,
+  persistMessages: true,
   persistNotices: true,
   publicCollectionRows: true,
   searchPosts: true,

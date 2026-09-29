@@ -73,6 +73,7 @@ run("slice-4 discover search", "npm", ["run", "check:slice4"], repoRoot);
 run("slice-5 communications", "npm", ["run", "check:slice5"], repoRoot);
 run("slice-6 ask seoully", "npm", ["run", "check:slice6"], repoRoot);
 run("slice-7 room binder world", "npm", ["run", "check:slice7"], repoRoot);
+run("slice-8 onboarding first home", "npm", ["run", "check:slice8"], repoRoot);
 run("mobile TypeScript", "npx", ["tsc", "--noEmit"]);
 run("Expo lint", "npx", ["expo", "lint"]);
 run("Expo Doctor", "npx", ["expo-doctor"]);

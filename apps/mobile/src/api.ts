@@ -407,7 +407,8 @@ export type NativeOnboardingState = {
 export type NativeOnboardingPatch =
   | { action: "groups"; favoriteGroupIds: string[] }
   | { action: "bias"; biasMemberIds: string[] }
-  | { action: "interests"; collectorInterests: string[] };
+  | { action: "interests"; collectorInterests: string[] }
+  | { action: "complete" };
 
 async function mobileAccessToken() {
   productApiBase();

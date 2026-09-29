@@ -18,6 +18,7 @@ export default function Index() {
   const t = useCopy();
   const { toggleLocale } = useLocale();
   const [ready, setReady] = useState(false);
+  const [gate, setGate] = useState<"welcome" | "create" | "signin">("welcome");
   const [createMode, setCreateMode] = useState(false);
   const [handle, setHandle] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -91,33 +92,62 @@ export default function Index() {
               <SeoullyText variant="button">{t.switchLanguage}</SeoullyText>
             </Pressable>
           </View>
-          <SeoullyText variant="secondary" style={styles.tagline}>{t.tagline}</SeoullyText>
-          {!mobileConfig.authConfigured ? (
-            <SeoullyText variant="secondary" color={colors.plum} style={styles.warning}>{t.notConfigured}</SeoullyText>
-          ) : !mobileConfig.productApiConfigured ? (
-            <SeoullyText variant="secondary" color={colors.plum} style={styles.warning}>{t.productApiUnconfigured}</SeoullyText>
+          {gate === "welcome" ? (
+            <View style={styles.welcome}>
+              <SeoullyText variant="title" style={styles.welcomeTitle}>
+                {t.welcomeLine1}{"\n"}{t.welcomeLine2}
+              </SeoullyText>
+              <SeoullyText variant="secondary" style={styles.tagline}>{t.welcomeLede}</SeoullyText>
+              <SeoullyButton label={t.welcomeCreate} block onPress={() => { setGate("create"); setCreateMode(true); }} />
+              <Pressable accessibilityRole="button" onPress={() => { setGate("signin"); setCreateMode(false); }} style={styles.secondary}>
+                <SeoullyText variant="button" color={colors.plum}>{t.welcomeSignin}</SeoullyText>
+              </Pressable>
+            </View>
           ) : null}
-          <View style={styles.form}>
-            {createMode ? (
-              <>
-                <TextInput autoCapitalize="none" autoCorrect={false} placeholder={t.username} placeholderTextColor={colors.muted} value={handle} onChangeText={setHandle} style={styles.input} />
-                <TextInput autoCorrect={false} placeholder={t.displayName} placeholderTextColor={colors.muted} value={displayName} onChangeText={setDisplayName} style={styles.input} />
-              </>
-            ) : null}
-            <TextInput autoCapitalize="none" autoCorrect={false} keyboardType="email-address" placeholder={t.email} placeholderTextColor={colors.muted} value={email} onChangeText={setEmail} style={styles.input} />
-            <TextInput secureTextEntry placeholder={t.password} placeholderTextColor={colors.muted} value={password} onChangeText={setPassword} style={styles.input} />
-            <SeoullyButton
-              label={createMode ? t.createAccount : t.signIn}
-              disabled={submitting || !mobileConfig.authConfigured}
-              block
-              onPress={() => { void submit(); }}
-            />
-            {submitting ? <ActivityIndicator color={colors.plum} /> : null}
-            <Pressable accessibilityRole="button" onPress={() => { setCreateMode((value) => !value); setMessage(null); }} style={styles.secondary}>
-              <SeoullyText variant="button" color={colors.plum}>{createMode ? t.signIn : t.createAccount}</SeoullyText>
-            </Pressable>
-            {message ? <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum}>{message}</SeoullyText> : null}
-          </View>
+          {gate !== "welcome" ? (
+            <>
+              <SeoullyText variant="secondary" style={styles.tagline}>{t.tagline}</SeoullyText>
+              {!mobileConfig.authConfigured ? (
+                <SeoullyText variant="secondary" color={colors.plum} style={styles.warning}>{t.notConfigured}</SeoullyText>
+              ) : !mobileConfig.productApiConfigured ? (
+                <SeoullyText variant="secondary" color={colors.plum} style={styles.warning}>{t.productApiUnconfigured}</SeoullyText>
+              ) : null}
+              <View style={styles.form}>
+                {createMode ? (
+                  <>
+                    <TextInput autoCapitalize="none" autoCorrect={false} placeholder={t.username} placeholderTextColor={colors.muted} value={handle} onChangeText={setHandle} style={styles.input} />
+                    <TextInput autoCorrect={false} placeholder={t.displayName} placeholderTextColor={colors.muted} value={displayName} onChangeText={setDisplayName} style={styles.input} />
+                  </>
+                ) : null}
+                <TextInput autoCapitalize="none" autoCorrect={false} keyboardType="email-address" placeholder={t.email} placeholderTextColor={colors.muted} value={email} onChangeText={setEmail} style={styles.input} />
+                <TextInput secureTextEntry placeholder={t.password} placeholderTextColor={colors.muted} value={password} onChangeText={setPassword} style={styles.input} />
+                <SeoullyButton
+                  label={createMode ? t.createAccount : t.signIn}
+                  disabled={submitting || !mobileConfig.authConfigured}
+                  block
+                  onPress={() => { void submit(); }}
+                />
+                {submitting ? <ActivityIndicator color={colors.plum} /> : null}
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    setCreateMode((value) => !value);
+                    setGate((current) => (current === "create" ? "signin" : "create"));
+                    setMessage(null);
+                  }}
+                  style={styles.secondary}
+                >
+                  <SeoullyText variant="button" color={colors.plum}>{createMode ? t.signIn : t.createAccount}</SeoullyText>
+                </Pressable>
+                <Pressable accessibilityRole="button" onPress={() => { setGate("welcome"); setMessage(null); }} style={styles.secondary}>
+                  <SeoullyText variant="button">{t.back}</SeoullyText>
+                </Pressable>
+                {message ? <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum}>{message}</SeoullyText> : null}
+              </View>
+            </>
+          ) : message ? (
+            <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum} style={styles.tagline}>{message}</SeoullyText>
+          ) : null}
         </View>
       </KeyboardScreen>
     </SeoullyScreen>
@@ -128,7 +158,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", paddingHorizontal: 16 },
   topline: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   language: { justifyContent: "center", minHeight: 44, paddingHorizontal: 4 },
-  tagline: { marginTop: 8 },
+  welcome: { gap: 16, marginTop: 28 },
+  welcomeTitle: { letterSpacing: -0.8, lineHeight: 36 },
+  tagline: { marginTop: 8, lineHeight: 22 },
   warning: { backgroundColor: colors.lilacSoft, borderRadius: 14, marginTop: 16, padding: 14 },
   form: { gap: 10, marginTop: 24 },
   input: {

@@ -28,6 +28,9 @@ const onboardingPatchSchema = z.discriminatedUnion("action", [
     action: z.literal("interests"),
     collectorInterests: z.array(interestSchema).min(1).max(7),
   }).strict(),
+  z.object({
+    action: z.literal("complete"),
+  }).strict(),
 ]);
 
 type OnboardingStep = "group" | "bias" | "interest" | "done";
@@ -111,13 +114,16 @@ export async function PATCH(request: Request) {
 
     const patch: Record<string, unknown> = {};
     const editingComplete = state.step === "done";
-    if (parsed.data.action === "groups" && (state.step === "group" || editingComplete)) {
+    const identityOpen = state.step === "group" || state.step === "bias" || state.step === "interest";
+    if (parsed.data.action === "groups" && (identityOpen || editingComplete)) {
       if (parsed.data.favoriteGroupIds.some((id) => !groupIds.has(id))) {
         return NextResponse.json({ error: "invalid_input" }, { status: 400 });
       }
       patch.favorite_group_ids = parsed.data.favoriteGroupIds;
-      if (!editingComplete) patch.onboarding_step = parsed.data.favoriteGroupIds.length > 0 ? "bias" : "interest";
-    } else if (parsed.data.action === "bias" && (state.step === "bias" || editingComplete)) {
+      if (state.step === "group" && !editingComplete) {
+        patch.onboarding_step = parsed.data.favoriteGroupIds.length > 0 ? "bias" : "interest";
+      }
+    } else if (parsed.data.action === "bias" && (state.step === "bias" || state.step === "interest" || editingComplete)) {
       if (parsed.data.biasMemberIds.some((id) => {
         const member = membersById.get(id);
         return !member || !state.favoriteGroupIds.includes(member.groupId);
@@ -125,13 +131,24 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: "invalid_input" }, { status: 400 });
       }
       patch.bias_member_ids = parsed.data.biasMemberIds;
-      if (!editingComplete) patch.onboarding_step = "interest";
+      if (state.step === "bias" && !editingComplete) patch.onboarding_step = "interest";
     } else if (parsed.data.action === "interests" && (state.step === "interest" || editingComplete)) {
       patch.collector_interests = parsed.data.collectorInterests;
       patch.collector_type = parsed.data.collectorInterests.includes("everything")
         ? "Collects everything"
         : "Collector";
-      if (!editingComplete) patch.onboarding_step = "done";
+    } else if (parsed.data.action === "complete" && state.step === "interest") {
+      const { count, error: countError } = await state.client
+        .from("holdings")
+        .select("id", { count: "exact", head: true })
+        .eq("owner_user_id", state.userId);
+      if (countError) {
+        return NextResponse.json({ error: "onboarding_unavailable" }, { status: 503 });
+      }
+      if (!count) {
+        return NextResponse.json({ error: "first_holding_required", step: state.step }, { status: 409 });
+      }
+      patch.onboarding_step = "done";
     } else {
       return NextResponse.json({ step: state.step });
     }

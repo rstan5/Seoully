@@ -27,6 +27,7 @@ export default function AddCollectibleScreen() {
     memberName?: string;
     releaseName?: string;
     newTemplate?: string;
+    from?: string;
   }>();
   const [uri, setUri] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
@@ -91,10 +92,16 @@ export default function AddCollectibleScreen() {
           }
         }
       }
-      router.replace({
-        pathname: "/collectible",
-        params: { holdingId: holding.id, ...(photoFailed ? { photoWarning: "1" } : {}) },
-      });
+      const fromOnboarding = params.from === "onboarding";
+      router.replace(fromOnboarding
+        ? {
+            pathname: "/onboarding",
+            params: { phase: "reveal", holdingId: holding.id, ...(photoFailed ? { photoWarning: "1" } : {}) },
+          }
+        : {
+            pathname: "/collectible",
+            params: { holdingId: holding.id, ...(photoFailed ? { photoWarning: "1" } : {}) },
+          });
       return;
     } catch {
       setMessage(copy.holdingCreateFailed);

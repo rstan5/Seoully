@@ -1,6 +1,6 @@
 # Native road to ship
 
-**Status:** Slices 1–7 implemented in tree — **SLICE 7 — CODE VERIFIED / DEVICE QA PENDING**. Slice 8 not started.  
+**Status:** Slices 1–8 implemented in tree — **SLICE 8 — CODE VERIFIED / DEVICE QA PENDING**. Feature slices are complete. Next phase is **PHYSICAL DEVICE QA + HARDENING**. Do not invent Slice 9.  
 **Canonical spec:** `docs/web-native-parity-contract.md`  
 **Connectivity evidence:** `docs/native-backend-connectivity-audit.md`  
 **Tree:** `mobile-native`  
@@ -28,8 +28,8 @@ Done is a complete user-experience slice (web behavior + native UI + backend + p
 ### What does not exist
 
 - The web product structure: **Room always mounted under social**; Profile as identity over that Room.
-- Web onboarding after tastes: avatar, first collectible, room reveal, meet collectors.
-- Production notifications.
+- Web onboarding after tastes: avatar, first collectible, room reveal, meet collectors. **Native Slice 8 now covers this** (avatar still skipped — no production avatar).
+- Production notifications beyond like/comment/follow.
 - Production messages with post share, trade templates, unread (pending SQL is body-only and unapplied).
 - Avatars in production.
 - Web binder-as-object, zone docking, doorway, card flight, undo/redo.
@@ -331,6 +331,122 @@ Order is dependency-shaped. **Slice 1 is first.**
 **Acceptance:** New account cannot reach tabs without completing the same beats web requires for `ready` (collect + reveal). Returning user with `done` lands in social over their room (or Profile with real underlay).
 
 **Device QA:** Fresh account full path; second launch skips to app; language toggle.
+
+**Implementation (2026-09-29):** SLICE 8 — CODE VERIFIED / DEVICE QA PENDING. Welcome reconstructs `WelcomeGate` copy. Durable `onboarding_step` stays `group | bias | interest | done` (no new table). `interests` PATCH no longer sets `done`; a new `complete` action sets `done` only after a real Holding exists. Client/session phases cover collect → reveal → real Slice 7 Room/Binder intro → production meet. First collectible reuses `/collect` + `/add` (`createHolding`). No Vision. Avatar beat skipped. `20261002` was not applied. No Slice 9.
+
+---
+
+## PHYSICAL DEVICE QA + HARDENING
+
+Feature slices 1–8 are **code verified**. Do not invent additional feature slices. The working plan from here is:
+
+1. Full physical-device QA (iPhone first; Android when that build is in play)
+2. Integration repair of what the device proves is broken
+3. Performance / heat / memory hardening
+4. Privacy / security regression
+5. Release readiness
+6. Beta / ship
+
+Consolidated matrix (pulls still-pending physical QA from Slices 1–8):
+
+### A. Startup / auth
+- Cold launch Expo Go — no R3F crash, no missing API URL false start
+- Secure session restore; sign-out; sign-in; email confirmation
+- Deep-link `code=` exchange
+- Welcome personality, then identity — not dumped into a SaaS form
+- Returning `onboarding_step=done` goes to tabs; incomplete resumes the durable step
+
+### B. Onboarding (Slice 8 first-user)
+1. Fresh Live identity signs in
+2. Welcome appears
+3. Group selection uses production catalog/taste IDs
+4. Bias matches chosen group
+5. Interest step persists
+6. Kill app → resume correct step (interest chips vs collect vs reveal)
+7. Add first existing catalog collectible
+8. Camera/library
+9. Photocard crop
+10. Add to Collection creates Holding once
+11. Personal image on the digital card
+12. First reveal
+13. Room loads without R3F startup crash
+14. New object available in Room (stored/unplaced is valid)
+15. Photocard in Binder
+16. Separate non-photocard path
+17. Catalog miss → Add Manually
+18. Manual item becomes Holding
+19. Consent OFF does not share private photo
+20. Consent ON uses separate catalog reference
+21. Kill after Holding → no duplicate
+22. Room/Binder reveal completes
+23. Social intro uses real collectors or honest empty
+24. Finish onboarding (`done`)
+25. Relaunch → no onboarding
+26–30. Profile / Collection / Room / Binder / Ask “Do I own this?”
+31. Demo never writes Live
+32. EN/KO preserves progress
+33. Reduced motion completes
+34. Offline/error paths do not duplicate ownership
+
+### C. Profile / Collection
+- Own identity, counts, posts, trade, remove, wishlist
+- Edit Profile text; tastes via onboarding `edit=1` without resetting `done`
+- Public collector shelves match returned rows; no private media leak
+
+### D. Discover / Search
+- Live Discover is public-outside-following, not fixtures
+- Search people / rooms / collectibles / posts; collectible dest is owner not Add
+- Ask search cards preserve query
+
+### E. Collector graph
+- Production compatibility/trade, not fixture SOO/MINJI
+- Taste slug ↔ catalog UUID alias at the service boundary
+
+### F. Messages / notices
+- Live inbox/thread/send against applied `20261001` (body-only; post share/trade templates still incomplete)
+- Notices like/comment/follow only; Demo local
+
+### G. Ask Seoully
+- Typed surface context; allowlisted navigation; “Do I own this?” from real holdings
+- Companion visible after onboarding; still on reduced motion
+
+### H. Room
+- Authored docks, six zones, edit persist, store does not delete Holding
+- Public room view-only; Profile glimpse is world not paper
+- `20261002` remains unapplied; hearth default
+
+### I. Binder
+- Desk object → in-scene OpenBinder; photocards only; odd last spread; image-failure geometry
+
+### J. Media / crop
+- Camera/library permissions; photocard pan/zoom crop; personal media vs catalog reference
+
+### K. Demo / Live isolation
+- Demo `__DEV__` fixtures only; Live never falls back to SOO/MINJI
+- Onboarding first-run forces Live so Demo cannot block Holding writes
+
+### L. EN / KO
+- Typed dictionaries; Baloo 2 / Noto Sans KR; locale toggle does not reset onboarding
+
+### M. Reduced motion
+- Camera snap, binder snap, reveal fade/timer, companion still, flow complete
+
+### N. Lifecycle / background / resume
+- AppState pause GL; kill/relaunch session; onboarding resume idempotent
+
+### O. Performance / heat / memory
+- Welcome/auth do not mount Room Canvas
+- Lazy GL on reveal/room; frameloop pause
+- Media compressed/resized; heat after minutes in Room
+
+### P. Privacy / security regressions
+- Catalog-reference consent default false
+- Public rooms no private holding media
+- Bearer session; no secrets in the client tree; RLS unchanged
+
+**Known device-QA risks:** Expo Go GL/R3F on first Room intro; camera permission; Metro Demo default-on in `__DEV__` (onboarding now forces Live); `20261001` DMs missing post/trade payload; Room theme column still unapplied; Expo Doctor pin skew.
+
+**Remaining pre-beta hardening:** Physical proof of the matrix above; repair only what the iPhone shows; performance; privacy pass; then release readiness. No Slice 9.
 
 ---
 

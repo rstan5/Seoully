@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { contributeCatalogItem, type NativeCatalogTemplate } from "../src/api";
 import { useSocialRepository } from "../src/data";
@@ -22,6 +22,8 @@ export default function CollectScreen() {
   const copy = useCopy();
   const router = useRouter();
   const social = useSocialRepository();
+  const params = useLocalSearchParams<{ from?: string }>();
+  const fromOnboarding = params.from === "onboarding";
   const [step, setStep] = useState<Step>("entry");
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<NativeCatalogTemplate[]>([]);
@@ -72,6 +74,7 @@ export default function CollectScreen() {
         memberName: template.memberName ?? "",
         releaseName: template.releaseName ?? "",
         ...(extra?.newTemplate ? { newTemplate: "true" } : {}),
+        ...(fromOnboarding ? { from: "onboarding" } : {}),
       },
     });
   }
@@ -103,12 +106,17 @@ export default function CollectScreen() {
     <SeoullyScreen>
       <KeyboardScreen>
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <ScreenBack label={copy.back} onPress={() => (step === "entry" ? router.back() : setStep("entry"))} />
+          {step !== "entry" || !fromOnboarding ? (
+            <ScreenBack
+              label={copy.back}
+              onPress={() => (step === "entry" ? router.back() : setStep("entry"))}
+            />
+          ) : null}
 
           {step === "entry" ? (
             <View style={styles.entry}>
-              <SeoullyText variant="title" style={styles.headline}>{copy.catalogEntryTitle}</SeoullyText>
-              <SeoullyText variant="secondary" style={styles.lede}>{copy.catalogEntryLede}</SeoullyText>
+              <SeoullyText variant="title" style={styles.headline}>{fromOnboarding ? copy.onboardCollectFirstTitle : copy.catalogEntryTitle}</SeoullyText>
+              <SeoullyText variant="secondary" style={styles.lede}>{fromOnboarding ? copy.onboardCollectFirstLede : copy.catalogEntryLede}</SeoullyText>
               <SeoullyButton label={copy.searchSeoullyCatalog} block onPress={() => setStep("search")} />
               <SeoullyText variant="caption" style={styles.kicker}>{copy.searchSeoullyCatalogLede}</SeoullyText>
               <SeoullyButton label={copy.addManuallyTitle} variant="ghost" block onPress={() => setStep("manual")} />

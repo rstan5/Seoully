@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "outDir": ".tmp/build",
+    "skipLibCheck": true,
+    "strict": false,
+    "esModuleInterop": true
+  },
+  "include": [
+    "scripts/check-slice8.ts",
+    "apps/mobile/src/onboarding/journey.ts",
+    "apps/mobile/src/data/ownership.ts"
+  ]
+}

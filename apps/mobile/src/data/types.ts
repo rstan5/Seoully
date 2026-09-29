@@ -10,6 +10,7 @@ import type {
   NativeSearchUser,
   NativeWishlistEntry,
 } from "../api";
+import type { SocialCapabilities } from "./capabilities";
 
 export type FeedMode = "following" | "discover";
 
@@ -17,7 +18,22 @@ export type SocialSuggested = {
   user: NativeSearchUser;
   score: number;
   meta: string;
+  subtitle?: string;
   avatarUrl?: string;
+};
+
+export type SocialTheme = {
+  scheme: "light" | "dark";
+  paper: string;
+  mist: string;
+  ink: string;
+  mute: string;
+  line: string;
+  primary: string;
+  primaryDeep: string;
+  primarySoft: string;
+  action: string;
+  cream: string;
 };
 
 export type SocialEntity = {
@@ -26,6 +42,29 @@ export type SocialEntity = {
   title: string;
   subtitle?: string;
   query: string;
+};
+
+export type SocialTradeItem = {
+  templateId: string;
+  name: string;
+  kind: string;
+  groupName?: string;
+  memberName?: string | null;
+  colorway?: { base: string; accent: string; ink: string };
+  imageUrl?: string;
+  onYourWishlist: boolean;
+  theyWantThis: boolean;
+  openToTrade: boolean;
+};
+
+export type SocialCompatibility = {
+  score: number;
+  /** `domain` = fixture computeCompatibility. `production` = computeCompatibilityPeople. Do not merge. */
+  source: "domain" | "production";
+  reasons: string[];
+  theyOwnYourWants: SocialTradeItem[];
+  youOwnTheirWants: SocialTradeItem[];
+  reciprocal: boolean;
 };
 
 export type SocialCollector = {
@@ -46,17 +85,50 @@ export type SocialCollector = {
   holdingCount: number;
   wishlist: NativeWishlistEntry[];
   posts: NativeFeedPost[];
-  compatibility?: { score: number; reasons: string[] };
+  compatibility?: SocialCompatibility;
   roomAvailable: boolean;
+  theme?: SocialTheme;
+};
+
+export type SocialNotice = {
+  id: string;
+  kind: "like" | "comment" | "follow" | "trade" | "activity" | "repost";
+  actor: { userId: string; handle: string; displayName: string; avatarUrl?: string };
+  headline: string;
+  createdAt: string;
+  read: boolean;
+  postId?: string;
+  templateIds?: string[];
+};
+
+export type SocialShareRecipient = NativeSearchUser;
+
+export type SocialShareResult = { delivered: boolean };
+
+export type NativeAskCard = {
+  kind: "collector" | "collectible" | "room" | "holding";
+  id: string;
+  title: string;
+  subtitle?: string;
+  detail?: string;
+  action?: { type: string; userId?: string; query?: string; destination?: string };
+};
+
+export type NativeAskResult = {
+  reply: string;
+  cards: NativeAskCard[];
 };
 
 export interface SocialRepository {
   kind: "production" | "demo";
+  capabilities: SocialCapabilities;
   viewerId(): string | null;
   loadIdentity(): Promise<NativeIdentity | null>;
   loadFeed(mode: FeedMode, cursor?: string): Promise<NativeFeedPage>;
   loadSuggested(): Promise<SocialSuggested[]>;
   setPostLiked(postId: string, liked: boolean): Promise<void>;
+  setPostReposted(postId: string, reposted: boolean): Promise<{ persisted: boolean }>;
+  setPostSaved(postId: string, saved: boolean): Promise<{ persisted: boolean }>;
   loadPostComments(postId: string, cursor?: string): Promise<NativeCommentPage>;
   addPostComment(postId: string, body: string): Promise<NativePostComment>;
   searchCollectors(query: string): Promise<NativeSearchUser[]>;
@@ -67,8 +139,16 @@ export interface SocialRepository {
   loadCollector(userId: string): Promise<SocialCollector>;
   setFollowing(userId: string, following: boolean): Promise<void>;
   loadCollectorPosts(userId: string, cursor?: string): Promise<NativeFeedPage>;
-  loadMyHoldings(): Promise<NativeHolding[]>;
-  loadMyWishlist(): Promise<NativeWishlistEntry[]>;
+  loadMyHoldings(offset?: number, limit?: number): Promise<NativeHolding[]>;
+  loadMyWishlist(offset?: number, limit?: number): Promise<NativeWishlistEntry[]>;
   setWishlist(templateId: string, wanted: boolean): Promise<void>;
+  setHoldingTradeStatus(holdingId: string, tradeStatus: NativeHolding["tradeStatus"]): Promise<NativeHolding>;
+  removeHolding(holdingId: string): Promise<void>;
   loadFollowCounts(): Promise<{ followers: number; followingCount: number }>;
+  loadNotices(): Promise<{ items: SocialNotice[]; persisted: boolean }>;
+  unreadNoticeCount(): Promise<number>;
+  markNoticesRead(): Promise<void>;
+  searchShareRecipients(query: string): Promise<SocialShareRecipient[]>;
+  sendShare(postId: string, peerUserId: string, body: string): Promise<SocialShareResult>;
+  askSeoully(question: string, locale: "en" | "ko", history: { role: "user" | "assistant"; content: string }[]): Promise<NativeAskResult>;
 }

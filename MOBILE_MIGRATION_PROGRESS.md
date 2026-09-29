@@ -13,9 +13,10 @@ security, and Room/Binder data model.
 - Recovered from: `d2d779d`
 - Device-QA checkpoint: `ae8e155`
 - Prior reconstruction HEAD (presentation rejected on device): `b4469d5`
-- Current task: Vertical Expansion 02 — The Living Social World — CODE COMPLETE — AWAITING PHYSICAL IPHONE QA
+- Current task: Global companion + communication shell — CODE COMPLETE — AWAITING PHYSICAL IPHONE QA
 - Slice 01 (Profile / Edit Profile / Add Collectible) was physically approved on iPhone and is the native visual calibration baseline.
-- Overall status: Development-only demo/fixture world is available on native. Feed, Search/Explore, Collector Profile, and social post interactions are reconstructed against that world. Room, Binder, and Messages were not rebuilt this pass.
+- Expansion 02 booted on physical iPhone (HEAD `bdde759`) and was recognizably Seoully, then failed visual/product parity against web.
+- Overall status: Shell, Feed, own Profile, and collection presentation were corrected against the live web product. Canonical domain logic was traced and verified. Room/Binder visual reconstruction is still deferred.
 
 ## Current Room parity matrix
 
@@ -569,10 +570,10 @@ Room/Binder visual/tactile parity is not finished.
   device checks.
 - **SEARCH / EXPLORE: CODE COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL (Expansion 02)**
   Destinations reconstructed as discovery cards. Demo populates People / Rooms / Posts / Collectibles / Groups from web fixtures. Production People/Rooms/Collectibles/Groups still use real APIs; Posts search has no production endpoint (honest empty).
-- **PROFILE / COLLECTOR: CODE COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL (Expansion 02)**
-  Own Profile Slice 01 remains the calibration. Collector Profile now uses the same identity language plus fixture collection/compatibility/posts in demo. Production collector shelves for holdings/wishlist/groups remain an API gap.
-- **FEED VISUAL RECONSTRUCTION: AWAITING PHYSICAL DEVICE VISUAL APPROVAL — EXPANSION 02**
-  Populated Feed is now evaluable in Demo via web fixtures. Production Feed is still following + self and may be empty. Discover/suggested are demo-only.
+- **PROFILE / COLLECTOR: CODE COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL (profile + collection graph correction)**
+  Fake Profile Room objects were removed. Temporary theme-only underlay + 85% veil is the pre-Room composition. Own Profile posts use `SeoullyFeedPost`. Owned/Wishlist are collapsible with trade/remove on existing contracts. Demo Minji includes canonical Potential Trade Match. Live uses `GET /api/mobile/collectors/:id/match` (derived pair) or honest absence — never a invented 65%.
+- **FEED VISUAL RECONSTRUCTION: AWAITING PHYSICAL DEVICE VISUAL APPROVAL — CALIBRATION CORRECTION**
+  Feed now includes web action model (like/comment/repost/share), underline Following/Discover in Demo and Live, and suggested cream cards. Live suggested people call production discovery. Live Discover **posts** remain empty (no production discover-posts contract).
 - Physical iPhone Expo Go relaunch after the Room import-time crash fix
 - Room GL canvas mount, FPS, texture memory, raycast hits, drag/orbit feel
 - Binder swipe, cover open/close, card lift springs, page perspective
@@ -612,23 +613,108 @@ Native social screens read through `SocialRepository`:
 - **Feed:** Following / Discover (demo), suggested collectors, `SeoullyPost` with fixture media, likes, comments, collector navigation
 - **Search / Explore:** People, Rooms, Posts, Collectibles, Groups & Members populated from fixtures in demo. Destinations are discovery cards, not giant bordered table rows. Demo Rooms go to Collector Profile, not production GL
 - **Collector Profile:** identity, chips, compatibility, follow, posts, owned/wishlist. Message stays blocked (unapplied DM migration). Enter Room is the spatial CTA but does not open production Rooms for fixture collectors
-- **Own Profile in demo:** SOOMIN’s fixture identity/collection/posts. Production Edit / Add / Enter Room / collection detail remain Live-only so demo cannot conceal those production paths
+- **Own Profile in demo:** SOOMIN’s fixture identity/collection/posts. Edit / Add / Sign out / Enter Room are **shown** (product IA). Writes stay intercepted. Enter Room does not open a production Room for the fixture collector.
 
-### Production functionality (not proven by demo)
+## Calibration correction + system integrity
 
-- Production Feed is still following + self via `GET /api/mobile/feed`. Discover/suggested/post-search have **no** production APIs yet (honest empty)
-- Production collector holdings/wishlist/groups are not returned by the public collector payload (count may exist; shelves stay empty)
-- Production post create, holding create, profile save, and follow still require **Live**
-- Messages remain blocked by `20261001000000_direct_messages.sql`
+Physical iPhone QA of Expansion 02 **booted** and felt recognizably Seoully, then failed parity against the live web product. This pass corrected calibrated surfaces and traced the real Seoully system. Room/Binder visuals were **not** rebuilt.
 
-### Old presentation replaced
+### Presentation corrections
+- Global shell: extra header breathing room under the iOS safe area; brand heart no longer overflows into the status bar; tab icons are the web SVG paths; Create keeps the raised lilac plus
+- Feed: handle-first identity, Following/Discover underline tabs in Demo **and** Live, suggested collectors as cream cards, like / comment / repost / share, View comments, video play overlay, fixture colorway tags
+- Own Profile: Edit / Add / Sign out / Enter Room restored in Demo; Live uses production paths; room-sync intermediate backdrop from canonical `resolveProfileTheme` + collection colorways (not a screenshot)
+- Collection highlights: vertical cream cards using catalog colorways / personal media when present
 
-- Sparse/empty-only Feed as the only way to evaluate social product
-- Search as a search bar plus giant generic bordered destination rows
-- Collector Profile as a thin follow/message card without collection identity or `SeoullyPost`
-- Fake records hardcoded inside Feed/Search/Profile JSX (none; data stays behind the repository)
+### Canonical algorithms (do not conflate)
+- **Collection compatibility (fixtures / Demo / web social):** `src/domain/compatibility.ts` `computeCompatibility` — overlap coefficient; weights groups 0.2, bias 0.18, members 0.12, items 0.16, eras 0.08, interests 0.08, complement 0.18
+- **Production people compatibility (discovery / trade intelligence):** `src/server/compatibility/service.ts` `computeCompatibilityPeople` — different weights (templates 0.4, groups 0.25, members 0.15, releases 0.1, favoriteGroups 0.05, biasMembers 0.05); **no wishlist complement**
+- Native Demo Feed/Collector scores call the **canonical domain** function, not a hardcoded number
+- Native Live collector profiles **cannot** compute domain compatibility: public `GET /api/mobile/collectors/:id` omits holdings/wishlist. Discovery suggested people use the **server** people-compat path via `POST /api/mobile/discovery/collectors`. Live collector **pair** now calls `GET /api/mobile/collectors/:id/match` wrapping existing `getCollectorCompatibility` + `getTradeOpportunity` (same `graph_pair_snapshot` RPC). That score is **people-engine**, not domain 65%. If the route fails (not visible / not uuid / no session), the native UI shows no compatibility — never an invented number.
 
-Do not mark this expansion approved from TypeScript, Expo Doctor, or Metro export.
+## Profile + collection graph correction
+
+Physical iPhone QA of the calibration pass showed remaining Profile defects. This pass corrected them without Room/Binder reconstruction and without applying DM or room-theme migrations.
+
+### Composition (ONE WORLD)
+- Removed fake Profile Room objects (`SeoullyWorldLayer` collectible rectangles)
+- Temporary pre-Room: `SeoullyRoomUnderlay` (theme paper only) under `SeoullyProfileVeil` (`PROFILE_VEIL = 0.85`, matching web `--s-profile-veil` on `.social-background`)
+- Children stay fully opaque. Future swap: replace underlay with `NativeRoomRenderer`; do not rebuild Profile overlay
+- Do not maintain a second fake Profile Room once native Room exists
+
+### Own Profile
+- Action row: Edit Profile / Add to collection / Sign out — equal-height fill buttons, centered text, 2-line wrap allowed for native width; Enter Room remains full-width CTA
+- Posts use canonical `SeoullyFeedPost` (same family as Feed / Minji / Search)
+- Owned / Wishlist collapsible; rows are real holdings/wishlist
+- Trade status: Demo mutates local fixture holdings; Live `PATCH /api/mobile/holdings` (`setMyHoldingTradeStatus`)
+- Remove: Demo local; Live `DELETE /api/mobile/holdings` wrapping existing `removeMyHolding` (no new schema/RLS)
+
+### Collector (Minji Demo)
+- Compatibility from canonical `computeCompatibility` (domain engine)
+- Potential Trade Match collapsible: You want / They want from `theyOwnYourWants` / `youOwnTheirWants`
+- Message about trade CTA present; Demo blocked honestly; Live does not pretend DMs work (`20261001000000_direct_messages.sql` unapplied). Handler already accepts `templateIds` for later prefill
+
+### Live pair contract
+- Safe existing integration: `GET /api/mobile/collectors/[userId]/match` returns viewer-relative `{ compatibility, trade }` only
+- Does **not** dump another user's private holdings/wishlist graph
+- Production public collector payload still omits raw holdings/wishlist for shelves — HUMAN REVIEW if those shelves should exist Live
+- Do not unify `computeCompatibility` and `computeCompatibilityPeople` in this pass
+
+### Compatibility engines (still separate)
+- **`computeCompatibility`** (`src/domain/compatibility.ts`): web social, fixture Demo native collector/search/feed suggested, `MemoryCollectionRepository`, `check-fixtures`. Weights include wishlist complement 0.18
+- **`computeCompatibilityPeople`** (`src/server/compatibility/service.ts`): production discovery ranking, `getCollectorCompatibility`, native Live match route. No wishlist complement in the score; trade complement is a **separate** `computeTradeOpportunity` result
+
+### HUMAN REVIEW REQUIRED (this pass)
+- Unify or explicitly version the two compatibility engines (unchanged decision)
+- Public collector holdings/wishlist on Live collector shelves (match API is derived-only)
+- `20261001000000_direct_messages.sql` for Message about trade prefill
+- `20261002000000_native_room_theme.sql` + native Room under Profile
+- Demo collectible **detail** screen still uses production `loadMyHolding` (UUID); Demo owned rows toggle trade/remove in-place instead of opening `/collectible`
+
+Do not mark this pass approved from TypeScript, Expo Doctor, or Metro export.
+
+### Safe gaps fixed
+- Live suggested people now call existing `POST /api/mobile/discovery/collectors` (was an unused client helper)
+- Live collector chips map public `favoriteGroupIds` / `biasMemberIds` through the onboarding catalog names when available
+- Demo Feed excludes the viewer’s own posts (matches web CollectorFeed)
+- Demo posts/holdings pass catalog colorways and video posters from fixtures
+- Own Profile product actions restored in Demo with write intercepts
+
+### HUMAN REVIEW REQUIRED
+- Unify or explicitly version the two compatibility engines
+- Public collector payload still omits holdings/wishlist/groups (Live collector shelves and domain-compat remain blocked)
+- Production repost/share/bookmark persistence (UI parity is present; social DAL has like/comment/create only)
+- `20261001000000_direct_messages.sql` (web share-into-DM)
+- `20261002000000_native_room_theme.sql`
+- Full GL Room under Profile
+- Production Discover **posts** feed (toggle exists; post list is empty until a following-style discover contract exists)
+
+### Integration gap matrix
+
+| System | Canonical implementation | Web | Native Demo | Native Live | Production data | Tested | Blocker | Next fix |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Auth | Supabase session + `/api/mobile/session` | Y | Y (real session under Demo) | Y | Y | manual | none | none |
+| Profile | `profiles` + `/api/mobile/profile` | Y | fixture identity | Y | Y | fixtures | appearance not on mobile DTO | appearance DTO HUMAN REVIEW |
+| Catalog | `collectible_templates` + search | Y | fixtures | Y | Y | fixtures | none | none |
+| Holdings | `holdings` + `/api/mobile/holdings` | Y | fixtures | own only | Y | fixtures | public collector omits holdings | public holdings contract HUMAN REVIEW |
+| Media | `media_assets` + holding photo | Y | bundled posts/avatars | own holdings | Y | partial | demo objects use colorways, not personal photos | Room/media pass |
+| DigitalRepresentation | `src/domain/representation.ts` | Y | Y (canonical fn) | Room path | Y | fixtures | Profile uses colorway tiles, not GL meshes | Room reconstruction |
+| Wishlist | `wishlist` + `/api/mobile/wishlist` | Y | local fixture copy | own only | Y | fixtures | public collector omits wishlist | public wishlist contract HUMAN REVIEW |
+| Trade | domain complement + `computeTradeOpportunity` | Y (domain) | Y (domain UI) | derived match API or absent | Y | fixtures | Live does not invent complement | keep engines split |
+| Collection Graph | holdings/wishlist/groups/members/eras | Y | fixtures | discovery batch + match RPC | Y | fixtures | Live profile cannot see another's raw graph | derived match only |
+| Compatibility | domain `computeCompatibility` vs server `computeCompatibilityPeople` | domain | domain | people-engine match + discovery | split | fixtures / domain | two engines | HUMAN REVIEW — do not rewrite |
+| Discovery | `src/server/discovery/service.ts` | web uses fixtures for social; server brain exists | fixture ranking | `POST /api/mobile/discovery/*` | Y | unused→wired collectors | Live Discover **posts** empty | post-discover contract HUMAN REVIEW |
+| Posts | `posts` + `/api/mobile/posts` | Y | fixtures | Y | Y | partial | no production repost row | keep DAL |
+| Follows | `follows` | Y | local | Y | Y | partial | none | none |
+| Likes | `post_likes` | Y | local | Y | Y | partial | none | none |
+| Comments | `post_comments` | Y | local | Y | Y | partial | none | none |
+| Reposts | memory-repository only | Y (fixture) | local UI | UI only, `persisted: false` | N | UI | no production table/API | HUMAN REVIEW |
+| Share | web → inbox Send to | Y | native Send to | Demo local send; Live blocked at DM | N | fixtures / honest Live | production DMs unapplied; SQL has no post_id | `20261001000000_direct_messages.sql` HUMAN REVIEW — do not apply |
+| Room | Room + placements | Y | theme tokens only | production GL path | Y | data contract | no GL under Profile | reconstruction pass |
+| RoomPlacement | `room_placements` | Y | fixtures | Y | Y | fixtures | not visually rebuilt | reconstruction pass |
+| Binder | photocard holdings | Y | data contract | Y | Y | fixtures | not visually rebuilt | reconstruction pass |
+| Public collector data | `GET /api/mobile/collectors/:id` | Y | fixtures | profile+follow+counts | partial | typed | no holdings/wishlist | HUMAN REVIEW |
+
+Do not mark this pass approved from TypeScript, Expo Doctor, or Metro export.
 
 ## Vertical Slice 01 — Collector Ownership
 
@@ -652,3 +738,41 @@ Strategy: preserve proven infrastructure; rebuild rejected Profile / Edit / Add 
 - Binder eligibility: `buildNativeBinderPages` includes holdings where `template.kind === "photocard"`
 - Room eligibility: Room `unplaced` = holdings without a RoomPlacement (stored tray). Ownership ≠ placement
 - GL Binder/Room feel remains DEVICE QA REQUIRED and was not visually rebuilt this slice
+
+## Global companion + communication shell (2026-09-28)
+
+Ask Seoully, header wordmark alignment, notifications, Send to, and a Direct Messages **review** (not applied). Room/Binder reconstruction was not started. Profile veil contract is unchanged.
+
+### Ask Seoully
+- Global companion is `SeoullyCompanion` in the root app shell (same PNG mascot as onboarding).
+- Demo: `runAssistantTools` + fixture repository. Live: `POST /api/mobile/assistant` wraps `askSeoullyProduction` with bearer ALS (`runWithSupabaseClient`) so cookie-oriented DALs reuse the same tools.
+- Remaining Live gaps: LLM provider still optional (deterministic fallback); catalog/discovery/graph identity now prefers the request bearer client; no second native Ask algorithm.
+
+### Notifications
+- Web: fixture `NOTICES` via memory-repository. Kinds: like, comment, follow, trade, activity, repost. No message kind. No production table or mobile notices API.
+- Native Demo: fixture list + unread badge. Live: honest empty (`persisted: false`). Do not fake production rows.
+
+### Share / Send to
+- Web Share opens inbox Send to with post preview, then `sendMessage({ postId })`.
+- Native Share opens `/send-to`. Demo delivers locally. Live stops at `messages_unavailable`.
+- Canonical production delivery still depends on Direct Messages plus a **post/trade context column the current SQL does not have**.
+
+### Direct Messages migration review — DO NOT APPLY
+`supabase/migrations/20261001000000_direct_messages.sql`
+
+**NEEDS CHANGES BEFORE APPROVAL** for Seoully Share and trade-message, even though text-only RLS looks sound.
+
+- Schema: `direct_conversations`, `direct_conversation_participants`, `direct_messages` (body 1–2000). No `post_id`, no `template_ids`, no read receipts.
+- RLS: participant SELECT; INSERT only when `sender_user_id = current_seoully_user_id()` and sender is a participant. Conversations/participants are not client-insertable (security-definer `ensure_direct_conversation`).
+- Native API (`/api/mobile/messages`) is bearer-ready for text-only threads **after** apply.
+- Web fixture messages already attach `postId` / `templateIds`. Applying this SQL as-is would force a parallel share architecture or a follow-up breaking column add.
+- Recommendation: add optional share/trade context columns (or a typed context jsonb) **without weakening RLS**, then re-review. Do not apply in this pass.
+
+### Communication dependency map
+- POST SHARE → DM message with post context (blocked until DM schema includes it)
+- MESSAGE ABOUT TRADE → DM thread + template context (same blocker)
+- DM RECEIVED → no notification kind/table yet
+- NOTIFICATION TAP → collector profile today; thread/post when those contracts exist
+- ASK SEOULLY → controlled navigation only (profile/room/search/collection/wishlist/inbox/composer)
+
+`20261001000000_direct_messages.sql` and `20261002000000_native_room_theme.sql` were **not** applied.

@@ -19,7 +19,7 @@ export function BrandMark() {
 
 const styles = StyleSheet.create({
   row: {
-    alignItems: "flex-end",
+    alignItems: "center",
     flexDirection: "row",
     flexShrink: 1,
     overflow: "visible",
@@ -30,19 +30,18 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     letterSpacing: -0.8,
     lineHeight: 22,
+    textAlignVertical: "center",
   },
   heartSlot: {
     height: 22,
-    marginBottom: 1,
-    marginLeft: 3,
+    justifyContent: "center",
+    marginLeft: 4,
     overflow: "visible",
-    width: 28,
+    width: 22,
   },
   heart: {
-    bottom: -2,
-    height: 26,
-    left: 0,
-    position: "absolute",
-    width: 28,
+    height: 22,
+    marginTop: -1,
+    width: 22,
   },
 });

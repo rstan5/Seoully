@@ -1,13 +1,23 @@
+import { isProductApiConfigured } from "./config-rules";
 import { supabase } from "./supabase";
 
-const baseUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, "") ?? "";
+function productApiBase(): string {
+  const value = (process.env.EXPO_PUBLIC_API_URL ?? "").replace(/\/$/, "").trim();
+  if (!isProductApiConfigured(value)) throw new Error("product_api_unconfigured");
+  return value;
+}
 
 export async function resolveNativeIdentity<T>(): Promise<T | null> {
-  if (!baseUrl) return null;
+  let apiBase: string;
+  try {
+    apiBase = productApiBase();
+  } catch {
+    return null;
+  }
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
   if (!accessToken) return null;
-  const response = await fetch(`${baseUrl}/api/mobile/session`, {
+  const response = await fetch(`${apiBase}/api/mobile/session`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) return null;
@@ -27,13 +37,14 @@ export type NativeCatalogTemplate = {
   groupName: string;
   memberName: string | null;
   releaseName: string | null;
+  colorway?: { base: string; accent: string; ink: string };
 };
 
 export type NativeSearchUser = { userId: string; handle: string; displayName: string; avatarUrl?: string };
 
 export async function searchCollectors(query: string): Promise<NativeSearchUser[]> {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/search?q=${encodeURIComponent(query)}`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/search?q=${encodeURIComponent(query)}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) throw new Error("social_search_failed");
@@ -42,8 +53,7 @@ export async function searchCollectors(query: string): Promise<NativeSearchUser[
 }
 
 export async function searchCatalog(query: string): Promise<NativeCatalogTemplate[]> {
-  if (!baseUrl) return [];
-  const response = await fetch(`${baseUrl}/api/catalog/search?q=${encodeURIComponent(query)}&limit=24`);
+  const response = await fetch(`${productApiBase()}/api/catalog/search?q=${encodeURIComponent(query)}&limit=24`);
   if (!response.ok) throw new Error("catalog_unavailable");
   const payload = await response.json() as { results?: NativeCatalogTemplate[] };
   return payload.results ?? [];
@@ -52,8 +62,8 @@ export async function searchCatalog(query: string): Promise<NativeCatalogTemplat
 export async function createHolding(templateId: string) {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
-  if (!baseUrl || !accessToken) throw new Error("unauthenticated");
-  const response = await fetch(`${baseUrl}/api/mobile/holdings`, {
+  if (!accessToken) throw new Error("unauthenticated");
+  const response = await fetch(`${productApiBase()}/api/mobile/holdings`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({ templateId }),
@@ -78,7 +88,7 @@ export type NativeWishlistEntry = {
 
 export async function loadMyHoldings(offset = 0, limit = 100): Promise<NativeHolding[]> {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/holdings?offset=${offset}&limit=${limit}`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/holdings?offset=${offset}&limit=${limit}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) throw new Error("holding_read_failed");
@@ -88,7 +98,7 @@ export async function loadMyHoldings(offset = 0, limit = 100): Promise<NativeHol
 
 export async function loadMyHolding(holdingId: string): Promise<NativeHolding | null> {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/holdings?holdingId=${encodeURIComponent(holdingId)}`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/holdings?holdingId=${encodeURIComponent(holdingId)}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) throw new Error("holding_read_failed");
@@ -108,7 +118,7 @@ export async function loadAllMyHoldings(): Promise<NativeHolding[]> {
 
 export async function updateHoldingTradeStatus(holdingId: string, tradeStatus: NativeHolding["tradeStatus"]) {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/holdings`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/holdings`, {
     method: "PATCH",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({ holdingId, tradeStatus }),
@@ -116,6 +126,50 @@ export async function updateHoldingTradeStatus(holdingId: string, tradeStatus: N
   if (!response.ok) throw new Error("holding_trade_update_failed");
   const payload = await response.json() as { holding: NativeHolding };
   return payload.holding;
+}
+
+export async function removeHolding(holdingId: string) {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/holdings`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ holdingId }),
+  });
+  if (!response.ok) throw new Error("holding_delete_failed");
+}
+
+export type NativeCollectorMatchItem = {
+  templateId: string;
+  name: string;
+  ownedCopies: number;
+  forTradeCopies: number;
+  openToTrade: boolean;
+};
+
+export type NativeCollectorMatch = {
+  compatibility: {
+    score: number;
+    engine: "people";
+    evidenceStrength: string;
+    visibilityLimited: boolean;
+    reasons: { code: string; count: number }[];
+  };
+  trade: {
+    theyOwnYourWants: NativeCollectorMatchItem[];
+    youOwnTheirWants: NativeCollectorMatchItem[];
+    reciprocal: boolean;
+    strength: string;
+    visibility: { collectionVisible: boolean; wishlistVisible: boolean };
+  };
+};
+
+export async function loadCollectorMatch(userId: string): Promise<NativeCollectorMatch> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/collectors/${encodeURIComponent(userId)}/match`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("collector_match_unavailable");
+  return response.json() as Promise<NativeCollectorMatch>;
 }
 
 export async function loadAllMyWishlist(): Promise<NativeWishlistEntry[]> {
@@ -130,7 +184,7 @@ export async function loadAllMyWishlist(): Promise<NativeWishlistEntry[]> {
 
 export async function loadMyWishlist(offset = 0, limit = 100): Promise<NativeWishlistEntry[]> {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/wishlist?offset=${offset}&limit=${limit}`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/wishlist?offset=${offset}&limit=${limit}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) throw new Error("wishlist_read_failed");
@@ -140,7 +194,7 @@ export async function loadMyWishlist(offset = 0, limit = 100): Promise<NativeWis
 
 export async function setWishlistTemplate(templateId: string, wanted: boolean) {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/wishlist`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/wishlist`, {
     method: wanted ? "POST" : "DELETE",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({ templateId }),
@@ -151,11 +205,11 @@ export async function setWishlistTemplate(templateId: string, wanted: boolean) {
 export async function uploadHoldingPhoto(holdingId: string, uri: string, mimeType = "image/jpeg") {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
-  if (!baseUrl || !accessToken) throw new Error("unauthenticated");
+  if (!accessToken) throw new Error("unauthenticated");
   const body = new FormData();
   body.append("holdingId", holdingId);
   body.append("file", { uri, name: "collectible.jpg", type: mimeType } as unknown as Blob);
-  const response = await fetch(`${baseUrl}/api/mobile/media`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body });
+  const response = await fetch(`${productApiBase()}/api/mobile/media`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body });
   if (!response.ok) throw new Error("media_upload_failed");
   return response.json();
 }
@@ -163,12 +217,12 @@ export async function uploadHoldingPhoto(holdingId: string, uri: string, mimeTyp
 export async function uploadCatalogReferencePhoto(templateId: string, uri: string, mimeType = "image/jpeg") {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
-  if (!baseUrl || !accessToken) throw new Error("unauthenticated");
+  if (!accessToken) throw new Error("unauthenticated");
   const body = new FormData();
   body.append("templateId", templateId);
   body.append("sourceKey", uri.slice(-160));
   body.append("file", { uri, name: "catalog-reference.jpg", type: mimeType } as unknown as Blob);
-  const response = await fetch(`${baseUrl}/api/mobile/catalog/reference-images`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body });
+  const response = await fetch(`${productApiBase()}/api/mobile/catalog/reference-images`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body });
   if (!response.ok) throw new Error("catalog_reference_upload_failed");
   return response.json();
 }
@@ -176,14 +230,19 @@ export async function uploadCatalogReferencePhoto(templateId: string, uri: strin
 export async function contributeCatalogItem(input: { name: string; kind: string; groupName: string; memberName?: string; releaseName?: string; descriptor?: string }) {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
-  if (!baseUrl || !accessToken) throw new Error("unauthenticated");
-  const response = await fetch(`${baseUrl}/api/mobile/catalog/contributions`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify(input) });
+  if (!accessToken) throw new Error("unauthenticated");
+  const response = await fetch(`${productApiBase()}/api/mobile/catalog/contributions`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify(input) });
   if (!response.ok) throw new Error("catalog_contribution_failed");
   return response.json() as Promise<{ contribution: { template: NativeCatalogTemplate } }>;
 }
 
 export type NativeSocialAuthor = { userId: string; displayName: string; handle: string };
-export type NativeCollectibleTag = { templateId: string; name: string; kind: string };
+export type NativeCollectibleTag = {
+  templateId: string;
+  name: string;
+  kind: string;
+  colorway?: { base: string; accent: string; ink: string };
+};
 export type NativeFeedPost = {
   id: string;
   caption: string;
@@ -194,7 +253,11 @@ export type NativeFeedPost = {
   likeCount: number;
   commentCount: number;
   likedByMe: boolean;
-  media: { url: string; mediaType: string }[];
+  repostedByMe?: boolean;
+  savedByMe?: boolean;
+  repostOf?: string | null;
+  originAuthor?: NativeSocialAuthor;
+  media: { url: string; mediaType: string; duration?: string }[];
   taggedUsers?: NativeSocialAuthor[];
   taggedCollectibles?: NativeCollectibleTag[];
 };
@@ -203,9 +266,9 @@ export type NativeFeedPage = { items: NativeFeedPost[]; nextCursor: string | nul
 export async function loadFeed(cursor?: string): Promise<NativeFeedPage> {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
-  if (!baseUrl || !accessToken) throw new Error("unauthenticated");
+  if (!accessToken) throw new Error("unauthenticated");
   const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-  const response = await fetch(`${baseUrl}/api/mobile/feed${query}`, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const response = await fetch(`${productApiBase()}/api/mobile/feed${query}`, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!response.ok) throw new Error("social_read_failed");
   const payload = await response.json() as { page?: { items?: NativeFeedPost[]; nextCursor?: string | null } };
   return { items: payload.page?.items ?? [], nextCursor: payload.page?.nextCursor ?? null };
@@ -213,7 +276,7 @@ export async function loadFeed(cursor?: string): Promise<NativeFeedPage> {
 
 export async function setPostLiked(postId: string, liked: boolean) {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/posts/${encodeURIComponent(postId)}/like`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/posts/${encodeURIComponent(postId)}/like`, {
     method: liked ? "PUT" : "DELETE",
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -225,7 +288,7 @@ export type NativeCommentPage = { items: NativePostComment[]; nextCursor: string
 export async function loadPostComments(postId: string, cursor?: string): Promise<NativeCommentPage> {
   const accessToken = await mobileAccessToken();
   const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-  const response = await fetch(`${baseUrl}/api/mobile/posts/${encodeURIComponent(postId)}/comments${query}`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/posts/${encodeURIComponent(postId)}/comments${query}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) throw new Error("comments_read_failed");
@@ -235,7 +298,7 @@ export async function loadPostComments(postId: string, cursor?: string): Promise
 
 export async function addPostComment(postId: string, body: string): Promise<NativePostComment> {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/posts/${encodeURIComponent(postId)}/comments`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/posts/${encodeURIComponent(postId)}/comments`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({ body }),
@@ -250,7 +313,7 @@ export async function createNativePost(uri: string, caption: string, mimeType = 
   const body = new FormData();
   body.append("caption", caption);
   body.append("file", { uri, name: "seoully-post.jpg", type: mimeType } as unknown as Blob);
-  const response = await fetch(`${baseUrl}/api/mobile/posts`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/posts`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}` },
     body,
@@ -275,8 +338,8 @@ export type NativeIdentity = {
 
 export async function updateNativeProfile(input: { displayName?: string; bio?: string; tagline?: string; location?: string }) {
   const { data } = await supabase.auth.getSession(); const accessToken = data.session?.access_token;
-  if (!baseUrl || !accessToken) throw new Error("unauthenticated");
-  const response = await fetch(`${baseUrl}/api/mobile/profile`, { method: "PATCH", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify(input) });
+  if (!accessToken) throw new Error("unauthenticated");
+  const response = await fetch(`${productApiBase()}/api/mobile/profile`, { method: "PATCH", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify(input) });
   if (!response.ok) throw new Error("profile_update_failed"); return response.json();
 }
 
@@ -307,15 +370,41 @@ export type NativeOnboardingPatch =
   | { action: "interests"; collectorInterests: string[] };
 
 async function mobileAccessToken() {
+  productApiBase();
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
-  if (!baseUrl || !accessToken) throw new Error("unauthenticated");
+  if (!accessToken) throw new Error("unauthenticated");
   return accessToken;
+}
+
+export type NativeAskCard = {
+  kind: "collector" | "collectible" | "room" | "holding";
+  id: string;
+  title: string;
+  subtitle?: string;
+  detail?: string;
+  action?: { type: string; userId?: string; query?: string; destination?: string };
+};
+
+export async function askSeoullyNative(input: {
+  locale: "en" | "ko";
+  question: string;
+  history: { role: "user" | "assistant"; content: string }[];
+  context?: { surface?: string; profileUserId?: string; templateId?: string };
+}) {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/assistant`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw new Error("assistant_unavailable");
+  return response.json() as Promise<{ reply?: string; cards?: NativeAskCard[] }>;
 }
 
 export async function loadNativeOnboarding(): Promise<NativeOnboardingState> {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/onboarding`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/onboarding`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) throw new Error("onboarding_unavailable");
@@ -326,7 +415,7 @@ export async function updateNativeOnboarding(
   patch: NativeOnboardingPatch,
 ): Promise<{ step: NativeOnboardingStep }> {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/onboarding`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/onboarding`, {
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -378,7 +467,7 @@ export type NativeRoomDiscovery = {
 
 async function loadDiscovery<T>(surface: "collectors" | "collectibles" | "rooms"): Promise<T[]> {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/discovery/${surface}`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/discovery/${surface}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -418,7 +507,7 @@ export type NativeDirectMessage = {
 
 export async function loadConversations(): Promise<NativeConversation[]> {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/messages`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/messages`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) throw new Error("messages_read_failed");
@@ -428,7 +517,7 @@ export async function loadConversations(): Promise<NativeConversation[]> {
 
 export async function ensureConversation(peerUserId: string): Promise<string> {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/messages`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/messages`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({ peerUserId }),
@@ -440,7 +529,7 @@ export async function ensureConversation(peerUserId: string): Promise<string> {
 
 export async function loadDirectMessages(conversationId: string): Promise<NativeDirectMessage[]> {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/messages/${encodeURIComponent(conversationId)}`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/messages/${encodeURIComponent(conversationId)}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) throw new Error("messages_read_failed");
@@ -450,7 +539,7 @@ export async function loadDirectMessages(conversationId: string): Promise<Native
 
 export async function sendDirectMessage(conversationId: string, body: string): Promise<NativeDirectMessage> {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/messages/${encodeURIComponent(conversationId)}`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/messages/${encodeURIComponent(conversationId)}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({ body }),
@@ -462,7 +551,16 @@ export async function sendDirectMessage(conversationId: string, body: string): P
 
 export type NativeCollectorProfile = {
   user: { id: string; handle: string; displayName: string; joinedAt: string };
-  profile: { tagline: string; bio: string; location?: string; collectorInterests: string[] };
+  profile: {
+    tagline: string;
+    bio: string;
+    location?: string;
+    collectorInterests: string[];
+    collectorType?: string;
+    favoriteGroupIds?: string[];
+    biasMemberIds?: string[];
+    favoriteEraIds?: string[];
+  };
   followerCount: number;
   followingCount: number;
   roomAvailable: boolean;
@@ -494,7 +592,7 @@ export type NativePublicRoom = {
 
 export async function loadCollectorRoom(userId: string): Promise<NativePublicRoom> {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/collectors/${encodeURIComponent(userId)}/room`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/collectors/${encodeURIComponent(userId)}/room`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) throw new Error("public_room_read_failed");
@@ -503,7 +601,7 @@ export async function loadCollectorRoom(userId: string): Promise<NativePublicRoo
 
 export async function loadCollectorProfile(userId: string) {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/collectors/${encodeURIComponent(userId)}`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/collectors/${encodeURIComponent(userId)}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) throw new Error("collector_read_failed");
@@ -515,7 +613,7 @@ export async function loadCollectorProfile(userId: string) {
 
 export async function setCollectorFollowing(userId: string, following: boolean) {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/collectors/${encodeURIComponent(userId)}`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/collectors/${encodeURIComponent(userId)}`, {
     method: "PATCH",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({ following }),
@@ -527,7 +625,7 @@ export async function setCollectorFollowing(userId: string, following: boolean) 
 export async function loadCollectorPosts(userId: string, cursor?: string): Promise<NativeFeedPage> {
   const accessToken = await mobileAccessToken();
   const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-  const response = await fetch(`${baseUrl}/api/mobile/collectors/${encodeURIComponent(userId)}/posts${query}`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/collectors/${encodeURIComponent(userId)}/posts${query}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) throw new Error("social_read_failed");
@@ -555,7 +653,7 @@ export type NativeRoomSnapshot = {
 
 export async function loadNativeRoom(): Promise<NativeRoomSnapshot> {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/room`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/room`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!response.ok) throw new Error("room_read_failed");
@@ -571,7 +669,7 @@ export async function saveNativeRoomPlacement(input: {
   surfaceId?: string;
 }) {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/room`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/room`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -583,7 +681,7 @@ export async function saveNativeRoomPlacement(input: {
 
 export async function saveNativeRoomTheme(roomId: string, themeId: NativeRoomThemeId) {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/room`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/room`, {
     method: "PATCH",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({ roomId, themeId }),
@@ -595,7 +693,7 @@ export async function saveNativeRoomTheme(roomId: string, themeId: NativeRoomThe
 
 export async function removeNativeRoomPlacement(roomId: string, holdingId: string) {
   const accessToken = await mobileAccessToken();
-  const response = await fetch(`${baseUrl}/api/mobile/room`, {
+  const response = await fetch(`${productApiBase()}/api/mobile/room`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({ roomId, holdingId }),

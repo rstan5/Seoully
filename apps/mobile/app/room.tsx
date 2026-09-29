@@ -3,7 +3,8 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { useFocusEffect, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ActivityIndicator, PanResponder, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
-import { loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomPlacement, saveNativeRoomTheme, type NativeHolding, type NativeRoomSnapshot, type NativeRoomThemeId } from "../src/api";
+import { loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomPlacement, type NativeHolding, type NativeRoomSnapshot } from "../src/api";
+import { useSocialRepository } from "../src/data";
 import { collectibleKindLabel } from "../src/i18n";
 import { useCopy } from "../src/locale";
 import { RetryNotice } from "../src/components/RetryNotice";
@@ -23,6 +24,7 @@ const ROOM_FOCUS_KEY = "seoully.mobile.room-focus.v1";
 export default function RoomScreen() {
   const copy = useCopy();
   const router = useRouter();
+  const social = useSocialRepository();
   const [snapshot, setSnapshot] = useState<NativeRoomSnapshot | null>(null);
   const [items, setItems] = useState<RoomRenderable[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -70,6 +72,13 @@ export default function RoomScreen() {
   }, [items, selectedId]);
 
   const refresh = useCallback(async () => {
+    if (!social.capabilities.persistRoom) {
+      setSnapshot(null);
+      setItems([]);
+      setError(copy.demoRoomUnavailable);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const next = await loadNativeRoom();
@@ -81,7 +90,7 @@ export default function RoomScreen() {
     } finally {
       setLoading(false);
     }
-  }, [copy.roomUnavailable]);
+  }, [copy.demoRoomUnavailable, copy.roomUnavailable, social.capabilities.persistRoom]);
   useFocusEffect(useCallback(() => {
     if (!editingRef.current) void refresh();
   }, [refresh]));
@@ -251,19 +260,6 @@ export default function RoomScreen() {
     }
   }
 
-  async function changeTheme(themeId: NativeRoomThemeId) {
-    if (!snapshot || snapshot.room.themeId === themeId) return;
-    const previous = snapshot.room;
-    setSnapshot((current) => current ? { ...current, room: { ...current.room, themeId } } : current);
-    try {
-      const room = await saveNativeRoomTheme(snapshot.room.id, themeId);
-      setSnapshot((current) => current ? { ...current, room } : current);
-    } catch {
-      setSnapshot((current) => current ? { ...current, room: previous } : current);
-      setError(copy.roomSaveFailed);
-    }
-  }
-
   return <SafeAreaView style={styles.safe}><View style={styles.container}>
     <View style={styles.header}>
       <View style={styles.heading}>{router.canGoBack() ? <ScreenBack label={copy.back} onPress={() => router.back()} /> : null}<Text style={styles.title}>{copy.room}</Text><Text style={styles.lead}>{copy.roomLead}</Text></View>
@@ -273,11 +269,6 @@ export default function RoomScreen() {
         <Pressable accessibilityRole="button" disabled={!snapshot} onPress={() => editing ? setEditing(false) : beginEditing()} style={styles.editButton}><Text style={styles.editButtonText}>{editing ? copy.finishEditing : copy.editRoom}</Text></Pressable>
       </View>
     </View>
-    {editing && snapshot ? <View><Text style={styles.themeLabel}>{copy.roomStyle}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.themeRow}>{([
-      ["hearth", copy.roomThemeHearth],
-      ["blossom", copy.roomThemeBlossom],
-      ["midnight", copy.roomThemeMidnight],
-    ] as const).map(([id, label]) => <Pressable key={id} accessibilityRole="button" accessibilityState={{ selected: snapshot.room.themeId === id }} onPress={() => changeTheme(id)} style={[styles.themeChoice, snapshot.room.themeId === id && styles.themeChoiceSelected]}><Text style={[styles.themeChoiceText, snapshot.room.themeId === id && styles.themeChoiceTextSelected]}>{label}</Text></Pressable>)}</ScrollView></View> : null}
     {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
     {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
     {!loading && !snapshot?.holdings.length ? <Text style={styles.empty}>{copy.roomEmpty}</Text> : null}

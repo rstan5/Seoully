@@ -37,7 +37,7 @@ import {
   type IdentityBeat,
   type OnboardingProgress,
 } from "./onboarding";
-import { isLocale, type Locale } from "@/locale/translate";
+import { isLocale, type Locale } from "../locale/translate";
 import { handleError, isFixtureUser, normalizeHandle } from "./session";
 import { homeForTemplate, slotForHome } from "./homes";
 import { createStarterFurniture, createStarterRoom } from "./starter-room";

@@ -14,6 +14,14 @@
     "**/*.tsx",
     "../../src/domain/types.ts",
     "../../src/domain/compatibility.ts",
-    "../../src/domain/fixtures/**/*.ts"
+    "../../src/domain/profile-theme.ts",
+    "../../src/domain/assistant-tools.ts",
+    "../../src/domain/explore.ts",
+    "../../src/domain/memory-repository.ts",
+    "../../src/domain/fixtures/**/*.ts",
+    "../../src/locale/translate.ts",
+    "../../src/locale/en.ts",
+    "../../src/locale/ko.ts",
+    "../../src/locale/copy.ts"
   ]
 }

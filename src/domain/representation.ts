@@ -1,4 +1,4 @@
-import type { CollectibleKind, CollectibleTemplate, Holding, HoldingView } from "@/domain/types";
+import type { CollectibleKind, CollectibleTemplate, Holding, HoldingView } from "./types";
 
 export type RepresentationGeometry = "photocard" | "poster" | "album" | "object" | "generic";
 

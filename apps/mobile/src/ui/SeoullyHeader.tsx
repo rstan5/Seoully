@@ -1,9 +1,12 @@
 import type { ReactNode } from "react";
+import { useCallback, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { isDemoWorldAllowed, useDataMode } from "../data";
+import { useFocusEffect, useRouter } from "expo-router";
+import { isDemoWorldAllowed, useDataMode, useSocialRepository } from "../data";
 import { useCopy } from "../locale";
 import { colors, sizes } from "../theme";
 import { BrandMark } from "./BrandMark";
+import { IconBell } from "./icons";
 import { pressShift, useReduceMotion } from "./motion";
 import { SeoullyText } from "./SeoullyText";
 
@@ -17,9 +20,25 @@ export function SeoullyHeader({
   trailing?: ReactNode;
 }) {
   const copy = useCopy();
+  const router = useRouter();
   const reduceMotion = useReduceMotion();
   const { demo, setDemo } = useDataMode();
+  const social = useSocialRepository();
   const allowed = isDemoWorldAllowed();
+  const [unread, setUnread] = useState(0);
+
+  useFocusEffect(useCallback(() => {
+    let mounted = true;
+    void social.unreadNoticeCount().then((count) => {
+      if (mounted) setUnread(social.capabilities.persistNotices ? count : 0);
+    }).catch(() => {
+      if (mounted) setUnread(0);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [social]));
+
   return (
     <View style={styles.top}>
       <BrandMark />
@@ -46,6 +65,22 @@ export function SeoullyHeader({
         >
           <SeoullyText variant="button" color={colors.ink}>{languageLabel}</SeoullyText>
         </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={unread > 0 ? `${copy.notices}, ${unread}` : copy.notices}
+          hitSlop={8}
+          onPress={() => router.push("/notices")}
+          style={({ pressed }) => [styles.bell, pressShift(pressed, reduceMotion)]}
+        >
+          <IconBell color={colors.ink} />
+          {unread > 0 ? (
+            <View style={styles.badge}>
+              <SeoullyText variant="caption" color={colors.onPrimary} style={styles.badgeText}>
+                {unread > 9 ? "9+" : String(unread)}
+              </SeoullyText>
+            </View>
+          ) : null}
+        </Pressable>
         {trailing}
       </View>
     </View>
@@ -61,7 +96,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     minHeight: sizes.topBar,
     overflow: "visible",
+    paddingBottom: 8,
     paddingHorizontal: 16,
+    paddingTop: 10,
     zIndex: 2,
   },
   end: {
@@ -87,5 +124,28 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minHeight: 44,
     paddingHorizontal: 4,
+  },
+  bell: {
+    alignItems: "center",
+    height: 44,
+    justifyContent: "center",
+    marginLeft: 2,
+    width: 36,
+  },
+  badge: {
+    alignItems: "center",
+    backgroundColor: colors.plum,
+    borderRadius: 8,
+    height: 16,
+    justifyContent: "center",
+    minWidth: 16,
+    paddingHorizontal: 4,
+    position: "absolute",
+    right: 2,
+    top: 6,
+  },
+  badgeText: {
+    fontSize: 10,
+    lineHeight: 12,
   },
 });

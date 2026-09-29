@@ -2,13 +2,15 @@ import {
   searchCollectibles,
   searchPeople,
   searchRooms,
-} from "@/domain/explore";
-import { repository } from "@/domain/memory-repository";
-import type { CollectibleTemplate, TemplateId, UserId } from "@/domain/types";
-import type { Locale } from "@/locale/translate";
-import type { MessageKey } from "@/locale/en";
-import { translate } from "@/locale/translate";
-import { compatibilityLines } from "@/locale/copy";
+} from "./explore";
+import { repository } from "./memory-repository";
+import type { CollectibleTemplate, TemplateId, UserId } from "./types";
+import type { Locale } from "../locale/translate";
+import type { MessageKey } from "../locale/en";
+import { translate } from "../locale/translate";
+import { compatibilityLines } from "../locale/copy";
+
+export { translate };
 
 export type AssistantAction =
   | { type: "profile"; userId: string }

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { ensureConversation, type NativeFeedPost, type NativePostComment } from "../src/api";
-import { useSocialRepository, type SocialCollector } from "../src/data";
+import type { NativeFeedPost } from "../src/api";
+import { useSocialRepository, type SocialCollector, type SocialCompatibility } from "../src/data";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
 import { collectibleKindLabel, type MobileCopy } from "../src/i18n";
@@ -10,27 +10,49 @@ import { useCopy, useLocale } from "../src/locale";
 import { colors } from "../src/theme";
 import { SeoullyButton, SeoullyChip, SeoullyShelf } from "../src/ui/SeoullyControls";
 import { SeoullyEmptyState } from "../src/ui/SeoullyEmptyState";
+import { SeoullyFeedPost } from "../src/ui/SeoullyFeedPost";
 import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
-import { SeoullyPost } from "../src/ui/SeoullyPost";
 import {
   formatCollectingSince,
   SeoullyHighlight,
   SeoullyProfileHead,
   SeoullyProfileMeta,
+  SeoullyProfileVeil,
+  SeoullyRoomUnderlay,
   SeoullyShelfRow,
 } from "../src/ui/SeoullyProfile";
 import { SeoullyScreen } from "../src/ui/SeoullyScreen";
 import { SeoullyText } from "../src/ui/SeoullyText";
+import { SeoullyTradeMatch } from "../src/ui/SeoullyTradeMatch";
 
 function highlightsFromCollector(collector: SocialCollector) {
-  const groups = new Map<string, { name: string; count: number }>();
+  const groups = new Map<string, { name: string; count: number; imageUrl?: string; colorway?: { base: string; accent: string; ink: string } }>();
   for (const holding of collector.holdings) {
     const name = holding.template.groupName || holding.template.name;
-    const current = groups.get(name) ?? { name, count: 0 };
+    const current = groups.get(name) ?? { name, count: 0, imageUrl: holding.personalMediaUrl, colorway: holding.template.colorway };
     current.count += 1;
+    if (!current.imageUrl && holding.personalMediaUrl) current.imageUrl = holding.personalMediaUrl;
+    if (!current.colorway && holding.template.colorway) current.colorway = holding.template.colorway;
     groups.set(name, current);
   }
   return [...groups.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)).slice(0, 4);
+}
+
+function displayReasons(compatibility: SocialCompatibility, copy: MobileCopy) {
+  if (compatibility.source === "domain") return compatibility.reasons;
+  const labels: Record<string, string> = {
+    SHARED_TEMPLATE: copy.compatReasonSharedTemplate,
+    SHARED_GROUP: copy.compatReasonSharedGroup,
+    SHARED_MEMBER: copy.compatReasonSharedMember,
+    SHARED_RELEASE: copy.compatReasonSharedRelease,
+    SHARED_FAVORITE_GROUP: copy.compatReasonSharedFavoriteGroup,
+    SHARED_BIAS: copy.compatReasonSharedBias,
+  };
+  return compatibility.reasons.map((raw) => {
+    const [code, count] = raw.split(":");
+    const label = labels[code ?? ""] ?? raw;
+    return count ? `${label} (${count})` : label;
+  });
 }
 
 export default function CollectorScreen() {
@@ -45,6 +67,8 @@ export default function CollectorScreen() {
   const [followingCount, setFollowingCount] = useState(0);
   const [posts, setPosts] = useState<NativeFeedPost[]>([]);
   const [postCursor, setPostCursor] = useState<string | null>(null);
+  const [ownedExpanded, setOwnedExpanded] = useState(false);
+  const [wishlistExpanded, setWishlistExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -122,19 +146,13 @@ export default function CollectorScreen() {
 
   async function message() {
     if (!collector || busy) return;
-    if (social.kind === "demo") {
-      setNotice(copy.messagesBlocked);
-      return;
-    }
-    setBusy(true);
-    try {
-      const conversationId = await ensureConversation(userId);
-      router.push({ pathname: "/thread", params: { conversationId, displayName: collector.user.displayName, handle: collector.user.handle } });
-    } catch {
-      setNotice(copy.messagesUnavailable);
-    } finally {
-      setBusy(false);
-    }
+    setNotice(social.kind === "demo" ? copy.messagesBlocked : copy.messagesUnavailable);
+  }
+
+  function messageAboutTrade(templateIds: string[]) {
+    // Reserved for DM prefill after 20261001000000_direct_messages.sql.
+    void templateIds;
+    setNotice(social.kind === "demo" ? copy.messagesBlocked : copy.messagesTradeUnavailable);
   }
 
   function enterRoom() {
@@ -147,7 +165,9 @@ export default function CollectorScreen() {
   }
 
   return (
-    <SeoullyScreen>
+    <SeoullyScreen backgroundColor={collector?.theme?.mist ?? colors.mist}>
+      <SeoullyRoomUnderlay theme={collector?.theme} />
+      <SeoullyProfileVeil theme={collector?.theme} />
       <View style={styles.top}>
         <ScreenBack label={copy.back} onPress={() => router.back()} />
         <Pressable accessibilityRole="button" onPress={toggleLocale} style={styles.lang}>
@@ -167,8 +187,12 @@ export default function CollectorScreen() {
                 { value: posts.length, label: copy.profilePosts },
                 { value: followers, label: copy.profileFollowers },
                 { value: followingCount, label: copy.profileFollowingCount },
-                { value: collector.holdingCount, label: copy.profileCollected },
-                { value: collector.wishlist.length, label: copy.profileWishlistCount },
+                ...(social.capabilities.publicCollectionRows
+                  ? [
+                      { value: collector.holdingCount, label: copy.profileCollected },
+                      { value: collector.wishlist.length, label: copy.profileWishlistCount },
+                    ]
+                  : []),
               ]}
             />
             <SeoullyProfileMeta
@@ -189,12 +213,15 @@ export default function CollectorScreen() {
                 <SeoullyButton label={copy.messageCollector} variant="ghost" disabled={busy} fill onPress={() => { void message(); }} />
               </View>
             ) : null}
-            <SeoullyButton
-              label={copy.viewCollectorRoom}
-              variant="enter"
-              onPress={enterRoom}
-            />
+            <View style={styles.enter}>
+              <SeoullyButton
+                label={copy.viewCollectorRoom}
+                variant="enter"
+                onPress={enterRoom}
+              />
+            </View>
             {notice ? <SeoullyText variant="secondary" style={styles.inlineNotice}>{notice}</SeoullyText> : null}
+            <SeoullyText variant="caption" color={colors.muted} style={styles.inlineNotice}>{copy.profileUnderlayHint}</SeoullyText>
           </View>
 
           {collector.groups.length > 0 || collector.biases.length > 0 || collector.eras.length > 0 ? (
@@ -212,6 +239,8 @@ export default function CollectorScreen() {
                   key={slice.name}
                   name={slice.name}
                   countLabel={copy.profileOwnedCount.replace("{count}", String(slice.count))}
+                  imageUrl={slice.imageUrl}
+                  colorway={slice.colorway}
                 />
               ))}
             </ScrollView>
@@ -223,18 +252,24 @@ export default function CollectorScreen() {
                 {copy.compatScore.replace("{score}", String(collector.compatibility.score))}
               </SeoullyText>
               <SeoullyText variant="section" style={styles.compatLabel}>{copy.compatTitle}</SeoullyText>
-              {collector.compatibility.reasons.slice(0, 4).map((reason) => (
+              {displayReasons(collector.compatibility, copy).slice(0, 4).map((reason) => (
                 <SeoullyText key={reason} variant="secondary" style={styles.compatReason}>{reason}</SeoullyText>
               ))}
+              <SeoullyTradeMatch
+                compatibility={collector.compatibility}
+                copy={copy}
+                canMessage={social.capabilities.persistMessages}
+                onMessage={messageAboutTrade}
+              />
             </View>
           ) : null}
 
           <SeoullyShelf title={copy.profilePostsTitle} empty={posts.length === 0 && !postsError ? copy.profileEmptyPosts : undefined}>
             {postsError ? <RetryNotice message={postsError} retryLabel={copy.retry} onRetry={refresh} /> : null}
             {posts.map((post) => (
-              <CollectorPost
+              <SeoullyFeedPost
                 key={post.id}
-                post={post}
+                item={post}
                 copy={copy}
                 locale={locale}
                 onChange={(next) => setPosts((current) => current.map((item) => item.id === next.id ? next : item))}
@@ -247,16 +282,27 @@ export default function CollectorScreen() {
             ) : null}
           </SeoullyShelf>
 
+          {social.capabilities.publicCollectionRows ? (
+            <>
           <SeoullyShelf
             title={copy.profileOwned}
             count={collector.holdingCount}
+            expanded={ownedExpanded}
+            onToggle={() => setOwnedExpanded((value) => !value)}
             empty={collector.holdings.length === 0 ? copy.profileEmptyOwned : undefined}
           >
-            {collector.holdings.slice(0, 8).map((holding) => (
+            {collector.holdings.map((holding) => (
               <SeoullyShelfRow
                 key={holding.id}
                 title={holding.template.name}
-                meta={[holding.template.groupName, holding.template.memberName, collectibleKindLabel(holding.template.kind, copy)].filter(Boolean).join(" · ")}
+                meta={[
+                  holding.template.groupName,
+                  holding.template.memberName,
+                  collectibleKindLabel(holding.template.kind, copy),
+                  holding.tradeStatus === "for-trade" ? copy.compatOpenToTrade : undefined,
+                ].filter(Boolean).join(" · ")}
+                colorway={holding.template.colorway}
+                imageUrl={holding.personalMediaUrl}
               />
             ))}
           </SeoullyShelf>
@@ -264,16 +310,23 @@ export default function CollectorScreen() {
           <SeoullyShelf
             title={copy.profileWishlistTitle}
             count={collector.wishlist.length}
+            expanded={wishlistExpanded}
+            onToggle={() => setWishlistExpanded((value) => !value)}
             empty={collector.wishlist.length === 0 ? copy.profileEmptyWish : undefined}
           >
-            {collector.wishlist.slice(0, 8).map((entry) => (
+            {collector.wishlist.map((entry) => (
               <SeoullyShelfRow
                 key={entry.id}
                 title={entry.template.name}
                 meta={[entry.template.groupName, entry.template.memberName, collectibleKindLabel(entry.template.kind, copy)].filter(Boolean).join(" · ")}
+                colorway={entry.template.colorway}
               />
             ))}
           </SeoullyShelf>
+            </>
+          ) : (
+            <SeoullyText variant="secondary" style={styles.connect}>{copy.publicShelvesUnavailable}</SeoullyText>
+          )}
 
           <SeoullyText variant="secondary" style={styles.connect}>
             {copy.profileConnect.replace("{name}", collector.user.displayName)}
@@ -281,64 +334,6 @@ export default function CollectorScreen() {
         </ScrollView>
       ) : !loading && !error ? <SeoullyEmptyState align="start" body={copy.collectorUnavailable} /> : null}
     </SeoullyScreen>
-  );
-}
-
-function CollectorPost({
-  post,
-  copy,
-  locale,
-  onChange,
-}: {
-  post: NativeFeedPost;
-  copy: MobileCopy;
-  locale: "en" | "ko";
-  onChange: (post: NativeFeedPost) => void;
-}) {
-  const router = useRouter();
-  const social = useSocialRepository();
-  const [comments, setComments] = useState<NativePostComment[] | null>(null);
-  const [commentBody, setCommentBody] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function toggleLike() {
-    if (busy) return;
-    const nextLiked = !post.likedByMe;
-    const optimistic = { ...post, likedByMe: nextLiked, likeCount: Math.max(0, post.likeCount + (nextLiked ? 1 : -1)) };
-    onChange(optimistic);
-    setBusy(true);
-    try { await social.setPostLiked(post.id, nextLiked); }
-    catch { onChange(post); }
-    finally { setBusy(false); }
-  }
-
-  return (
-    <SeoullyPost
-      item={post}
-      copy={copy}
-      locale={locale}
-      comments={comments}
-      commentCursor={null}
-      commentBody={commentBody}
-      commentError={null}
-      busy={busy}
-      onOpenCollector={(userId) => { if (userId) router.push({ pathname: "/collector", params: { userId } }); }}
-      onToggleLike={() => { void toggleLike(); }}
-      onToggleComments={() => { void social.loadPostComments(post.id).then((page) => setComments(page.items)); }}
-      onLoadMoreComments={() => undefined}
-      onChangeComment={setCommentBody}
-      onSubmitComment={() => {
-        const body = commentBody.trim();
-        if (!body || busy) return;
-        setBusy(true);
-        void social.addPostComment(post.id, body).then((comment) => {
-          setComments((current) => [...(current ?? []), comment]);
-          setCommentBody("");
-          onChange({ ...post, commentCount: post.commentCount + 1 });
-        }).finally(() => setBusy(false));
-      }}
-      onRetryComments={() => undefined}
-    />
   );
 }
 
@@ -355,6 +350,7 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 16, paddingTop: 14 },
   highlights: { gap: 12, paddingHorizontal: 16, paddingTop: 16 },
   actions: { flexDirection: "row", gap: 8, marginTop: 14 },
+  enter: { marginTop: 10 },
   notice: { paddingHorizontal: 16, paddingTop: 12 },
   inlineNotice: { marginTop: 10 },
   compat: {

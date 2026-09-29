@@ -3,6 +3,7 @@ import { lazy, Suspense, useCallback, useRef, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, PanResponder, Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
 import { loadCollectorRoom } from "../src/api";
+import { useSocialRepository } from "../src/data";
 import { collectibleKindLabel } from "../src/i18n";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
@@ -18,6 +19,7 @@ const NativeRoomRenderer = lazy(async () => {
 export default function CollectorRoomScreen() {
   const copy = useCopy();
   const router = useRouter();
+  const social = useSocialRepository();
   const { userId = "" } = useLocalSearchParams<{ userId?: string }>();
   const [items, setItems] = useState<RoomRenderable[]>([]);
   const [ownerName, setOwnerName] = useState("");
@@ -30,6 +32,14 @@ export default function CollectorRoomScreen() {
   const cameraOrigin = useRef({ yaw: 0, pitch: 0 });
 
   const refresh = useCallback(async () => {
+    if (social.kind === "demo" || !social.capabilities.persistRoom) {
+      setItems([]);
+      setOwnerName("");
+      setPrivateRoom(false);
+      setError(copy.demoRoomUnavailable);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const snapshot = await loadCollectorRoom(userId);
@@ -46,7 +56,7 @@ export default function CollectorRoomScreen() {
     } finally {
       setLoading(false);
     }
-  }, [copy.roomUnavailable, router, userId]);
+  }, [copy.demoRoomUnavailable, copy.roomUnavailable, router, social.capabilities.persistRoom, social.kind, userId]);
   useFocusEffect(useCallback(() => {
     void refresh();
   }, [refresh]));

@@ -30,7 +30,7 @@ export function SeoullyTabBar({ state, descriptors, navigation }: SeoullyTabBarP
 
   return (
     <View style={[styles.bar, { paddingBottom: insets.bottom }]}>
-      {state.routes.filter((route) => route.name !== "room").map((route) => {
+      {state.routes.filter((route) => route.name in icons).map((route) => {
         const focused = state.routes[state.index]?.name === route.name;
         const { options } = descriptors[route.key];
         const label = options.tabBarAccessibilityLabel ?? options.title ?? route.name;
@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     minHeight: sizes.tabBar,
-    paddingTop: 4,
+    paddingTop: 2,
   },
   tab: {
     alignItems: "center",
@@ -90,9 +90,9 @@ const styles = StyleSheet.create({
   },
   create: {
     backgroundColor: colors.lilacSoft,
-    borderColor: colors.lilac,
+    borderColor: "#fad4de",
     borderRadius: radii.create,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     height: sizes.create,
     width: sizes.create,
     ...elevation.raise,

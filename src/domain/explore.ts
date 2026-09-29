@@ -6,7 +6,7 @@
  * rewriting Search. Nothing here invents catalog, compatibility, or holdings.
  */
 
-import { repository } from "@/domain/memory-repository";
+import { repository } from "./memory-repository";
 import type {
   CollectibleTemplate,
   CollectionCompatibility,
@@ -17,7 +17,7 @@ import type {
   RoomId,
   User,
   UserId,
-} from "@/domain/types";
+} from "./types";
 
 export const EXPLORE_DESTINATIONS = [
   "people",

@@ -2,14 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from "react-native";
-import {
-  loadMyHoldings,
-  loadMyWishlist,
-  setWishlistTemplate,
-  updateHoldingTradeStatus,
-  type NativeHolding,
-  type NativeWishlistEntry,
-} from "../src/api";
+import { useSocialRepository } from "../src/data";
 import { collectibleKindLabel } from "../src/i18n";
 import { useCopy } from "../src/locale";
 import { RetryNotice } from "../src/components/RetryNotice";
@@ -20,6 +13,7 @@ import { SeoullyEmptyState } from "../src/ui/SeoullyEmptyState";
 import { SeoullyScreen } from "../src/ui/SeoullyScreen";
 import { SeoullyShelfRow } from "../src/ui/SeoullyProfile";
 import { SeoullyText } from "../src/ui/SeoullyText";
+import type { NativeHolding, NativeWishlistEntry } from "../src/api";
 
 const COLLECTION_TAB_KEY = "seoully.mobile.collection-tab.v1";
 type CollectionRow =
@@ -29,6 +23,7 @@ type CollectionRow =
 export default function CollectionScreen() {
   const copy = useCopy();
   const router = useRouter();
+  const social = useSocialRepository();
   const [holdings, setHoldings] = useState<NativeHolding[]>([]);
   const [wishlist, setWishlist] = useState<NativeWishlistEntry[]>([]);
   const [tab, setTab] = useState<"collection" | "wishlist">("collection");
@@ -44,7 +39,10 @@ export default function CollectionScreen() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [nextHoldings, nextWishlist] = await Promise.all([loadMyHoldings(0, 100), loadMyWishlist(0, 100)]);
+      const [nextHoldings, nextWishlist] = await Promise.all([
+        social.loadMyHoldings(0, 100),
+        social.loadMyWishlist(0, 100),
+      ]);
       setHoldings(nextHoldings);
       setHasMore(nextHoldings.length === 100);
       setWishlist(nextWishlist);
@@ -55,7 +53,7 @@ export default function CollectionScreen() {
     } finally {
       setLoading(false);
     }
-  }, [copy.collectionUnavailable]);
+  }, [copy.collectionUnavailable, social]);
 
   const loadMore = useCallback(async () => {
     if (loading || loadingMore) return;
@@ -63,7 +61,7 @@ export default function CollectionScreen() {
       if (!hasMore) return;
       setLoadingMore(true);
       try {
-        const page = await loadMyHoldings(holdings.length, 100);
+        const page = await social.loadMyHoldings(holdings.length, 100);
         setHoldings((current) => [...current, ...page.filter((item) => !current.some((existing) => existing.id === item.id))]);
         setHasMore(page.length === 100);
       } catch {
@@ -76,7 +74,7 @@ export default function CollectionScreen() {
     if (!hasMoreWishlist) return;
     setLoadingMore(true);
     try {
-      const page = await loadMyWishlist(wishlist.length, 100);
+      const page = await social.loadMyWishlist(wishlist.length, 100);
       setWishlist((current) => [...current, ...page.filter((item) => !current.some((existing) => existing.id === item.id))]);
       setHasMoreWishlist(page.length === 100);
     } catch {
@@ -84,7 +82,7 @@ export default function CollectionScreen() {
     } finally {
       setLoadingMore(false);
     }
-  }, [copy.collectionUnavailable, hasMore, hasMoreWishlist, holdings.length, loading, loadingMore, tab, wishlist.length]);
+  }, [copy.collectionUnavailable, hasMore, hasMoreWishlist, holdings.length, loading, loadingMore, social, tab, wishlist.length]);
 
   useFocusEffect(useCallback(() => {
     void refresh();
@@ -106,7 +104,7 @@ export default function CollectionScreen() {
     const nextStatus = holding.tradeStatus === "for-trade" ? "not-for-trade" : "for-trade";
     setBusyId(holding.id);
     try {
-      const updated = await updateHoldingTradeStatus(holding.id, nextStatus);
+      const updated = await social.setHoldingTradeStatus(holding.id, nextStatus);
       setHoldings((current) => current.map((item) => item.id === updated.id ? updated : item));
     } catch {
       setError(copy.collectionUnavailable);
@@ -118,7 +116,7 @@ export default function CollectionScreen() {
   async function removeWanted(entry: NativeWishlistEntry) {
     setBusyId(entry.id);
     try {
-      await setWishlistTemplate(entry.templateId, false);
+      await social.setWishlist(entry.templateId, false);
       setWishlist((current) => current.filter((item) => item.id !== entry.id));
     } catch {
       setError(copy.collectionUnavailable);

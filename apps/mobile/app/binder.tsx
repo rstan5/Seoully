@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, FlatList, Image, Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { loadAllMyHoldings, type NativeHolding } from "../src/api";
+import { useSocialRepository } from "../src/data";
+import type { NativeHolding } from "../src/api";
 import { binderSectionStarts, binderSpreads, buildNativeBinderPages, spreadIndexForHolding, type NativeBinderPage, type NativeBinderSpread } from "../src/binder/model";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
@@ -16,6 +17,7 @@ const BINDER_SPREAD_KEY = "seoully.mobile.binder-spread.v1";
 export default function BinderScreen() {
   const copy = useCopy();
   const router = useRouter();
+  const social = useSocialRepository();
   const params = useLocalSearchParams<{ holdingId?: string }>();
   const jumpedHolding = useRef<string | null>(null);
   const { width } = useWindowDimensions();
@@ -41,14 +43,20 @@ export default function BinderScreen() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      setHoldings(await loadAllMyHoldings());
+      const items: NativeHolding[] = [];
+      for (let offset = 0; offset < 2_000; offset += 100) {
+        const page = await social.loadMyHoldings(offset, 100);
+        items.push(...page.filter((item) => !items.some((existing) => existing.id === item.id)));
+        if (page.length < 100) break;
+      }
+      setHoldings(items);
       setError(null);
     } catch {
       setError(copy.binderUnavailable);
     } finally {
       setLoading(false);
     }
-  }, [copy.binderUnavailable]);
+  }, [copy.binderUnavailable, social]);
   useFocusEffect(useCallback(() => {
     void refresh();
   }, [refresh]));

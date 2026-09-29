@@ -6,6 +6,7 @@ import type { IdentityProfileDTO } from "@/domain/identity";
 import type { CollectorInterest, Profile, UserId } from "@/domain/types";
 import { normalizeHandle } from "@/domain/session";
 import { createSupabaseServerClient } from "@/server/supabase/server";
+import { requestSupabaseClient } from "@/server/supabase/request-client";
 
 const HANDLE_RE = /^[a-z][a-z0-9_]{2,15}$/;
 const interestValues = ["albums", "photocards", "merch", "vinyl", "posters", "lightsticks", "everything"] as const;
@@ -34,7 +35,7 @@ export interface PublicProfileDTO extends IdentityProfileDTO {
 }
 
 export async function getCurrentIdentity(): Promise<IdentityProfileDTO | null> {
-  const supabase = await createSupabaseServerClient();
+  const supabase = requestSupabaseClient() ?? await createSupabaseServerClient();
   return getCurrentIdentityFromClient(supabase);
 }
 

@@ -7,13 +7,15 @@ export function SeoullyScreen({
   children,
   style,
   edges = ["top"],
+  backgroundColor = colors.canvas,
 }: {
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
   edges?: ("top" | "right" | "bottom" | "left")[];
+  backgroundColor?: string;
 }) {
   return (
-    <SafeAreaView edges={edges} style={[styles.safe, style]}>
+    <SafeAreaView edges={edges} style={[styles.safe, { backgroundColor }, style]}>
       {children}
     </SafeAreaView>
   );
@@ -24,6 +26,6 @@ export function SeoullyBody({ children, style }: { children: ReactNode; style?: 
 }
 
 const styles = {
-  safe: { backgroundColor: colors.canvas, flex: 1 },
+  safe: { backgroundColor: colors.canvas, flex: 1, overflow: "visible" as const },
   body: { flex: 1 },
 };

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCollectionPairSnapshot, type PairPerson } from "@/server/dal/collection-graph-pair";
 
 const inputSchema = z.object({ targetUserId: z.string().uuid() }).strict();
@@ -37,9 +38,9 @@ const groups = (person: PairPerson) => person.holdings.map((holding) => holding.
 const members = (person: PairPerson) => person.holdings.flatMap((holding) => holding.member_id ? [holding.member_id] : []);
 const releases = (person: PairPerson) => person.holdings.flatMap((holding) => holding.release_id ? [holding.release_id] : []);
 
-export async function getCollectorCompatibility(input: unknown): Promise<CompatibilityResult> {
+export async function getCollectorCompatibility(input: unknown, client?: SupabaseClient): Promise<CompatibilityResult> {
   const { targetUserId } = inputSchema.parse(input);
-  const snapshot = await getCollectionPairSnapshot(targetUserId);
+  const snapshot = await getCollectionPairSnapshot(targetUserId, client);
   return computeCompatibilityPeople(snapshot.actor!, snapshot.target!, targetUserId, snapshot.target_collection_public === false);
 }
 

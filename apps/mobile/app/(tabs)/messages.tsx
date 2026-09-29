@@ -1,13 +1,12 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { FlatList, StyleSheet, View } from "react-native";
-import { loadConversations, type NativeConversation } from "../../src/api";
-import { RetryNotice } from "../../src/components/RetryNotice";
+import type { NativeConversation } from "../../src/api";
+import { useSocialRepository } from "../../src/data";
 import { useCopy, useLocale } from "../../src/locale";
 import { SeoullyAvatar } from "../../src/ui/SeoullyAvatar";
 import { SeoullyEmptyState } from "../../src/ui/SeoullyEmptyState";
 import { SeoullyHeader } from "../../src/ui/SeoullyHeader";
-import { SeoullyLoadingState } from "../../src/ui/SeoullyLoadingState";
 import { SeoullyScreen } from "../../src/ui/SeoullyScreen";
 import { SeoullySearchRow } from "../../src/ui/SeoullySearch";
 import { SeoullyText } from "../../src/ui/SeoullyText";
@@ -16,20 +15,12 @@ export default function MessagesScreen() {
   const copy = useCopy();
   const { toggleLocale } = useLocale();
   const router = useRouter();
+  const social = useSocialRepository();
   const [conversations, setConversations] = useState<NativeConversation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      setConversations(await loadConversations());
-      setError(null);
-    } catch {
-      setError(copy.messagesUnavailable);
-    } finally {
-      setLoading(false);
-    }
-  }, [copy.messagesUnavailable]);
+    setConversations([]);
+    void social.capabilities.persistMessages;
+  }, [social.capabilities.persistMessages]);
   useFocusEffect(useCallback(() => {
     void refresh();
   }, [refresh]));
@@ -39,16 +30,14 @@ export default function MessagesScreen() {
       <SeoullyHeader languageLabel={copy.switchLanguage} onToggleLanguage={toggleLocale} />
       <View style={styles.intro}>
         <SeoullyText variant="title">{copy.messages}</SeoullyText>
-        <SeoullyText variant="secondary" style={styles.lead}>{copy.messagesLead}</SeoullyText>
+        <SeoullyText variant="secondary" style={styles.lead}>{copy.messagesUnavailable}</SeoullyText>
       </View>
-      {loading && conversations.length === 0 ? <SeoullyLoadingState label={copy.messages} /> : null}
-      {error ? <View style={styles.notice}><RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /></View> : null}
       <FlatList
         data={conversations}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
-        refreshing={loading && conversations.length > 0}
         onRefresh={refresh}
+        refreshing={false}
         renderItem={({ item }) => (
           <SeoullySearchRow
             title={item.peer.displayName}
@@ -60,7 +49,7 @@ export default function MessagesScreen() {
             })}
           />
         )}
-        ListEmptyComponent={!loading && !error ? <SeoullyEmptyState align="start" body={copy.messagesEmpty} /> : null}
+        ListEmptyComponent={<SeoullyEmptyState align="start" body={copy.messagesUnavailable} />}
       />
     </SeoullyScreen>
   );

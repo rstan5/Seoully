@@ -1,8 +1,9 @@
 import "server-only";
 
 import { z } from "zod";
-import { getCurrentIdentity } from "@/server/dal/profile";
+import { getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/profile";
 import { createSupabaseServerClient } from "@/server/supabase/server";
+import { requestSupabaseClient } from "@/server/supabase/request-client";
 import { getMyCollection, getMyWishlist, getCollectionBreakdown, findOwnersOfTemplate, findWantersOfTemplate, findOwnersOfMyWishlist, findCollectorsWantingMyItems, getReciprocalRelationships, getKnownCoverage } from "@/server/dal/collection-graph";
 import { searchSharedCatalog, getSharedCatalogTemplate } from "@/server/dal/catalog";
 import { getCollectorCompatibility } from "@/server/compatibility/service";
@@ -26,7 +27,17 @@ interface ToolDefinition { name: string; description: string; input: z.ZodTypeAn
 
 function card(kind: AssistantCard["kind"], id: string, title: string, subtitle?: string, detail?: string, action?: AssistantCard["action"]): AssistantCard { return { kind, id, title, ...(subtitle ? { subtitle } : {}), ...(detail ? { detail } : {}), ...(action ? { action } : {}) }; }
 
-async function identityClient() { const identity = await getCurrentIdentity(); if (!identity) throw new Error("unauthenticated"); return { identity, supabase: await createSupabaseServerClient() }; }
+async function identityClient() {
+  const stored = requestSupabaseClient();
+  if (stored) {
+    const identity = await getCurrentIdentityFromClient(stored);
+    if (!identity) throw new Error("unauthenticated");
+    return { identity, supabase: stored };
+  }
+  const identity = await getCurrentIdentity();
+  if (!identity) throw new Error("unauthenticated");
+  return { identity, supabase: await createSupabaseServerClient() };
+}
 
 async function resolveTarget(input: z.infer<typeof targetSchema>, context: AssistantSurfaceContext, supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, actorId: string): Promise<string> {
   const target = input.targetUserId ?? context.targetUserId ?? context.profileUserId;

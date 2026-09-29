@@ -27,13 +27,17 @@ export default function Index() {
   const [submitting, setSubmitting] = useState(false);
 
   const routeAfterAuth = useCallback(async () => {
+    if (!mobileConfig.productApiConfigured) {
+      setMessage(t.productApiUnconfigured);
+      return;
+    }
     try {
       const onboarding = await loadNativeOnboarding();
       router.replace(onboarding.step === "done" ? "/(tabs)" : "/onboarding");
     } catch {
       setMessage(t.onboardingUnavailable);
     }
-  }, [router, t.onboardingUnavailable]);
+  }, [router, t.onboardingUnavailable, t.productApiUnconfigured]);
 
   useEffect(() => {
     let mounted = true;
@@ -88,8 +92,10 @@ export default function Index() {
             </Pressable>
           </View>
           <SeoullyText variant="secondary" style={styles.tagline}>{t.tagline}</SeoullyText>
-          {!mobileConfig.isConfigured ? (
+          {!mobileConfig.authConfigured ? (
             <SeoullyText variant="secondary" color={colors.plum} style={styles.warning}>{t.notConfigured}</SeoullyText>
+          ) : !mobileConfig.productApiConfigured ? (
+            <SeoullyText variant="secondary" color={colors.plum} style={styles.warning}>{t.productApiUnconfigured}</SeoullyText>
           ) : null}
           <View style={styles.form}>
             {createMode ? (
@@ -102,7 +108,7 @@ export default function Index() {
             <TextInput secureTextEntry placeholder={t.password} placeholderTextColor={colors.muted} value={password} onChangeText={setPassword} style={styles.input} />
             <SeoullyButton
               label={createMode ? t.createAccount : t.signIn}
-              disabled={submitting || !mobileConfig.isConfigured}
+              disabled={submitting || !mobileConfig.authConfigured}
               block
               onPress={() => { void submit(); }}
             />

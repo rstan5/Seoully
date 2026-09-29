@@ -17,9 +17,9 @@ import { colors, spacing } from "../../src/theme";
 import { IconCard, IconDoor, IconGroup, IconPhoto, IconUser } from "../../src/ui/icons";
 import { SeoullyAvatar } from "../../src/ui/SeoullyAvatar";
 import { SeoullyEmptyState } from "../../src/ui/SeoullyEmptyState";
+import { SeoullyFeedPost } from "../../src/ui/SeoullyFeedPost";
 import { SeoullyHeader } from "../../src/ui/SeoullyHeader";
 import { SeoullyLoadingState } from "../../src/ui/SeoullyLoadingState";
-import { SeoullyPost } from "../../src/ui/SeoullyPost";
 import { SeoullyScreen } from "../../src/ui/SeoullyScreen";
 import {
   SeoullyCollectibleMark,
@@ -107,6 +107,13 @@ export default function SearchScreen() {
         setRooms(await social.searchRooms(text));
         setPeople([]); setCatalog([]); setPosts([]); setEntities([]);
       } else if (nextDestination === "posts") {
+        if (!social.capabilities.searchPosts) {
+          setPosts([]);
+          setPeople([]); setRooms([]); setCatalog([]); setEntities([]);
+          setError(copy.searchPostsUnavailable);
+          setLoading(false);
+          return;
+        }
         setPosts(await social.searchPosts(text));
         setPeople([]); setRooms([]); setCatalog([]); setEntities([]);
       } else if (nextDestination === "entities") {
@@ -121,7 +128,7 @@ export default function SearchScreen() {
     } finally {
       setLoading(false);
     }
-  }, [copy.catalogUnavailable, copy.exploreUnavailable, social]);
+  }, [copy.catalogUnavailable, copy.exploreUnavailable, copy.searchPostsUnavailable, social]);
 
   useEffect(() => {
     let active = true;
@@ -273,6 +280,7 @@ export default function SearchScreen() {
                   hits={posts}
                   heading={copy.resultsPosts}
                   empty={copy.searchNone}
+                  onChange={(next) => setPosts((current) => current.map((post) => post.id === next.id ? next : post))}
                 />
               ) : null}
 
@@ -346,76 +354,29 @@ function PostResults({
   hits,
   heading,
   empty,
+  onChange,
 }: {
   hits: NativeFeedPost[];
   heading: string;
   empty: string;
+  onChange: (post: NativeFeedPost) => void;
 }) {
   const copy = useCopy();
   const { locale } = useLocale();
-  const router = useRouter();
   if (hits.length === 0) return <SeoullyEmptyState align="start" body={empty} />;
   return (
     <View>
       <SeoullyText variant="section" style={styles.section}>{heading}</SeoullyText>
       {hits.map((item) => (
-        <SearchPost key={item.id} item={item} copy={copy} locale={locale} onOpen={(userId) => router.push({ pathname: "/collector", params: { userId } })} />
+        <SeoullyFeedPost
+          key={item.id}
+          item={item}
+          copy={copy}
+          locale={locale}
+          onChange={onChange}
+        />
       ))}
     </View>
-  );
-}
-
-function SearchPost({
-  item,
-  copy,
-  locale,
-  onOpen,
-}: {
-  item: NativeFeedPost;
-  copy: MobileCopy;
-  locale: "en" | "ko";
-  onOpen: (userId: string) => void;
-}) {
-  const social = useSocialRepository();
-  const [comments, setComments] = useState<import("../../src/api").NativePostComment[] | null>(null);
-  const [commentBody, setCommentBody] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [post, setPost] = useState(item);
-
-  async function toggleLike() {
-    const nextLiked = !post.likedByMe;
-    const optimistic = { ...post, likedByMe: nextLiked, likeCount: Math.max(0, post.likeCount + (nextLiked ? 1 : -1)) };
-    setPost(optimistic);
-    try { await social.setPostLiked(post.id, nextLiked); } catch { setPost(post); }
-  }
-
-  return (
-    <SeoullyPost
-      item={post}
-      copy={copy}
-      locale={locale}
-      comments={comments}
-      commentCursor={null}
-      commentBody={commentBody}
-      commentError={null}
-      busy={busy}
-      onOpenCollector={(userId) => { if (userId) onOpen(userId); }}
-      onToggleLike={() => { void toggleLike(); }}
-      onToggleComments={() => { void social.loadPostComments(post.id).then((page) => setComments(page.items)); }}
-      onLoadMoreComments={() => undefined}
-      onChangeComment={setCommentBody}
-      onSubmitComment={() => {
-        const body = commentBody.trim();
-        if (!body) return;
-        setBusy(true);
-        void social.addPostComment(post.id, body).then((comment) => {
-          setComments((current) => [...(current ?? []), comment]);
-          setCommentBody("");
-          setPost((current) => ({ ...current, commentCount: current.commentCount + 1 }));
-        }).finally(() => setBusy(false));
-      }}
-      onRetryComments={() => undefined}
-    />
   );
 }
 

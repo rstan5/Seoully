@@ -1,24 +1,58 @@
 import {
   addPostComment,
+  askSeoullyNative,
+  loadCollectorDiscovery,
+  loadCollectorMatch,
   loadCollectorPosts,
   loadCollectorProfile,
   loadFeed,
   loadMyHoldings,
   loadMyWishlist,
+  loadNativeOnboarding,
   loadPostComments,
   loadRoomDiscovery,
+  removeHolding,
   resolveNativeIdentity,
   searchCatalog,
   searchCollectors,
   setCollectorFollowing,
   setPostLiked,
   setWishlistTemplate,
+  updateHoldingTradeStatus,
+  type NativeCollectorMatch,
   type NativeIdentity,
 } from "../api";
-import type { SocialRepository } from "./types";
+import { LIVE_CAPABILITIES } from "./capabilities";
+import { liveRepostResult, liveSaveResult, liveShareResult } from "./honesty";
+import type { NativeAskResult, SocialCompatibility, SocialNotice, SocialRepository, SocialShareRecipient, SocialTradeItem } from "./types";
+
+function matchItems(items: NativeCollectorMatch["trade"]["theyOwnYourWants"], side: "they" | "you"): SocialTradeItem[] {
+  return items.map((item) => ({
+    templateId: item.templateId,
+    name: item.name,
+    kind: "",
+    onYourWishlist: side === "they",
+    theyWantThis: side === "you",
+    openToTrade: item.openToTrade,
+  }));
+}
+
+function toCompatibility(match: NativeCollectorMatch): SocialCompatibility {
+  return {
+    score: match.compatibility.score,
+    source: "production",
+    reasons: match.compatibility.reasons
+      .filter((reason) => reason.count > 0)
+      .map((reason) => `${reason.code}:${reason.count}`),
+    theyOwnYourWants: matchItems(match.trade.theyOwnYourWants, "they"),
+    youOwnTheirWants: matchItems(match.trade.youOwnTheirWants, "you"),
+    reciprocal: match.trade.reciprocal,
+  };
+}
 
 export const productionRepository: SocialRepository = {
   kind: "production",
+  capabilities: LIVE_CAPABILITIES,
   viewerId() {
     return null;
   },
@@ -30,10 +64,34 @@ export const productionRepository: SocialRepository = {
     return loadFeed(cursor);
   },
   async loadSuggested() {
-    return [];
+    try {
+      const items = await loadCollectorDiscovery();
+      return items.map((item) => ({
+        user: {
+          userId: item.collector.userId,
+          handle: item.collector.handle,
+          displayName: item.collector.displayName,
+        },
+        score: item.compatibilityScore,
+        meta: `${item.compatibilityScore}% match`,
+        subtitle: item.reciprocal
+          ? "You may have something for each other."
+          : item.wishlistItemsOwnedCount
+            ? "Contains items from your wishlist"
+            : undefined,
+      }));
+    } catch {
+      return [];
+    }
   },
   async setPostLiked(postId, liked) {
     await setPostLiked(postId, liked);
+  },
+  async setPostReposted() {
+    return liveRepostResult();
+  },
+  async setPostSaved() {
+    return liveSaveResult();
   },
   loadPostComments,
   addPostComment,
@@ -84,23 +142,32 @@ export const productionRepository: SocialRepository = {
     return [...byUser.values()];
   },
   async loadCollector(userId) {
-    const [result, page] = await Promise.all([loadCollectorProfile(userId), loadCollectorPosts(userId)]);
+    const [result, page, tastes, match] = await Promise.all([
+      loadCollectorProfile(userId),
+      loadCollectorPosts(userId),
+      loadNativeOnboarding().catch(() => null),
+      loadCollectorMatch(userId).catch(() => null),
+    ]);
+    const groupIds = result.profile.profile.favoriteGroupIds ?? [];
+    const biasIds = result.profile.profile.biasMemberIds ?? [];
     return {
       user: result.profile.user,
       profile: {
         tagline: result.profile.profile.tagline,
         bio: result.profile.profile.bio,
         location: result.profile.profile.location,
+        collectorType: result.profile.profile.collectorType,
         collectorInterests: result.profile.profile.collectorInterests,
       },
       follow: result.follow,
-      groups: [],
-      biases: [],
+      groups: (tastes?.groups ?? []).filter((group) => groupIds.includes(group.id)).map((group) => ({ id: group.id, name: group.name })),
+      biases: (tastes?.members ?? []).filter((member) => biasIds.includes(member.id)).map((member) => ({ id: member.id, name: member.stageName })),
       eras: [],
       holdings: [],
-      holdingCount: result.profile.collectionSummary?.holdingCount ?? 0,
+      holdingCount: LIVE_CAPABILITIES.publicCollectionRows ? (result.profile.collectionSummary?.holdingCount ?? 0) : 0,
       wishlist: [],
       posts: page.items,
+      ...(match ? { compatibility: toCompatibility(match) } : {}),
       roomAvailable: result.profile.roomAvailable,
     };
   },
@@ -108,13 +175,36 @@ export const productionRepository: SocialRepository = {
     await setCollectorFollowing(userId, following);
   },
   loadCollectorPosts,
-  loadMyHoldings: () => loadMyHoldings(0, 100),
-  loadMyWishlist: () => loadMyWishlist(0, 100),
+  loadMyHoldings: (offset = 0, limit = 100) => loadMyHoldings(offset, limit),
+  loadMyWishlist: (offset = 0, limit = 100) => loadMyWishlist(offset, limit),
   setWishlist: setWishlistTemplate,
+  setHoldingTradeStatus: updateHoldingTradeStatus,
+  removeHolding,
   async loadFollowCounts() {
     const identity = await resolveNativeIdentity<NativeIdentity>();
     if (!identity?.user.id) return { followers: 0, followingCount: 0 };
     const result = await loadCollectorProfile(identity.user.id);
     return { followers: result.follow.followers, followingCount: result.follow.followingCount };
+  },
+  async loadNotices(): Promise<{ items: SocialNotice[]; persisted: boolean }> {
+    return { items: [], persisted: false };
+  },
+  async unreadNoticeCount() {
+    return 0;
+  },
+  async markNoticesRead() {
+    return;
+  },
+  async searchShareRecipients(query: string): Promise<SocialShareRecipient[]> {
+    const needle = query.trim();
+    if (!needle) return [];
+    return searchCollectors(needle);
+  },
+  async sendShare() {
+    return liveShareResult();
+  },
+  async askSeoully(question: string, locale: "en" | "ko", history: { role: "user" | "assistant"; content: string }[]): Promise<NativeAskResult> {
+    const payload = await askSeoullyNative({ locale, question, history, context: { surface: "home" } });
+    return { reply: payload.reply ?? "", cards: payload.cards ?? [] };
   },
 };

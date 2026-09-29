@@ -1,8 +1,9 @@
 import "server-only";
 
 import { z } from "zod";
-import { getCurrentIdentity } from "@/server/dal/profile";
+import { getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/profile";
 import { createSupabaseServerClient } from "@/server/supabase/server";
+import { requestSupabaseClient } from "@/server/supabase/request-client";
 
 const uuid = z.string().uuid();
 const pageSchema = z.object({ limit: z.number().int().min(1).max(500).default(25), offset: z.number().int().min(0).max(10_000).default(0) }).strict();
@@ -18,6 +19,12 @@ export interface WishlistItemResult { entryId: string; templateId: string; templ
 export interface CoverageResult { knownToSeoully: number; ownedKnown: number; missingKnown: string[]; ownedKnownIds: string[]; }
 
 async function identityAndClient() {
+  const stored = requestSupabaseClient();
+  if (stored) {
+    const identity = await getCurrentIdentityFromClient(stored);
+    if (!identity) throw new Error("unauthenticated");
+    return { identity, supabase: stored };
+  }
   const identity = await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
   return { identity, supabase: await createSupabaseServerClient() };

@@ -17,5 +17,20 @@ export function useSocialRepository(): SocialRepository {
   return useMemo(() => (demo ? demoRepository() : productionRepository), [demo]);
 }
 
+export { DEMO_CAPABILITIES, LIVE_CAPABILITIES, type SocialCapabilities } from "./capabilities";
 export { DataModeProvider, isDemoWorldAllowed, useDataMode } from "./mode";
-export type { FeedMode, SocialCollector, SocialEntity, SocialRepository, SocialSuggested } from "./types";
+export type {
+  FeedMode,
+  NativeAskCard,
+  NativeAskResult,
+  SocialCollector,
+  SocialCompatibility,
+  SocialEntity,
+  SocialNotice,
+  SocialRepository,
+  SocialShareRecipient,
+  SocialShareResult,
+  SocialSuggested,
+  SocialTheme,
+  SocialTradeItem,
+} from "./types";

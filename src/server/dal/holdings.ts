@@ -116,11 +116,11 @@ export async function setMyHoldingTradeStatus(input: unknown, client?: SupabaseC
   return result;
 }
 
-export async function removeMyHolding(input: unknown): Promise<{ removed: boolean }> {
+export async function removeMyHolding(input: unknown, client?: SupabaseClient): Promise<{ removed: boolean }> {
   const { holdingId } = holdingIdSchema.parse(input);
-  const identity = await getCurrentIdentity();
+  const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("holdings")
     .delete()

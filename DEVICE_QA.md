@@ -197,19 +197,95 @@ Check on the physical iPhone:
 - Default in Expo Go / `__DEV__`: Demo **on** unless SecureStore `seoully.mobile.demo-world.v1` is `"0"`
 - Switch to Live: tap **Demo** in the header until it reads **Live**
 - Switch back to Demo: tap **Live** until it reads **Demo**
-- Demo mutations (like, comment, follow, wishlist) persist until Metro reload
-- Production writes are blocked while Demo is on
+- Demo mutations (like, comment, repost, follow, wishlist) persist until Metro reload
+- Production collection/profile writes are blocked while Demo is on. Sign out is real auth.
+
+### Exact iPhone test sequence — Expansion 02 (historical)
+
+The following sequence was the Expansion 02 ask. Item 9 is **superseded** by the calibration pass (Profile actions are now shown in Demo).
+
+1. Cold launch Expo Go on `mobile-native`. Confirm the header chip reads **Demo**.
+2. Open **Feed**. Confirm Discover shows Minji’s inhabited posts with avatars, media, captions, likes, comments, repost, share.
+3. Like a post. Confirm the heart and count change. Open comments, add one, confirm it appears.
+4. Tap Minji’s identity. Confirm Collector Profile answers *who is this collector?*
+5. Confirm **Enter Room** is the spatial CTA and does **not** open a production Room for Minji.
+6. Open **Search**. Confirm destinations feel like discovering Seoully.
+7. Save a collectible to wishlist in Search. Confirm it does not hit production.
+8. On Feed, switch **Following**. It should be empty until you followed Minji.
+9. Open **Profile**. Confirm you are SOOMIN. Confirm Edit / Add / Sign out / Enter Room are present.
+10. Tap **Demo** → **Live**. Confirm production data, not fixtures.
+
+## Physical iPhone — Calibration correction + system integrity
+
+- Date: 2026-09-28
+- Branch: `mobile-native`
+- Parent: Expansion 02 HEAD `bdde759`
+- Status: **CODE COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL**
+- Ignore the blue Expo Go floating gear. It is not Seoully.
 
 ### Exact iPhone test sequence
 
-1. Cold launch Expo Go on `mobile-native`. Confirm the header chip reads **Demo**.
-2. Open **Feed**. Confirm Discover shows Minji’s inhabited posts (concert, haul, Seoul, unbox) with avatars, media, captions, likes, comments.
-3. Like a post. Confirm the heart and count change. Open comments, add one, confirm it appears.
-4. Tap Minji’s identity. Confirm Collector Profile answers *who is this collector?* — avatar, bio, groups/biases, compatibility, owned/wishlist, posts. Follow, then unfollow, confirm the button/count change.
-5. Confirm **Enter Room** is the spatial CTA and does **not** open a production Room for Minji. Confirm **Message** explains it is blocked.
-6. Open **Search**. Confirm destinations feel like discovering Seoully, not picking database tables. Search `minji` in People, `IVE` or `concert` in Posts, `SWITCH` in Collectibles, a group in Groups & Members.
-7. Save a collectible to wishlist in Search. Confirm it does not hit production. Check Profile wishlist.
-8. On Feed, switch **Following**. It should be empty until you followed Minji; after follow, Minji’s posts appear.
-9. Open **Profile**. Confirm you are SOOMIN in Demo, with fixture collection/posts. Confirm Edit / Add / Enter Room are not offered (those are Live production paths).
-10. Tap **Demo** → **Live**. Confirm Feed/Search/Profile return to the signed-in production account and empty production social graph is honest, not filled with fixtures.
-11. Reject if Feed/Search/Collector still feel like generic React Native lists, or if Demo content appears after switching to Live.
+1. Cold launch Expo Go. Confirm Demo. Confirm the Seoully wordmark is fully visible below the Dynamic Island / status bar, not clipped.
+2. Confirm the bottom nav: home/search/plus/chat/profile shapes match web; Create is the smaller raised lilac plus; active tab is a soft lilac square, not a generic fill.
+3. Open **Feed** Discover. Confirm suggested collectors are cream cards with a `% match` pill, then Following / Discover **underline** tabs, then posts.
+4. On a post: handle is the name (not display name), date is to the right, media is 4:3 rounded, then like / comment / repost / share. Concert fixture shows a play overlay. Caption is `handle  body`. If comments exist, **View comments** appears.
+5. Like, comment, repost (flash), share (system share sheet). Confirm Demo does not write production.
+6. Switch Following. Empty until Minji is followed from her profile.
+7. Open **Profile**. Confirm a darker room-synced field behind identity (Soomin), collection cream cards with object colorways, and the four actions: Edit Profile, Add to collection, Sign out, Enter Room.
+8. Tap Edit Profile. Confirm Soomin’s identity. Save must explain Demo cannot write Live. Sign out still signs out of the real session.
+9. Tap Add to collection, attempt a write, confirm the Demo intercept. Tap Enter Room, confirm it does **not** open a production Room.
+10. Switch **Live**. Confirm Feed suggested people (if the session has discovery candidates) come from production discovery, not Minji. Confirm own Profile actions hit production paths. Confirm collector profiles do **not** invent a compatibility score.
+
+Reject if the shell/feed/profile still read as a generic React Native app, if Demo hides product actions, or if Live shows fixture collectors.
+
+## Physical iPhone — Profile + collection graph correction
+
+- Date: 2026-09-28
+- Branch: `mobile-native`
+- Parent: Expansion 02 HEAD `bdde759` plus uncommitted calibration work (do not reset)
+- Status: **CODE COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL**
+- Ignore the blue Expo Go floating gear. It is not Seoully.
+- Do not approve from TypeScript, Expo Doctor, or Metro export.
+
+### Exact iPhone QA sequence
+
+1. Cold launch Expo Go on `mobile-native`. Confirm **Demo**.
+2. Open **Profile** (SOOMIN). Confirm there are **no** floating fake collectible rectangles behind identity. Background should be a quiet themed mist, not a pretend Room.
+3. Confirm identity text, avatar, and buttons are fully readable (not faded). The surface may feel slightly translucent; children must not be at 85% opacity.
+4. Confirm the three actions **Edit Profile**, **Add to collection**, **Sign out** are visually centered, same height, no ugly cramped type. **Enter Room** is the full-width spatial CTA below them.
+5. Expand **Posts**. Confirm they are full Seoully posts (avatar, handle, date, media, like/comment/repost/share, caption, View comments) — not tiny summary rows.
+6. Expand **Owned**. Confirm real fixture objects. Toggle **Open to trade** / **Not for trade** on one item and confirm the label changes. Tap **Remove** on a copy you can restore by reloading Metro. Confirm this does not hit production.
+7. Expand **Wishlist**. Confirm Soomin’s wants. Remove one locally. Reload Metro to restore fixtures if needed.
+8. From Feed or Search, open **Minji**. Confirm **65% match** and shared reasons from the canonical domain engine.
+9. Expand **Potential trade match**. Confirm **You want** (5) and **They want** (4) are real collectibles, not invented names. Confirm open-to-trade labels where Minji’s chase card is open.
+10. Tap **Message about trade**. Confirm an honest blocked notice. Do not expect a production DM thread.
+11. Switch header **Demo → Live**. Open a real collector. Confirm there is **no invented 65%**. If a match appears, it came from the production pair route. If it does not, that is the honest state.
+12. Live own Profile: confirm Owned trade toggle hits production (session required). Confirm posts still use the full post presentation.
+
+Reject if fake Room objects remain, if own posts are still summary rows, if Minji lacks You want / They want, or if Live invents fixture compatibility.
+
+## Physical iPhone — Global companion + communication shell
+
+- Date: 2026-09-28
+- Branch: `mobile-native`
+- Parent: Expansion 02 HEAD `bdde759` plus uncommitted calibration and Profile/collection-graph work (do not reset)
+- Status: **CODE COMPLETE — AWAITING PHYSICAL DEVICE VISUAL APPROVAL**
+- Ignore the blue Expo Go floating gear. It is not Seoully.
+- Do not approve from TypeScript, Expo Doctor, or Metro export.
+- Do not apply `20261001000000_direct_messages.sql` or `20261002000000_native_room_theme.sql`.
+
+### Exact iPhone QA sequence
+
+1. Cold launch Expo Go on `mobile-native`. Confirm **Demo**.
+2. Confirm the **Seoully** wordmark and adjacent heart share a visual centerline on Feed. The heart must not sit visibly lower than the text. Confirm top safe-area spacing and no clipping.
+3. Confirm the same wordmark treatment on Search, Create, Messages, Profile, and nested screens that use the global header.
+4. Confirm the Seoully heart companion sits near the bottom-right, above the tab bar and home indicator. It should bounce quietly unless Reduce Motion is on.
+5. Tap the companion. Confirm **Ask Seoully** opens. Ask “What’s on my wishlist?” Confirm a real fixture answer and cards, not a decorative empty heart.
+6. Confirm the companion survives tab changes (Feed → Search → Profile).
+7. Confirm the notification bell is in the header. Confirm a real Demo unread badge. Open the list. Confirm Minji like/comment/follow/trade/activity notices. Tap a row and land on Minji’s collector profile.
+8. On a Feed post: Like changes the heart and count. Comment create/read/count works. Repost flashes local Demo state.
+9. Tap **Share**. Confirm Seoully **Send to** opens (post preview + “Search who to send to…”). It must not jump straight to the iOS share sheet.
+10. Search **Minji**, select her, confirm Demo reports a local send. Confirm this does not write production.
+11. Switch **Demo → Live**. Confirm the companion still opens Ask Seoully against production tools (session required). Confirm the bell has **no fake production notices**. Confirm Share still opens Send to, and sending stops with an honest messaging-unavailable notice. Confirm Like/Comment still hit production. Confirm Repost does not claim a production save.
+
+Reject if the heart is decorative-only, if Share opens the system sheet first, if Live claims a message was sent, or if Live invents notification rows.

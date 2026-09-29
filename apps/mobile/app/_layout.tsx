@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { View } from "react-native";
 import { Stack } from "expo-router";
 import * as Linking from "expo-linking";
 import { StatusBar } from "expo-status-bar";
@@ -7,6 +8,7 @@ import { FontProvider } from "../src/fonts";
 import { DataModeProvider } from "../src/data";
 import { LocaleProvider } from "../src/locale";
 import { supabase } from "../src/supabase";
+import { SeoullyCompanion } from "../src/ui/SeoullyCompanion";
 
 export default function RootLayout() {
   useEffect(() => {
@@ -28,7 +30,10 @@ export default function RootLayout() {
         <DataModeProvider>
           <FontProvider>
             <StatusBar style="dark" />
-            <Stack screenOptions={{ headerShown: false, animation: "fade" }} />
+            <View style={{ flex: 1 }}>
+              <Stack screenOptions={{ headerShown: false, animation: "fade" }} />
+              <SeoullyCompanion />
+            </View>
           </FontProvider>
         </DataModeProvider>
       </LocaleProvider>

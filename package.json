@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "check:fixtures": "tsc --project tsconfig.check-fixtures.json && node -r ./scripts/register-build-alias.cjs .tmp/build/scripts/check-fixtures.js"
+    "check:fixtures": "tsc --project tsconfig.check-fixtures.json && node -r ./scripts/register-build-alias.cjs .tmp/build/scripts/check-fixtures.js",
+    "check:slice1": "tsc --project tsconfig.check-slice1.json && node .tmp/build/scripts/check-slice1.js",
+    "mobile:verify": "node scripts/mobile-verify.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

@@ -3,7 +3,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import { Image, ScrollView, StyleSheet, View } from "react-native";
-import { loadMyHolding, updateHoldingTradeStatus, uploadHoldingPhoto, type NativeHolding } from "../src/api";
+import { loadMyHolding, uploadHoldingPhoto, type NativeHolding } from "../src/api";
 import { useSocialRepository } from "../src/data";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
@@ -33,7 +33,14 @@ export default function CollectibleDetailScreen() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const item = holdingId ? await loadMyHolding(holdingId) : null;
+      let item: NativeHolding | null = null;
+      if (holdingId) {
+        if (social.kind === "demo") {
+          item = (await social.loadMyHoldings(0, 100)).find((holding) => holding.id === holdingId) ?? null;
+        } else {
+          item = await loadMyHolding(holdingId);
+        }
+      }
       setHolding(item);
       setError(item ? null : copy.collectibleUnavailable);
     } catch {
@@ -41,7 +48,7 @@ export default function CollectibleDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [copy.collectibleUnavailable, holdingId]);
+  }, [copy.collectibleUnavailable, holdingId, social]);
   useEffect(() => {
     const task = setTimeout(() => { void refresh(); }, 0);
     return () => clearTimeout(task);
@@ -91,11 +98,10 @@ export default function CollectibleDetailScreen() {
   }
 
   async function toggleTrade() {
-    if (social.kind === "demo") { setError(copy.demoWriteBlocked); return; }
     if (!holding || busy) return;
     setBusy(true);
     try {
-      setHolding(await updateHoldingTradeStatus(holding.id, holding.tradeStatus === "for-trade" ? "not-for-trade" : "for-trade"));
+      setHolding(await social.setHoldingTradeStatus(holding.id, holding.tradeStatus === "for-trade" ? "not-for-trade" : "for-trade"));
       setError(null);
     } catch {
       setError(copy.collectionUnavailable);

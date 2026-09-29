@@ -3,6 +3,13 @@
  * Pastel is accent, not a wash. Existing `colors` / `spacing` keys stay so
  * other screens keep compiling while Feed and chrome adopt the social system.
  */
+/**
+ * Web `--s-profile-veil` on `.social-background`. Profile UI stays fully
+ * opaque; only this underlay compositing is translucent so the Room shows
+ * through. Do not apply this to text, images, or buttons.
+ */
+export const PROFILE_VEIL = 0.85;
+
 export const colors = {
   ink: "#2c2e4c",
   muted: "#8a7380",
@@ -25,6 +32,7 @@ export const colors = {
   action: "#c45374",
   onPrimary: "#ffffff",
   media: "#1a1620",
+  repost: "#3d8f6e",
 } as const;
 
 export const spacing = {
@@ -85,6 +93,7 @@ export const sizes = {
   create: 42,
   topBar: 52,
   tabBar: 58,
+  companion: 44,
   control: 44,
   mediaRadius: 14,
 } as const;
@@ -92,9 +101,9 @@ export const sizes = {
 export const elevation = {
   card: {
     shadowColor: "#2c2e4c",
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.05,
-    shadowRadius: 10,
+    shadowRadius: 18,
     elevation: 2,
   },
   raise: {

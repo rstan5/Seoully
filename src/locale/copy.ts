@@ -1,4 +1,4 @@
-import type { CollectionCompatibility, CollectibleKind, CollectorInterest, Condition, Notice, Rarity, TradeStatus, ZoneKind } from "@/domain/types";
+import type { CollectionCompatibility, CollectibleKind, CollectorInterest, Condition, Notice, Rarity, TradeStatus, ZoneKind } from "../domain/types";
 import { en, type MessageKey } from "./en";
 import type { Translate } from "./translate";
 

@@ -1,8 +1,10 @@
 import "server-only";
 
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/server/supabase/server";
-import { getCurrentIdentity } from "@/server/dal/profile";
+import { requestSupabaseClient } from "@/server/supabase/request-client";
+import { getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/profile";
 
 const uuid = z.string().uuid();
 const holdingSchema = z.object({
@@ -39,12 +41,12 @@ export type PairHolding = z.infer<typeof holdingSchema>;
 export type PairPerson = z.infer<typeof personSchema>;
 export type PairSnapshot = z.infer<typeof snapshotSchema>;
 
-export async function getCollectionPairSnapshot(targetUserId: string): Promise<PairSnapshot> {
+export async function getCollectionPairSnapshot(targetUserId: string, client?: SupabaseClient): Promise<PairSnapshot> {
   const parsedTarget = uuid.parse(targetUserId);
-  const identity = await getCurrentIdentity();
+  const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
   if (identity.user.id === parsedTarget) throw new Error("same_collector");
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? requestSupabaseClient() ?? await createSupabaseServerClient();
   const { data, error } = await supabase.rpc("graph_pair_snapshot", { p_target_user_id: parsedTarget });
   if (error) throw new Error("graph_pair_read_failed");
   const snapshot = snapshotSchema.parse(data);

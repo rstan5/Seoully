@@ -1,4 +1,4 @@
-import { computeCompatibility } from "seoully-domain/compatibility";
+import { computeCompatibility, sharedInterestCount } from "seoully-domain/compatibility";
 import {
   COLLECTIBLE_TEMPLATES,
   ERA_BY_ID,
@@ -13,15 +13,18 @@ import {
   FOLLOWS,
   HOLDINGS_FIXTURE,
   PROFILES,
+  ROOMS,
   SOO,
   USERS,
   WISHLIST,
 } from "seoully-domain/fixtures/collectors";
-import { POST_COMMENTS, POST_LIKES, POSTS } from "seoully-domain/fixtures/social";
-import type { CollectibleTemplate, Follow, Holding, PostComment, PostLike, UserId, WishlistItem } from "seoully-domain/types";
+import { POST_COMMENTS, POST_LIKES, POSTS, NOTICES } from "seoully-domain/fixtures/social";
+import { resolveProfileTheme } from "seoully-domain/profile-theme";
+import type { CollectibleTemplate, Follow, Holding, Notice, Post, PostComment, PostLike, UserId, WishlistItem } from "seoully-domain/types";
 import type { NativeCatalogTemplate, NativeFeedPost, NativeHolding, NativeIdentity, NativeWishlistEntry } from "../../api";
+import { DEMO_CAPABILITIES } from "../capabilities";
 import { isDemoWorldAllowed } from "../mode";
-import type { FeedMode, SocialCollector, SocialRepository, SocialSuggested } from "../types";
+import type { FeedMode, NativeAskResult, SocialCollector, SocialNotice, SocialRepository, SocialShareRecipient, SocialSuggested, SocialTradeItem } from "../types";
 import { demoAssetUri } from "./assets";
 
 const VIEWER = SOO;
@@ -55,15 +58,21 @@ function nativeTemplate(template: CollectibleTemplate): NativeCatalogTemplate {
     groupName: GROUP_BY_ID.get(template.groupId)?.name ?? "",
     memberName: template.memberId ? MEMBER_BY_ID.get(template.memberId)?.stageName ?? null : null,
     releaseName: template.releaseId ? RELEASE_BY_ID.get(template.releaseId)?.title ?? null : null,
+    colorway: template.colorway,
   };
 }
 
 export class DemoSocialRepository implements SocialRepository {
   kind = "demo" as const;
+  capabilities = DEMO_CAPABILITIES;
   private follows: Follow[];
   private likes: PostLike[];
   private comments: PostComment[];
   private wishlist: WishlistItem[];
+  private holdings: Holding[];
+  private notices: Notice[];
+  private shares: { postId: string; peerUserId: string; body: string; createdAt: string }[] = [];
+  private reposts = new Set<string>();
   private commentSerial = 100;
 
   constructor() {
@@ -71,6 +80,8 @@ export class DemoSocialRepository implements SocialRepository {
     this.likes = copy(POST_LIKES);
     this.comments = copy(POST_COMMENTS);
     this.wishlist = copy(WISHLIST);
+    this.holdings = copy(HOLDINGS_FIXTURE);
+    this.notices = copy(NOTICES);
   }
 
   viewerId() {
@@ -100,8 +111,9 @@ export class DemoSocialRepository implements SocialRepository {
     const following = new Set(this.followingIds(VIEWER));
     const items = POSTS
       .filter((post) => {
-        if (mode === "following") return post.authorId === VIEWER || following.has(post.authorId);
-        return post.authorId !== VIEWER && !following.has(post.authorId);
+        if (post.authorId === VIEWER) return false;
+        const friend = following.has(post.authorId);
+        return mode === "following" ? friend : !friend;
       })
       .map((post) => this.toPost(post.id))
       .filter((post): post is NativeFeedPost => post !== null)
@@ -112,10 +124,19 @@ export class DemoSocialRepository implements SocialRepository {
   async loadSuggested(): Promise<SocialSuggested[]> {
     return USERS.filter((user) => user.id !== VIEWER).map((user) => {
       const compat = this.compatibility(VIEWER, user.id);
+      const following = this.follows.some((follow) => follow.followerId === VIEWER && follow.followeeId === user.id);
+      const parts: string[] = [];
+      if (compat) {
+        const shared = sharedInterestCount(compat);
+        if (shared > 0) parts.push(`${shared} in common`);
+        if (compat.potentialTradeMatches.length > 0) parts.push(`${compat.potentialTradeMatches.length} to trade`);
+      }
+      if (following) parts.push("Following");
       return {
         user: { userId: user.id, handle: user.handle, displayName: user.displayName },
         score: compat?.score ?? 0,
         meta: compat ? `${compat.score}% match` : user.handle,
+        subtitle: parts.join(" · ") || undefined,
         avatarUrl: demoAssetUri(PROFILES.find((profile) => profile.userId === user.id)?.avatarUrl),
       };
     });
@@ -124,6 +145,20 @@ export class DemoSocialRepository implements SocialRepository {
   async setPostLiked(postId: string, liked: boolean) {
     this.likes = this.likes.filter((like) => !(like.postId === postId && like.userId === VIEWER));
     if (liked) this.likes.push({ postId: postId as PostLike["postId"], userId: VIEWER });
+  }
+
+  async setPostReposted(postId: string, reposted: boolean) {
+    if (reposted) this.reposts.add(postId);
+    else this.reposts.delete(postId);
+    return { persisted: true };
+  }
+
+  async setPostSaved(postId: string, saved: boolean) {
+    const post = POSTS.find((item) => item.id === postId);
+    const origin = post?.repostOf ? POSTS.find((item) => item.id === post.repostOf) ?? post : post;
+    const templateIds = [...new Set([...(origin?.templateIds ?? []), ...(origin?.taggedTemplateIds ?? [])])];
+    for (const templateId of templateIds) await this.setWishlist(templateId, saved);
+    return { persisted: true };
   }
 
   async loadPostComments(postId: string) {
@@ -211,7 +246,7 @@ export class DemoSocialRepository implements SocialRepository {
         roomId: profile?.roomId ?? person.userId,
         collector: person,
         rankScore: compat?.score ?? 0,
-        displayedHoldingCount: HOLDINGS_FIXTURE.filter((holding) => holding.ownerId === person.userId).length,
+        displayedHoldingCount: this.holdings.filter((holding) => holding.ownerId === person.userId).length,
         relevantDisplayedCount: 0,
         reasons: compat?.theyOwnYourWants.length ? [{ code: "wishlist" as const, label: "Contains items from your wishlist" }] : [],
       };
@@ -248,8 +283,18 @@ export class DemoSocialRepository implements SocialRepository {
       holdingCount: holdings.length,
       wishlist,
       posts,
-      ...(compat ? { compatibility: { score: compat.score, reasons: compat.reasons } } : {}),
-      roomAvailable: false,
+      ...(compat ? {
+        compatibility: {
+          score: compat.score,
+          source: "domain" as const,
+          reasons: compat.reasons,
+          theyOwnYourWants: this.tradeItems(compat.theyOwnYourWants, userId, compat.theyOwnYourWants, compat.youOwnTheirWants),
+          youOwnTheirWants: this.tradeItems(compat.youOwnTheirWants, VIEWER, compat.theyOwnYourWants, compat.youOwnTheirWants),
+          reciprocal: compat.theyOwnYourWants.length > 0 && compat.youOwnTheirWants.length > 0,
+        },
+      } : {}),
+      roomAvailable: ROOMS.some((room) => room.ownerId === userId),
+      theme: this.themeFor(profile),
     };
   }
 
@@ -263,12 +308,12 @@ export class DemoSocialRepository implements SocialRepository {
     return { items, nextCursor: null };
   }
 
-  async loadMyHoldings() {
-    return this.holdingsFor(VIEWER);
+  async loadMyHoldings(offset = 0, limit = 100) {
+    return this.holdingsFor(VIEWER).slice(offset, offset + limit);
   }
 
-  async loadMyWishlist() {
-    return this.wishlistFor(VIEWER);
+  async loadMyWishlist(offset = 0, limit = 100) {
+    return this.wishlistFor(VIEWER).slice(offset, offset + limit);
   }
 
   async setWishlist(templateId: string, wanted: boolean) {
@@ -283,6 +328,19 @@ export class DemoSocialRepository implements SocialRepository {
     }
   }
 
+  async setHoldingTradeStatus(holdingId: string, tradeStatus: NativeHolding["tradeStatus"]) {
+    const holding = this.holdings.find((item) => item.id === holdingId && item.ownerId === VIEWER);
+    if (!holding) throw new Error("holding_not_found");
+    holding.tradeStatus = tradeStatus;
+    const native = this.holdingsFor(VIEWER).find((item) => item.id === holdingId);
+    if (!native) throw new Error("holding_not_found");
+    return native;
+  }
+
+  async removeHolding(holdingId: string) {
+    this.holdings = this.holdings.filter((item) => !(item.id === holdingId && item.ownerId === VIEWER));
+  }
+
   async loadFollowCounts() {
     return {
       followers: this.follows.filter((follow) => follow.followeeId === VIEWER).length,
@@ -290,12 +348,61 @@ export class DemoSocialRepository implements SocialRepository {
     };
   }
 
+  async loadNotices(): Promise<{ items: SocialNotice[]; persisted: boolean }> {
+    return {
+      items: this.notices.filter((notice) => notice.recipientId === VIEWER).map((notice) => this.toNotice(notice)),
+      persisted: true,
+    };
+  }
+
+  async unreadNoticeCount() {
+    return this.notices.filter((notice) => notice.recipientId === VIEWER && !notice.read).length;
+  }
+
+  async markNoticesRead() {
+    for (const notice of this.notices) {
+      if (notice.recipientId === VIEWER) notice.read = true;
+    }
+  }
+
+  async searchShareRecipients(query: string): Promise<SocialShareRecipient[]> {
+    const q = needle(query);
+    return USERS.filter((user) => {
+      if (user.id === VIEWER) return false;
+      if (!q) return true;
+      const profile = PROFILES.find((item) => item.userId === user.id);
+      return matches(user.handle, q) || matches(user.displayName, q) || matches(profile?.tagline, q);
+    }).map((user) => ({
+      userId: user.id,
+      handle: user.handle,
+      displayName: user.displayName,
+      ...(demoAssetUri(PROFILES.find((profile) => profile.userId === user.id)?.avatarUrl)
+        ? { avatarUrl: demoAssetUri(PROFILES.find((profile) => profile.userId === user.id)?.avatarUrl) }
+        : {}),
+    }));
+  }
+
+  async sendShare(postId: string, peerUserId: string, body: string) {
+    this.shares.push({ postId, peerUserId, body, createdAt: new Date().toISOString() });
+    return { delivered: true };
+  }
+
+  listDemoShares() {
+    return [...this.shares];
+  }
+
+  async askSeoully(question: string, locale: "en" | "ko", history: { role: "user" | "assistant"; content: string }[]): Promise<NativeAskResult> {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { askDemo } = require("./ask") as typeof import("./ask");
+    return askDemo(question, locale, history);
+  }
+
   private followingIds(userId: string) {
     return this.follows.filter((follow) => follow.followerId === userId).map((follow) => follow.followeeId);
   }
 
   private holdingsFor(userId: string): NativeHolding[] {
-    return HOLDINGS_FIXTURE.filter((holding) => holding.ownerId === userId).flatMap((holding) => {
+    return this.holdings.filter((holding) => holding.ownerId === userId).flatMap((holding) => {
       const template = TEMPLATE_BY_ID.get(holding.templateId);
       if (!template) return [];
       return [{
@@ -303,6 +410,7 @@ export class DemoSocialRepository implements SocialRepository {
         templateId: holding.templateId,
         acquiredAt: holding.acquisition.acquiredAt,
         tradeStatus: tradeStatus(holding.tradeStatus),
+        ...(holding.personalMediaUrl ? { personalMediaUrl: demoAssetUri(holding.personalMediaUrl) } : {}),
         template: nativeTemplate(template),
       }];
     });
@@ -324,7 +432,7 @@ export class DemoSocialRepository implements SocialRepository {
     return computeCompatibility(
       {
         userId: viewerId as UserId,
-        holdings: HOLDINGS_FIXTURE.filter((holding) => holding.ownerId === viewerId),
+        holdings: this.holdings.filter((holding) => holding.ownerId === viewerId),
         wishlist: this.wishlist.filter((item) => item.userId === viewerId),
         favoriteGroupIds: viewer.favoriteGroupIds,
         biasMemberIds: viewer.biasMemberIds,
@@ -333,7 +441,7 @@ export class DemoSocialRepository implements SocialRepository {
       },
       {
         userId: otherId as UserId,
-        holdings: HOLDINGS_FIXTURE.filter((holding) => holding.ownerId === otherId),
+        holdings: this.holdings.filter((holding) => holding.ownerId === otherId),
         wishlist: this.wishlist.filter((item) => item.userId === otherId),
         favoriteGroupIds: other.favoriteGroupIds,
         biasMemberIds: other.biasMemberIds,
@@ -349,6 +457,36 @@ export class DemoSocialRepository implements SocialRepository {
     );
   }
 
+  private tradeItems(
+    templateIds: string[],
+    ownerId: string,
+    theyOwnYourWants: string[],
+    youOwnTheirWants: string[],
+  ): SocialTradeItem[] {
+    const theyWant = new Set(theyOwnYourWants);
+    const youHave = new Set(youOwnTheirWants);
+    return templateIds.flatMap((templateId) => {
+      const template = TEMPLATE_BY_ID.get(templateId as CollectibleTemplate["id"]);
+      if (!template) return [];
+      const openToTrade = this.holdings.some((holding) => (
+        holding.ownerId === ownerId
+        && holding.templateId === templateId
+        && holding.tradeStatus !== "not-for-trade"
+      ));
+      return [{
+        templateId,
+        name: template.name,
+        kind: template.kind,
+        groupName: GROUP_BY_ID.get(template.groupId)?.name,
+        memberName: template.memberId ? MEMBER_BY_ID.get(template.memberId)?.stageName ?? null : null,
+        colorway: template.colorway,
+        onYourWishlist: theyWant.has(templateId),
+        theyWantThis: youHave.has(templateId),
+        openToTrade,
+      }];
+    });
+  }
+
   private profileNames(userId: string) {
     const profile = PROFILES.find((item) => item.userId === userId);
     if (!profile) return [];
@@ -359,30 +497,69 @@ export class DemoSocialRepository implements SocialRepository {
     ].filter((name): name is string => Boolean(name));
   }
 
+  private themeFor(profile: (typeof PROFILES)[number]) {
+    const room = ROOMS.find((item) => item.id === profile.roomId);
+    const tokens = resolveProfileTheme(profile.appearance, room);
+    return {
+      scheme: tokens.scheme,
+      paper: tokens.paper,
+      mist: tokens.mist,
+      ink: tokens.ink,
+      mute: tokens.mute,
+      line: tokens.line,
+      primary: tokens.primary,
+      primaryDeep: tokens.primaryDeep,
+      primarySoft: tokens.primarySoft,
+      action: tokens.action,
+      cream: tokens.tint,
+    };
+  }
+
+  private originOf(post: Post): Post {
+    if (!post.repostOf) return post;
+    return POSTS.find((item) => item.id === post.repostOf) ?? post;
+  }
+
   private toPost(postId: string): NativeFeedPost | null {
     const post = POSTS.find((item) => item.id === postId);
     const author = USERS.find((user) => user.id === post?.authorId);
     if (!post || !author) return null;
-    const taggedUsers = (post.taggedUserIds ?? []).flatMap((id) => {
+    const origin = this.originOf(post);
+    const originAuthor = USERS.find((user) => user.id === origin.authorId) ?? author;
+    const taggedUsers = (origin.taggedUserIds ?? []).flatMap((id) => {
       const user = USERS.find((item) => item.id === id);
       return user ? [{ userId: user.id, displayName: user.displayName, handle: user.handle }] : [];
     });
-    const taggedCollectibles = post.templateIds.flatMap((id) => {
+    const taggedCollectibles = [...origin.templateIds, ...(origin.taggedTemplateIds ?? [])].flatMap((id) => {
       const template = TEMPLATE_BY_ID.get(id);
-      return template ? [{ templateId: template.id, name: template.name, kind: template.kind }] : [];
+      return template ? [{
+        templateId: template.id,
+        name: template.name,
+        kind: template.kind,
+        colorway: template.colorway,
+      }] : [];
     });
+    const savedByMe = taggedCollectibles.length > 0
+      && taggedCollectibles.every((tag) => this.wishlist.some((item) => item.userId === VIEWER && item.templateId === tag.templateId));
     return {
       id: post.id,
-      caption: post.body,
+      caption: origin.body,
       createdAt: post.createdAt,
-      location: post.location,
+      location: post.repostOf ? undefined : post.location,
       author: { userId: author.id, displayName: author.displayName, handle: author.handle },
-      likeCount: this.likes.filter((like) => like.postId === post.id).length,
-      commentCount: this.comments.filter((comment) => comment.postId === post.id).length,
-      likedByMe: this.likes.some((like) => like.postId === post.id && like.userId === VIEWER),
-      media: (post.media ?? []).flatMap((media) => {
+      likeCount: this.likes.filter((like) => like.postId === origin.id).length,
+      commentCount: this.comments.filter((comment) => comment.postId === origin.id).length,
+      likedByMe: this.likes.some((like) => like.postId === origin.id && like.userId === VIEWER),
+      repostedByMe: this.reposts.has(origin.id),
+      savedByMe,
+      ...(post.repostOf ? { repostOf: post.repostOf, originAuthor: { userId: originAuthor.id, displayName: originAuthor.displayName, handle: originAuthor.handle } } : {}),
+      media: (origin.media ?? []).flatMap((media) => {
         const url = demoAssetUri(media.kind === "video" ? media.poster ?? media.url : media.url);
-        return url ? [{ url, mediaType: "image" }] : [];
+        return url ? [{
+          url,
+          mediaType: media.kind === "video" ? "video" : "image",
+          ...(media.kind === "video" && media.duration ? { duration: media.duration } : {}),
+        }] : [];
       }),
       ...(demoAssetUri(PROFILES.find((profile) => profile.userId === author.id)?.avatarUrl)
         ? { authorAvatarUrl: demoAssetUri(PROFILES.find((profile) => profile.userId === author.id)?.avatarUrl) }
@@ -400,6 +577,26 @@ export class DemoSocialRepository implements SocialRepository {
       body: comment.body,
       createdAt: comment.createdAt,
       author: { userId: author.id, displayName: author.displayName, handle: author.handle },
+    };
+  }
+
+  private toNotice(notice: Notice): SocialNotice {
+    const actor = USERS.find((user) => user.id === notice.actorId) ?? USERS[0]!;
+    const avatarUrl = demoAssetUri(PROFILES.find((profile) => profile.userId === actor.id)?.avatarUrl);
+    return {
+      id: notice.id,
+      kind: notice.kind,
+      actor: {
+        userId: actor.id,
+        handle: actor.handle,
+        displayName: actor.displayName,
+        ...(avatarUrl ? { avatarUrl } : {}),
+      },
+      headline: notice.headline,
+      createdAt: notice.createdAt,
+      read: Boolean(notice.read),
+      ...(notice.postId ? { postId: notice.postId } : {}),
+      ...(notice.templateIds ? { templateIds: [...notice.templateIds] } : {}),
     };
   }
 }

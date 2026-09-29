@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { resolveNativeIdentity, updateNativeProfile, type NativeIdentity } from "../src/api";
+import { updateNativeProfile, type NativeIdentity } from "../src/api";
 import { useSocialRepository } from "../src/data";
 import { KeyboardScreen } from "../src/components/KeyboardScreen";
 import { RetryNotice } from "../src/components/RetryNotice";
@@ -32,7 +32,7 @@ export default function EditProfileScreen() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const next = await resolveNativeIdentity<NativeIdentity>();
+      const next = await social.loadIdentity();
       if (!next?.user.id) throw new Error("identity_unavailable");
       setIdentity(next);
       setDisplayName(next.user.displayName);
@@ -45,7 +45,7 @@ export default function EditProfileScreen() {
     } finally {
       setLoading(false);
     }
-  }, [copy.profileUnavailable]);
+  }, [copy.profileUnavailable, social]);
 
   useFocusEffect(useCallback(() => {
     void refresh();

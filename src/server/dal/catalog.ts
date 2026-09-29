@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/profile";
 import { createSupabaseServerClient } from "@/server/supabase/server";
+import { requestSupabaseClient } from "@/server/supabase/request-client";
 
 const kindValues = ["photocard", "album", "vinyl", "poster", "lightstick", "plushie", "figure", "book", "apparel", "memorabilia"] as const;
 
@@ -47,7 +48,7 @@ export interface CatalogContributionDTO {
 
 export async function searchSharedCatalog(input: unknown): Promise<CatalogTemplateDTO[]> {
   const parsed = catalogSearchSchema.parse(input);
-  const supabase = await createSupabaseServerClient();
+  const supabase = requestSupabaseClient() ?? await createSupabaseServerClient();
   let query = supabase
     .from("collectible_templates")
     .select("id,group_id,member_id,release_id,kind,name,descriptor,status,created_at")
@@ -65,7 +66,7 @@ export async function searchSharedCatalog(input: unknown): Promise<CatalogTempla
 
 export async function getSharedCatalogTemplate(templateId: string): Promise<CatalogTemplateDTO | null> {
   const id = z.string().uuid().parse(templateId);
-  const supabase = await createSupabaseServerClient();
+  const supabase = requestSupabaseClient() ?? await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("collectible_templates")
     .select("id,group_id,member_id,release_id,kind,name,descriptor,status,created_at")

@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/profile";
 import { createSupabaseServerClient } from "@/server/supabase/server";
+import { requestSupabaseClient } from "@/server/supabase/request-client";
 import type { PairPerson } from "@/server/dal/collection-graph-pair";
 
 const uuid = z.string().uuid();
@@ -21,7 +22,7 @@ export async function getDiscoveryCandidateBatch(input?: unknown, client?: Supab
   const limit = z.object({ limit: z.number().int().min(1).max(100).default(100) }).strict().parse(input ?? {}).limit;
   const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
-  const supabase = client ?? await createSupabaseServerClient();
+  const supabase = client ?? requestSupabaseClient() ?? await createSupabaseServerClient();
   const { data, error } = await supabase.rpc("graph_discovery_candidates", { p_limit: limit });
   if (error) throw new Error("discovery_candidates_failed");
   const parsed = batchSchema.parse(data);
@@ -32,7 +33,7 @@ export async function getDiscoveryCatalog(input?: unknown, client?: SupabaseClie
   const page = z.object({ limit: z.number().int().min(1).max(200).default(200), offset: z.number().int().min(0).max(10_000).default(0) }).strict().parse(input ?? {});
   const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
-  const supabase = client ?? await createSupabaseServerClient();
+  const supabase = client ?? requestSupabaseClient() ?? await createSupabaseServerClient();
   const { data, error } = await supabase.from("collectible_templates").select("id,name,kind,group_id,member_id,release_id,status").neq("status", "restricted").order("name").range(page.offset, page.offset + page.limit - 1);
   if (error) throw new Error("discovery_catalog_failed");
   return (data ?? []).map((row) => ({ id: String(row.id), name: String(row.name), kind: String(row.kind), groupId: String(row.group_id), memberId: typeof row.member_id === "string" ? row.member_id : null, releaseId: typeof row.release_id === "string" ? row.release_id : null, status: String(row.status) }));

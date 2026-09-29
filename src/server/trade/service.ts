@@ -1,6 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCollectionPairSnapshot, type PairPerson } from "@/server/dal/collection-graph-pair";
 
 const inputSchema = z.object({ targetUserId: z.string().uuid() }).strict();
@@ -38,9 +39,9 @@ function aggregate(person: PairPerson, templateIds: Set<string>): TradeRelations
   return [...map.values()].sort((a, b) => a.templateId.localeCompare(b.templateId)).slice(0, 50);
 }
 
-export async function getTradeOpportunity(input: unknown): Promise<TradeOpportunity> {
+export async function getTradeOpportunity(input: unknown, client?: SupabaseClient): Promise<TradeOpportunity> {
   const { targetUserId } = inputSchema.parse(input);
-  const snapshot = await getCollectionPairSnapshot(targetUserId);
+  const snapshot = await getCollectionPairSnapshot(targetUserId, client);
   return computeTradeOpportunity(snapshot.actor!, snapshot.target!, targetUserId, snapshot.target_collection_public !== false, snapshot.target_wishlist_public !== false);
 }
 

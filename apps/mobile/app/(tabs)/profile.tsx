@@ -4,26 +4,30 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import {
   loadNativeOnboarding,
-  updateHoldingTradeStatus,
   type NativeFeedPost,
   type NativeHolding,
   type NativeIdentity,
   type NativeOnboardingState,
   type NativeWishlistEntry,
 } from "../../src/api";
-import { useSocialRepository } from "../../src/data";
+import { useSocialRepository, type SocialTheme } from "../../src/data";
 import { RetryNotice } from "../../src/components/RetryNotice";
 import { collectibleKindLabel } from "../../src/i18n";
 import { useCopy, useLocale } from "../../src/locale";
+import { supabase } from "../../src/supabase";
 import { colors } from "../../src/theme";
 import { SeoullyButton, SeoullyChip, SeoullyShelf } from "../../src/ui/SeoullyControls";
+import { SeoullyFeedPost } from "../../src/ui/SeoullyFeedPost";
 import { SeoullyHeader } from "../../src/ui/SeoullyHeader";
 import { SeoullyLoadingState } from "../../src/ui/SeoullyLoadingState";
 import {
   formatCollectingSince,
   SeoullyHighlight,
+  SeoullyOwnedRow,
   SeoullyProfileHead,
   SeoullyProfileMeta,
+  SeoullyProfileVeil,
+  SeoullyRoomUnderlay,
   SeoullyShelfRow,
 } from "../../src/ui/SeoullyProfile";
 import { SeoullyScreen } from "../../src/ui/SeoullyScreen";
@@ -32,12 +36,13 @@ import { SeoullyText } from "../../src/ui/SeoullyText";
 const COLLECTION_TAB_KEY = "seoully.mobile.collection-tab.v1";
 
 function highlightsFromHoldings(holdings: NativeHolding[]) {
-  const groups = new Map<string, { name: string; count: number; imageUrl?: string }>();
+  const groups = new Map<string, { name: string; count: number; imageUrl?: string; colorway?: { base: string; accent: string; ink: string } }>();
   for (const holding of holdings) {
     const name = holding.template.groupName || holding.template.name;
-    const current = groups.get(name) ?? { name, count: 0, imageUrl: holding.personalMediaUrl };
+    const current = groups.get(name) ?? { name, count: 0, imageUrl: holding.personalMediaUrl, colorway: holding.template.colorway };
     current.count += 1;
     if (!current.imageUrl && holding.personalMediaUrl) current.imageUrl = holding.personalMediaUrl;
+    if (!current.colorway && holding.template.colorway) current.colorway = holding.template.colorway;
     groups.set(name, current);
   }
   return [...groups.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)).slice(0, 4);
@@ -59,6 +64,8 @@ export default function ProfileScreen() {
   const [onboarding, setOnboarding] = useState<NativeOnboardingState | null>(null);
   const [demoGroups, setDemoGroups] = useState<{ id: string; name: string }[]>([]);
   const [demoBiases, setDemoBiases] = useState<{ id: string; name: string }[]>([]);
+  const [theme, setTheme] = useState<SocialTheme | undefined>();
+  const [notice, setNotice] = useState<string | null>(null);
   const [ownedExpanded, setOwnedExpanded] = useState(false);
   const [wishlistExpanded, setWishlistExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -82,6 +89,7 @@ export default function ProfileScreen() {
         setWishlist(collector.wishlist);
         setDemoGroups(collector.groups);
         setDemoBiases(collector.biases);
+        setTheme(collector.theme);
         setOnboarding(null);
       } else {
         const [counts, page, nextHoldings, nextWishlist, tastes] = await Promise.all([
@@ -101,6 +109,7 @@ export default function ProfileScreen() {
         setWishlist(nextWishlist);
         setDemoGroups([]);
         setDemoBiases([]);
+        setTheme(undefined);
         setOnboarding(tastes);
       }
       setError(null);
@@ -128,13 +137,22 @@ export default function ProfileScreen() {
   const highlights = useMemo(() => highlightsFromHoldings(holdings), [holdings]);
 
   async function toggleTrade(holding: NativeHolding) {
-    if (!live) return;
     const next = holding.tradeStatus === "for-trade" ? "not-for-trade" : "for-trade";
     setHoldings((current) => current.map((item) => item.id === holding.id ? { ...item, tradeStatus: next } : item));
     try {
-      await updateHoldingTradeStatus(holding.id, next);
+      await social.setHoldingTradeStatus(holding.id, next);
     } catch {
       setHoldings((current) => current.map((item) => item.id === holding.id ? holding : item));
+    }
+  }
+
+  async function removeOwned(holding: NativeHolding) {
+    setHoldings((current) => current.filter((item) => item.id !== holding.id));
+    setHoldingCount((count) => Math.max(0, count - 1));
+    try {
+      await social.removeHolding(holding.id);
+    } catch {
+      await refresh();
     }
   }
 
@@ -153,9 +171,38 @@ export default function ProfileScreen() {
     router.push("/collection");
   }
 
+  async function signOut() {
+    const { error: signOutError } = await supabase.auth.signOut();
+    if (signOutError) {
+      setNotice(copy.signOutFailed);
+      return;
+    }
+    router.replace("/");
+  }
+
+  function addToCollection() {
+    if (!live) {
+      setNotice(copy.demoWriteBlocked);
+      router.push("/collect");
+      return;
+    }
+    router.push("/collect");
+  }
+
+  function enterRoom() {
+    if (!live) {
+      setNotice(copy.demoRoomUnavailable);
+      return;
+    }
+    router.push("/room");
+  }
+
   return (
-    <SeoullyScreen>
+    <SeoullyScreen backgroundColor={theme?.mist ?? colors.mist}>
+      <SeoullyRoomUnderlay theme={theme} />
+      <SeoullyProfileVeil theme={theme} />
       <SeoullyHeader languageLabel={copy.switchLanguage} onToggleLanguage={toggleLocale} />
+      <SeoullyText variant="caption" color={colors.muted} style={styles.underlayHint}>{copy.profileUnderlayHint}</SeoullyText>
       {loading && !identity ? <SeoullyLoadingState label={copy.profile} /> : null}
       {error ? <View style={styles.notice}><RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /></View> : null}
       {identity ? (
@@ -165,8 +212,6 @@ export default function ProfileScreen() {
               name={identity.user.displayName}
               handle={identity.user.handle}
               imageUrl={avatarUrl}
-              editLabel={live ? copy.profileEdit : undefined}
-              onEdit={live ? () => router.push("/edit-profile") : undefined}
               counts={[
                 { value: posts.length, label: copy.profilePosts },
                 { value: followers, label: copy.profileFollowers },
@@ -181,19 +226,15 @@ export default function ProfileScreen() {
               since={identity.user.joinedAt ? copy.profileCollectingSince.replace("{date}", formatCollectingSince(identity.user.joinedAt, locale)) : undefined}
               collectorType={identity.profile.collectorType}
             />
-            {live ? (
-              <>
-                <SeoullyButton label={copy.viewCollectorRoom} variant="enter" onPress={() => router.push("/room")} />
-                <View style={styles.collectAction}>
-                  <SeoullyButton
-                    label={copy.profileAddToCollection}
-                    variant="ghost"
-                    block
-                    onPress={() => router.push("/collect")}
-                  />
-                </View>
-              </>
-            ) : null}
+            <View style={styles.actions}>
+              <SeoullyButton label={copy.profileEdit} fill onPress={() => router.push("/edit-profile")} />
+              <SeoullyButton label={copy.profileAddToCollection} variant="ghost" fill onPress={addToCollection} />
+              <SeoullyButton label={copy.signOut} variant="ghost" fill onPress={() => { void signOut(); }} />
+            </View>
+            <View style={styles.enter}>
+              <SeoullyButton label={copy.viewCollectorRoom} variant="enter" onPress={enterRoom} />
+            </View>
+            {notice ? <SeoullyText variant="secondary" style={styles.inlineNotice}>{notice}</SeoullyText> : null}
           </View>
 
           {groups.length > 0 || biases.length > 0 ? (
@@ -211,23 +252,22 @@ export default function ProfileScreen() {
                   name={slice.name}
                   countLabel={copy.profileOwnedCount.replace("{count}", String(slice.count))}
                   imageUrl={slice.imageUrl}
+                  colorway={slice.colorway}
                 />
               ))}
             </ScrollView>
           ) : null}
 
           <SeoullyShelf title={copy.profilePostsTitle} empty={posts.length === 0 ? copy.profileEmptyPostsSelf : undefined}>
-            {posts.slice(0, 6).map((post) => {
-              const image = post.media.find((media) => media.mediaType === "image");
-              return (
-                <SeoullyShelfRow
-                  key={post.id}
-                  title={post.caption || copy.sharedMoment}
-                  meta={post.author.handle}
-                  imageUrl={image?.url}
-                />
-              );
-            })}
+            {posts.map((post) => (
+              <SeoullyFeedPost
+                key={post.id}
+                item={post}
+                copy={copy}
+                locale={locale}
+                onChange={(next) => setPosts((current) => current.map((item) => item.id === next.id ? next : item))}
+              />
+            ))}
           </SeoullyShelf>
 
           <SeoullyShelf
@@ -237,22 +277,19 @@ export default function ProfileScreen() {
             onToggle={() => setOwnedExpanded((value) => !value)}
             empty={holdings.length === 0 ? copy.profileEmptyOwnedSelf : undefined}
           >
-            {holdings.slice(0, 8).map((holding) => (
-              <View key={holding.id}>
-                <SeoullyShelfRow
-                  title={holding.template.name}
-                  meta={[holding.template.groupName, holding.template.memberName, collectibleKindLabel(holding.template.kind, copy)].filter(Boolean).join(" · ")}
-                  imageUrl={holding.personalMediaUrl}
-                  onPress={live ? () => router.push({ pathname: "/collectible", params: { holdingId: holding.id } }) : undefined}
-                />
-                {live ? (
-                  <Pressable accessibilityRole="button" onPress={() => { void toggleTrade(holding); }} style={styles.shelfAction}>
-                    <SeoullyText variant="caption" color={colors.plum}>
-                      {holding.tradeStatus === "for-trade" ? copy.forTrade : copy.notForTrade}
-                    </SeoullyText>
-                  </Pressable>
-                ) : null}
-              </View>
+            {holdings.map((holding) => (
+              <SeoullyOwnedRow
+                key={holding.id}
+                title={holding.template.name}
+                meta={[holding.template.groupName, holding.template.memberName, collectibleKindLabel(holding.template.kind, copy)].filter(Boolean).join(" · ")}
+                imageUrl={holding.personalMediaUrl}
+                colorway={holding.template.colorway}
+                tradeLabel={holding.tradeStatus === "for-trade" ? copy.compatOpenToTrade : copy.notForTrade}
+                removeLabel={copy.commonRemove}
+                onOpen={live ? () => router.push({ pathname: "/collectible", params: { holdingId: holding.id } }) : undefined}
+                onToggleTrade={() => { void toggleTrade(holding); }}
+                onRemove={() => { void removeOwned(holding); }}
+              />
             ))}
             {live && holdings.length === 0 ? (
               <Pressable accessibilityRole="button" onPress={() => router.push("/collect")} style={styles.shelfAction}>
@@ -272,12 +309,13 @@ export default function ProfileScreen() {
             onToggle={() => setWishlistExpanded((value) => !value)}
             empty={wishlist.length === 0 ? copy.profileEmptyWishSelf : undefined}
           >
-            {wishlist.slice(0, 8).map((entry) => (
+            {wishlist.map((entry) => (
               <SeoullyShelfRow
                 key={entry.id}
                 title={entry.template.name}
                 meta={[entry.template.groupName, entry.template.memberName, collectibleKindLabel(entry.template.kind, copy)].filter(Boolean).join(" · ")}
                 action={copy.removeFromWishlist}
+                colorway={entry.template.colorway}
                 onPress={() => { void removeWanted(entry.templateId); }}
               />
             ))}
@@ -296,9 +334,12 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { paddingBottom: 120 },
   card: { paddingHorizontal: 16, paddingTop: 18 },
-  collectAction: { marginTop: 10 },
+  actions: { alignItems: "stretch", flexDirection: "row", gap: 8, marginTop: 14 },
+  enter: { marginTop: 10 },
+  inlineNotice: { marginTop: 10 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 16, paddingTop: 14 },
-  highlights: { gap: 12, paddingHorizontal: 16, paddingTop: 16 },
+  highlights: { gap: 10, paddingHorizontal: 16, paddingTop: 16 },
   notice: { paddingHorizontal: 16, paddingTop: 12 },
+  underlayHint: { paddingHorizontal: 16, paddingTop: 8 },
   shelfAction: { paddingBottom: 8 },
 });

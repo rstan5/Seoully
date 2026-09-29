@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { Image, Pressable, StyleSheet, TextInput, View } from "react-native";
-import { colors, elevation, radii, sizes, spacing } from "../theme";
+import { colors, elevation, radii, spacing } from "../theme";
 import type { NativeFeedPost, NativePostComment } from "../api";
 import type { MobileCopy } from "../i18n";
-import { IconComment, IconHeart } from "./icons";
+import { IconBookmark, IconComment, IconHeart, IconPlay, IconRepost, IconShare } from "./icons";
 import { pressShift, useReduceMotion } from "./motion";
 import { SeoullyAvatar } from "./SeoullyAvatar";
 import { SeoullyIconButton } from "./SeoullyIconButton";
@@ -14,10 +15,41 @@ export function formatPostTime(iso: string, locale: "en" | "ko") {
   return date.toLocaleDateString(locale === "ko" ? "ko-KR" : "en-US", { month: "short", day: "numeric" });
 }
 
-export function SeoullyMedia({ url, label }: { url: string; label?: string }) {
+export function SeoullyMedia({
+  item,
+  copy,
+}: {
+  item: NativeFeedPost;
+  copy: MobileCopy;
+}) {
+  const [index, setIndex] = useState(0);
+  const current = item.media[index];
+  if (!current) return null;
+  const video = current.mediaType === "video";
   return (
     <View style={styles.mediaWrap}>
-      <Image accessibilityIgnoresInvertColors accessibilityLabel={label} source={{ uri: url }} style={styles.media} />
+      <Image accessibilityIgnoresInvertColors source={{ uri: current.url }} style={styles.media} />
+      {video ? (
+        <View pointerEvents="none" style={styles.play}>
+          <IconPlay color="#fff" />
+          {current.duration ? <SeoullyText variant="caption" color="#fff">{current.duration}</SeoullyText> : (
+            <SeoullyText variant="caption" color="#fff">{copy.playVideo}</SeoullyText>
+          )}
+        </View>
+      ) : null}
+      {item.media.length > 1 ? (
+        <View style={styles.dots}>
+          {item.media.map((media, mediaIndex) => (
+            <Pressable
+              key={`${media.url}-${mediaIndex}`}
+              accessibilityRole="button"
+              accessibilityLabel={copy.playVideo}
+              onPress={() => setIndex(mediaIndex)}
+              style={[styles.dot, mediaIndex === index && styles.dotOn]}
+            />
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -44,17 +76,25 @@ export function SeoullyCollectorIdentity({
     >
       <SeoullyAvatar name={name} imageUrl={imageUrl} />
       <View>
-        <SeoullyText variant="handle">{name}</SeoullyText>
-        <SeoullyText variant="metadata">@{handle}{location ? ` · ${location}` : ""}</SeoullyText>
+        <SeoullyText variant="handle">{handle}</SeoullyText>
+        {location ? <SeoullyText variant="metadata">{location}</SeoullyText> : null}
       </View>
     </Pressable>
   );
 }
 
-export function SeoullyCollectiblePreview({ name, kind }: { name: string; kind: string }) {
+export function SeoullyCollectiblePreview({
+  name,
+  kind,
+  colorway,
+}: {
+  name: string;
+  kind: string;
+  colorway?: { base: string; accent: string; ink: string };
+}) {
   return (
     <View style={styles.collectible}>
-      <View style={styles.collectibleSwatch} />
+      <View style={[styles.collectibleSwatch, colorway ? { backgroundColor: colorway.base, borderColor: colorway.accent } : null]} />
       <View style={styles.collectibleCopy}>
         <SeoullyText variant="caption" color={colors.ink} numberOfLines={1}>{name}</SeoullyText>
         <SeoullyText variant="metadata" numberOfLines={1}>{kind}</SeoullyText>
@@ -71,10 +111,15 @@ export function SeoullyPost({
   commentCursor,
   commentBody,
   commentError,
+  notice,
   busy,
   onOpenCollector,
   onToggleLike,
   onToggleComments,
+  onToggleRepost,
+  onShare,
+  onToggleSave,
+  canRepost = true,
   onLoadMoreComments,
   onChangeComment,
   onSubmitComment,
@@ -87,17 +132,24 @@ export function SeoullyPost({
   commentCursor: string | null;
   commentBody: string;
   commentError: string | null;
+  notice?: string | null;
   busy: boolean;
   onOpenCollector: (userId?: string) => void;
   onToggleLike: () => void;
   onToggleComments: () => void;
+  onToggleRepost: () => void;
+  onShare?: () => void;
+  onToggleSave?: () => void;
+  canRepost?: boolean;
   onLoadMoreComments: () => void;
   onChangeComment: (value: string) => void;
   onSubmitComment: () => void;
   onRetryComments: () => void;
 }) {
-  const image = item.media.find((media) => media.mediaType === "image");
   const likeLabel = item.likeCount === 1 ? copy.likeOne : copy.likeMany.replace("{count}", String(item.likeCount));
+  const captionAuthor = item.originAuthor ?? item.author;
+  const showRepost = Boolean(canRepost);
+  const collectible = Boolean(item.taggedCollectibles && item.taggedCollectibles.length > 0);
 
   return (
     <View style={styles.post}>
@@ -111,18 +163,40 @@ export function SeoullyPost({
         />
         <SeoullyText variant="metadata">{formatPostTime(item.createdAt, locale)}</SeoullyText>
       </View>
-      {image ? <SeoullyMedia url={image.url} /> : null}
+      {item.repostOf && item.originAuthor ? (
+        <Pressable accessibilityRole="button" onPress={() => onOpenCollector(item.originAuthor?.userId)} style={styles.repostLine}>
+          <SeoullyText variant="metadata">{copy.repostedFrom.replace("{handle}", item.originAuthor.handle)}</SeoullyText>
+        </Pressable>
+      ) : null}
+      {item.media.length > 0 ? <SeoullyMedia item={item} copy={copy} /> : null}
       <View style={styles.actions}>
         <SeoullyIconButton label={item.likedByMe ? copy.unlike : copy.like} selected={item.likedByMe} disabled={busy} onPress={onToggleLike}>
           <IconHeart color={item.likedByMe ? colors.like : colors.ink} filled={item.likedByMe} />
         </SeoullyIconButton>
-        <SeoullyIconButton label={comments ? copy.hideComments : copy.viewComments} onPress={onToggleComments}>
+        <SeoullyIconButton label={comments ? copy.hideComments : copy.comment} onPress={onToggleComments}>
           <IconComment color={colors.ink} />
         </SeoullyIconButton>
+        {showRepost ? (
+          <SeoullyIconButton label={item.repostedByMe ? copy.unrepost : copy.repost} selected={item.repostedByMe} disabled={busy} onPress={onToggleRepost}>
+            <IconRepost color={item.repostedByMe ? colors.repost : colors.ink} />
+          </SeoullyIconButton>
+        ) : null}
+        {onShare ? (
+          <SeoullyIconButton label={copy.shareAction} onPress={onShare}>
+            <IconShare color={colors.ink} />
+          </SeoullyIconButton>
+        ) : null}
+        {collectible && onToggleSave ? (
+          <View style={styles.save}>
+            <SeoullyIconButton label={item.savedByMe ? copy.unsaveWishlist : copy.saveWishlist} selected={item.savedByMe} onPress={onToggleSave}>
+              <IconBookmark color={item.savedByMe ? colors.plum : colors.ink} filled={item.savedByMe} />
+            </SeoullyIconButton>
+          </View>
+        ) : null}
       </View>
       {item.likeCount > 0 ? <SeoullyText variant="handle" style={styles.block}>{likeLabel}</SeoullyText> : null}
       <SeoullyText variant="body" style={styles.caption}>
-        <SeoullyText variant="handle" onPress={() => onOpenCollector(item.author.userId)}>{item.author.handle}</SeoullyText>
+        <SeoullyText variant="handle" onPress={() => onOpenCollector(captionAuthor.userId)}>{captionAuthor.handle}</SeoullyText>
         {"  "}
         {item.caption || copy.sharedMoment}
       </SeoullyText>
@@ -144,13 +218,21 @@ export function SeoullyPost({
       {item.taggedCollectibles && item.taggedCollectibles.length > 0 ? (
         <View style={styles.collectibles}>
           {item.taggedCollectibles.map((tag) => (
-            <SeoullyCollectiblePreview key={tag.templateId} name={tag.name} kind={tag.kind} />
+            <SeoullyCollectiblePreview key={tag.templateId} name={tag.name} kind={tag.kind} colorway={tag.colorway} />
           ))}
         </View>
       ) : null}
+      {notice ? <SeoullyText variant="metadata" style={styles.notice}>{notice}</SeoullyText> : null}
       {commentError ? (
         <Pressable accessibilityRole="button" onPress={onRetryComments} style={styles.retry}>
           <SeoullyText variant="secondary" color={colors.plum}>{commentError} · {copy.retry}</SeoullyText>
+        </Pressable>
+      ) : null}
+      {item.commentCount > 0 && !comments ? (
+        <Pressable accessibilityRole="button" onPress={onToggleComments} style={styles.viewComments}>
+          <SeoullyText variant="metadata">
+            {item.commentCount === 1 ? copy.viewComment : copy.viewCommentsMany.replace("{count}", String(item.commentCount))}
+          </SeoullyText>
         </Pressable>
       ) : null}
       {comments ? (
@@ -202,6 +284,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   who: { alignItems: "center", flexDirection: "row", gap: spacing.inline },
+  repostLine: { marginTop: -4, paddingBottom: 8, paddingHorizontal: spacing.post },
   mediaWrap: {
     backgroundColor: colors.media,
     borderRadius: radii.card,
@@ -210,7 +293,25 @@ const styles = StyleSheet.create({
     ...elevation.card,
   },
   media: { aspectRatio: 4 / 3, width: "100%" },
+  play: {
+    ...StyleSheet.absoluteFill,
+    alignItems: "center",
+    gap: 8,
+    justifyContent: "center",
+  },
+  dots: {
+    bottom: 10,
+    flexDirection: "row",
+    gap: 5,
+    justifyContent: "center",
+    left: 0,
+    position: "absolute",
+    right: 0,
+  },
+  dot: { backgroundColor: "rgba(255,255,255,0.45)", borderRadius: 3, height: 6, width: 6 },
+  dotOn: { backgroundColor: "#fff" },
   actions: { alignItems: "center", flexDirection: "row", gap: 14, paddingHorizontal: spacing.post, paddingTop: 10 },
+  save: { marginLeft: "auto" },
   block: { marginTop: 6, paddingHorizontal: spacing.post },
   caption: { marginTop: 6, paddingHorizontal: spacing.post },
   tags: { flexDirection: "row", flexWrap: "wrap", marginTop: 5, paddingHorizontal: spacing.post },
@@ -225,11 +326,21 @@ const styles = StyleSheet.create({
     gap: 7,
     maxWidth: "100%",
     paddingHorizontal: 8,
+    paddingLeft: 4,
     paddingVertical: 4,
   },
-  collectibleSwatch: { backgroundColor: colors.pinkSoft, borderRadius: 8, height: sizes.avatarSm - 8, width: sizes.avatarSm - 8 },
+  collectibleSwatch: {
+    backgroundColor: colors.pinkSoft,
+    borderColor: colors.lilac,
+    borderRadius: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    height: 34,
+    width: 22,
+  },
   collectibleCopy: { maxWidth: 160 },
+  notice: { marginTop: 6, paddingHorizontal: spacing.post },
   retry: { marginTop: 8, paddingHorizontal: spacing.post },
+  viewComments: { marginTop: 6, paddingHorizontal: spacing.post },
   comments: { gap: 8, paddingBottom: 8, paddingHorizontal: spacing.post, paddingTop: 8 },
   comment: { lineHeight: 20 },
   composer: { alignItems: "center", flexDirection: "row", gap: 8, paddingTop: 8 },

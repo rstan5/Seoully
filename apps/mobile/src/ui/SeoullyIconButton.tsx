@@ -27,7 +27,7 @@ export function SeoullyIconButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        selected && styles.selected,
+        pressed && styles.pressed,
         pressShift(pressed, reduceMotion),
       ]}
     >
@@ -45,5 +45,5 @@ const styles = StyleSheet.create({
     margin: -4,
     width: sizes.iconButton,
   },
-  selected: { backgroundColor: colors.mist },
+  pressed: { backgroundColor: colors.mist },
 });

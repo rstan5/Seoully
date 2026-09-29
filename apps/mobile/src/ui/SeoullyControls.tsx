@@ -38,6 +38,8 @@ export function SeoullyButton({
       <SeoullyText
         variant={variant === "enter" ? "handle" : "button"}
         color={variant === "primary" ? colors.onPrimary : colors.plum}
+        numberOfLines={fill ? 2 : 1}
+        style={styles.label}
       >
         {label}
       </SeoullyText>
@@ -137,9 +139,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.action,
     borderRadius: radii.button,
     justifyContent: "center",
-    minHeight: 40,
-    paddingHorizontal: 14,
+    minHeight: 48,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     ...elevation.raise,
+  },
+  label: {
+    textAlign: "center",
+    width: "100%",
   },
   block: {
     alignSelf: "stretch",
@@ -147,6 +154,7 @@ const styles = StyleSheet.create({
   },
   fill: {
     flex: 1,
+    minWidth: 0,
   },
   ghost: {
     backgroundColor: colors.lilacSoft,

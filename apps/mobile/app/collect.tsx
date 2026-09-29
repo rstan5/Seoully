@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "expo-router";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { contributeCatalogItem, searchCatalog, type NativeCatalogTemplate } from "../src/api";
+import { contributeCatalogItem, type NativeCatalogTemplate } from "../src/api";
 import { useSocialRepository } from "../src/data";
 import { KeyboardScreen } from "../src/components/KeyboardScreen";
 import { ScreenBack } from "../src/components/ScreenBack";
@@ -41,7 +41,7 @@ export default function CollectScreen() {
     if (!text) return;
     const timer = setTimeout(() => {
       setSearching(true);
-      void searchCatalog(text).then((results) => {
+      void social.searchCatalog(text).then((results) => {
         setHits(results);
         setSearchError(null);
       }).catch(() => {
@@ -50,7 +50,7 @@ export default function CollectScreen() {
       }).finally(() => setSearching(false));
     }, 180);
     return () => clearTimeout(timer);
-  }, [copy.catalogUnavailable, query, step]);
+  }, [copy.catalogUnavailable, query, social, step]);
 
   function updateQuery(value: string) {
     setQuery(value);

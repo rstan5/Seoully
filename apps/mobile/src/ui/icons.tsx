@@ -1,285 +1,220 @@
-import type { ReactNode } from "react";
-import { View, type StyleProp, type ViewStyle } from "react-native";
+import Svg, { Circle, Path, Rect } from "react-native-svg";
 
 type IconProps = { color: string; filled?: boolean; size?: number };
 
-function Frame({ size = 24, children }: { size?: number; children: ReactNode }) {
-  return <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>{children}</View>;
-}
-
-function Stroke({ style, color }: { style: StyleProp<ViewStyle>; color: string }) {
-  return <View style={[{ borderColor: color, backgroundColor: "transparent" }, style]} />;
-}
-
 export function IconHome({ color, filled = false, size = 24 }: IconProps) {
-  const w = size * 0.62;
   return (
-    <Frame size={size}>
-      <View style={{
-        width: 0,
-        height: 0,
-        borderLeftWidth: w / 2,
-        borderRightWidth: w / 2,
-        borderBottomWidth: size * 0.28,
-        borderLeftColor: "transparent",
-        borderRightColor: "transparent",
-        borderBottomColor: color,
-        marginBottom: -1,
-      }} />
-      <View style={{
-        width: w * 0.82,
-        height: size * 0.42,
-        borderWidth: filled ? 0 : 1.7,
-        borderColor: color,
-        backgroundColor: filled ? color : "transparent",
-        borderBottomLeftRadius: 2,
-        borderBottomRightRadius: 2,
-      }} />
-    </Frame>
+    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden>
+      {filled ? (
+        <Path fill={color} d="M12 3.2 3 11h2v9h6v-6h2v6h6v-9h2L12 3.2Z" />
+      ) : (
+        <Path
+          fill="none"
+          stroke={color}
+          strokeWidth={1.7}
+          strokeLinejoin="round"
+          d="M4.5 11.2 12 4.8l7.5 6.4V20a1 1 0 0 1-1 1h-4.2v-6.2H9.7V21H5.5a1 1 0 0 1-1-1v-8.8Z"
+        />
+      )}
+    </Svg>
   );
 }
 
 export function IconSearch({ color, size = 24 }: IconProps) {
-  const d = size * 0.42;
   return (
-    <Frame size={size}>
-      <View style={{ width: d, height: d, borderRadius: d / 2, borderWidth: 1.7, borderColor: color, marginRight: size * 0.12, marginBottom: size * 0.1 }} />
-      <View style={{
-        position: "absolute",
-        width: size * 0.28,
-        height: 1.7,
-        backgroundColor: color,
-        borderRadius: 2,
-        right: size * 0.14,
-        bottom: size * 0.22,
-        transform: [{ rotate: "40deg" }],
-      }} />
-    </Frame>
+    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden>
+      <Circle cx="11" cy="11" r="6.2" fill="none" stroke={color} strokeWidth={1.7} />
+      <Path d="M15.8 15.8 20 20" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+    </Svg>
   );
 }
 
 export function IconPlus({ color, size = 22 }: IconProps) {
   return (
-    <Frame size={size}>
-      <Stroke color={color} style={{ position: "absolute", width: size * 0.72, height: size * 0.72, borderRadius: 6, borderWidth: 1.7 }} />
-      <View style={{ width: size * 0.34, height: 1.7, backgroundColor: color, borderRadius: 2 }} />
-      <View style={{ position: "absolute", width: 1.7, height: size * 0.34, backgroundColor: color, borderRadius: 2 }} />
-    </Frame>
+    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden>
+      <Rect x="4.4" y="4.4" width="15.2" height="15.2" rx="4" fill="none" stroke={color} strokeWidth={1.7} />
+      <Path d="M12 8.2v7.6M8.2 12h7.6" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+    </Svg>
   );
 }
 
 export function IconChat({ color, filled = false, size = 24 }: IconProps) {
   return (
-    <Frame size={size}>
-      <View style={{
-        width: size * 0.64,
-        height: size * 0.48,
-        borderRadius: 8,
-        borderWidth: 1.7,
-        borderColor: color,
-        backgroundColor: filled ? color : "transparent",
-      }} />
-      <View style={{
-        width: 0,
-        height: 0,
-        marginTop: -1,
-        marginRight: size * 0.22,
-        borderLeftWidth: 4,
-        borderRightWidth: 4,
-        borderTopWidth: 6,
-        borderLeftColor: "transparent",
-        borderRightColor: "transparent",
-        borderTopColor: color,
-      }} />
-    </Frame>
+    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden>
+      <Path
+        d="M5.2 18.6 4 21l3.2-.9A8.8 8.8 0 1 0 5.2 18.6Z"
+        fill={filled ? color : "none"}
+        stroke={color}
+        strokeWidth={1.7}
+        strokeLinejoin="round"
+      />
+    </Svg>
   );
 }
 
 export function IconUser({ color, filled = false, size = 24 }: IconProps) {
-  const head = size * 0.28;
   return (
-    <Frame size={size}>
-      <View style={{
-        width: head,
-        height: head,
-        borderRadius: head / 2,
-        borderWidth: 1.7,
-        borderColor: color,
-        backgroundColor: filled ? color : "transparent",
-        marginBottom: 3,
-      }} />
-      <View style={{
-        width: size * 0.56,
-        height: size * 0.28,
-        borderTopLeftRadius: 12,
-        borderTopRightRadius: 12,
-        borderWidth: 1.7,
-        borderBottomWidth: 0,
-        borderColor: color,
-        backgroundColor: filled ? color : "transparent",
-      }} />
-    </Frame>
+    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden>
+      <Circle cx="12" cy="8.2" r="3.2" fill={filled ? color : "none"} stroke={color} strokeWidth={1.7} />
+      <Path
+        d="M5.4 19.4c.8-3.2 3.3-5 6.6-5s5.8 1.8 6.6 5"
+        fill="none"
+        stroke={color}
+        strokeWidth={1.7}
+        strokeLinecap="round"
+      />
+    </Svg>
   );
 }
 
 export function IconDoor({ color, size = 24 }: IconProps) {
   return (
-    <Frame size={size}>
-      <View style={{
-        width: size * 0.48,
-        height: size * 0.64,
-        borderRadius: 3,
-        borderWidth: 1.7,
-        borderColor: color,
-      }}>
-        <View style={{
-          position: "absolute",
-          right: 4,
-          top: "46%",
-          width: 3,
-          height: 3,
-          borderRadius: 2,
-          backgroundColor: color,
-        }} />
-      </View>
-    </Frame>
+    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden>
+      <Path
+        d="M6.4 20V5.6A1.6 1.6 0 0 1 8 4h8a1.6 1.6 0 0 1 1.6 1.6V20"
+        fill="none"
+        stroke={color}
+        strokeWidth={1.7}
+        strokeLinejoin="round"
+      />
+      <Path d="M5 20h14" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+      <Path d="M14.6 12.2h.2" fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" />
+    </Svg>
   );
 }
 
 export function IconHeart({ color, filled = false, size = 24 }: IconProps) {
-  const bump = size * 0.28;
   return (
-    <Frame size={size}>
-      <View style={{ width: size * 0.7, height: size * 0.64, alignItems: "center" }}>
-        <View style={{ flexDirection: "row", zIndex: 1 }}>
-          <View style={{ width: bump, height: bump, borderRadius: bump / 2, backgroundColor: color, borderWidth: filled ? 0 : 1.7, borderColor: color }} />
-          <View style={{ width: bump, height: bump, borderRadius: bump / 2, backgroundColor: color, borderWidth: filled ? 0 : 1.7, borderColor: color, marginLeft: -size * 0.04 }} />
-        </View>
-        <View style={{
-          width: size * 0.42,
-          height: size * 0.42,
-          backgroundColor: color,
-          transform: [{ rotate: "45deg" }],
-          marginTop: -size * 0.18,
-          borderBottomRightRadius: 3,
-        }} />
-      </View>
-    </Frame>
+    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden>
+      <Path
+        d="M12 20s-7.2-4.4-9-8.6C1.6 8.2 3.3 5 6.6 5c2 0 3.4 1.2 4.4 2.6C12 6.2 13.4 5 15.4 5c3.3 0 5 3.2 3.6 6.4C19.2 15.6 12 20 12 20Z"
+        fill={filled ? color : "none"}
+        stroke={color}
+        strokeWidth={1.7}
+        strokeLinejoin="round"
+      />
+    </Svg>
   );
 }
 
 export function IconComment({ color, size = 24 }: IconProps) {
-  return <IconChat color={color} size={size} />;
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden>
+      <Path
+        d="M5 18.2 4.2 21l3.4-1A8.4 8.4 0 1 0 5 18.2Z"
+        fill="none"
+        stroke={color}
+        strokeWidth={1.7}
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+export function IconBell({ color, size = 22 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden>
+      <Path
+        d="M6.4 16.6h11.2L16.4 15v-3.4a4.4 4.4 0 1 0-8.8 0V15L6.4 16.6Z"
+        fill="none"
+        stroke={color}
+        strokeWidth={1.7}
+        strokeLinejoin="round"
+      />
+      <Path d="M10 18.4a2 2 0 0 0 4 0" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function IconShare({ color, size = 24 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden>
+      <Path
+        d="M7.4 10.4 12 6l4.6 4.4M12 6.4V16"
+        fill="none"
+        stroke={color}
+        strokeWidth={1.7}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M5.4 14.8V18a1.4 1.4 0 0 0 1.4 1.4h10.4A1.4 1.4 0 0 0 18.6 18v-3.2"
+        fill="none"
+        stroke={color}
+        strokeWidth={1.7}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+export function IconRepost({ color, size = 24 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden>
+      <Path d="M7.4 4.2h11.4v8.2" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="miter" />
+      <Path d="M16.6 10.2 18.8 12.6 21 10.2" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="miter" />
+      <Path d="M16.6 19.8H5.2V11.6" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="miter" />
+      <Path d="M7.4 13.8 5.2 11.4 3 13.8" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="miter" />
+    </Svg>
+  );
+}
+
+export function IconBookmark({ color, filled = false, size = 24 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden>
+      <Path
+        d="M7 4.8h10a1 1 0 0 1 1 1V19l-6-3.4L6 19V5.8a1 1 0 0 1 1-1Z"
+        fill={filled ? color : "none"}
+        stroke={color}
+        strokeWidth={1.7}
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+export function IconPlay({ color = "#fff", size = 28 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden>
+      <Circle cx="12" cy="12" r="11" fill="rgba(0,0,0,0.45)" />
+      <Path d="M10 8.2 16.4 12 10 15.8V8.2Z" fill={color} />
+    </Svg>
+  );
 }
 
 export function IconPhoto({ color, size = 24 }: IconProps) {
   return (
-    <Frame size={size}>
-      <View style={{
-        width: size * 0.68,
-        height: size * 0.5,
-        borderRadius: 4,
-        borderWidth: 1.7,
-        borderColor: color,
-      }}>
-        <View style={{
-          position: "absolute",
-          left: 4,
-          top: 4,
-          width: 4,
-          height: 4,
-          borderRadius: 2,
-          borderWidth: 1.4,
-          borderColor: color,
-        }} />
-        <View style={{
-          position: "absolute",
-          left: 3,
-          bottom: 3,
-          width: size * 0.22,
-          height: 1.6,
-          backgroundColor: color,
-          transform: [{ rotate: "-28deg" }],
-        }} />
-        <View style={{
-          position: "absolute",
-          right: 4,
-          bottom: 3,
-          width: size * 0.28,
-          height: 1.6,
-          backgroundColor: color,
-          transform: [{ rotate: "28deg" }],
-        }} />
-      </View>
-    </Frame>
+    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden>
+      <Rect x="4.2" y="6.2" width="15.6" height="11.6" rx="2.2" fill="none" stroke={color} strokeWidth={1.7} />
+      <Circle cx="9" cy="11" r="1.5" fill="none" stroke={color} strokeWidth={1.5} />
+      <Path
+        d="M7.2 16.2 10.4 13l2.2 2.1 2.4-2.8 3.6 3.7"
+        fill="none"
+        stroke={color}
+        strokeWidth={1.7}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
   );
 }
 
 export function IconCard({ color, size = 24 }: IconProps) {
   return (
-    <Frame size={size}>
-      <View style={{
-        width: size * 0.48,
-        height: size * 0.62,
-        borderRadius: 4,
-        borderWidth: 1.7,
-        borderColor: color,
-        paddingTop: 5,
-        paddingHorizontal: 4,
-        gap: 3,
-      }}>
-        <View style={{ height: 1.6, backgroundColor: color, borderRadius: 1, width: "100%" }} />
-        <View style={{ height: 1.6, backgroundColor: color, borderRadius: 1, width: "68%" }} />
-      </View>
-    </Frame>
+    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden>
+      <Rect x="6.2" y="4.6" width="11.6" height="14.8" rx="2.2" fill="none" stroke={color} strokeWidth={1.7} />
+      <Path d="M8.6 8.2h6.8M8.6 11.2h4.6" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+    </Svg>
   );
 }
 
 export function IconGroup({ color, size = 24 }: IconProps) {
-  const left = size * 0.22;
-  const right = size * 0.18;
   return (
-    <Frame size={size}>
-      <View style={{ flexDirection: "row", alignItems: "flex-end", height: size * 0.72 }}>
-        <View style={{ alignItems: "center" }}>
-          <View style={{
-            width: left,
-            height: left,
-            borderRadius: left / 2,
-            borderWidth: 1.7,
-            borderColor: color,
-            marginBottom: 3,
-          }} />
-          <View style={{
-            width: size * 0.42,
-            height: size * 0.2,
-            borderTopLeftRadius: 10,
-            borderTopRightRadius: 10,
-            borderWidth: 1.7,
-            borderBottomWidth: 0,
-            borderColor: color,
-          }} />
-        </View>
-        <View style={{ alignItems: "center", marginLeft: -size * 0.08, marginBottom: 2 }}>
-          <View style={{
-            width: right,
-            height: right,
-            borderRadius: right / 2,
-            borderWidth: 1.7,
-            borderColor: color,
-            marginBottom: 3,
-          }} />
-          <View style={{
-            width: size * 0.3,
-            height: size * 0.16,
-            borderTopLeftRadius: 8,
-            borderTopRightRadius: 8,
-            borderWidth: 1.7,
-            borderBottomWidth: 0,
-            borderColor: color,
-          }} />
-        </View>
-      </View>
-    </Frame>
+    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden>
+      <Circle cx="9" cy="8.4" r="2.6" fill="none" stroke={color} strokeWidth={1.7} />
+      <Circle cx="15.4" cy="8.8" r="2.2" fill="none" stroke={color} strokeWidth={1.7} />
+      <Path d="M4.8 18.6c.7-3 2.8-4.6 5.6-4.6s4.9 1.6 5.6 4.6" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+      <Path d="M14.2 14.4c1.6.2 3.2 1.2 3.8 3.2" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+    </Svg>
   );
 }

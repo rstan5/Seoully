@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "outDir": ".tmp/build",
+    "skipLibCheck": true,
+    "strict": false,
+    "esModuleInterop": true
+  },
+  "include": [
+    "scripts/check-slice7.ts",
+    "src/world/objects/binderGeometry.ts",
+    "apps/mobile/src/data/ownership.ts",
+    "apps/mobile/src/room/editSession.ts",
+    "apps/mobile/src/room/worldView.ts"
+  ]
+}

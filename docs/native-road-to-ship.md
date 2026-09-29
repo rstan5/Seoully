@@ -1,9 +1,9 @@
 # Native road to ship
 
-**Status:** Slices 1–6 implemented in tree — **SLICE 6 — CODE VERIFIED / DEVICE QA PENDING**. Slices 7–8 not started.  
+**Status:** Slices 1–7 implemented in tree — **SLICE 7 — CODE VERIFIED / DEVICE QA PENDING**. Slice 8 not started.  
 **Canonical spec:** `docs/web-native-parity-contract.md`  
 **Connectivity evidence:** `docs/native-backend-connectivity-audit.md`  
-**Tree:** `mobile-native` `bdde759` + dirty working tree.  
+**Tree:** `mobile-native`  
 **Date:** 2026-09-29
 
 Done is a complete user-experience slice (web behavior + native UI + backend + persistence + read-back + navigation + loading/error/empty + `mobile:verify` + device QA). Not a layer of APIs or a coat of tokens.
@@ -281,6 +281,32 @@ Order is dependency-shaped. **Slice 1 is first.**
 **Acceptance:** Own holdings placeable; relaunch restores transforms; photocard opens binder **in room** at the right spread; Profile shows that room through veil; public room read-only; stored = unplaced, not unowned. `mobile:verify` still passes (R3F must not break Expo Go graph).
 
 **Device QA:** Web’s physical Room checklist: enter from Profile, place album on shelf, photocard to binder, back, visit someone else’s public room, relaunch.
+
+**Implementation (2026-09-29):** SLICE 7 — CODE VERIFIED / DEVICE QA PENDING. Native Room is one authored-camera world (HOME / six canonical docks / inspect / edit / open Binder). Desk Binder is a physical object; tap flies the camera into an in-scene OpenBinder (pages, pockets, lift). Profile uses `RoomWorldGlimpse` derived from the real room palette, not paper. Theme column `20261002` was reviewed and **not applied** — production rooms have no theme persist; hearth default matches starter HEARTH. Demo Rooms use fixture placements in-memory; Live uses `rooms` + `room_placements`. Standalone `/binder` remains a data fallback for older checks; product path is in-room.
+
+#### Slice 7 visual / interaction QA map
+
+| State | Web target | Native implementation | Device-QA risk |
+| --- | --- | --- | --- |
+| Room home | Overview dock, crop into furniture on phone | `HOME_POSE` authored camera, no orbit | Framing vs web CSS 3D scale |
+| Shelf | Zone dock + shelf hotspots | Tap shelf hotspot / chip → `ZONE_DOCKS.shelf` | Hotspot vs object hit-testing |
+| Wall | Poster wall dock | Wall plane + dock | Poster scale / lighting |
+| Case | Display case dock, glass | Case furniture + glass plane | Glass opacity/readability |
+| Desk | Desk dock, lamp | Desk + lamp + binder object | Binder vs desk objects |
+| Archive | Floor crate dock | Archive crate dock | Easy to miss at home crop |
+| Object focus | Inspect pose, object lifts | Inspect dock + lift offset | Overlay vs in-world primacy |
+| Edit mode | Overview+tilt, grab/settle | `EDIT_POSE`, pan selected, tray | Gesture vs camera |
+| Stored tray | EditChrome unplaced holdings | Compact tray, place/store | Tray crowding |
+| Binder closed/desk | BinderZone on desk | Closed binder mesh on desk | Tap target size |
+| Binder open | OpenBinder lift off desk | `NativeOpenBinder` same Canvas | Continuity / scale |
+| Page turn | Leaf pivots on spine | rotateY leaf + reduced-motion snap | Gesture collision |
+| Card focus | Card lifts from pocket | Pocket card lifts; no white modal | Texture remount flash |
+| Profile over Room | Room mounted, veil 0.85 | `RoomWorldGlimpse` + veil | Not live GL; derived palette |
+| Public Room | readOnly Room | `mode="public"`, no edit, public placements only | Empty honest rooms |
+
+#### Physical iPhone QA (Slice 7)
+
+1. Cold launch — no R3F crash. 2. Profile glimpse is the room world, not paper. 3. Enter Room feels authored. 4. Six zones readable. 5–9. Tap Shelf/Wall/Case/Desk/Archive — camera docks. 10. Tap collectible — focus/lift. 11. Back one spatial level. 12–18. Edit move / invalid drop / store (holding remains) / place / cancel / save+relaunch. 19–27. Desk Binder → open → turn pages → odd last spread complete → personal photocard → lift → return without white flash → close to desk. 28. Profile ↔ Room no black Canvas. 29. Background/resume. 30–31. Public room view-only, no private media. 32–33. Demo fixtures; Live never SOO/MINJI. 34. Reduced motion still usable. 35. Heat/memory after minutes.
 
 ---
 

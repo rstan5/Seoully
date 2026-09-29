@@ -15,6 +15,7 @@
     "check:slice4": "tsc --project tsconfig.check-slice4.json && node -r ./scripts/register-build-alias.cjs .tmp/build/scripts/check-slice4.js",
     "check:slice5": "tsc --project tsconfig.check-slice5.json && node -r ./scripts/register-build-alias.cjs .tmp/build/scripts/check-slice5.js",
     "check:slice6": "tsc --project tsconfig.check-slice6.json && node -r ./scripts/register-build-alias.cjs .tmp/build/scripts/check-slice6.js",
+    "check:slice7": "tsc --project tsconfig.check-slice7.json && node -r ./scripts/register-build-alias.cjs .tmp/build/scripts/check-slice7.js",
     "mobile:verify": "node scripts/mobile-verify.cjs"
   },
   "dependencies": {

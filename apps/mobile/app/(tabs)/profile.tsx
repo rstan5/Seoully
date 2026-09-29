@@ -191,10 +191,6 @@ export default function ProfileScreen() {
   }
 
   function enterRoom() {
-    if (!live) {
-      setNotice(copy.demoRoomUnavailable);
-      return;
-    }
     router.push("/room");
   }
 

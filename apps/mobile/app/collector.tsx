@@ -192,8 +192,12 @@ export default function CollectorScreen() {
 
   function enterRoom() {
     if (!collector) return;
-    if (social.kind === "demo" || !collector.roomAvailable) {
-      setNotice(social.kind === "demo" ? copy.demoRoomUnavailable : copy.roomPrivate);
+    if (social.kind === "demo") {
+      router.push({ pathname: "/collector-room", params: { userId } });
+      return;
+    }
+    if (!collector.roomAvailable) {
+      setNotice(copy.roomPrivate);
       return;
     }
     router.push({ pathname: "/collector-room", params: { userId } });

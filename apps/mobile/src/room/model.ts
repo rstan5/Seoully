@@ -141,15 +141,29 @@ export function moveRenderable(renderable: RoomRenderable, dx: number, depthOrVe
   };
 }
 
+export function surfaceAcceptsGeometry(surface: NativeRoomSurface, geometry: RoomRenderable["geometry"]) {
+  if (geometry === "poster") return surface.kind === "wall";
+  if (geometry === "photocard") return surface.id.includes("binder") || surface.id.includes("desk");
+  if (geometry === "apparel") return surface.id.includes("archive") || surface.id.includes("desk") || surface.id.includes("floor");
+  if (geometry === "lightstick" || geometry === "figure" || geometry === "plushie") {
+    return surface.id.includes("display-case") || surface.id.includes("desk") || surface.id.includes("shelf");
+  }
+  if (surface.kind === "wall") return false;
+  return true;
+}
+
 export function isSupportedRoomPlacement(renderable: RoomRenderable, roomId: string) {
-  return nativeRoomSurfaces(roomId).some((surface) => footprintDistance(renderable.position, surface) < 1.45);
+  return nativeRoomSurfaces(roomId).some((surface) =>
+    surfaceAcceptsGeometry(surface, renderable.geometry) && footprintDistance(renderable.position, surface) < 1.45,
+  );
 }
 
 export function settleRoomRenderable(renderable: RoomRenderable, roomId: string, preferredSurfaceId?: string) {
-  const surfaces = nativeRoomSurfaces(roomId);
-  const surface = surfaces.find((candidate) => candidate.id === preferredSurfaceId) ?? surfaces
+  const surfaces = nativeRoomSurfaces(roomId).filter((surface) => surfaceAcceptsGeometry(surface, renderable.geometry));
+  const preferred = surfaces.find((candidate) => candidate.id === preferredSurfaceId);
+  const surface = preferred ?? surfaces
     .map((candidate) => ({ candidate, distance: footprintDistance(renderable.position, candidate) }))
-    .sort((a, b) => a.distance - b.distance)[0]!.candidate;
+    .sort((a, b) => a.distance - b.distance)[0]?.candidate ?? nativeRoomSurfaces(roomId).find((item) => item.id.endsWith("-desk"))!;
   const halfHeight = extentsForGeometry(renderable.geometry).y / 2;
   return {
     renderable: {

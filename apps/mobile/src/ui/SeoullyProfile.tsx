@@ -4,6 +4,7 @@ import { PROFILE_VEIL, colors, elevation } from "../theme";
 import { SeoullyAvatar } from "./SeoullyAvatar";
 import { SeoullyChip } from "./SeoullyControls";
 import { SeoullyText } from "./SeoullyText";
+import { RoomWorldGlimpse } from "../room/RoomWorldGlimpse";
 
 export function formatCollectingSince(iso: string, locale: "en" | "ko") {
   const date = new Date(iso);
@@ -25,19 +26,12 @@ function hexToRgba(hex: string, alpha: number) {
 /**
  * Profile composition (ONE WORLD):
  *
- *   <SeoullyRoomUnderlay />   // later: NativeRoomRenderer (actual Room/placements/objects)
+ *   <SeoullyRoomUnderlay />   // room-derived glimpse of the collector world
  *   <SeoullyProfileVeil />    // ~85% mist, matching web --s-profile-veil
  *   identity / actions / shelves  // fully opaque children
- *
- * Temporary pre-Room: theme paper only. Do not draw fake objects, shelves, or placements.
  */
-export function SeoullyRoomUnderlay({ theme }: { theme?: SocialTheme }) {
-  return (
-    <View
-      pointerEvents="none"
-      style={[StyleSheet.absoluteFill, { backgroundColor: theme?.paper ?? colors.canvas }]}
-    />
-  );
+export function SeoullyRoomUnderlay({ theme, themeId }: { theme?: SocialTheme; themeId?: import("../api").NativeRoomThemeId }) {
+  return <RoomWorldGlimpse themeId={themeId ?? (theme?.scheme === "dark" ? "midnight" : "hearth")} />;
 }
 
 export function SeoullyProfileVeil({ theme }: { theme?: SocialTheme }) {

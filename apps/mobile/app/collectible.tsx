@@ -190,12 +190,11 @@ export default function CollectibleDetailScreen() {
                   fill
                   disabled={!isRoomEligible(holding)}
                   onPress={() => {
-                    if (social.kind === "demo") { setError(copy.demoRoomUnavailable); return; }
                     router.push("/room");
                   }}
                 />
                 {isBinderEligible(holding) ? (
-                  <SeoullyButton label={copy.viewBinder} variant="ghost" fill onPress={() => router.push("/binder")} />
+                  <SeoullyButton label={copy.viewBinder} variant="ghost" fill onPress={() => router.push({ pathname: "/room", params: { holdingId: holding.id } })} />
                 ) : (
                   <SeoullyButton label={copy.removeFromCollection} variant="ghost" fill disabled={busy} onPress={() => { void removeOwned(); }} />
                 )}

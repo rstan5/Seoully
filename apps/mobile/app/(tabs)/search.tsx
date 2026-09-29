@@ -295,7 +295,17 @@ export default function SearchScreen() {
                   savedLabel={copy.savedToWishlist}
                   wantedIds={wantedIds}
                   onAdd={social.kind === "production"
-                    ? (item) => router.push({ pathname: "/add", params: { templateId: item.id, name: item.name, kind: item.kind } })
+                    ? (item) => router.push({
+                      pathname: "/add",
+                      params: {
+                        templateId: item.id,
+                        name: item.name,
+                        kind: item.kind,
+                        groupName: item.groupName,
+                        memberName: item.memberName ?? "",
+                        releaseName: item.releaseName ?? "",
+                      },
+                    })
                     : undefined}
                   onSave={saveWanted}
                 />

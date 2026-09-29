@@ -166,7 +166,6 @@ export default function ProfileScreen() {
   }
 
   async function openCollection(tab: "collection" | "wishlist") {
-    if (!live) return;
     await AsyncStorage.setItem(COLLECTION_TAB_KEY, tab);
     router.push("/collection");
   }
@@ -237,10 +236,11 @@ export default function ProfileScreen() {
             {notice ? <SeoullyText variant="secondary" style={styles.inlineNotice}>{notice}</SeoullyText> : null}
           </View>
 
-          {groups.length > 0 || biases.length > 0 ? (
+          {groups.length > 0 || biases.length > 0 || (identity.profile.collectorInterests?.length ?? 0) > 0 ? (
             <View style={styles.chips}>
               {groups.map((group) => <SeoullyChip key={group.id} label={group.name} />)}
               {biases.map((member) => <SeoullyChip key={member.id} label={member.name} tone="bias" />)}
+              {(identity.profile.collectorInterests ?? []).map((interest) => <SeoullyChip key={interest} label={interest} />)}
             </View>
           ) : null}
 
@@ -281,25 +281,25 @@ export default function ProfileScreen() {
               <SeoullyOwnedRow
                 key={holding.id}
                 title={holding.template.name}
-                meta={[holding.template.groupName, holding.template.memberName, collectibleKindLabel(holding.template.kind, copy)].filter(Boolean).join(" · ")}
+                meta={[holding.template.groupName, holding.template.memberName, holding.template.releaseName, collectibleKindLabel(holding.template.kind, copy)].filter(Boolean).join(" · ")}
                 imageUrl={holding.personalMediaUrl}
                 colorway={holding.template.colorway}
                 tradeLabel={holding.tradeStatus === "for-trade" ? copy.compatOpenToTrade : copy.notForTrade}
                 removeLabel={copy.commonRemove}
-                onOpen={live ? () => router.push({ pathname: "/collectible", params: { holdingId: holding.id } }) : undefined}
+                onOpen={() => router.push({ pathname: "/collectible", params: { holdingId: holding.id } })}
                 onToggleTrade={() => { void toggleTrade(holding); }}
                 onRemove={() => { void removeOwned(holding); }}
               />
             ))}
-            {live && holdings.length === 0 ? (
-              <Pressable accessibilityRole="button" onPress={() => router.push("/collect")} style={styles.shelfAction}>
+            {holdings.length === 0 ? (
+              <Pressable accessibilityRole="button" onPress={addToCollection} style={styles.shelfAction}>
                 <SeoullyText variant="button" color={colors.plum}>{copy.profileAddToCollection}</SeoullyText>
               </Pressable>
-            ) : live ? (
+            ) : (
               <Pressable accessibilityRole="button" onPress={() => { void openCollection("collection"); }}>
                 <SeoullyText variant="button" color={colors.plum}>{copy.profileSeeAll}</SeoullyText>
               </Pressable>
-            ) : null}
+            )}
           </SeoullyShelf>
 
           <SeoullyShelf
@@ -319,7 +319,7 @@ export default function ProfileScreen() {
                 onPress={() => { void removeWanted(entry.templateId); }}
               />
             ))}
-            {live && wishlist.length > 0 ? (
+            {wishlist.length > 0 ? (
               <Pressable accessibilityRole="button" onPress={() => { void openCollection("wishlist"); }}>
                 <SeoullyText variant="button" color={colors.plum}>{copy.profileSeeAll}</SeoullyText>
               </Pressable>

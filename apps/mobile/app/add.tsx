@@ -5,7 +5,9 @@ import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import { createHolding, uploadCatalogReferencePhoto, uploadHoldingPhoto } from "../src/api";
 import { useSocialRepository } from "../src/data";
+import { catalogReferenceConsentDefault, shouldShareCatalogReference } from "../src/data/ownership";
 import { ScreenBack } from "../src/components/ScreenBack";
+import { collectibleKindLabel } from "../src/i18n";
 import { useCopy } from "../src/locale";
 import { PhotocardCropper, type CropRect } from "../src/media/PhotocardCropper";
 import { colors } from "../src/theme";
@@ -17,13 +19,22 @@ export default function AddCollectibleScreen() {
   const copy = useCopy();
   const router = useRouter();
   const social = useSocialRepository();
-  const params = useLocalSearchParams<{ templateId: string; name: string; kind: string; newTemplate?: string }>();
+  const params = useLocalSearchParams<{
+    templateId: string;
+    name: string;
+    kind: string;
+    groupName?: string;
+    memberName?: string;
+    releaseName?: string;
+    newTemplate?: string;
+  }>();
   const [uri, setUri] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [shareReference, setShareReference] = useState(false);
+  const [shareReference, setShareReference] = useState(catalogReferenceConsentDefault());
   const [cropAsset, setCropAsset] = useState<{ uri: string; width: number; height: number } | null>(null);
   const photocard = params.kind === "photocard";
+  const isNewTemplate = params.newTemplate === "true";
 
   async function choose(source: "camera" | "library") {
     setMessage(null);
@@ -64,19 +75,39 @@ export default function AddCollectibleScreen() {
     setWorking(true);
     setMessage(null);
     try {
-      const result = await createHolding(params.templateId) as { holding?: { id: string } };
-      if (uri && result.holding?.id) await uploadHoldingPhoto(result.holding.id, uri);
-      if (uri && shareReference && params.newTemplate === "true") await uploadCatalogReferencePhoto(params.templateId, uri);
-      if (result.holding?.id) {
-        router.replace({ pathname: "/collectible", params: { holdingId: result.holding.id } });
-        return;
+      const { holding } = await createHolding(params.templateId);
+      let photoFailed = false;
+      if (uri) {
+        try {
+          await uploadHoldingPhoto(holding.id, uri);
+        } catch {
+          photoFailed = true;
+        }
+        if (shouldShareCatalogReference({ consent: shareReference, isNewTemplate, hasPersonalMedia: !photoFailed })) {
+          try {
+            await uploadCatalogReferencePhoto(params.templateId, uri);
+          } catch {
+            photoFailed = true;
+          }
+        }
       }
-      router.replace("/collection");
+      router.replace({
+        pathname: "/collectible",
+        params: { holdingId: holding.id, ...(photoFailed ? { photoWarning: "1" } : {}) },
+      });
+      return;
     } catch {
       setMessage(copy.holdingCreateFailed);
     }
     setWorking(false);
   }
+
+  const meta = [
+    typeof params.groupName === "string" ? params.groupName : "",
+    typeof params.memberName === "string" ? params.memberName : "",
+    typeof params.releaseName === "string" ? params.releaseName : "",
+    params.kind ? collectibleKindLabel(params.kind, copy) : "",
+  ].filter(Boolean).join(" · ");
 
   return (
     <SeoullyScreen>
@@ -84,6 +115,7 @@ export default function AddCollectibleScreen() {
         <ScreenBack label={copy.back} onPress={() => router.back()} />
         <SeoullyText variant="title" style={styles.headline}>{copy.myCopyTitle}</SeoullyText>
         <SeoullyText variant="handle" color={colors.plum}>{params.name ?? copy.catalogItemFallback}</SeoullyText>
+        {meta ? <SeoullyText variant="caption" style={styles.meta}>{meta}</SeoullyText> : null}
         <SeoullyText variant="secondary" style={styles.lede}>{copy.myCopyLede}</SeoullyText>
         {uri ? (
           <Image
@@ -101,7 +133,7 @@ export default function AddCollectibleScreen() {
           <SeoullyButton label={copy.takePhoto} variant="ghost" fill onPress={() => { void choose("camera"); }} />
           <SeoullyButton label={copy.chooseFromLibrary} variant="ghost" fill onPress={() => { void choose("library"); }} />
         </View>
-        {params.newTemplate === "true" ? (
+        {isNewTemplate ? (
           <Pressable
             accessibilityRole="checkbox"
             accessibilityState={{ checked: shareReference }}
@@ -109,6 +141,7 @@ export default function AddCollectibleScreen() {
             style={styles.consent}
           >
             <SeoullyText variant="body">{shareReference ? "☑" : "☐"} {copy.shareCatalogPhoto}</SeoullyText>
+            <SeoullyText variant="caption" color={colors.muted}>{copy.shareCatalogPhotoHelp}</SeoullyText>
           </Pressable>
         ) : null}
         <SeoullyButton
@@ -137,6 +170,7 @@ export default function AddCollectibleScreen() {
 const styles = StyleSheet.create({
   container: { gap: 14, paddingBottom: 80, paddingHorizontal: 16 },
   headline: { letterSpacing: -0.8, marginTop: 8 },
+  meta: { marginTop: 2 },
   lede: { lineHeight: 21 },
   preview: { alignSelf: "center", borderRadius: 14, height: 240, width: 180 },
   cardPreview: { alignSelf: "center", aspectRatio: 55 / 85, borderRadius: 10, width: "58%" },
@@ -150,5 +184,5 @@ const styles = StyleSheet.create({
   },
   emptyText: { textAlign: "center" },
   row: { flexDirection: "row", gap: 8 },
-  consent: { minHeight: 44, justifyContent: "center" },
+  consent: { gap: 4, minHeight: 44, justifyContent: "center" },
 });

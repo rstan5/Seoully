@@ -154,6 +154,8 @@ Order is dependency-shaped. **Slice 1 is first.**
 
 **Device QA:** Sign in → add from catalog → skip photo → count + list → photocard appears in Binder → wishlist from Search → remove wishlist → trade toggle → remove holding → counts update.
 
+**Implementation (2026-09-29):** SLICE 2 — CODE VERIFIED / DEVICE QA PENDING. Own Profile, Collection, Add Collectible (`/collect` catalog or manual), confirm (`/add`), and collectible detail form one production-backed journey: `createHolding` persists immediately without photo or Room placement; optional personal media + photocard crop; consent default false for catalog reference images; Profile/Collection refresh on focus; Binder selects photocard holdings; Room stored collection includes unplaced owned holdings. Demo cannot mutate production through this flow. No new migrations. `20261001` and `20261002` were not applied.
+
 ---
 
 ### Slice 3 — Other collector (identity graph)

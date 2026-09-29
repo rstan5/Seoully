@@ -8,10 +8,10 @@ import { useCopy } from "../src/locale";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
 import { colors } from "../src/theme";
-import { SeoullyChoiceChip } from "../src/ui/SeoullyControls";
+import { SeoullyButton, SeoullyChoiceChip } from "../src/ui/SeoullyControls";
 import { SeoullyEmptyState } from "../src/ui/SeoullyEmptyState";
+import { SeoullyOwnedRow, SeoullyShelfRow } from "../src/ui/SeoullyProfile";
 import { SeoullyScreen } from "../src/ui/SeoullyScreen";
-import { SeoullyShelfRow } from "../src/ui/SeoullyProfile";
 import { SeoullyText } from "../src/ui/SeoullyText";
 import type { NativeHolding, NativeWishlistEntry } from "../src/api";
 
@@ -107,7 +107,19 @@ export default function CollectionScreen() {
       const updated = await social.setHoldingTradeStatus(holding.id, nextStatus);
       setHoldings((current) => current.map((item) => item.id === updated.id ? updated : item));
     } catch {
-      setError(copy.collectionUnavailable);
+      setError(copy.holdingTradeFailed);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function removeOwned(holding: NativeHolding) {
+    setBusyId(holding.id);
+    try {
+      await social.removeHolding(holding.id);
+      setHoldings((current) => current.filter((item) => item.id !== holding.id));
+    } catch {
+      setError(copy.holdingRemoveFailed);
     } finally {
       setBusyId(null);
     }
@@ -142,10 +154,13 @@ export default function CollectionScreen() {
         ListHeaderComponent={(
           <View>
             <ScreenBack label={copy.back} onPress={() => router.back()} />
-            <SeoullyText variant="title" style={styles.title}>
+            <SeoullyText variant="section" style={styles.title}>
               {tab === "collection" ? copy.profileOwned : copy.profileWishlistTitle}
             </SeoullyText>
             <SeoullyText variant="secondary" style={styles.lead}>{copy.collectionLead}</SeoullyText>
+            <View style={styles.add}>
+              <SeoullyButton label={copy.profileAddToCollection} block onPress={() => router.push("/collect")} />
+            </View>
             <View style={styles.tabs}>
               <SeoullyChoiceChip
                 selected={tab === "collection"}
@@ -176,34 +191,25 @@ export default function CollectionScreen() {
           </Pressable>
         ) : null}
         renderItem={({ item }) => item.kind === "holding" ? (
-          <View style={styles.row}>
-            <SeoullyShelfRow
-              title={item.holding.template.name}
-              meta={[item.holding.template.groupName, item.holding.template.memberName, item.holding.template.releaseName, collectibleKindLabel(item.holding.template.kind, copy)].filter(Boolean).join(" · ")}
-              imageUrl={item.holding.personalMediaUrl}
-              onPress={() => router.push({ pathname: "/collectible", params: { holdingId: item.holding.id } })}
-            />
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: item.holding.tradeStatus === "for-trade", disabled: busyId === item.holding.id }}
-              disabled={busyId === item.holding.id}
-              onPress={() => { void toggleTrade(item.holding); }}
-              style={styles.action}
-            >
-              <SeoullyText variant="caption" color={colors.plum}>
-                {item.holding.tradeStatus === "for-trade" ? copy.forTrade : copy.notForTrade}
-              </SeoullyText>
-            </Pressable>
-          </View>
+          <SeoullyOwnedRow
+            title={item.holding.template.name}
+            meta={[item.holding.template.groupName, item.holding.template.memberName, item.holding.template.releaseName, item.holding.template.descriptor, collectibleKindLabel(item.holding.template.kind, copy)].filter(Boolean).join(" · ")}
+            imageUrl={item.holding.personalMediaUrl}
+            colorway={item.holding.template.colorway}
+            tradeLabel={busyId === item.holding.id ? copy.saving : (item.holding.tradeStatus === "for-trade" ? copy.forTrade : copy.notForTrade)}
+            removeLabel={copy.commonRemove}
+            onOpen={() => router.push({ pathname: "/collectible", params: { holdingId: item.holding.id } })}
+            onToggleTrade={() => { void toggleTrade(item.holding); }}
+            onRemove={() => { void removeOwned(item.holding); }}
+          />
         ) : (
-          <View style={styles.row}>
-            <SeoullyShelfRow
-              title={item.entry.template.name}
-              meta={[item.entry.template.groupName, item.entry.template.memberName, item.entry.template.releaseName, collectibleKindLabel(item.entry.template.kind, copy)].filter(Boolean).join(" · ")}
-              action={copy.removeFromWishlist}
-              onPress={() => { void removeWanted(item.entry); }}
-            />
-          </View>
+          <SeoullyShelfRow
+            title={item.entry.template.name}
+            meta={[item.entry.template.groupName, item.entry.template.memberName, item.entry.template.releaseName, collectibleKindLabel(item.entry.template.kind, copy)].filter(Boolean).join(" · ")}
+            action={copy.removeFromWishlist}
+            colorway={item.entry.template.colorway}
+            onPress={() => { void removeWanted(item.entry); }}
+          />
         )}
       />
     </SeoullyScreen>
@@ -214,25 +220,8 @@ const styles = StyleSheet.create({
   container: { paddingBottom: 80, paddingHorizontal: 16 },
   title: { marginTop: 8 },
   lead: { marginTop: 6, maxWidth: 320 },
+  add: { marginTop: 16 },
   tabs: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 16 },
   loading: { marginTop: 24 },
-  row: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginTop: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 2,
-  },
-  action: {
-    alignSelf: "flex-end",
-    backgroundColor: colors.lilacSoft,
-    borderRadius: 999,
-    marginBottom: 10,
-    minHeight: 36,
-    justifyContent: "center",
-    paddingHorizontal: 12,
-  },
   more: { alignItems: "center", justifyContent: "center", minHeight: 44, marginTop: 12 },
 });

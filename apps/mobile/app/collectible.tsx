@@ -5,6 +5,7 @@ import * as ImageManipulator from "expo-image-manipulator";
 import { Image, ScrollView, StyleSheet, View } from "react-native";
 import { loadMyHolding, uploadHoldingPhoto, type NativeHolding } from "../src/api";
 import { useSocialRepository } from "../src/data";
+import { isBinderEligible, isRoomEligible } from "../src/data/ownership";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
 import { collectibleKindLabel } from "../src/i18n";
@@ -21,7 +22,7 @@ export default function CollectibleDetailScreen() {
   const copy = useCopy();
   const { locale } = useLocale();
   const router = useRouter();
-  const { holdingId = "" } = useLocalSearchParams<{ holdingId?: string }>();
+  const { holdingId = "", photoWarning } = useLocalSearchParams<{ holdingId?: string; photoWarning?: string }>();
   const [holding, setHolding] = useState<NativeHolding | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -104,8 +105,20 @@ export default function CollectibleDetailScreen() {
       setHolding(await social.setHoldingTradeStatus(holding.id, holding.tradeStatus === "for-trade" ? "not-for-trade" : "for-trade"));
       setError(null);
     } catch {
-      setError(copy.collectionUnavailable);
+      setError(copy.holdingTradeFailed);
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeOwned() {
+    if (!holding || busy) return;
+    setBusy(true);
+    try {
+      await social.removeHolding(holding.id);
+      router.replace("/collection");
+    } catch {
+      setError(copy.holdingRemoveFailed);
       setBusy(false);
     }
   }
@@ -119,12 +132,18 @@ export default function CollectibleDetailScreen() {
         {holding ? (
           <>
             {mediaUri ? (
-              <Image accessibilityLabel={copy.personalPreview} resizeMode="contain" source={{ uri: mediaUri }} style={styles.image} />
+              <Image
+                accessibilityLabel={copy.personalPreview}
+                resizeMode="contain"
+                source={{ uri: mediaUri }}
+                style={holding.template.kind === "photocard" ? styles.image : styles.objectImage}
+              />
             ) : (
-              <View style={styles.fallback}>
+              <View style={holding.template.kind === "photocard" ? styles.fallback : styles.objectFallback}>
                 <SeoullyText variant="title" style={styles.fallbackText}>{holding.template.name}</SeoullyText>
               </View>
             )}
+            {photoWarning === "1" ? <SeoullyText variant="secondary" color={colors.plum} style={styles.kind}>{copy.holdingAddedPhotoFailed}</SeoullyText> : null}
             <SeoullyText variant="caption" color={colors.plum} style={styles.kind}>
               {collectibleKindLabel(holding.template.kind, copy)}
             </SeoullyText>
@@ -159,9 +178,28 @@ export default function CollectibleDetailScreen() {
                 />
               </View>
               <View style={styles.row}>
-                <SeoullyButton label={copy.viewRoom} variant="ghost" fill onPress={() => router.push("/room")} />
-                <SeoullyButton label={copy.viewBinder} variant="ghost" fill onPress={() => router.push("/binder")} />
+                <SeoullyButton
+                  label={copy.viewRoom}
+                  variant="ghost"
+                  fill
+                  disabled={!isRoomEligible(holding)}
+                  onPress={() => {
+                    if (social.kind === "demo") { setError(copy.demoRoomUnavailable); return; }
+                    router.push("/room");
+                  }}
+                />
+                {isBinderEligible(holding) ? (
+                  <SeoullyButton label={copy.viewBinder} variant="ghost" fill onPress={() => router.push("/binder")} />
+                ) : (
+                  <SeoullyButton label={copy.removeFromCollection} variant="ghost" fill disabled={busy} onPress={() => { void removeOwned(); }} />
+                )}
               </View>
+              {isBinderEligible(holding) ? (
+                <SeoullyButton label={copy.removeFromCollection} variant="ghost" block disabled={busy} onPress={() => { void removeOwned(); }} />
+              ) : null}
+              <SeoullyText variant="caption" color={colors.muted}>
+                {isBinderEligible(holding) ? copy.binderEligibleHint : copy.roomEligibleHint}
+              </SeoullyText>
             </View>
           </>
         ) : null}
@@ -184,6 +222,7 @@ export default function CollectibleDetailScreen() {
 const styles = StyleSheet.create({
   container: { paddingBottom: 80, paddingHorizontal: 16 },
   image: { alignSelf: "center", aspectRatio: 55 / 85, marginTop: 16, maxHeight: 500, width: "78%" },
+  objectImage: { alignSelf: "center", aspectRatio: 1, marginTop: 16, maxHeight: 280, width: "72%" },
   fallback: {
     alignItems: "center",
     alignSelf: "center",
@@ -194,6 +233,17 @@ const styles = StyleSheet.create({
     marginTop: 16,
     padding: 18,
     width: "78%",
+  },
+  objectFallback: {
+    alignItems: "center",
+    alignSelf: "center",
+    aspectRatio: 1,
+    backgroundColor: colors.lilacSoft,
+    borderRadius: 18,
+    justifyContent: "center",
+    marginTop: 16,
+    padding: 18,
+    width: "72%",
   },
   fallbackText: { textAlign: "center" },
   kind: { letterSpacing: 0.4, marginTop: 18, textTransform: "uppercase" },

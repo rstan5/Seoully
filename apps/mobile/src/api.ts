@@ -59,7 +59,7 @@ export async function searchCatalog(query: string): Promise<NativeCatalogTemplat
   return payload.results ?? [];
 }
 
-export async function createHolding(templateId: string) {
+export async function createHolding(templateId: string): Promise<{ holding: NativeHolding }> {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
   if (!accessToken) throw new Error("unauthenticated");
@@ -69,7 +69,9 @@ export async function createHolding(templateId: string) {
     body: JSON.stringify({ templateId }),
   });
   if (!response.ok) throw new Error("holding_create_failed");
-  return response.json();
+  const payload = await response.json() as { holding?: NativeHolding };
+  if (!payload.holding?.id) throw new Error("holding_create_failed");
+  return { holding: payload.holding };
 }
 
 export type NativeHolding = {

@@ -31,6 +31,7 @@ export default function CollectScreen() {
   const [groupName, setGroupName] = useState("");
   const [memberName, setMemberName] = useState("");
   const [releaseName, setReleaseName] = useState("");
+  const [versionName, setVersionName] = useState("");
   const [kind, setKind] = useState<(typeof COLLECTIBLE_KINDS)[number]>("photocard");
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -67,6 +68,9 @@ export default function CollectScreen() {
         templateId: template.id,
         name: template.name,
         kind: template.kind,
+        groupName: template.groupName,
+        memberName: template.memberName ?? "",
+        releaseName: template.releaseName ?? "",
         ...(extra?.newTemplate ? { newTemplate: "true" } : {}),
       },
     });
@@ -85,6 +89,7 @@ export default function CollectScreen() {
         memberName: memberName.trim() || undefined,
         releaseName: releaseName.trim() || undefined,
         kind,
+        ...(versionName.trim() ? { descriptor: versionName.trim() } : {}),
       });
       openPhoto(result.contribution.template, { newTemplate: "true" });
     } catch {
@@ -129,7 +134,7 @@ export default function CollectScreen() {
                 <SeoullyShelfRow
                   key={template.id}
                   title={template.name}
-                  meta={[template.groupName, template.memberName, collectibleKindLabel(template.kind, copy)].filter(Boolean).join(" · ")}
+                  meta={[template.groupName, template.memberName, template.releaseName, template.descriptor, collectibleKindLabel(template.kind, copy)].filter(Boolean).join(" · ")}
                   onPress={() => openPhoto(template)}
                 />
               ))}
@@ -181,6 +186,12 @@ export default function CollectScreen() {
                 value={releaseName}
                 onChangeText={setReleaseName}
                 placeholder={copy.releaseOptionalPlaceholder}
+              />
+              <SeoullyField
+                label={`${copy.catalogVersion} · ${copy.catalogOptional}`}
+                value={versionName}
+                onChangeText={setVersionName}
+                placeholder={copy.catalogVersionPlaceholder}
               />
               {message ? <SeoullyText accessibilityRole="alert" variant="caption" color={colors.plum}>{message}</SeoullyText> : null}
               <SeoullyButton

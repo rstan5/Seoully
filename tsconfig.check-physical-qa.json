@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "outDir": ".tmp/build",
+    "skipLibCheck": true,
+    "strict": false,
+    "esModuleInterop": true
+  },
+  "include": [
+    "scripts/check-physical-qa.ts",
+    "apps/mobile/src/startup/eligibility.ts",
+    "apps/mobile/src/startup/routing.ts",
+    "apps/mobile/src/ui/profileContrast.ts",
+    "apps/mobile/src/theme.ts"
+  ]
+}

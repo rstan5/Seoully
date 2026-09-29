@@ -14,19 +14,18 @@ import {
 } from "react-native";
 import { usePathname, useRouter, useGlobalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { supabase } from "../supabase";
 import { useAskSurfaceOverlay } from "../ask-surface";
 import { contextFromNativeRoute, isAskNavigationAction, mergeAskContext, nativeRouteLeaf, type AskNavigationAction } from "seoully-domain/ask-context";
 import { useSocialRepository, type NativeAskCard } from "../data";
 import { isExploreDestination } from "../explore";
 import { useCopy, useLocale } from "../locale";
+import { useBootstrap } from "../startup/BootstrapProvider";
 import { colors, elevation, radii, sizes } from "../theme";
 import { pressShift, useReduceMotion } from "./motion";
 import { SeoullyText } from "./SeoullyText";
 
 const HEART = require("../../assets/brand/seoully-heart-mark.png");
 const TAB_LEAF = new Set(["", "search", "create", "messages", "profile", "send-to", "notices", "index"]);
-const HIDDEN_LEAF = new Set(["onboarding"]);
 
 function cardActionLabel(action: AskNavigationAction, copy: ReturnType<typeof useCopy>) {
   if (action.type === "profile" || action.type === "profile_self") return copy.askViewProfile;
@@ -52,28 +51,14 @@ export function SeoullyCompanion() {
   const { locale } = useLocale();
   const router = useRouter();
   const social = useSocialRepository();
+  const boot = useBootstrap();
   const context = mergeAskContext(contextFromNativeRoute(pathname, params as Record<string, string | string[] | undefined>), overlay);
-  const [sessionReady, setSessionReady] = useState(false);
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [bounce] = useState(() => new Animated.Value(0));
-
-  useEffect(() => {
-    let mounted = true;
-    void supabase.auth.getSession().then(({ data }) => {
-      if (mounted) setSessionReady(Boolean(data.session));
-    });
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSessionReady(Boolean(session));
-    });
-    return () => {
-      mounted = false;
-      data.subscription.unsubscribe();
-    };
-  }, []);
 
   useEffect(() => {
     if (reduceMotion) {
@@ -91,8 +76,7 @@ export function SeoullyCompanion() {
     return () => loop.stop();
   }, [bounce, reduceMotion]);
 
-  const visible = sessionReady && !HIDDEN_LEAF.has(nativeRouteLeaf(pathname));
-  if (!visible) return null;
+  if (!boot.companionEligible) return null;
 
   const tabOffset = TAB_LEAF.has(nativeRouteLeaf(pathname)) ? sizes.tabBar + 8 : 16;
   const bottom = insets.bottom + tabOffset;

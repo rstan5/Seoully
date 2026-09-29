@@ -9,6 +9,8 @@ import { ScreenBack } from "../src/components/ScreenBack";
 import { collectibleKindLabel, type MobileCopy } from "../src/i18n";
 import { useCopy, useLocale } from "../src/locale";
 import { colors } from "../src/theme";
+import { identityPalette } from "../src/ui/profileContrast";
+import { ProfileIdentityProvider } from "../src/ui/ProfileIdentity";
 import { SeoullyButton, SeoullyChip, SeoullyShelf } from "../src/ui/SeoullyControls";
 import { SeoullyEmptyState } from "../src/ui/SeoullyEmptyState";
 import { SeoullyFeedPost } from "../src/ui/SeoullyFeedPost";
@@ -16,6 +18,7 @@ import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
 import {
   formatCollectingSince,
   SeoullyHighlight,
+  SeoullyProfileChrome,
   SeoullyProfileHead,
   SeoullyProfileMeta,
   SeoullyProfileVeil,
@@ -203,10 +206,14 @@ export default function CollectorScreen() {
     router.push({ pathname: "/collector-room", params: { userId } });
   }
 
+  const palette = identityPalette(collector?.theme);
+
   return (
-    <SeoullyScreen backgroundColor={collector?.theme?.mist ?? colors.mist}>
+    <SeoullyScreen backgroundColor={palette.mist}>
       <SeoullyRoomUnderlay theme={collector?.theme} />
-      <SeoullyProfileVeil theme={collector?.theme} />
+      <SeoullyProfileVeil theme={collector?.theme} mist={palette.mist} />
+      <ProfileIdentityProvider palette={palette}>
+        <SeoullyProfileChrome>
       <View style={styles.top}>
         <ScreenBack label={copy.back} onPress={() => router.back()} />
         <Pressable accessibilityRole="button" onPress={toggleLocale} style={styles.lang}>
@@ -376,6 +383,8 @@ export default function CollectorScreen() {
           </SeoullyText>
         </ScrollView>
       ) : !loading && !error ? <SeoullyEmptyState align="start" body={copy.collectorUnavailable} /> : null}
+        </SeoullyProfileChrome>
+      </ProfileIdentityProvider>
     </SeoullyScreen>
   );
 }

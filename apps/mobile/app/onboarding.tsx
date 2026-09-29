@@ -23,6 +23,7 @@ import { BrandMark } from "../src/ui/BrandMark";
 import { SeoullyAvatar } from "../src/ui/SeoullyAvatar";
 import { SeoullyButton, SeoullyChoiceChip } from "../src/ui/SeoullyControls";
 import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
+import { useBootstrap } from "../src/startup/BootstrapProvider";
 import { useReduceMotion } from "../src/ui/motion";
 import { SeoullyScreen } from "../src/ui/SeoullyScreen";
 import { SeoullyText } from "../src/ui/SeoullyText";
@@ -53,6 +54,7 @@ export default function OnboardingScreen() {
   const reduceMotion = useReduceMotion();
   const social = useSocialRepository();
   const { setDemo } = useDataMode();
+  const boot = useBootstrap();
   const [state, setState] = useState<NativeOnboardingState | null>(null);
   const [phase, setPhase] = useState<OnboardingPhase>("group");
   const [groupIds, setGroupIds] = useState<string[]>([]);
@@ -201,6 +203,7 @@ export default function OnboardingScreen() {
     setError(null);
     try {
       await updateNativeOnboarding({ action: "complete" });
+      boot.enterApp();
       router.replace("/(tabs)");
     } catch {
       setError(t.onboardingSaveFailed);
@@ -213,6 +216,7 @@ export default function OnboardingScreen() {
     setError(null);
     try {
       await updateNativeOnboarding({ action: "complete" });
+      boot.enterApp();
       router.replace({ pathname: "/collector", params: { userId } });
     } catch {
       setError(t.onboardingSaveFailed);

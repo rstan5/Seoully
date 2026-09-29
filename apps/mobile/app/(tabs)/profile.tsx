@@ -17,6 +17,8 @@ import { collectibleKindLabel } from "../../src/i18n";
 import { useCopy, useLocale } from "../../src/locale";
 import { supabase } from "../../src/supabase";
 import { colors } from "../../src/theme";
+import { identityPalette } from "../../src/ui/profileContrast";
+import { ProfileIdentityProvider } from "../../src/ui/ProfileIdentity";
 import { SeoullyButton, SeoullyChip, SeoullyShelf } from "../../src/ui/SeoullyControls";
 import { SeoullyFeedPost } from "../../src/ui/SeoullyFeedPost";
 import { SeoullyHeader } from "../../src/ui/SeoullyHeader";
@@ -25,6 +27,7 @@ import {
   formatCollectingSince,
   SeoullyHighlight,
   SeoullyOwnedRow,
+  SeoullyProfileChrome,
   SeoullyProfileHead,
   SeoullyProfileMeta,
   SeoullyProfileVeil,
@@ -176,9 +179,7 @@ export default function ProfileScreen() {
     const { error: signOutError } = await supabase.auth.signOut();
     if (signOutError) {
       setNotice(copy.signOutFailed);
-      return;
     }
-    router.replace("/");
   }
 
   function addToCollection() {
@@ -194,12 +195,16 @@ export default function ProfileScreen() {
     router.push("/room");
   }
 
+  const palette = identityPalette(theme);
+
   return (
-    <SeoullyScreen backgroundColor={theme?.mist ?? colors.mist}>
+    <SeoullyScreen backgroundColor={palette.mist}>
       <SeoullyRoomUnderlay theme={theme} />
-      <SeoullyProfileVeil theme={theme} />
+      <SeoullyProfileVeil theme={theme} mist={palette.mist} />
+      <ProfileIdentityProvider palette={palette}>
+        <SeoullyProfileChrome>
       <SeoullyHeader languageLabel={copy.switchLanguage} onToggleLanguage={toggleLocale} />
-      <SeoullyText variant="caption" color={colors.muted} style={styles.underlayHint}>{copy.profileUnderlayHint}</SeoullyText>
+      <SeoullyText variant="caption" style={styles.underlayHint}>{copy.profileUnderlayHint}</SeoullyText>
       {loading && !identity ? <SeoullyLoadingState label={copy.profile} /> : null}
       {error ? <View style={styles.notice}><RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /></View> : null}
       {identity ? (
@@ -325,6 +330,8 @@ export default function ProfileScreen() {
           </SeoullyShelf>
         </ScrollView>
       ) : null}
+        </SeoullyProfileChrome>
+      </ProfileIdentityProvider>
     </SeoullyScreen>
   );
 }

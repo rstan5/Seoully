@@ -443,10 +443,11 @@ export async function askSeoullyNative(input: {
   return response.json() as Promise<{ reply?: string; cards?: NativeAskCard[] }>;
 }
 
-export async function loadNativeOnboarding(): Promise<NativeOnboardingState> {
+export async function loadNativeOnboarding(signal?: AbortSignal): Promise<NativeOnboardingState> {
   const accessToken = await mobileAccessToken();
   const response = await fetch(`${productApiBase()}/api/mobile/onboarding`, {
     headers: { Authorization: `Bearer ${accessToken}` },
+    ...(signal ? { signal } : {}),
   });
   if (!response.ok) throw new Error("onboarding_unavailable");
   return response.json() as Promise<NativeOnboardingState>;

@@ -1,6 +1,9 @@
+import type { ReactNode } from "react";
 import { Image, Pressable, StyleSheet, View } from "react-native";
 import type { SocialTheme } from "../data/types";
 import { PROFILE_VEIL, colors, elevation } from "../theme";
+import { hexToRgba } from "./profileContrast";
+import { useProfileIdentity } from "./ProfileIdentity";
 import { SeoullyAvatar } from "./SeoullyAvatar";
 import { SeoullyChip } from "./SeoullyControls";
 import { SeoullyText } from "./SeoullyText";
@@ -12,17 +15,6 @@ export function formatCollectingSince(iso: string, locale: "en" | "ko") {
   return date.toLocaleDateString(locale === "ko" ? "ko-KR" : "en-US", { month: "long", year: "numeric" });
 }
 
-function hexToRgba(hex: string, alpha: number) {
-  const value = hex.trim().replace("#", "");
-  if (value.length !== 6) return `rgba(255, 241, 244, ${alpha})`;
-  const n = Number.parseInt(value, 16);
-  if (Number.isNaN(n)) return `rgba(255, 241, 244, ${alpha})`;
-  const r = (n >> 16) & 255;
-  const g = (n >> 8) & 255;
-  const b = n & 255;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
 /**
  * Profile composition (ONE WORLD):
  *
@@ -31,16 +23,24 @@ function hexToRgba(hex: string, alpha: number) {
  *   identity / actions / shelves  // fully opaque children
  */
 export function SeoullyRoomUnderlay({ theme, themeId }: { theme?: SocialTheme; themeId?: import("../api").NativeRoomThemeId }) {
-  return <RoomWorldGlimpse themeId={themeId ?? (theme?.scheme === "dark" ? "midnight" : "hearth")} />;
+  return (
+    <View pointerEvents="none" style={styles.worldLayer}>
+      <RoomWorldGlimpse themeId={themeId ?? (theme?.scheme === "dark" ? "midnight" : "hearth")} />
+    </View>
+  );
 }
 
-export function SeoullyProfileVeil({ theme }: { theme?: SocialTheme }) {
+export function SeoullyProfileVeil({ theme, mist }: { theme?: SocialTheme; mist?: string }) {
   return (
     <View
       pointerEvents="none"
-      style={[StyleSheet.absoluteFill, { backgroundColor: hexToRgba(theme?.mist ?? colors.mist, PROFILE_VEIL) }]}
+      style={[styles.veilLayer, { backgroundColor: hexToRgba(mist ?? theme?.mist ?? colors.mist, PROFILE_VEIL) }]}
     />
   );
+}
+
+export function SeoullyProfileChrome({ children }: { children: ReactNode }) {
+  return <View style={styles.chrome}>{children}</View>;
 }
 
 export function SeoullyProfileHead({
@@ -58,14 +58,15 @@ export function SeoullyProfileHead({
   onEdit?: () => void;
   imageUrl?: string;
 }) {
+  const identity = useProfileIdentity();
   return (
     <View style={styles.head}>
-      <View style={styles.avatarRing}>
+      <View style={[styles.avatarRing, identity ? { backgroundColor: identity.paper, borderColor: identity.line } : null]}>
         <SeoullyAvatar name={name} size={86} imageUrl={imageUrl} />
       </View>
       <View style={styles.copy}>
         <SeoullyText variant="title">{name}</SeoullyText>
-        <SeoullyText variant="handle" color={colors.muted} style={styles.handle}>@{handle}</SeoullyText>
+        <SeoullyText variant="handle" color={identity?.mute} style={styles.handle}>@{handle}</SeoullyText>
         {editLabel && onEdit ? (
           <Pressable accessibilityRole="button" hitSlop={8} onPress={onEdit} style={styles.edit}>
             <SeoullyText variant="caption" color={colors.plum}>{editLabel}</SeoullyText>
@@ -73,7 +74,7 @@ export function SeoullyProfileHead({
         ) : null}
         <View style={styles.counts}>
           {counts.map((count) => (
-            <SeoullyText key={count.label} variant="caption" color="#555555">
+            <SeoullyText key={count.label} variant="caption" color={identity?.counts}>
               <SeoullyText variant="handle">{count.value}</SeoullyText>
               {" "}
               {count.label}
@@ -240,6 +241,9 @@ export function SeoullyShelfRow({
 }
 
 const styles = StyleSheet.create({
+  worldLayer: { ...StyleSheet.absoluteFill, zIndex: 0 },
+  veilLayer: { ...StyleSheet.absoluteFill, zIndex: 1 },
+  chrome: { flex: 1, zIndex: 2 },
   head: { alignItems: "center", flexDirection: "row", gap: 16 },
   avatarRing: {
     backgroundColor: colors.surface,

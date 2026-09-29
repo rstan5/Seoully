@@ -78,9 +78,7 @@ export default function EditProfileScreen() {
     if (signOutError) {
       setMessage(copy.signOutFailed);
       setBusy(false);
-      return;
     }
-    router.replace("/");
   }
 
   return (

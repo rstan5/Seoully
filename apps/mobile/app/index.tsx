@@ -1,23 +1,20 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from "react-native";
-import { useRouter } from "expo-router";
 import { mobileConfig } from "../src/config";
-import { loadNativeOnboarding } from "../src/api";
 import { KeyboardScreen } from "../src/components/KeyboardScreen";
 import { useCopy, useLocale } from "../src/locale";
 import { supabase } from "../src/supabase";
+import { useBootstrap } from "../src/startup/BootstrapProvider";
 import { colors } from "../src/theme";
 import { BrandMark } from "../src/ui/BrandMark";
 import { SeoullyButton } from "../src/ui/SeoullyControls";
-import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
 import { SeoullyScreen } from "../src/ui/SeoullyScreen";
 import { SeoullyText } from "../src/ui/SeoullyText";
 
 export default function Index() {
-  const router = useRouter();
   const t = useCopy();
   const { toggleLocale } = useLocale();
-  const [ready, setReady] = useState(false);
+  const boot = useBootstrap();
   const [gate, setGate] = useState<"welcome" | "create" | "signin">("welcome");
   const [createMode, setCreateMode] = useState(false);
   const [handle, setHandle] = useState("");
@@ -26,36 +23,6 @@ export default function Index() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  const routeAfterAuth = useCallback(async () => {
-    if (!mobileConfig.productApiConfigured) {
-      setMessage(t.productApiUnconfigured);
-      return;
-    }
-    try {
-      const onboarding = await loadNativeOnboarding();
-      router.replace(onboarding.step === "done" ? "/(tabs)" : "/onboarding");
-    } catch {
-      setMessage(t.onboardingUnavailable);
-    }
-  }, [router, t.onboardingUnavailable, t.productApiUnconfigured]);
-
-  useEffect(() => {
-    let mounted = true;
-    void supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      if (data.session) void routeAfterAuth().finally(() => mounted && setReady(true));
-      else setReady(true);
-    });
-    const { data: listener } = supabase.auth.onAuthStateChange((event) => {
-      if (mounted && event === "SIGNED_IN") void routeAfterAuth();
-    });
-    return () => { mounted = false; listener.subscription.unsubscribe(); };
-  }, [routeAfterAuth]);
-
-  if (!ready) {
-    return <SeoullyScreen><SeoullyLoadingState label={t.brand} /></SeoullyScreen>;
-  }
 
   async function submit() {
     const normalizedHandle = handle.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
@@ -79,7 +46,7 @@ export default function Index() {
     setSubmitting(false);
     if (result.error) { setMessage(result.error.message); return; }
     if (createMode && !result.data.session) setMessage(t.emailConfirmation);
-    else await routeAfterAuth();
+    else boot.refresh();
   }
 
   return (
@@ -158,6 +125,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", paddingHorizontal: 16 },
   topline: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   language: { justifyContent: "center", minHeight: 44, paddingHorizontal: 4 },
+  centered: { flex: 1, gap: 16, justifyContent: "center", paddingHorizontal: 16 },
   welcome: { gap: 16, marginTop: 28 },
   welcomeTitle: { letterSpacing: -0.8, lineHeight: 36 },
   tagline: { marginTop: 8, lineHeight: 22 },

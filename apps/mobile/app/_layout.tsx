@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { View } from "react-native";
-import { Stack } from "expo-router";
 import * as Linking from "expo-linking";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -8,6 +7,8 @@ import { FontProvider } from "../src/fonts";
 import { DataModeProvider } from "../src/data";
 import { LocaleProvider } from "../src/locale";
 import { supabase } from "../src/supabase";
+import { AuthRouteTree } from "../src/startup/AuthRouteTree";
+import { BootstrapProvider } from "../src/startup/BootstrapProvider";
 import { SeoullyCompanion } from "../src/ui/SeoullyCompanion";
 
 export default function RootLayout() {
@@ -31,8 +32,10 @@ export default function RootLayout() {
           <FontProvider>
             <StatusBar style="dark" />
             <View style={{ flex: 1 }}>
-              <Stack screenOptions={{ headerShown: false, animation: "fade" }} />
-              <SeoullyCompanion />
+              <BootstrapProvider>
+                <AuthRouteTree />
+                <SeoullyCompanion />
+              </BootstrapProvider>
             </View>
           </FontProvider>
         </DataModeProvider>

@@ -5,6 +5,7 @@ import type { NativeFeedPost, NativePostComment } from "../api";
 import type { MobileCopy } from "../i18n";
 import { IconBookmark, IconComment, IconHeart, IconPlay, IconRepost, IconShare } from "./icons";
 import { pressShift, useReduceMotion } from "./motion";
+import { useProfileInk } from "./ProfileIdentity";
 import { SeoullyAvatar } from "./SeoullyAvatar";
 import { SeoullyIconButton } from "./SeoullyIconButton";
 import { SeoullyText } from "./SeoullyText";
@@ -92,11 +93,12 @@ export function SeoullyCollectiblePreview({
   kind: string;
   colorway?: { base: string; accent: string; ink: string };
 }) {
+  const ink = useProfileInk();
   return (
     <View style={styles.collectible}>
       <View style={[styles.collectibleSwatch, colorway ? { backgroundColor: colorway.base, borderColor: colorway.accent } : null]} />
       <View style={styles.collectibleCopy}>
-        <SeoullyText variant="caption" color={colors.ink} numberOfLines={1}>{name}</SeoullyText>
+        <SeoullyText variant="caption" color={ink} numberOfLines={1}>{name}</SeoullyText>
         <SeoullyText variant="metadata" numberOfLines={1}>{kind}</SeoullyText>
       </View>
     </View>
@@ -150,6 +152,7 @@ export function SeoullyPost({
   const captionAuthor = item.originAuthor ?? item.author;
   const showRepost = Boolean(canRepost);
   const collectible = Boolean(item.taggedCollectibles && item.taggedCollectibles.length > 0);
+  const ink = useProfileInk();
 
   return (
     <View style={styles.post}>
@@ -171,25 +174,25 @@ export function SeoullyPost({
       {item.media.length > 0 ? <SeoullyMedia item={item} copy={copy} /> : null}
       <View style={styles.actions}>
         <SeoullyIconButton label={item.likedByMe ? copy.unlike : copy.like} selected={item.likedByMe} disabled={busy} onPress={onToggleLike}>
-          <IconHeart color={item.likedByMe ? colors.like : colors.ink} filled={item.likedByMe} />
+          <IconHeart color={item.likedByMe ? colors.like : ink} filled={item.likedByMe} />
         </SeoullyIconButton>
         <SeoullyIconButton label={comments ? copy.hideComments : copy.comment} onPress={onToggleComments}>
-          <IconComment color={colors.ink} />
+          <IconComment color={ink} />
         </SeoullyIconButton>
         {showRepost ? (
           <SeoullyIconButton label={item.repostedByMe ? copy.unrepost : copy.repost} selected={item.repostedByMe} disabled={busy} onPress={onToggleRepost}>
-            <IconRepost color={item.repostedByMe ? colors.repost : colors.ink} />
+            <IconRepost color={item.repostedByMe ? colors.repost : ink} />
           </SeoullyIconButton>
         ) : null}
         {onShare ? (
           <SeoullyIconButton label={copy.shareAction} onPress={onShare}>
-            <IconShare color={colors.ink} />
+            <IconShare color={ink} />
           </SeoullyIconButton>
         ) : null}
         {collectible && onToggleSave ? (
           <View style={styles.save}>
             <SeoullyIconButton label={item.savedByMe ? copy.unsaveWishlist : copy.saveWishlist} selected={item.savedByMe} onPress={onToggleSave}>
-              <IconBookmark color={item.savedByMe ? colors.plum : colors.ink} filled={item.savedByMe} />
+              <IconBookmark color={item.savedByMe ? colors.plum : ink} filled={item.savedByMe} />
             </SeoullyIconButton>
           </View>
         ) : null}
@@ -257,7 +260,7 @@ export function SeoullyPost({
               value={commentBody}
               onChangeText={onChangeComment}
               onSubmitEditing={onSubmitComment}
-              style={styles.input}
+              style={[styles.input, { color: ink }]}
             />
             <Pressable accessibilityRole="button" disabled={!commentBody.trim() || busy} onPress={onSubmitComment}>
               <SeoullyText variant="button" color={commentBody.trim() ? colors.plum : colors.muted}>{copy.postComment}</SeoullyText>

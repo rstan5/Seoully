@@ -142,7 +142,8 @@ assertContains(read("apps/mobile/src/api.ts"), '{ action: "complete" }', "client
 const index = read("apps/mobile/app/index.tsx");
 assertContains(index, "welcomeLine1", "welcome personality");
 assertContains(index, "welcomeCreate", "create your world");
-assertContains(index, 'onboarding.step === "done" ? "/(tabs)" : "/onboarding"', "auth restore");
+assertContains(read("apps/mobile/src/startup/AuthRouteTree.tsx"), 'name="(tabs)"', "app tree is tabs");
+assertContains(read("apps/mobile/src/startup/AuthRouteTree.tsx"), 'name="onboarding"', "onboarding tree");
 
 const i18n = read("apps/mobile/src/i18n.ts");
 assertContains(i18n, "Turn your fandom", "EN welcome");
@@ -159,6 +160,7 @@ assert.equal(walk.relaunch, "app");
 assert.equal(walk.durable.at(-1), "done");
 
 const tabs = read("apps/mobile/app/(tabs)/_layout.tsx");
-assertContains(tabs, 'onboarding.step === "done" ? "ready" : "onboarding"', "tabs gate");
+assertNotContains(tabs, "Redirect", "tabs no auth redirect");
+assertContains(read("apps/mobile/app/_layout.tsx"), "AuthRouteTree", "root owns trees");
 
 console.log("check:slice8 passed");

@@ -8,6 +8,7 @@ import { colors, sizes } from "../theme";
 import { BrandMark } from "./BrandMark";
 import { IconBell } from "./icons";
 import { pressShift, useReduceMotion } from "./motion";
+import { useProfileIdentity, useProfileInk, useProfileMute } from "./ProfileIdentity";
 import { SeoullyText } from "./SeoullyText";
 
 export function SeoullyHeader({
@@ -26,6 +27,9 @@ export function SeoullyHeader({
   const social = useSocialRepository();
   const allowed = isDemoWorldAllowed();
   const [unread, setUnread] = useState(0);
+  const ink = useProfileInk();
+  const mute = useProfileMute();
+  const identity = useProfileIdentity();
 
   useFocusEffect(useCallback(() => {
     let mounted = true;
@@ -40,7 +44,7 @@ export function SeoullyHeader({
   }, [social]));
 
   return (
-    <View style={styles.top}>
+    <View style={[styles.top, identity ? { borderBottomColor: identity.line } : null]}>
       <BrandMark />
       <View style={styles.end}>
         {allowed ? (
@@ -51,7 +55,7 @@ export function SeoullyHeader({
             onPress={() => setDemo(!demo)}
             style={({ pressed }) => [styles.demo, demo && styles.demoOn, pressShift(pressed, reduceMotion)]}
           >
-            <SeoullyText variant="caption" color={demo ? colors.plum : colors.muted}>
+            <SeoullyText variant="caption" color={demo ? colors.plum : mute}>
               {demo ? copy.demoWorld : copy.productionData}
             </SeoullyText>
           </Pressable>
@@ -63,7 +67,7 @@ export function SeoullyHeader({
           onPress={onToggleLanguage}
           style={({ pressed }) => [styles.lang, pressShift(pressed, reduceMotion)]}
         >
-          <SeoullyText variant="button" color={colors.ink}>{languageLabel}</SeoullyText>
+          <SeoullyText variant="button" color={ink}>{languageLabel}</SeoullyText>
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -72,7 +76,7 @@ export function SeoullyHeader({
           onPress={() => router.push("/notices")}
           style={({ pressed }) => [styles.bell, pressShift(pressed, reduceMotion)]}
         >
-          <IconBell color={colors.ink} />
+          <IconBell color={ink} />
           {unread > 0 ? (
             <View style={styles.badge}>
               <SeoullyText variant="caption" color={colors.onPrimary} style={styles.badgeText}>

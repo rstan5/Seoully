@@ -68,6 +68,7 @@ console.log(`host  ${os.platform()}`);
 run("import-boundary", "node", [path.join(repoRoot, "scripts/check-mobile-imports.cjs")], repoRoot);
 run("slice-1 honesty", "npm", ["run", "check:slice1"], repoRoot);
 run("slice-2 own collector", "npm", ["run", "check:slice2"], repoRoot);
+run("slice-3 collection graph", "npm", ["run", "check:slice3"], repoRoot);
 run("mobile TypeScript", "npx", ["tsc", "--noEmit"]);
 run("Expo lint", "npx", ["expo", "lint"]);
 run("Expo Doctor", "npx", ["expo-doctor"]);

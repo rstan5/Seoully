@@ -25,13 +25,14 @@ import { SeoullyScreen } from "../src/ui/SeoullyScreen";
 import { SeoullyText } from "../src/ui/SeoullyText";
 import { SeoullyTradeMatch } from "../src/ui/SeoullyTradeMatch";
 
-function highlightsFromCollector(collector: SocialCollector) {
+function highlightsFromCollector(collector: SocialCollector, allowPersonalMedia: boolean) {
   const groups = new Map<string, { name: string; count: number; imageUrl?: string; colorway?: { base: string; accent: string; ink: string } }>();
   for (const holding of collector.holdings) {
     const name = holding.template.groupName || holding.template.name;
-    const current = groups.get(name) ?? { name, count: 0, imageUrl: holding.personalMediaUrl, colorway: holding.template.colorway };
+    const imageUrl = allowPersonalMedia ? holding.personalMediaUrl : undefined;
+    const current = groups.get(name) ?? { name, count: 0, imageUrl, colorway: holding.template.colorway };
     current.count += 1;
-    if (!current.imageUrl && holding.personalMediaUrl) current.imageUrl = holding.personalMediaUrl;
+    if (!current.imageUrl && imageUrl) current.imageUrl = imageUrl;
     if (!current.colorway && holding.template.colorway) current.colorway = holding.template.colorway;
     groups.set(name, current);
   }
@@ -111,7 +112,7 @@ export default function CollectorScreen() {
     return () => clearTimeout(task);
   }, [refresh]);
 
-  const highlights = useMemo(() => (collector ? highlightsFromCollector(collector) : []), [collector]);
+  const highlights = useMemo(() => (collector ? highlightsFromCollector(collector, social.kind === "demo") : []), [collector, social.kind]);
 
   async function loadMorePosts() {
     if (!postCursor || loadingMore) return;
@@ -136,6 +137,11 @@ export default function CollectorScreen() {
     setBusy(true);
     try {
       await social.setFollowing(userId, next);
+      const latest = await social.loadCollector(userId);
+      setCollector(latest);
+      setFollowing(latest.follow.following);
+      setFollowers(latest.follow.followers);
+      setFollowingCount(latest.follow.followingCount);
     } catch {
       setFollowing(!next);
       setFollowers((count) => Math.max(0, count + (next ? -1 : 1)));
@@ -187,11 +193,11 @@ export default function CollectorScreen() {
                 { value: posts.length, label: copy.profilePosts },
                 { value: followers, label: copy.profileFollowers },
                 { value: followingCount, label: copy.profileFollowingCount },
-                ...(social.capabilities.publicCollectionRows
-                  ? [
-                      { value: collector.holdingCount, label: copy.profileCollected },
-                      { value: collector.wishlist.length, label: copy.profileWishlistCount },
-                    ]
+                ...(collector.visibility.collectionPublic
+                  ? [{ value: collector.holdingCount, label: copy.profileCollected }]
+                  : []),
+                ...(collector.visibility.wishlistPublic
+                  ? [{ value: collector.wishlist.length, label: copy.profileWishlistCount }]
                   : []),
               ]}
             />
@@ -224,11 +230,12 @@ export default function CollectorScreen() {
             <SeoullyText variant="caption" color={colors.muted} style={styles.inlineNotice}>{copy.profileUnderlayHint}</SeoullyText>
           </View>
 
-          {collector.groups.length > 0 || collector.biases.length > 0 || collector.eras.length > 0 ? (
+          {collector.groups.length > 0 || collector.biases.length > 0 || collector.eras.length > 0 || (collector.profile.collectorInterests?.length ?? 0) > 0 ? (
             <View style={styles.chips}>
               {collector.groups.map((group) => <SeoullyChip key={group.id} label={group.name} />)}
               {collector.biases.map((member) => <SeoullyChip key={member.id} label={member.name} tone="bias" />)}
               {collector.eras.map((era) => <SeoullyChip key={era.id} label={era.name} />)}
+              {(collector.profile.collectorInterests ?? []).map((interest) => <SeoullyChip key={interest} label={interest} />)}
             </View>
           ) : null}
 
@@ -255,10 +262,12 @@ export default function CollectorScreen() {
               {displayReasons(collector.compatibility, copy).slice(0, 4).map((reason) => (
                 <SeoullyText key={reason} variant="secondary" style={styles.compatReason}>{reason}</SeoullyText>
               ))}
+              <SeoullyText variant="caption" color={colors.muted} style={styles.compatReason}>
+                {collector.compatibility.source === "production" ? copy.compatEngineProduction : copy.compatEngineDemo}
+              </SeoullyText>
               <SeoullyTradeMatch
                 compatibility={collector.compatibility}
                 copy={copy}
-                canMessage={social.capabilities.persistMessages}
                 onMessage={messageAboutTrade}
               />
             </View>
@@ -282,51 +291,52 @@ export default function CollectorScreen() {
             ) : null}
           </SeoullyShelf>
 
-          {social.capabilities.publicCollectionRows ? (
-            <>
           <SeoullyShelf
             title={copy.profileOwned}
-            count={collector.holdingCount}
+            count={collector.visibility.collectionPublic ? collector.holdingCount : undefined}
             expanded={ownedExpanded}
             onToggle={() => setOwnedExpanded((value) => !value)}
-            empty={collector.holdings.length === 0 ? copy.profileEmptyOwned : undefined}
+            empty={collector.visibility.collectionPublic
+              ? (collector.holdings.length === 0 ? copy.profileEmptyOwned : undefined)
+              : copy.collectionPrivate}
           >
-            {collector.holdings.map((holding) => (
+            {collector.visibility.collectionPublic ? collector.holdings.map((holding) => (
               <SeoullyShelfRow
                 key={holding.id}
                 title={holding.template.name}
                 meta={[
                   holding.template.groupName,
                   holding.template.memberName,
+                  holding.template.releaseName,
                   collectibleKindLabel(holding.template.kind, copy),
-                  holding.tradeStatus === "for-trade" ? copy.compatOpenToTrade : undefined,
+                  holding.tradeStatus === "for-trade" ? copy.compatOpenToTrade : copy.notForTrade,
                 ].filter(Boolean).join(" · ")}
                 colorway={holding.template.colorway}
-                imageUrl={holding.personalMediaUrl}
+                imageUrl={social.kind === "demo" ? holding.personalMediaUrl : undefined}
+                onPress={() => router.push({ pathname: "/public-collectible", params: { userId, holdingId: holding.id } })}
               />
-            ))}
+            )) : null}
           </SeoullyShelf>
 
           <SeoullyShelf
             title={copy.profileWishlistTitle}
-            count={collector.wishlist.length}
+            count={collector.visibility.wishlistPublic ? collector.wishlist.length : undefined}
             expanded={wishlistExpanded}
             onToggle={() => setWishlistExpanded((value) => !value)}
-            empty={collector.wishlist.length === 0 ? copy.profileEmptyWish : undefined}
+            empty={collector.visibility.wishlistPublic
+              ? (collector.wishlist.length === 0 ? copy.profileEmptyWish : undefined)
+              : copy.wishlistPrivate}
           >
-            {collector.wishlist.map((entry) => (
+            {collector.visibility.wishlistPublic ? collector.wishlist.map((entry) => (
               <SeoullyShelfRow
                 key={entry.id}
                 title={entry.template.name}
                 meta={[entry.template.groupName, entry.template.memberName, collectibleKindLabel(entry.template.kind, copy)].filter(Boolean).join(" · ")}
                 colorway={entry.template.colorway}
+                onPress={() => router.push({ pathname: "/public-collectible", params: { userId, templateId: entry.templateId } })}
               />
-            ))}
+            )) : null}
           </SeoullyShelf>
-            </>
-          ) : (
-            <SeoullyText variant="secondary" style={styles.connect}>{copy.publicShelvesUnavailable}</SeoullyText>
-          )}
 
           <SeoullyText variant="secondary" style={styles.connect}>
             {copy.profileConnect.replace("{name}", collector.user.displayName)}

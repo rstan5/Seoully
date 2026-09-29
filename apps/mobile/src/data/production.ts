@@ -5,6 +5,7 @@ import {
   loadCollectorMatch,
   loadCollectorPosts,
   loadCollectorProfile,
+  loadCollectorCollection,
   loadFeed,
   loadMyHoldings,
   loadMyWishlist,
@@ -142,14 +143,23 @@ export const productionRepository: SocialRepository = {
     return [...byUser.values()];
   },
   async loadCollector(userId) {
-    const [result, page, tastes, match] = await Promise.all([
+    const [result, page, tastes, match, collection] = await Promise.all([
       loadCollectorProfile(userId),
       loadCollectorPosts(userId),
       loadNativeOnboarding().catch(() => null),
       loadCollectorMatch(userId).catch(() => null),
+      loadCollectorCollection(userId),
     ]);
     const groupIds = result.profile.profile.favoriteGroupIds ?? [];
     const biasIds = result.profile.profile.biasMemberIds ?? [];
+    const holdings = collection.collectionPublic ? collection.holdings.map((holding) => ({
+      id: holding.id,
+      templateId: holding.templateId,
+      acquiredAt: holding.acquiredAt,
+      tradeStatus: holding.tradeStatus,
+      template: holding.template,
+    })) : [];
+    const wishlist = collection.wishlistPublic ? collection.wishlist : [];
     return {
       user: result.profile.user,
       profile: {
@@ -163,9 +173,13 @@ export const productionRepository: SocialRepository = {
       groups: (tastes?.groups ?? []).filter((group) => groupIds.includes(group.id)).map((group) => ({ id: group.id, name: group.name })),
       biases: (tastes?.members ?? []).filter((member) => biasIds.includes(member.id)).map((member) => ({ id: member.id, name: member.stageName })),
       eras: [],
-      holdings: [],
-      holdingCount: LIVE_CAPABILITIES.publicCollectionRows ? (result.profile.collectionSummary?.holdingCount ?? 0) : 0,
-      wishlist: [],
+      holdings,
+      holdingCount: holdings.length,
+      wishlist,
+      visibility: {
+        collectionPublic: collection.collectionPublic,
+        wishlistPublic: collection.wishlistPublic,
+      },
       posts: page.items,
       ...(match ? { compatibility: toCompatibility(match) } : {}),
       roomAvailable: result.profile.roomAvailable,

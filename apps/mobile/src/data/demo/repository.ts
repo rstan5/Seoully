@@ -282,6 +282,7 @@ export class DemoSocialRepository implements SocialRepository {
       holdings,
       holdingCount: holdings.length,
       wishlist,
+      visibility: { collectionPublic: true, wishlistPublic: true },
       posts,
       ...(compat ? {
         compatibility: {

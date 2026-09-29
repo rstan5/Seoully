@@ -13,7 +13,7 @@ function captionFor(item: SocialTradeItem, copy: MobileCopy) {
     : item.onYourWishlist
       ? copy.compatOnYourWishlist
       : copy.compatTheyWantThis;
-  return item.openToTrade ? `${relation} · ${copy.compatOpenToTrade}` : relation;
+  return item.openToTrade ? `${relation} · ${copy.compatOpenToTrade}` : `${relation} · ${copy.notForTrade}`;
 }
 
 function TradeColumn({
@@ -45,7 +45,6 @@ function TradeColumn({
 export function SeoullyTradeMatch({
   compatibility,
   copy,
-  canMessage = false,
   onMessage,
 }: {
   compatibility: SocialCompatibility;
@@ -78,16 +77,14 @@ export function SeoullyTradeMatch({
         <View>
           <TradeColumn label={copy.compatYouWant} items={compatibility.theyOwnYourWants} copy={copy} />
           <TradeColumn label={copy.compatTheyWant} items={compatibility.youOwnTheirWants} copy={copy} />
-          {canMessage ? (
-            <View style={styles.message}>
-              <SeoullyButton
-                label={copy.compatMessageTrade}
-                variant="ghost"
-                block
-                onPress={() => onMessage(templateIds)}
-              />
-            </View>
-          ) : null}
+          <View style={styles.message}>
+            <SeoullyButton
+              label={copy.compatMessageTrade}
+              variant="ghost"
+              block
+              onPress={() => onMessage(templateIds)}
+            />
+          </View>
         </View>
       ) : null}
     </View>

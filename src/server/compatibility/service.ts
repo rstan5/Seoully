@@ -3,6 +3,8 @@ import "server-only";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCollectionPairSnapshot, type PairPerson } from "@/server/dal/collection-graph-pair";
+import { buildTasteAliasIndex, expandTasteIds } from "@/server/compatibility/taste-ids";
+import { createSupabaseServerClient } from "@/server/supabase/server";
 
 const inputSchema = z.object({ targetUserId: z.string().uuid() }).strict();
 const MAX_REASONS = 24;
@@ -38,10 +40,37 @@ const groups = (person: PairPerson) => person.holdings.map((holding) => holding.
 const members = (person: PairPerson) => person.holdings.flatMap((holding) => holding.member_id ? [holding.member_id] : []);
 const releases = (person: PairPerson) => person.holdings.flatMap((holding) => holding.release_id ? [holding.release_id] : []);
 
+async function resolvePeopleTastes(a: PairPerson, b: PairPerson, client?: SupabaseClient): Promise<{ actor: PairPerson; target: PairPerson }> {
+  try {
+    const supabase = client ?? await createSupabaseServerClient();
+    const [groups, members] = await Promise.all([
+      supabase.from("catalog_groups").select("id,slug,name").neq("status", "restricted"),
+      supabase.from("catalog_members").select("id,group_id,stage_name,normalized_name").neq("status", "restricted"),
+    ]);
+    if (groups.error || members.error) return { actor: a, target: b };
+    const index = buildTasteAliasIndex({
+      catalogGroups: (groups.data ?? []).map((row) => ({ id: row.id, slug: row.slug, name: row.name })),
+      catalogMembers: (members.data ?? []).map((row) => ({
+        id: row.id,
+        groupId: row.group_id,
+        stageName: row.stage_name,
+        normalizedName: row.normalized_name,
+      })),
+    });
+    return {
+      actor: { ...a, favorite_group_ids: expandTasteIds(a.favorite_group_ids, index), bias_member_ids: expandTasteIds(a.bias_member_ids, index) },
+      target: { ...b, favorite_group_ids: expandTasteIds(b.favorite_group_ids, index), bias_member_ids: expandTasteIds(b.bias_member_ids, index) },
+    };
+  } catch {
+    return { actor: a, target: b };
+  }
+}
+
 export async function getCollectorCompatibility(input: unknown, client?: SupabaseClient): Promise<CompatibilityResult> {
   const { targetUserId } = inputSchema.parse(input);
   const snapshot = await getCollectionPairSnapshot(targetUserId, client);
-  return computeCompatibilityPeople(snapshot.actor!, snapshot.target!, targetUserId, snapshot.target_collection_public === false);
+  const resolved = await resolvePeopleTastes(snapshot.actor!, snapshot.target!, client);
+  return computeCompatibilityPeople(resolved.actor, resolved.target, targetUserId, snapshot.target_collection_public === false);
 }
 
 export function computeCompatibilityPeople(a: PairPerson, b: PairPerson, targetUserId: string, visibilityLimited = false): CompatibilityResult {

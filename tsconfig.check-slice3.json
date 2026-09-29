@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "outDir": ".tmp/build",
+    "skipLibCheck": true,
+    "strict": false,
+    "esModuleInterop": true
+  },
+  "include": [
+    "scripts/check-slice3.ts",
+    "src/server/compatibility/taste-ids.ts",
+    "src/server/public-collection-contract.ts",
+    "apps/mobile/src/data/capabilities.ts"
+  ]
+}

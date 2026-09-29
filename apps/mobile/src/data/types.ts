@@ -84,6 +84,7 @@ export type SocialCollector = {
   holdings: NativeHolding[];
   holdingCount: number;
   wishlist: NativeWishlistEntry[];
+  visibility: { collectionPublic: boolean; wishlistPublic: boolean };
   posts: NativeFeedPost[];
   compatibility?: SocialCompatibility;
   roomAvailable: boolean;

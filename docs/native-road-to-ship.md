@@ -180,6 +180,8 @@ Order is dependency-shaped. **Slice 1 is first.**
 
 **Device QA:** Open a real public collector → shelves populated or honestly empty → follow → their posts on Following feed → match/trade UI → Enter Room reaches public orbit **or** a clear unavailable state if Room GET still blocked.
 
+**Implementation (2026-09-29):** SLICE 3 — CODE VERIFIED / DEVICE QA PENDING. Other-collector Profile loads identity, posts, follow, production `computeCompatibilityPeople` (not fixture `computeCompatibility`), and safe public Owned/Wishlist rows from existing `graph_pair_snapshot` (no new migration, no RLS weakening, no personal Holding media). Public collectible destination does not call owner-only Holding APIs. Taste slugs are resolved to catalog UUIDs at the compatibility boundary without rewriting profile rows. Live collection counts match returned public rows. Trade CTA stays visible but does not send messages. `20261001` and `20261002` were not applied. Own-profile count remains the loaded holdings page (default 100) — not rewritten in this slice.
+
 ---
 
 ### Slice 4 — Feed and Search (social discovery)

@@ -563,11 +563,39 @@ export type NativeCollectorProfile = {
     biasMemberIds?: string[];
     favoriteEraIds?: string[];
   };
+  visibility?: { collectionPublic: boolean; wishlistPublic: boolean };
   followerCount: number;
   followingCount: number;
   roomAvailable: boolean;
   collectionSummary?: { holdingCount: number; uniqueTemplateCount: number; groupCount: number };
 };
+
+export type NativePublicCollectorCollection = {
+  collectionPublic: boolean;
+  wishlistPublic: boolean;
+  holdings: NativeHolding[];
+  wishlist: NativeWishlistEntry[];
+};
+
+export async function loadCollectorCollection(userId: string): Promise<NativePublicCollectorCollection> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/collectors/${encodeURIComponent(userId)}/collection`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("collector_collection_failed");
+  return response.json() as Promise<NativePublicCollectorCollection>;
+}
+
+export async function loadPublicCollectorHolding(userId: string, holdingId: string): Promise<NativeHolding> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/collectors/${encodeURIComponent(userId)}/collection/holdings/${encodeURIComponent(holdingId)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("public_holding_read_failed");
+  const payload = await response.json() as { holding?: NativeHolding };
+  if (!payload.holding?.id) throw new Error("public_holding_read_failed");
+  return payload.holding;
+}
 
 export type NativePublicRoom = {
   owner: { userId: string; handle: string; displayName: string };

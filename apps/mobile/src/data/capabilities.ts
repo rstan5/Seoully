@@ -19,7 +19,7 @@ export const LIVE_CAPABILITIES: SocialCapabilities = {
   deliverShare: false,
   persistMessages: false,
   persistNotices: false,
-  publicCollectionRows: false,
+  publicCollectionRows: true,
   searchPosts: false,
   persistRoom: true,
   persistRoomTheme: false,

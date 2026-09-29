@@ -11,6 +11,7 @@
     "check:fixtures": "tsc --project tsconfig.check-fixtures.json && node -r ./scripts/register-build-alias.cjs .tmp/build/scripts/check-fixtures.js",
     "check:slice1": "tsc --project tsconfig.check-slice1.json && node .tmp/build/scripts/check-slice1.js",
     "check:slice2": "tsc --project tsconfig.check-slice2.json && node .tmp/build/scripts/check-slice2.js",
+    "check:slice3": "tsc --project tsconfig.check-slice3.json && node -r ./scripts/register-build-alias.cjs .tmp/build/scripts/check-slice3.js",
     "mobile:verify": "node scripts/mobile-verify.cjs"
   },
   "dependencies": {

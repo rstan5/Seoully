@@ -43,7 +43,7 @@ assert.equal(LIVE_CAPABILITIES.persistRepost, false);
 assert.equal(LIVE_CAPABILITIES.deliverShare, false);
 assert.equal(LIVE_CAPABILITIES.persistMessages, false);
 assert.equal(LIVE_CAPABILITIES.persistNotices, false);
-assert.equal(LIVE_CAPABILITIES.publicCollectionRows, false);
+assert.equal(LIVE_CAPABILITIES.publicCollectionRows, true);
 assert.equal(LIVE_CAPABILITIES.searchPosts, false);
 assert.equal(LIVE_CAPABILITIES.persistRoom, true);
 assert.equal(LIVE_CAPABILITIES.persistRoomTheme, false);
@@ -58,7 +58,7 @@ assert.deepEqual(liveRepostResult(), { persisted: false });
 assert.deepEqual(liveSaveResult(), { persisted: false });
 assert.equal(shareStatusCopyKey(false), "sendToBlocked");
 assert.equal(shareStatusCopyKey(true), "sendToDelivered");
-assert.equal(publicCollectedCount(LIVE_CAPABILITIES, 12), null);
+assert.equal(publicCollectedCount(LIVE_CAPABILITIES, 12), 12);
 assert.equal(publicCollectedCount(DEMO_CAPABILITIES, 12), 12);
 
 assert.equal(ROOM_OWNER_SELECT.includes("theme_id"), false);
@@ -103,7 +103,7 @@ assertNotContains(collectible, "updateHoldingTradeStatus", "collectible.tsx");
 
 const collector = read("apps/mobile/app/collector.tsx");
 assertNotContains(collector, "ensureConversation", "collector.tsx");
-assertContains(collector, "publicCollectionRows", "collector.tsx");
+assertContains(collector, "collectionPrivate", "collector.tsx");
 
 const feedPost = read("apps/mobile/src/ui/SeoullyFeedPost.tsx");
 assertContains(feedPost, "persistRepost", "SeoullyFeedPost.tsx");

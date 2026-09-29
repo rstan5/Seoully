@@ -3,6 +3,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeFeedPost } from "../../src/api";
 import { useSocialRepository, type FeedMode, type SocialSuggested } from "../../src/data";
+import { useReportAskSurface } from "../../src/ask-surface";
 import { KeyboardScreen } from "../../src/components/KeyboardScreen";
 import { RetryNotice } from "../../src/components/RetryNotice";
 import type { MobileCopy } from "../../src/i18n";
@@ -23,6 +24,7 @@ export default function FeedScreen() {
   const router = useRouter();
   const [modes, setModes] = useState<{ production: FeedMode; demo: FeedMode }>({ production: "discover", demo: "discover" });
   const mode = social.capabilities.discoverFeed ? modes[social.kind] : "following";
+  useReportAskSurface({ surface: mode === "following" ? "following" : "discover" });
   const [posts, setPosts] = useState<NativeFeedPost[]>([]);
   const [suggested, setSuggested] = useState<SocialSuggested[]>([]);
   const [loading, setLoading] = useState(true);

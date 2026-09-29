@@ -134,7 +134,7 @@ assertNotContains(tabBar, "binder:", "SeoullyTabBar.tsx");
 const companion = read("apps/mobile/src/ui/SeoullyCompanion.tsx");
 assertContains(companion, 'pathname: "/search"', "SeoullyCompanion.tsx");
 assertContains(companion, "isExploreDestination", "SeoullyCompanion.tsx");
-assertContains(companion, "askSearchQueryDropped", "SeoullyCompanion.tsx");
+assertContains(companion, "q: nextQuery", "SeoullyCompanion.tsx");
 
 const post = read("apps/mobile/src/ui/SeoullyFeedPost.tsx");
 assertContains(post, "persistRepost", "SeoullyFeedPost.tsx");

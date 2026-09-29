@@ -11,6 +11,7 @@ import {
   type NativeWishlistEntry,
 } from "../../src/api";
 import { useSocialRepository, type SocialTheme } from "../../src/data";
+import { useReportAskSurface } from "../../src/ask-surface";
 import { RetryNotice } from "../../src/components/RetryNotice";
 import { collectibleKindLabel } from "../../src/i18n";
 import { useCopy, useLocale } from "../../src/locale";
@@ -53,6 +54,7 @@ export default function ProfileScreen() {
   const copy = useCopy();
   const { locale, toggleLocale } = useLocale();
   const social = useSocialRepository();
+  useReportAskSurface({ surface: "profile" });
   const [identity, setIdentity] = useState<NativeIdentity | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>();
   const [followers, setFollowers] = useState(0);

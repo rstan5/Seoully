@@ -4,6 +4,7 @@ import { FlatList, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet,
 import { ScreenBack } from "../src/components/ScreenBack";
 import { messageHasSendableContext } from "../src/comms";
 import { useSocialRepository, type SocialMessage } from "../src/data";
+import { useReportAskSurface } from "../src/ask-surface";
 import { useCopy } from "../src/locale";
 import { colors, radii } from "../src/theme";
 import { SeoullyAvatar } from "../src/ui/SeoullyAvatar";
@@ -47,6 +48,12 @@ export default function ThreadScreen() {
   const [error, setError] = useState<string | null>(null);
   const persist = social.capabilities.persistMessages;
   const pendingPost = !sentPost && typeof params.postId === "string" ? params.postId : "";
+  useReportAskSurface({
+    surface: "conversation",
+    ...(conversationId ? { conversationId } : {}),
+    ...(peerUserId ? { collectorUserId: peerUserId } : {}),
+    ...(typeof params.handle === "string" ? { collectorHandle: params.handle } : {}),
+  });
 
   const refresh = useCallback(async () => {
     if (!persist || !conversationId) {

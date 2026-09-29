@@ -3,6 +3,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { FlatList, StyleSheet, View } from "react-native";
 import { conversationPreview } from "../../src/comms";
 import { useSocialRepository, type SocialConversation, type SocialShareRecipient } from "../../src/data";
+import { useReportAskSurface } from "../../src/ask-surface";
 import { useCopy, useLocale } from "../../src/locale";
 import { colors } from "../../src/theme";
 import { SeoullyAvatar } from "../../src/ui/SeoullyAvatar";
@@ -31,6 +32,7 @@ export default function MessagesScreen() {
   const [people, setPeople] = useState<SocialShareRecipient[]>([]);
   const [query, setQuery] = useState("");
   const persist = social.capabilities.persistMessages;
+  useReportAskSurface({ surface: "messages" });
 
   const refresh = useCallback(async () => {
     if (!persist) {

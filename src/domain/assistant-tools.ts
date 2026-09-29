@@ -9,18 +9,12 @@ import type { Locale } from "../locale/translate";
 import type { MessageKey } from "../locale/en";
 import { translate } from "../locale/translate";
 import { compatibilityLines } from "../locale/copy";
+import type { AskNavigationAction, AskSurfaceContext } from "./ask-context";
+import { helpForQuestion, navigationIntentFromQuestion } from "./ask-help";
 
 export { translate };
 
-export type AssistantAction =
-  | { type: "profile"; userId: string }
-  | { type: "room"; userId: string }
-  | { type: "search"; query: string; destination: "people" | "rooms" | "collectibles" }
-  | { type: "collection" }
-  | { type: "wishlist" }
-  | { type: "composer" }
-  | { type: "inbox" }
-  | { type: "add" };
+export type AssistantAction = AskNavigationAction;
 
 export interface AssistantCard {
   kind: "collector" | "collectible" | "room" | "holding";
@@ -45,6 +39,7 @@ export type AssistantIntent =
   | "similar"
   | "common"
   | "price"
+  | "owned"
   | "general";
 
 export type AssistantToolName =
@@ -62,7 +57,9 @@ export type AssistantToolName =
   | "find_similar_rooms"
   | "get_collector_details"
   | "get_collectible_details"
-  | "estimate_collectible_value";
+  | "estimate_collectible_value"
+  | "navigate"
+  | "check_my_collectible_status";
 
 export function assistantPlanForTool(tool: string): AssistantIntent | undefined {
   const mapping: Record<AssistantToolName, AssistantIntent> = {
@@ -81,6 +78,8 @@ export function assistantPlanForTool(tool: string): AssistantIntent | undefined 
     get_collector_details: "common",
     get_collectible_details: "collectibles",
     estimate_collectible_value: "price",
+    navigate: "help",
+    check_my_collectible_status: "collectibles",
   };
   return Object.hasOwn(mapping, tool) ? mapping[tool as AssistantToolName] : undefined;
 }
@@ -95,11 +94,7 @@ export interface AssistantToolResult {
   priceEstimate?: { range: string; source: "catalog-estimate" | "llm-estimate"; item: string };
 }
 
-export interface AssistantContext {
-  surface: string;
-  profileUserId?: string;
-  templateId?: string;
-}
+export type AssistantContext = Pick<AskSurfaceContext, "surface" | "profileUserId" | "collectorUserId" | "templateId" | "holdingId" | "conversationId" | "searchQuery" | "searchDestination">;
 
 const stopWords = new Set([
   "a", "an", "the", "me", "my", "i", "to", "for", "of", "on", "in", "at", "with", "please",
@@ -230,9 +225,13 @@ function collectibleCard(template: CollectibleTemplate): AssistantCard {
 
 function intentFor(question: string, context: AssistantContext): AssistantIntent {
   const q = question.toLowerCase();
+  const collectorId = context.collectorUserId ?? context.profileUserId;
+  if (navigationIntentFromQuestion(question)) return "help";
   if (/worth|price|expensive|estimate|가치|얼마/.test(q)) return "price";
   if (/remove|delete|unwish|change status|mark .*trade|삭제|제거|변경/.test(q)) return "help";
   if (/how do i|how can i|how does|where is|where do|how to|방법|어떻게|어디/.test(q)) return "help";
+  if (context.templateId && /own this|already own|do i (already )?have|갖고|소유|가지고/.test(q)) return "owned";
+  if (context.searchQuery && /search this|again|이대로|다시/.test(q)) return "collectibles";
   if (/trade|trade for|교환/.test(q)) return "trades";
   if (/wishlist|위시/.test(q) && /who|has|own|have|누가|가지|갖고/.test(q)) return "wishlistOwners";
   if (/who|anyone|collector|collectors|누가|컬렉터/.test(q) && /want|wants|looking for|찾|원하/.test(q)) return "wants";
@@ -242,30 +241,14 @@ function intentFor(question: string, context: AssistantContext): AssistantIntent
   if (/room|rooms|룸/.test(q)) return "rooms";
   if (/collectible|photocard|card|item|카드|포카|아이템/.test(q)) return "collectibles";
   if (/similar|like me|같은 취향|비슷/.test(q)) return "similar";
-  if (context.profileUserId && /we|both|common|in common|같이|공통/.test(q)) return "common";
+  if (collectorId && /we|both|common|in common|같이|공통/.test(q)) return "common";
+  if (collectorId && /their profile|this collector|프로필/.test(q)) return "common";
   if (/collector|collectors|who collects|find .* people|누구/.test(q)) return "collectors";
   return "general";
 }
 
 function helpAnswer(question: string, viewerId: UserId): { key: MessageKey; action: AssistantAction } {
-  const q = question.toLowerCase();
-  if (/how does (seoully|this) work|what is seoully|서울리는 어떤|서울리 사용/.test(q)) {
-    return { key: "assistant.answer.howSeoullyWorks", action: { type: "profile", userId: viewerId } };
-  }
-  if (/add|collectible|holding|추가|등록/.test(q)) return { key: "assistant.answer.helpAdd", action: { type: "add" } };
-  const asksHow = /how do i|how can i|how to|어떻게/.test(q);
-  if (/remove|delete|unwish|삭제|제거/.test(q) || (!asksHow && /change status|mark .*trade|변경/.test(q))) {
-    return { key: "assistant.answer.noMutations", action: { type: "collection" } };
-  }
-  if (/wishlist|위시/.test(q)) return { key: "assistant.answer.helpWishlist", action: { type: "wishlist" } };
-  if (/search rooms|find rooms|룸 검색|룸 찾/.test(q)) return { key: "assistant.answer.helpSearch", action: { type: "search", query: "", destination: "rooms" } };
-  if (/room|change my room|decorate|룸/.test(q)) return { key: "assistant.answer.helpRoom", action: { type: "room", userId: viewerId } };
-  if (/trade|open to trade|교환/.test(q)) return { key: "assistant.answer.helpTrade", action: { type: "collection" } };
-  if (/tag|post|게시/.test(q)) return { key: "assistant.answer.helpPost", action: { type: "composer" } };
-  if (/color|profile|프로필|색/.test(q)) return { key: "assistant.answer.helpProfile", action: { type: "profile", userId: viewerId } };
-  if (/room|룸/.test(q)) return { key: "assistant.answer.helpRoom", action: { type: "room", userId: viewerId } };
-  const destination = /room|룸/.test(q) ? "rooms" : /collectible|photocard|collectible|포토카드|포카/.test(q) ? "collectibles" : "people";
-  return { key: "assistant.answer.helpSearch", action: { type: "search", query: "", destination } };
+  return helpForQuestion(question, viewerId);
 }
 
 /** Read-only allowlisted tools over Seoully's actual in-browser repository. */
@@ -278,12 +261,35 @@ export function runAssistantTools(input: {
   intentOverride?: AssistantIntent;
   queryOverride?: string;
 }): AssistantToolResult {
-  const { viewerId, question, context } = input;
+  const { viewerId, question } = input;
+  const context: AssistantContext = {
+    ...input.context,
+    profileUserId: input.context.collectorUserId ?? input.context.profileUserId,
+  };
   const intent = input.intentOverride ?? intentFor(question, context);
-  const query = input.queryOverride?.trim() || cleanQuery(question);
+  const query = input.queryOverride?.trim() || (context.searchQuery && /search this|again|이대로|다시/.test(question.toLowerCase()) ? context.searchQuery : cleanQuery(question));
   const result: AssistantToolResult = { intent, currentSurface: context.surface, cards: [], fallbackKey: "assistant.answer.general" };
   const user = repository.getUser(viewerId);
   if (!user) return { ...result, fallbackKey: "assistant.answer.unavailable" };
+
+  const nav = !input.intentOverride ? navigationIntentFromQuestion(question) : null;
+  if (nav) {
+    result.intent = "help";
+    result.fallbackKey = "assistant.takeMeThere";
+    result.cards = [{ kind: "holding", id: "nav-action", title: translate(input.locale, "assistant.takeMeThere"), action: nav }];
+    return result;
+  }
+
+  if (context.searchQuery && /search this|again|이대로|다시/.test(question.toLowerCase())) {
+    result.cards = [{
+      kind: "collectible",
+      id: "search-again",
+      title: context.searchQuery,
+      action: { type: "search", query: context.searchQuery, destination: context.searchDestination ?? "people" },
+    }];
+    result.fallbackKey = "assistant.answer.collectibles";
+    return result;
+  }
 
   if (context.templateId) {
     const current = repository.getTemplate(context.templateId as TemplateId);
@@ -318,6 +324,21 @@ export function runAssistantTools(input: {
     const help = helpAnswer(question, viewerId);
     result.fallbackKey = help.key;
     result.cards = [{ kind: "holding", id: "help-action", title: translate(input.locale, "assistant.takeMeThere"), action: help.action }];
+    return result;
+  }
+
+  if (intent === "owned" && context.templateId) {
+    const template = repository.getTemplate(context.templateId as TemplateId);
+    const owned = repository.listHoldings(viewerId).some((holding) => holding.templateId === context.templateId);
+    const wished = repository.isWanted(viewerId, context.templateId as TemplateId);
+    if (template) result.cards = [collectibleCard(template)];
+    result.cards.push({
+      kind: "holding",
+      id: "owned-action",
+      title: translate(input.locale, owned ? "assistant.viewCollection" : wished ? "assistant.viewWishlist" : "assistant.search"),
+      action: owned ? { type: "collection" } : wished ? { type: "wishlist" } : { type: "search", query: template?.name ?? "", destination: "collectibles" },
+    });
+    result.fallbackKey = owned ? "assistant.answer.ownedYes" : wished ? "assistant.answer.wishlistYes" : "assistant.answer.ownedNo";
     return result;
   }
 

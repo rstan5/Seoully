@@ -53,6 +53,19 @@ async function assertParticipant(client: SupabaseClient, conversationId: string,
   if (!data) throw new Error("conversation_forbidden");
 }
 
+export async function viewerParticipatesInConversation(client: SupabaseClient, conversationId: string): Promise<boolean> {
+  try {
+    const actorId = await actor(client);
+    const parsed = uuid.safeParse(conversationId);
+    if (!parsed.success) return false;
+    const { data, error } = await client.from("direct_conversation_participants").select("user_id").eq("conversation_id", parsed.data).eq("user_id", actorId).maybeSingle();
+    if (error) return false;
+    return Boolean(data);
+  } catch {
+    return false;
+  }
+}
+
 export async function listDirectConversations(client: SupabaseClient): Promise<DirectConversationDTO[]> {
   const actorId = await actor(client);
   const memberships = await client.from("direct_conversation_participants").select("conversation_id,last_read_at").eq("user_id", actorId).limit(100);

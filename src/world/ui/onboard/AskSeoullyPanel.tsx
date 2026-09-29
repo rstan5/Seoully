@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { assistantFallback, assistantPlanForTool, runAssistantTools, type AssistantAction, type AssistantCard } from "@/domain/assistant-tools";
+import { parseAskContext } from "@/domain/ask-context";
 import { repository } from "@/domain/memory-repository";
 import { useLocale, useT } from "@/locale/store";
 import { useSession } from "@/world/store/sessionStore";
@@ -54,11 +55,11 @@ export function AskSeoullyPanel({ viewerId }: { viewerId: string }) {
     const inspectId = worldView.kind === "inspect"
       ? repository.getHoldingView(worldView.holdingId)?.template.id
       : undefined;
-    const context = {
+    const context = parseAskContext({
       surface: worldView.kind,
-      ...(worldView.kind === "profile" ? { profileUserId: worldView.userId, targetUserId: worldView.userId } : {}),
-      ...(inspectId ? { templateId: inspectId } : {}),
-    };
+      ...(worldView.kind === "profile" ? { profileUserId: worldView.userId, collectorUserId: worldView.userId, targetUserId: worldView.userId } : {}),
+      ...(worldView.kind === "inspect" ? { holdingId: worldView.holdingId, ...(inspectId ? { templateId: inspectId } : {}) } : {}),
+    });
     // Authenticated users use the server-owned production intelligence path.
     // Fixture/demo users continue through the frozen local assistant below.
     try {
@@ -152,6 +153,9 @@ export function AskSeoullyPanel({ viewerId }: { viewerId: string }) {
           if (profile.user?.handle) window.location.assign(`/@${profile.user.handle}`);
         });
         break;
+      case "profile_self":
+        world.showProfile(viewerId as never);
+        break;
       case "room":
         if (repository.getRoomByOwner(action.userId as never)) { travelToRoomOf(action.userId as never); break; }
         void fetch(`/api/profiles/${encodeURIComponent(action.userId)}`).then(async (response) => {
@@ -160,20 +164,30 @@ export function AskSeoullyPanel({ viewerId }: { viewerId: string }) {
           if (profile.user?.handle) window.location.assign(`/@${profile.user.handle}/room`);
         });
         break;
-      case "search":
-        queueSearchPreset(action.query, action.destination);
+      case "search": {
+        const destination = action.destination === "rooms" ? "rooms" : action.destination === "collectibles" ? "collectibles" : "people";
+        queueSearchPreset(action.query, destination);
         world.showSearch();
         break;
+      }
       case "collection":
       case "wishlist":
         queueProfilePreset(viewerId as never, action.type);
         world.showProfile(viewerId as never);
         break;
-      case "composer":
-        world.showCompose();
+      case "collectible":
+        queueProfilePreset(viewerId as never, "collection");
+        world.showProfile(viewerId as never);
         break;
+      case "public_collectible":
+        if (repository.getUser(action.userId as never)) world.showProfile(action.userId as never);
+        break;
+      case "conversation":
       case "inbox":
         world.showInbox();
+        break;
+      case "composer":
+        world.showCompose();
         break;
       case "add":
         useSession.getState().openCollect();

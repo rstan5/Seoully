@@ -1,4 +1,5 @@
 import { runAssistantTools, assistantFallback, translate } from "seoully-domain/assistant-tools";
+import { parseAskContext, type AskSurfaceContext } from "seoully-domain/ask-context";
 import { SOO } from "seoully-domain/fixtures/collectors";
 import type { NativeAskResult } from "../types";
 
@@ -6,13 +7,14 @@ export function askDemo(
   question: string,
   locale: "en" | "ko",
   history: { role: "user" | "assistant"; content: string }[],
+  context?: AskSurfaceContext,
 ): NativeAskResult {
   void history;
   const result = runAssistantTools({
     viewerId: SOO,
     question,
     locale,
-    context: { surface: "home" },
+    context: parseAskContext(context ?? { surface: "home" }),
   });
   return {
     reply: assistantFallback(result, (key, params) => translate(locale, key, params)),

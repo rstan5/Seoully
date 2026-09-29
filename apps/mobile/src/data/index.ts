@@ -22,6 +22,7 @@ export { DataModeProvider, isDemoWorldAllowed, useDataMode } from "./mode";
 export type {
   FeedMode,
   NativeAskCard,
+  NativeAskContext,
   NativeAskResult,
   SocialCollector,
   SocialCompatibility,

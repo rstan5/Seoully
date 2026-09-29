@@ -12,6 +12,7 @@ import type {
   NativeWishlistEntry,
 } from "../api";
 import type { SocialCapabilities } from "./capabilities";
+import type { AskNavigationAction, AskSurfaceContext } from "seoully-domain/ask-context";
 
 export type FeedMode = "following" | "discover";
 
@@ -160,13 +161,15 @@ export type NativeAskCard = {
   title: string;
   subtitle?: string;
   detail?: string;
-  action?: { type: string; userId?: string; query?: string; destination?: string };
+  action?: AskNavigationAction;
 };
 
 export type NativeAskResult = {
   reply: string;
   cards: NativeAskCard[];
 };
+
+export type NativeAskContext = AskSurfaceContext;
 
 export interface SocialRepository {
   kind: "production" | "demo";
@@ -204,5 +207,5 @@ export interface SocialRepository {
   loadMessages(conversationId: string): Promise<SocialMessage[]>;
   sendMessage(input: SocialSendMessageInput): Promise<SocialMessage>;
   markConversationRead(conversationId: string): Promise<void>;
-  askSeoully(question: string, locale: "en" | "ko", history: { role: "user" | "assistant"; content: string }[]): Promise<NativeAskResult>;
+  askSeoully(question: string, locale: "en" | "ko", history: { role: "user" | "assistant"; content: string }[], context?: NativeAskContext): Promise<NativeAskResult>;
 }

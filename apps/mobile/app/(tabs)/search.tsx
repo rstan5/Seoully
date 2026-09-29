@@ -11,6 +11,7 @@ import {
 } from "../../src/api";
 import { useSocialRepository, type SocialEntity } from "../../src/data";
 import { EXPLORE_DESTINATIONS, isExploreDestination, type ExploreDestination } from "../../src/explore";
+import { useReportAskSurface } from "../../src/ask-surface";
 import { KeyboardScreen } from "../../src/components/KeyboardScreen";
 import { RetryNotice } from "../../src/components/RetryNotice";
 import { collectibleKindLabel, type MobileCopy } from "../../src/i18n";
@@ -66,6 +67,11 @@ export default function SearchScreen() {
   const activeQuery = query.trim();
   const handleQuery = looksLikeHandle(query);
   const showingResults = destination !== null;
+  useReportAskSurface({
+    surface: "search",
+    ...(activeQuery ? { searchQuery: activeQuery } : {}),
+    ...(destination ? { searchDestination: destination } : {}),
+  });
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchGeneration = useRef(0);
   const appliedParams = useRef("");

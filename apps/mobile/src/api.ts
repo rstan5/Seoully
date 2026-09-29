@@ -1,5 +1,6 @@
 import { isProductApiConfigured } from "./config-rules";
 import { supabase } from "./supabase";
+import type { AskSurfaceContext } from "seoully-domain/ask-context";
 
 function productApiBase(): string {
   const value = (process.env.EXPO_PUBLIC_API_URL ?? "").replace(/\/$/, "").trim();
@@ -422,14 +423,14 @@ export type NativeAskCard = {
   title: string;
   subtitle?: string;
   detail?: string;
-  action?: { type: string; userId?: string; query?: string; destination?: string };
+  action?: { type: string; userId?: string; query?: string; destination?: string; conversationId?: string; holdingId?: string; templateId?: string };
 };
 
 export async function askSeoullyNative(input: {
   locale: "en" | "ko";
   question: string;
   history: { role: "user" | "assistant"; content: string }[];
-  context?: { surface?: string; profileUserId?: string; templateId?: string };
+  context?: AskSurfaceContext;
 }) {
   const accessToken = await mobileAccessToken();
   const response = await fetch(`${productApiBase()}/api/mobile/assistant`, {

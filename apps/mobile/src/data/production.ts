@@ -31,9 +31,10 @@ import {
   type NativeCollectorMatch,
   type NativeIdentity,
 } from "../api";
+import { isAskNavigationAction } from "seoully-domain/ask-context";
 import { LIVE_CAPABILITIES } from "./capabilities";
 import { liveNoticePage, liveRepostResult, liveSaveResult, liveShareResult } from "./honesty";
-import type { NativeAskResult, SocialCompatibility, SocialConversation, SocialMessage, SocialNotice, SocialRepository, SocialSendMessageInput, SocialShareRecipient, SocialTradeItem } from "./types";
+import type { NativeAskContext, NativeAskResult, SocialCompatibility, SocialConversation, SocialMessage, SocialNotice, SocialRepository, SocialSendMessageInput, SocialShareRecipient, SocialTradeItem } from "./types";
 
 function matchItems(items: NativeCollectorMatch["trade"]["theyOwnYourWants"], side: "they" | "you"): SocialTradeItem[] {
   return items.map((item) => ({
@@ -247,8 +248,18 @@ export const productionRepository: SocialRepository = {
     if (!LIVE_CAPABILITIES.persistMessages) return;
     await markProductionConversationRead(conversationId);
   },
-  async askSeoully(question: string, locale: "en" | "ko", history: { role: "user" | "assistant"; content: string }[]): Promise<NativeAskResult> {
-    const payload = await askSeoullyNative({ locale, question, history, context: { surface: "home" } });
-    return { reply: payload.reply ?? "", cards: payload.cards ?? [] };
+  async askSeoully(question: string, locale: "en" | "ko", history: { role: "user" | "assistant"; content: string }[], context?: NativeAskContext): Promise<NativeAskResult> {
+    const payload = await askSeoullyNative({ locale, question, history, context: context ?? { surface: "home" } });
+    return {
+      reply: payload.reply ?? "",
+      cards: (payload.cards ?? []).map((card) => ({
+        kind: card.kind,
+        id: card.id,
+        title: card.title,
+        ...(card.subtitle ? { subtitle: card.subtitle } : {}),
+        ...(card.detail ? { detail: card.detail } : {}),
+        ...(isAskNavigationAction(card.action) ? { action: card.action } : {}),
+      })),
+    };
   },
 };

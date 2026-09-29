@@ -27,6 +27,8 @@ const TOOL_DESCRIPTIONS: Record<AssistantToolName, string> = {
   get_collector_details: "Use current profile context to compare the viewer and that collector, when one is open.",
   get_collectible_details: "Inspect or search real catalog entities; do not create catalog entries.",
   estimate_collectible_value: "Resolve a collectible for a clearly labeled rough estimate; no live sale data is connected.",
+  navigate: "Choose one allowlisted Seoully destination. Never invent a URL or pathname.",
+  check_my_collectible_status: "Check whether the viewer owns or wishlists the collectible in current context.",
 };
 
 const ASSISTANT_TOOL_NAMES = Object.keys(TOOL_DESCRIPTIONS) as AssistantToolName[];

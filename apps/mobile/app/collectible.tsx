@@ -5,6 +5,7 @@ import * as ImageManipulator from "expo-image-manipulator";
 import { Image, ScrollView, StyleSheet, View } from "react-native";
 import { loadMyHolding, uploadHoldingPhoto, type NativeHolding } from "../src/api";
 import { useSocialRepository } from "../src/data";
+import { useReportAskSurface } from "../src/ask-surface";
 import { isBinderEligible, isRoomEligible } from "../src/data/ownership";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
@@ -30,6 +31,11 @@ export default function CollectibleDetailScreen() {
   const [cropAsset, setCropAsset] = useState<{ uri: string; width: number; height: number } | null>(null);
   const mediaUri = useCachedSignedMedia(holding?.id, holding?.personalMediaUrl);
   const social = useSocialRepository();
+  useReportAskSurface({
+    surface: "collectible",
+    ...(holdingId ? { holdingId } : {}),
+    ...(holding?.templateId ? { templateId: holding.templateId } : {}),
+  });
 
   const refresh = useCallback(async () => {
     setLoading(true);

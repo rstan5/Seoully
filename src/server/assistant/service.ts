@@ -1,9 +1,12 @@
 import "server-only";
 
 import { z } from "zod";
+import { CATALOG_COMPLETENESS_DISCLAIMER, parseAskContext, searchDestinationFromQuestion } from "@/domain/ask-context";
+import { navigationIntentFromQuestion } from "@/domain/ask-help";
+import { translate } from "@/locale/translate";
 import { getCurrentIdentity } from "@/server/dal/profile";
 import { generateAssistantReply, planAssistantTool, type AssistantTurn } from "@/server/assistant-provider";
-import { executeAssistantTool, hasAssistantTool, type AssistantSurfaceContext, type AssistantToolOutput } from "@/server/assistant/registry";
+import { contextTarget, executeAssistantTool, hasAssistantTool, type AssistantSurfaceContext, type AssistantToolOutput } from "@/server/assistant/registry";
 
 const requestSchema = z.object({
   locale: z.enum(["en", "ko"]),
@@ -13,6 +16,7 @@ const requestSchema = z.object({
 }).strict();
 
 const toolMap: Record<string, string> = {
+  get_seoully_help: "get_seoully_help",
   get_my_collection: "get_my_collection",
   get_my_wishlist: "get_my_wishlist",
   find_wishlist_owners: "find_wishlist_owners",
@@ -26,28 +30,89 @@ const toolMap: Record<string, string> = {
   get_collectible_details: "get_collectible_details",
   get_collector_details: "get_collector_compatibility",
   estimate_collectible_value: "estimate_collectible_value",
+  navigate: "navigate",
+  check_my_collectible_status: "check_my_collectible_status",
 };
 
-function deterministicTool(question: string, context: AssistantSurfaceContext): { name: string; input: Record<string, unknown> } {
+function searchQuery(question: string, plannedQuery?: string) {
+  return (plannedQuery?.trim() || question).slice(0, 120);
+}
+
+function deterministicTool(question: string, context: AssistantSurfaceContext, locale: "en" | "ko"): { name: string; input: Record<string, unknown> } {
   const q = question.toLocaleLowerCase();
   const listInput = { limit: 8 };
-  const searchInput = { query: question.slice(0, 120), limit: 8 };
-  if (/worth|price|value|estimate|가치|얼마|가격/.test(q)) return { name: "estimate_collectible_value", input: { query: question.slice(0, 120), ...(context.templateId ? { templateId: context.templateId } : {}) } };
+  const query = searchQuery(question);
+  const searchInput = { query, limit: 8 };
+  const target = contextTarget(context);
+  const nav = navigationIntentFromQuestion(question);
+  if (nav) {
+    if (nav.type === "search") return { name: "navigate", input: { destination: "search", query: context.searchQuery || query, ...(nav.destination ? { searchDestination: nav.destination } : {}) } };
+    if (nav.type === "profile") return { name: "navigate", input: { destination: "profile", ...(nav.userId ? { targetUserId: nav.userId } : {}) } };
+    if (nav.type === "room") return { name: "navigate", input: { destination: "room", ...(nav.userId ? { targetUserId: nav.userId } : {}) } };
+    if (nav.type === "conversation") return { name: "navigate", input: { destination: "conversation", conversationId: nav.conversationId } };
+    return { name: "navigate", input: { destination: nav.type === "profile_self" ? "profile_self" : nav.type } };
+  }
+  if (/how do i|how can i|how does|where is|what is the binder|방법|어떻게|어디/.test(q)) return { name: "get_seoully_help", input: { query: question, locale } };
+  if (context.templateId && /own this|already own|do i (already )?have|갖고|소유|가지고/.test(q)) return { name: "check_my_collectible_status", input: { templateId: context.templateId } };
+  if (context.templateId && /wishlist|위시/.test(q)) return { name: "check_my_collectible_status", input: { templateId: context.templateId } };
+  if (context.searchQuery && /search this|again|이대로|다시/.test(q)) {
+    return { name: "navigate", input: { destination: "search", query: context.searchQuery, searchDestination: searchDestinationFromQuestion(question, context.searchDestination) } };
+  }
+  if (target && /profile|프로필/.test(q) && /their|them|this collector|그/.test(q)) return { name: "navigate", input: { destination: "profile", targetUserId: target } };
+  if ((target || context.roomOwnerUserId) && /their room|this room|룸/.test(q) && !/search|찾/.test(q)) {
+    return { name: "navigate", input: { destination: "room", targetUserId: context.roomOwnerUserId ?? target } };
+  }
+  if (/worth|price|value|estimate|가치|얼마|가격/.test(q)) return { name: "estimate_collectible_value", input: { query, ...(context.templateId ? { templateId: context.templateId } : {}) } };
   if (/missing|am i missing|빠진|없는/.test(q)) return { name: "find_missing_known_collectibles", input: {} };
-  if (/trade|교환|want anything|wants/.test(q)) return { name: "get_trade_relationship", input: { query: question.slice(0, 120), ...(context.targetUserId ? { targetUserId: context.targetUserId } : {}) } };
-  if (/compatible|similar|like me|비슷|취향/.test(q)) return { name: context.targetUserId || context.profileUserId ? "get_collector_compatibility" : "discover_collectors", input: context.targetUserId || context.profileUserId ? { query: question.slice(0, 120), targetUserId: context.targetUserId ?? context.profileUserId } : listInput };
+  if (/trade|교환|want anything|wants/.test(q)) return { name: "get_trade_relationship", input: { query, ...(target ? { targetUserId: target } : {}) } };
+  if (/compatible|similar|like me|in common|we have|공통|비슷|취향/.test(q)) {
+    return {
+      name: target ? "get_collector_compatibility" : "discover_collectors",
+      input: target ? { query, targetUserId: target } : listInput,
+    };
+  }
   if (/room|룸/.test(q)) return { name: "discover_rooms", input: listInput };
   if (/wishlist|위시/.test(q) && /who|owner|own|누가|가지/.test(q)) return { name: "find_wishlist_owners", input: listInput };
   if (/wishlist|위시/.test(q)) return { name: "get_my_wishlist", input: listInput };
   if (/own|collection|컬렉션|소유/.test(q)) return { name: /group|most|많이|breakdown/.test(q) ? "get_my_collection_breakdown" : "get_my_collection", input: /group|most|많이|breakdown/.test(q) ? {} : listInput };
-  if (/collectible|photocard|card|item|카드|포카|아이템|search|찾/.test(q)) return { name: /discover|check out|추천/.test(q) ? "discover_collectibles" : "search_collectibles", input: /discover|check out|추천/.test(q) ? listInput : searchInput };
+  if (/collectible|photocard|card|item|카드|포카|아이템|search|찾/.test(q)) {
+    if (context.templateId && /\b(this|it|this card)\b|이거|이 카드/.test(q)) return { name: "check_my_collectible_status", input: { templateId: context.templateId } };
+    return { name: /discover|check out|추천/.test(q) ? "discover_collectibles" : "search_collectibles", input: /discover|check out|추천/.test(q) ? listInput : searchInput };
+  }
   if (/collector|people|누구|컬렉터/.test(q)) return { name: /like me|similar|비슷/.test(q) ? "discover_collectors" : "search_collectors", input: /like me|similar|비슷/.test(q) ? listInput : searchInput };
-  return { name: "get_my_collection_breakdown", input: {} };
+  if (target) return { name: "get_collector_compatibility", input: { query, targetUserId: target } };
+  if (context.templateId) return { name: "check_my_collectible_status", input: { templateId: context.templateId } };
+  return { name: "get_seoully_help", input: { query: question, locale } };
 }
 
 function fallbackReply(output: AssistantToolOutput, locale: "en" | "ko"): string {
   const data = output.data as Record<string, unknown>;
   const count = typeof data?.count === "number" ? data.count : Array.isArray(output.cards) ? output.cards.length : 0;
+  if (output.tool === "get_seoully_help" && typeof data.key === "string") {
+    return translate(locale, data.key as Parameters<typeof translate>[1]);
+  }
+  if (output.tool === "check_my_collectible_status") {
+    if (data.owned) return translate(locale, "assistant.answer.ownedYes");
+    if (data.onWishlist) return translate(locale, "assistant.answer.wishlistYes");
+    return translate(locale, "assistant.answer.ownedNo");
+  }
+  if (output.tool === "find_missing_known_collectibles") {
+    const missingCount = typeof data.missingCount === "number" ? data.missingCount : 0;
+    const disclaimer = locale === "ko" ? CATALOG_COMPLETENESS_DISCLAIMER.ko : CATALOG_COMPLETENESS_DISCLAIMER.en;
+    if (!missingCount) return `${translate(locale, "assistant.answer.missingEmpty")} ${disclaimer}`;
+    return `${translate(locale, "assistant.answer.missing", { count: missingCount })} ${disclaimer}`;
+  }
+  if (output.tool === "get_collector_compatibility") {
+    const score = typeof data.score === "number" ? data.score : 0;
+    return translate(locale, score > 0 ? "assistant.answer.common" : "assistant.answer.commonEmpty", { score });
+  }
+  if (output.tool === "get_trade_relationship") {
+    return locale === "ko"
+      ? (data.reciprocal ? "공개된 컬렉션/위시 기준으로 서로 관심 있는 아이템이 있어요." : "공개된 데이터로는 교환 신호가 거의 없어요.")
+      : (data.reciprocal ? "Using visible collection and wishlist data, you each have something the other wants." : "Visible collection data doesn’t show a two-way trade signal yet.");
+  }
+  if (output.tool === "navigate") return translate(locale, "assistant.takeMeThere");
+  if (output.tool === "search_collectibles" && !output.cards.length) return translate(locale, "assistant.answer.catalogNone");
   if (locale === "ko") {
     if (output.tool === "get_my_collection") return count ? `현재 컬렉션에서 ${count}개의 아이템을 찾았어요.` : "아직 production 컬렉션에 아이템이 없어요.";
     if (output.tool === "get_my_wishlist") return count ? `위시리스트에서 ${count}개의 아이템을 찾았어요.` : "위시리스트가 비어 있어요.";
@@ -62,31 +127,61 @@ function fallbackReply(output: AssistantToolOutput, locale: "en" | "ko"): string
   return output.cards.length ? `I found ${output.cards.length} results.` : "I couldn't find a matching result yet.";
 }
 
+function plannedInput(mapped: string, planQuery: string, context: AssistantSurfaceContext, question: string, locale: "en" | "ko"): Record<string, unknown> {
+  const target = contextTarget(context);
+  const listTools = new Set(["get_my_collection", "get_my_wishlist", "find_wishlist_owners", "find_collectors_wanting_my_items", "find_reciprocal_collection_relationships", "discover_collectors", "discover_rooms", "discover_collectibles"]);
+  if (mapped === "get_seoully_help") return { query: question, locale };
+  if (mapped === "check_my_collectible_status") return context.templateId ? { templateId: context.templateId } : {};
+  if (mapped === "navigate") {
+    const intent = navigationIntentFromQuestion(question);
+    if (intent?.type === "search") return { destination: "search", query: context.searchQuery || planQuery, searchDestination: intent.destination ?? context.searchDestination };
+    if (intent && intent.type !== "profile" && intent.type !== "room" && intent.type !== "conversation" && intent.type !== "collectible" && intent.type !== "public_collectible") {
+      return { destination: intent.type === "profile_self" ? "profile_self" : intent.type };
+    }
+    if (intent?.type === "profile") return { destination: "profile", targetUserId: intent.userId };
+    if (intent?.type === "room") return { destination: "room", targetUserId: intent.userId };
+    return { destination: "search", query: planQuery || context.searchQuery || "", searchDestination: searchDestinationFromQuestion(question, context.searchDestination) };
+  }
+  if (mapped === "find_missing_known_collectibles" || mapped === "get_my_collection_breakdown") return {};
+  if (listTools.has(mapped)) return { limit: 8 };
+  if (mapped === "get_collectible_details") return { templateId: context.templateId };
+  return { query: planQuery, limit: 8, ...(target ? { targetUserId: target } : {}), ...(context.templateId ? { templateId: context.templateId } : {}) };
+}
+
 export async function askSeoullyProduction(raw: unknown) {
   const input = requestSchema.parse(raw);
   const identity = await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
-  const context = (await import("@/server/assistant/registry")).assistantSurfaceContextSchema.parse(input.context ?? {});
+  const context = parseAskContext(input.context ?? {});
   let planned: { name: string; input: Record<string, unknown> } | null = null;
   try {
     const plan = await planAssistantTool({ locale: input.locale, question: input.question, history: input.history as AssistantTurn[], context });
     if (plan) {
       const mapped = toolMap[plan.tool] ?? plan.tool;
       if (hasAssistantTool(mapped)) {
-        const target = context.targetUserId ?? context.profileUserId;
         const resolvedTool = mapped === "get_collectible_details" && !context.templateId ? "search_collectibles" : mapped;
-        const listTools = new Set(["get_my_collection", "get_my_wishlist", "find_wishlist_owners", "find_collectors_wanting_my_items", "find_reciprocal_collection_relationships", "discover_collectors", "discover_rooms", "discover_collectibles"]);
-        const input = resolvedTool === "find_missing_known_collectibles" || resolvedTool === "get_my_collection_breakdown" ? {} : listTools.has(resolvedTool) ? { limit: 8 } : resolvedTool === "get_collectible_details" ? { templateId: context.templateId } : { query: plan.query, limit: 8, ...(target ? { targetUserId: target } : {}), ...(context.templateId ? { templateId: context.templateId } : {}) };
-        planned = { name: resolvedTool, input };
+        planned = { name: resolvedTool, input: plannedInput(resolvedTool, plan.query, context, input.question, input.locale) };
       }
     }
   } catch { /* deterministic routing below is the safe fallback */ }
-  const selected = planned ?? deterministicTool(input.question, context);
+  const selected = planned ?? deterministicTool(input.question, context, input.locale);
   let toolResult: AssistantToolOutput;
-  try { toolResult = await executeAssistantTool(selected.name, selected.input, context); }
-  catch (error) {
+  try {
+    toolResult = await executeAssistantTool(selected.name, selected.input, context);
+  } catch (error) {
     const reason = error instanceof Error ? error.message : "assistant_tool_failed";
-    if (["collector_not_found", "collector_ambiguous", "target_required"].includes(reason)) return { mode: "fallback" as const, reply: input.locale === "ko" ? "어느 컬렉터를 말하는지 조금 더 알려주세요." : "Which collector should I look at?", cards: [] };
+    if (reason === "template_required" || reason === "template_not_found") {
+      return { mode: "fallback" as const, reply: translate(input.locale, reason === "template_required" ? "assistant.answer.needCollectible" : "assistant.answer.catalogNone"), cards: [] };
+    }
+    if (reason === "destination_unavailable") {
+      return { mode: "fallback" as const, reply: translate(input.locale, "assistant.answer.roomUnavailable"), cards: [] };
+    }
+    if (reason === "collector_not_visible") {
+      return { mode: "fallback" as const, reply: translate(input.locale, "assistant.answer.privateUnavailable"), cards: [] };
+    }
+    if (["collector_not_found", "collector_ambiguous", "target_required"].includes(reason)) {
+      return { mode: "fallback" as const, reply: translate(input.locale, "assistant.answer.needCollector"), cards: [] };
+    }
     throw new Error("assistant_tool_failed");
   }
   const reply = await generateAssistantReply({ locale: input.locale, question: input.question, history: input.history as AssistantTurn[], toolResult: { tool: toolResult.tool, data: toolResult.data, cards: toolResult.cards } }).catch(() => null);

@@ -4,6 +4,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, PanResponder, Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
 import { loadCollectorRoom } from "../src/api";
 import { useSocialRepository } from "../src/data";
+import { useReportAskSurface } from "../src/ask-surface";
 import { collectibleKindLabel } from "../src/i18n";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
@@ -21,6 +22,10 @@ export default function CollectorRoomScreen() {
   const router = useRouter();
   const social = useSocialRepository();
   const { userId = "" } = useLocalSearchParams<{ userId?: string }>();
+  useReportAskSurface({
+    surface: "collector_room",
+    ...(userId ? { collectorUserId: userId, roomOwnerUserId: userId } : {}),
+  });
   const [items, setItems] = useState<RoomRenderable[]>([]);
   const [ownerName, setOwnerName] = useState("");
   const [privateRoom, setPrivateRoom] = useState(false);

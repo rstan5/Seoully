@@ -463,10 +463,10 @@ export class DemoSocialRepository implements SocialRepository {
     return [...this.shares];
   }
 
-  async askSeoully(question: string, locale: "en" | "ko", history: { role: "user" | "assistant"; content: string }[]): Promise<NativeAskResult> {
+  async askSeoully(question: string, locale: "en" | "ko", history: { role: "user" | "assistant"; content: string }[], context?: import("../types").NativeAskContext): Promise<NativeAskResult> {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { askDemo } = require("./ask") as typeof import("./ask");
-    return askDemo(question, locale, history);
+    return askDemo(question, locale, history, context);
   }
 
   private followingIds(userId: string) {

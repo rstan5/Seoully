@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeFeedPost } from "../src/api";
 import { useSocialRepository, type SocialCollector, type SocialCompatibility } from "../src/data";
+import { useReportAskSurface } from "../src/ask-surface";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
 import { collectibleKindLabel, type MobileCopy } from "../src/i18n";
@@ -76,6 +77,11 @@ export default function CollectorScreen() {
   const [error, setError] = useState<string | null>(null);
   const [postsError, setPostsError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  useReportAskSurface({
+    surface: "collector",
+    ...(userId ? { collectorUserId: userId } : {}),
+    ...(collector?.user.handle ? { collectorHandle: collector.user.handle } : {}),
+  });
 
   const viewerId = social.viewerId();
   const isSelf = Boolean(viewerId && viewerId === userId);

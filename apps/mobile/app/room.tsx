@@ -5,6 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ActivityIndicator, PanResponder, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 import { loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomPlacement, type NativeHolding, type NativeRoomSnapshot } from "../src/api";
 import { useSocialRepository } from "../src/data";
+import { useReportAskSurface } from "../src/ask-surface";
 import { collectibleKindLabel } from "../src/i18n";
 import { useCopy } from "../src/locale";
 import { RetryNotice } from "../src/components/RetryNotice";
@@ -25,6 +26,7 @@ export default function RoomScreen() {
   const copy = useCopy();
   const router = useRouter();
   const social = useSocialRepository();
+  useReportAskSurface({ surface: "room" });
   const [snapshot, setSnapshot] = useState<NativeRoomSnapshot | null>(null);
   const [items, setItems] = useState<RoomRenderable[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);

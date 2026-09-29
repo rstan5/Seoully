@@ -71,6 +71,7 @@ run("slice-2 own collector", "npm", ["run", "check:slice2"], repoRoot);
 run("slice-3 collection graph", "npm", ["run", "check:slice3"], repoRoot);
 run("slice-4 discover search", "npm", ["run", "check:slice4"], repoRoot);
 run("slice-5 communications", "npm", ["run", "check:slice5"], repoRoot);
+run("slice-6 ask seoully", "npm", ["run", "check:slice6"], repoRoot);
 run("mobile TypeScript", "npx", ["tsc", "--noEmit"]);
 run("Expo lint", "npx", ["expo", "lint"]);
 run("Expo Doctor", "npx", ["expo-doctor"]);

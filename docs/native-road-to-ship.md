@@ -1,6 +1,6 @@
 # Native road to ship
 
-**Status:** Slices 1–5 implemented in tree — **SLICE 5 — CODE VERIFIED / DEVICE QA PENDING**. Slices 6–8 not started.  
+**Status:** Slices 1–6 implemented in tree — **SLICE 6 — CODE VERIFIED / DEVICE QA PENDING**. Slices 7–8 not started.  
 **Canonical spec:** `docs/web-native-parity-contract.md`  
 **Connectivity evidence:** `docs/native-backend-connectivity-audit.md`  
 **Tree:** `mobile-native` `bdde759` + dirty working tree.  
@@ -34,7 +34,7 @@ Done is a complete user-experience slice (web behavior + native UI + backend + p
 - Avatars in production.
 - Web binder-as-object, zone docking, doorway, card flight, undo/redo.
 - Own Room GET against current production schema (`theme_id` selected, column unapplied).
-- Ask context beyond `{ surface: "home" }` (Search can now be opened with `q` / `dest`; Ask still always sends home context).
+- Ask context is now a typed surface contract (collector, collectible, search query/dest, conversation peer/thread). Physical-device proof of Ask journeys is still pending.
 - Honest Demo isolation (`collection`/`binder`/`room`/`messages` still call Live APIs).
 - Passing `npm run mobile:verify` (Expo Doctor patch skew).
 - Physical-device proof of any Live journey.
@@ -255,6 +255,8 @@ Order is dependency-shaped. **Slice 1 is first.**
 **Acceptance:** Live Ask never returns Demo collectors. Collection/wishlist/catalog/people/rooms cards open the right screen with the right id/query. Unavailable tools fail honestly.
 
 **Device QA:** From Profile and from a collector, ask collection, similar people, a collectible name; tap each card type.
+
+**Implementation (2026-09-29):** SLICE 6 — CODE VERIFIED / DEVICE QA PENDING. Native Ask sends a typed surface context (collector, collectible/holding, search `q`/`dest`, conversation peer/thread, room owner). Production tools remain the registry/DAL path; navigation is allowlisted and validated (collector exists, room public-or-own, conversation participant). Search cards preserve query and destination. Catalog completeness answers include the known-to-Seoully disclaimer. No Vision. No migration. `20261002` remains unapplied.
 
 ---
 

@@ -3,6 +3,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from "react-native";
 import { useSocialRepository } from "../src/data";
+import { useReportAskSurface } from "../src/ask-surface";
 import { collectibleKindLabel } from "../src/i18n";
 import { useCopy } from "../src/locale";
 import { RetryNotice } from "../src/components/RetryNotice";
@@ -32,6 +33,7 @@ export default function CollectionScreen() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [tabReady, setTabReady] = useState(false);
   const [kindFilter, setKindFilter] = useState("all");
+  useReportAskSurface({ surface: tab === "wishlist" ? "wishlist" : "collection" });
   const [hasMore, setHasMore] = useState(false);
   const [hasMoreWishlist, setHasMoreWishlist] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);

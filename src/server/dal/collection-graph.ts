@@ -96,6 +96,31 @@ export async function getCollectionBreakdown(input?: unknown) {
   return { totalHoldings: items.length, uniqueTemplates: new Set(items.map((item) => item.templateId)).size, forTradeHoldings: items.filter((item) => item.tradeStatus === "for-trade").length, wishlistCount: wishlist.length, byGroup: by((item) => item.groupId), byMember: by((item) => item.memberId ?? "unassigned"), byRelease: by((item) => item.releaseId ?? "unassigned"), byType: by((item) => item.kind), displayedHoldings: items.filter((item) => item.displayed).length, storedHoldings: items.filter((item) => !item.displayed).length };
 }
 
+export async function checkMyCollectibleStatus(templateId: string): Promise<{
+  templateId: string;
+  owned: boolean;
+  onWishlist: boolean;
+  holdingIds: string[];
+  tradeStatuses: string[];
+}> {
+  const id = uuid.parse(templateId);
+  const { identity, supabase } = await identityAndClient();
+  const [holdings, wishlist] = await Promise.all([
+    supabase.from("holdings").select("id,trade_status").eq("owner_user_id", identity.user.id).eq("template_id", id).limit(25),
+    supabase.from("wishlist_entries").select("id").eq("owner_user_id", identity.user.id).eq("template_id", id).maybeSingle(),
+  ]);
+  if (holdings.error) throw new Error("graph_collection_read_failed");
+  if (wishlist.error) throw new Error("graph_wishlist_read_failed");
+  const rows = holdings.data ?? [];
+  return {
+    templateId: id,
+    owned: rows.length > 0,
+    onWishlist: Boolean(wishlist.data),
+    holdingIds: rows.map((row) => String(row.id)),
+    tradeStatuses: rows.map((row) => String(row.trade_status)),
+  };
+}
+
 export async function getKnownCoverage(input: unknown): Promise<CoverageResult> {
   const filters = z.object({ groupId: uuid.optional(), memberId: uuid.optional(), releaseId: uuid.optional() }).strict().parse(input);
   const { identity, supabase } = await identityAndClient();

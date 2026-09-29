@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { loadCollectorCollection, loadPublicCollectorHolding, type NativeCatalogTemplate } from "../src/api";
 import { useSocialRepository } from "../src/data";
+import { useReportAskSurface } from "../src/ask-surface";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
 import { collectibleKindLabel } from "../src/i18n";
@@ -18,6 +19,12 @@ export default function PublicCollectibleScreen() {
   const router = useRouter();
   const social = useSocialRepository();
   const { userId = "", holdingId, templateId } = useLocalSearchParams<{ userId?: string; holdingId?: string; templateId?: string }>();
+  useReportAskSurface({
+    surface: "public_collectible",
+    ...(userId ? { collectorUserId: userId } : {}),
+    ...(typeof holdingId === "string" ? { holdingId } : {}),
+    ...(typeof templateId === "string" ? { templateId } : {}),
+  });
   const [template, setTemplate] = useState<NativeCatalogTemplate | null>(null);
   const [tradeStatus, setTradeStatus] = useState<"for-trade" | "not-for-trade" | null>(null);
   const [loading, setLoading] = useState(true);

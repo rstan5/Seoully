@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/refs -- Gesture refs are read and written only inside PanResponder callbacks. */
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Image, Modal, PanResponder, Pressable, SafeAreaView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Image, Modal, PanResponder, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, spacing } from "../theme";
 import { SeoullyText } from "../ui/SeoullyText";
 
@@ -92,7 +93,7 @@ export function PhotocardCropper({
   };
 
   return <Modal animationType="slide" visible onRequestClose={onCancel}>
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView edges={["top"]} style={styles.screen}>
       <SeoullyText variant="title">{title}</SeoullyText>
       <SeoullyText variant="secondary" style={styles.hint}>{hint}</SeoullyText>
       <View {...panResponder.panHandlers} style={[styles.viewport, { width: viewportWidth, height: viewportHeight }]}>

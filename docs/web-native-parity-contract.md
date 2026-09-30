@@ -438,6 +438,16 @@ Recommended comms shape (specification only): text + `kind` + `post_id` + templa
 
 ---
 
+## 11b. Slice 7 physical lock (Repair 01 — document only)
+
+Physical iPhone QA after the native slices proved Room is useful but not product-parity. **Do not implement these in Repair 01.** They remain the Slice 7 reconstruction contract. `20261002000000_native_room_theme.sql` stays unapplied until Slice 7 review.
+
+Full-screen Room (no social tab bar, no giant header, no permanent zone pills). Direct touch camera (constrained pan/pinch/focus; diorama, not CAD). Keep inspect/lift/details; wishlist/message via Slice 5. Touch-first edit (long-press, drag, settle, rollback) — not Turn/Scale buttons as primary UX. Ownership ≠ placement; reuse existing placement rules. Stored collection as a world object, not a giant list tray. Binder stays in-world with camera continuity. Material/lighting/depth so objects are recognizable without labels. Web-faithful customization without inventing schema. Invert cursor/button mental model to finger → world. **KEEP THE ENGINE, REBUILD THE EXPERIENCE** (R3F, Expo GL, RoomPlacement DAL, representation, media, focus, Binder data, persist/rollback, public security).
+
+See `docs/native-road-to-ship.md` Slice 7 “Physical iPhone findings — locked for Slice 7”.
+
+---
+
 ## 12. Validation this pass
 
 | Check | Result |

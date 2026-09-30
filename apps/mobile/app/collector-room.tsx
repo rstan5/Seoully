@@ -1,4 +1,4 @@
-import { SafeAreaView } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSocialRepository } from "../src/data";
 import { useReportAskSurface } from "../src/ask-surface";
@@ -15,7 +15,7 @@ export default function CollectorRoomScreen() {
     ...(userId ? { collectorUserId: userId, roomOwnerUserId: userId } : {}),
   });
   // Demo isolation: fixture rooms only. copy.demoRoomUnavailable is the Live-off message.
-  return <SafeAreaView style={{ flex: 1 }}>
+  return <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
     <RoomWorldScreen
       mode="public"
       userId={userId}

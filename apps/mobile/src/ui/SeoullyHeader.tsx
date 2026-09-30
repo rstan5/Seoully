@@ -4,8 +4,9 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { isDemoWorldAllowed, useDataMode, useSocialRepository } from "../data";
 import { useCopy } from "../locale";
-import { colors, sizes } from "../theme";
+import { colors } from "../theme";
 import { BrandMark } from "./BrandMark";
+import { chrome } from "./shellLayout";
 import { IconBell } from "./icons";
 import { pressShift, useReduceMotion } from "./motion";
 import { useProfileIdentity, useProfileInk, useProfileMute } from "./ProfileIdentity";
@@ -96,20 +97,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderBottomColor: colors.border,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    columnGap: 8,
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "space-between",
-    minHeight: sizes.topBar,
+    minHeight: chrome.headerHeight,
     overflow: "visible",
-    paddingBottom: 8,
-    paddingHorizontal: 16,
-    paddingTop: 10,
+    paddingHorizontal: chrome.gutter,
+    paddingVertical: 0,
+    rowGap: 4,
     zIndex: 2,
   },
   end: {
     alignItems: "center",
     flexDirection: "row",
-    flexShrink: 0,
-    marginLeft: 12,
+    flexShrink: 1,
+    marginLeft: "auto",
   },
   demo: {
     borderColor: colors.border,

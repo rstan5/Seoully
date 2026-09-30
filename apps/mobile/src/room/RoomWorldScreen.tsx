@@ -1,11 +1,13 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
-import { AccessibilityInfo, AppState, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AccessibilityInfo, AppState, PanResponder, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { loadCollectorRoom, loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomPlacement, type NativeHolding, type NativeRoomPlacement, type NativeRoomSnapshot } from "../api";
 import { binderSpreads, buildNativeBinderPages, spreadIndexForHolding } from "../binder/model";
 import { collectibleKindLabel, type MobileCopy } from "../i18n";
 import { CachedSignedImage } from "../media/cachedMedia";
 import { colors, spacing } from "../theme";
+import { chrome } from "../ui/shellLayout";
+import { SeoullyText } from "../ui/SeoullyText";
 import { cloneRenderables, holdingRemainsAfterStore, restoreEditBaseline, revertDrop, storeRenderable } from "./editSession";
 import {
   buildRoomRenderables,
@@ -376,7 +378,7 @@ export function RoomWorldScreen({
   if (privateRoom && !loading) {
     return <View style={styles.container}>
       <Header copy={copy} title={ownerName || copy.room} lead={copy.collectorRoomLead} onBack={onLeave} />
-      <Text style={styles.empty}>{copy.roomPrivate}</Text>
+      <SeoullyText variant="secondary" style={styles.empty}>{copy.roomPrivate}</SeoullyText>
     </View>;
   }
 
@@ -392,7 +394,7 @@ export function RoomWorldScreen({
       onCancel={cancelEditing}
       onSave={() => void saveEditing()}
     />
-    {error ? <Pressable onPress={() => void refresh()}><Text style={styles.error}>{error} · {copy.retry}</Text></Pressable> : null}
+    {error ? <Pressable onPress={() => void refresh()}><SeoullyText variant="secondary" color={colors.plum} style={styles.error}>{error} · {copy.retry}</SeoullyText></Pressable> : null}
     {!loading && snapshot ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.lookRow}>
       <LookChip label={copy.roomLookHome} selected={view.kind === "home"} onPress={() => { setSelectedId(null); setView({ kind: "home" }); }} />
       {CANONICAL_ZONE_KINDS.map((zone) => (
@@ -405,7 +407,7 @@ export function RoomWorldScreen({
       ))}
     </ScrollView> : null}
     {!loading && snapshot ? <View style={styles.stage} {...panResponder.panHandlers}>
-      <Suspense fallback={<Text style={styles.empty}>{copy.room}</Text>}>
+      <Suspense fallback={<SeoullyText variant="secondary" style={styles.empty}>{copy.room}</SeoullyText>}>
         <NativeRoomRenderer
           key={canvasEpoch}
           items={items}
@@ -448,31 +450,31 @@ export function RoomWorldScreen({
           }}
         />
       </Suspense>
-      <View pointerEvents="none" style={styles.hint}><Text style={styles.hintText}>{hint}</Text></View>
+      <View pointerEvents="none" style={styles.hint}><SeoullyText variant="caption" color={colors.ink} style={styles.hintText}>{hint}</SeoullyText></View>
     </View> : null}
     {selectedItem && !editing && view.kind !== "binder" ? <View style={styles.inspection}>
       <View style={styles.inspectionCopy}>
-        <Text numberOfLines={1} style={styles.inspectionTitle}>{selectedItem.holding.template.name}</Text>
-        <Text numberOfLines={1} style={styles.inspectionMeta}>{[selectedItem.holding.template.groupName, selectedItem.holding.template.memberName, collectibleKindLabel(selectedItem.holding.template.kind, copy)].filter(Boolean).join(" · ")}</Text>
+        <SeoullyText numberOfLines={1} variant="handle" style={styles.inspectionTitle}>{selectedItem.holding.template.name}</SeoullyText>
+        <SeoullyText numberOfLines={1} variant="caption" style={styles.inspectionMeta}>{[selectedItem.holding.template.groupName, selectedItem.holding.template.memberName, collectibleKindLabel(selectedItem.holding.template.kind, copy)].filter(Boolean).join(" · ")}</SeoullyText>
       </View>
-      {onInspectCollectible && !readOnly ? <Pressable onPress={() => onInspectCollectible(selectedItem.holding.id)} style={styles.inspectAction}><Text style={styles.inspectActionText}>{copy.viewCollectible}</Text></Pressable> : null}
-      {selectedItem.holding.template.kind === "photocard" && !readOnly ? <Pressable onPress={() => openBinder(selectedItem.holding.id)} style={styles.inspectAction}><Text style={styles.inspectActionText}>{copy.openBinder}</Text></Pressable> : null}
-      <Pressable onPress={goBack} style={styles.inspectAction}><Text style={styles.inspectActionText}>{copy.close}</Text></Pressable>
+      {onInspectCollectible && !readOnly ? <Pressable onPress={() => onInspectCollectible(selectedItem.holding.id)} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.viewCollectible}</SeoullyText></Pressable> : null}
+      {selectedItem.holding.template.kind === "photocard" && !readOnly ? <Pressable onPress={() => openBinder(selectedItem.holding.id)} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.openBinder}</SeoullyText></Pressable> : null}
+      <Pressable onPress={goBack} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.close}</SeoullyText></Pressable>
     </View> : null}
     {view.kind === "binder" && view.heldHoldingId ? <View style={styles.inspection}>
-      <Text style={styles.inspectionTitle}>{holdings.find((item) => item.id === view.heldHoldingId)?.template.name ?? copy.binder}</Text>
-      <Pressable onPress={() => setView({ kind: "binder", spread: view.spread })} style={styles.inspectAction}><Text style={styles.inspectActionText}>{copy.returnToBinder}</Text></Pressable>
+      <SeoullyText variant="handle" style={styles.inspectionTitle}>{holdings.find((item) => item.id === view.heldHoldingId)?.template.name ?? copy.binder}</SeoullyText>
+      <Pressable onPress={() => setView({ kind: "binder", spread: view.spread })} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.returnToBinder}</SeoullyText></Pressable>
     </View> : null}
     {selectedItem && editing ? <View style={styles.selectionColumn}>
-      <View style={styles.selectionRow}><Text numberOfLines={1} style={styles.selection}>{selectedItem.holding.template.name}</Text><Pressable onPress={() => void storeSelected()}><Text style={styles.removeText}>{copy.removeFromRoom}</Text></Pressable></View>
+      <View style={styles.selectionRow}><SeoullyText numberOfLines={1} variant="handle" color={colors.plum} style={styles.selection}>{selectedItem.holding.template.name}</SeoullyText><Pressable onPress={() => void storeSelected()}><SeoullyText variant="caption" color={colors.muted}>{copy.removeFromRoom}</SeoullyText></Pressable></View>
       <View style={styles.transformRow}>
-        <Pressable onPress={() => applyLocal(turnRenderable(selectedItem, -Math.PI / 12))} style={styles.transformButton}><Text style={styles.transformText}>{copy.rotateLeft}</Text></Pressable>
-        <Pressable onPress={() => applyLocal(turnRenderable(selectedItem, Math.PI / 12))} style={styles.transformButton}><Text style={styles.transformText}>{copy.rotateRight}</Text></Pressable>
-        <Pressable onPress={() => applyLocal(resizeRenderable(selectedItem, 0.9))} style={styles.transformButton}><Text style={styles.transformText}>{copy.scaleDown}</Text></Pressable>
-        <Pressable onPress={() => applyLocal(resizeRenderable(selectedItem, 1.1))} style={styles.transformButton}><Text style={styles.transformText}>{copy.scaleUp}</Text></Pressable>
+        <Pressable onPress={() => applyLocal(turnRenderable(selectedItem, -Math.PI / 12))} style={styles.transformButton}><SeoullyText variant="caption" color={colors.plum}>{copy.rotateLeft}</SeoullyText></Pressable>
+        <Pressable onPress={() => applyLocal(turnRenderable(selectedItem, Math.PI / 12))} style={styles.transformButton}><SeoullyText variant="caption" color={colors.plum}>{copy.rotateRight}</SeoullyText></Pressable>
+        <Pressable onPress={() => applyLocal(resizeRenderable(selectedItem, 0.9))} style={styles.transformButton}><SeoullyText variant="caption" color={colors.plum}>{copy.scaleDown}</SeoullyText></Pressable>
+        <Pressable onPress={() => applyLocal(resizeRenderable(selectedItem, 1.1))} style={styles.transformButton}><SeoullyText variant="caption" color={colors.plum}>{copy.scaleUp}</SeoullyText></Pressable>
       </View>
     </View> : null}
-    {editing && storedGroups.length ? <View style={styles.stored}><Text style={styles.storedTitle}>{copy.storedCollection}</Text>{storedGroups.map(([kind, group]) => <View key={kind} style={styles.storedGroup}><Text style={styles.storedKind}>{collectibleKindLabel(kind, copy)}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storedList}>{group.map((holding) => <Pressable key={holding.id} onPress={() => void placeHolding(holding)} style={styles.storedItem}>{holding.personalMediaUrl ? <CachedSignedImage cacheKey={holding.id} url={holding.personalMediaUrl} style={styles.storedImage} /> : null}<Text numberOfLines={2} style={styles.storedItemText}>+ {holding.template.name}</Text></Pressable>)}</ScrollView></View>)}</View> : null}
+    {editing && storedGroups.length ? <View style={styles.stored}><SeoullyText variant="handle" style={styles.storedTitle}>{copy.storedCollection}</SeoullyText>{storedGroups.map(([kind, group]) => <View key={kind} style={styles.storedGroup}><SeoullyText variant="caption" color={colors.muted} style={styles.storedKind}>{collectibleKindLabel(kind, copy)}</SeoullyText><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storedList}>{group.map((holding) => <Pressable key={holding.id} onPress={() => void placeHolding(holding)} style={styles.storedItem}>{holding.personalMediaUrl ? <CachedSignedImage cacheKey={holding.id} url={holding.personalMediaUrl} style={styles.storedImage} /> : null}<SeoullyText numberOfLines={2} variant="caption" color={colors.plum} style={styles.storedItemText}>+ {holding.template.name}</SeoullyText></Pressable>)}</ScrollView></View>)}</View> : null}
   </View>;
 }
 
@@ -499,20 +501,20 @@ function Header({
 }) {
   return <View style={styles.header}>
     <View style={styles.heading}>
-      <Pressable accessibilityRole="button" onPress={onBack}><Text style={styles.back}>{copy.back}</Text></Pressable>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.lead}>{lead}</Text>
+      <Pressable accessibilityRole="button" onPress={onBack}><SeoullyText variant="button" color={colors.plum}>{copy.back}</SeoullyText></Pressable>
+      <SeoullyText variant="title" style={styles.title}>{title}</SeoullyText>
+      <SeoullyText variant="secondary" style={styles.lead}>{lead}</SeoullyText>
     </View>
     {readOnly || !onEdit ? null : <View style={styles.headerActions}>
-      {editing ? <Pressable onPress={onCancel} style={styles.editButton}><Text style={styles.editButtonText}>{copy.cancelEditing}</Text></Pressable> : null}
-      <Pressable onPress={editing ? onSave : onEdit} style={styles.editButton}><Text style={styles.editButtonText}>{editing ? copy.finishEditing : copy.editRoom}</Text></Pressable>
+      {editing ? <Pressable onPress={onCancel} style={styles.editButton}><SeoullyText variant="button" color={colors.surface}>{copy.cancelEditing}</SeoullyText></Pressable> : null}
+      <Pressable onPress={editing ? onSave : onEdit} style={styles.editButton}><SeoullyText variant="button" color={colors.surface}>{editing ? copy.finishEditing : copy.editRoom}</SeoullyText></Pressable>
     </View>}
   </View>;
 }
 
 function LookChip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
   return <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress} style={[styles.lookChip, selected && styles.lookChipSelected]}>
-    <Text style={[styles.lookChipText, selected && styles.lookChipTextSelected]}>{label}</Text>
+    <SeoullyText variant="caption" color={selected ? colors.surface : colors.plum} style={styles.lookChipText}>{label}</SeoullyText>
   </Pressable>;
 }
 
@@ -546,16 +548,16 @@ function loadDemoRoom(): typeof import("./demoRoom") {
 
 const styles = StyleSheet.create({
   container: { backgroundColor: colors.canvas, flex: 1 },
-  header: { alignItems: "center", flexDirection: "row", gap: spacing.sm, padding: spacing.lg },
-  heading: { flex: 1 },
+  header: { alignItems: "center", flexDirection: "row", gap: spacing.sm, paddingHorizontal: chrome.gutter, paddingVertical: spacing.sm },
+  heading: { flex: 1, minWidth: 0 },
   back: { color: colors.plum, fontSize: 14, fontWeight: "700", marginBottom: 4 },
   headerActions: { flexDirection: "row", flexShrink: 0, flexWrap: "wrap", gap: spacing.xs, justifyContent: "flex-end", maxWidth: 220 },
-  title: { color: colors.ink, fontSize: 30, fontWeight: "700" },
-  lead: { color: colors.muted, fontSize: 14, marginTop: spacing.xs },
-  editButton: { backgroundColor: colors.plum, borderRadius: 12, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  title: { fontSize: 30, lineHeight: 36 },
+  lead: { marginTop: spacing.xs },
+  editButton: { backgroundColor: colors.plum, borderRadius: 12, justifyContent: "center", minHeight: 44, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   editButtonText: { color: colors.surface, fontWeight: "700" },
-  error: { color: colors.plum, paddingHorizontal: spacing.lg },
-  empty: { color: colors.muted, padding: spacing.lg },
+  error: { paddingHorizontal: chrome.gutter },
+  empty: { padding: chrome.gutter },
   lookRow: { gap: spacing.xs, paddingBottom: spacing.xs, paddingHorizontal: spacing.md },
   lookChip: { borderColor: colors.border, borderRadius: 999, borderWidth: 1, justifyContent: "center", minHeight: 32, paddingHorizontal: spacing.sm },
   lookChipSelected: { backgroundColor: colors.plum, borderColor: colors.plum },

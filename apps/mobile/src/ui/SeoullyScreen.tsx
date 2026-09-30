@@ -3,6 +3,7 @@ import { View, type StyleProp, type ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../theme";
 
+/** Social screens: top inset only. Header chrome sits inside this inset, matching web `.s-top`. */
 export function SeoullyScreen({
   children,
   style,

@@ -308,6 +308,36 @@ Order is dependency-shaped. **Slice 1 is first.**
 
 1. Cold launch — no R3F crash. 2. Profile glimpse is the room world, not paper. 3. Enter Room feels authored. 4. Six zones readable. 5–9. Tap Shelf/Wall/Case/Desk/Archive — camera docks. 10. Tap collectible — focus/lift. 11. Back one spatial level. 12–18. Edit move / invalid drop / store (holding remains) / place / cancel / save+relaunch. 19–27. Desk Binder → open → turn pages → odd last spread complete → personal photocard → lift → return without white flash → close to desk. 28. Profile ↔ Room no black Canvas. 29. Background/resume. 30–31. Public room view-only, no private media. 32–33. Demo fixtures; Live never SOO/MINJI. 34. Reduced motion still usable. 35. Heat/memory after minutes.
 
+#### Physical iPhone findings — locked for Slice 7 (Repair 01 recorded, not implemented)
+
+Physical device QA after Slice 5–8 proved the current native Room is functionally useful but **not product-parity**. Repair 01 does **not** implement the following. Slice 7 reconstruction must. `20261002000000_native_room_theme.sql` stays **unapplied** until explicitly reviewed in Slice 7.
+
+1. **Room is full screen.** Entering Room leaves the social layer. No persistent social bottom tab bar. No giant ordinary-screen Room header. No permanent Home/Shelf/Wall/Case/Desk/Binder/Archive pill navigation. The world occupies the usable display. Minimal overlays only (Back, Edit Room, contextual controls). Back returns to social/identity. Room is **not** a primary bottom tab.
+
+2. **Direct touch camera.** Replace desktop-like zone-button navigation as the primary interaction. Constrained pan/orbit on empty world, pinch zoom within useful limits, tap object/zone may smoothly focus. Camera must not get lost/flipped/clipped through geometry. Gestures coexist with object interaction. This is a small collector diorama, not a free 3D CAD camera.
+
+3. **Object inspection.** Keep tap collectible → focus/lift → inspect/details. For another collector's object, valid actions include Add to Wishlist and Message about this collectible (reuse Slice 5). No marketplace checkout/offers.
+
+4. **Touch-first edit mode.** Reject Turn left / Turn right / Smaller / Larger as the primary model. Target: Edit Room → long-press collectible → lift → drag → compatible surfaces communicate availability → release → settle; invalid placement rolls back. Do not expose arbitrary scaling as a normal collector action. Representation geometry defines scale. If orientation is required, invent a touch-native interaction later — not rotation buttons as the main UX.
+
+5. **Placement semantics.** Ownership ≠ placement. Albums/CDs/books → shelf/desk/compatible storage. Lightsticks/plush/figures → shelf/desk/case where compatible. Posters/flat display → wall. Photocards → Binder and/or supported display per canonical rules. Archive/memorabilia → Archive/storage. Use existing placement/domain contracts. Do not invent a second placement system.
+
+6. **Stored collection as a world concept.** The giant bottom text/list tray is not the final Room. Investigate a physical storage/archive/merch-box (or similar) affordance. Tap storage → native collection drawer/sheet with thumbnails and identity → choose/place. Unplaced Holdings remain owned. Storing removes placement only.
+
+7. **Binder is part of the world.** Binder remains a physical Room object. Tap → continuous camera to desk/binder → Binder opens in-space. Close → camera returns to Room. Do not make Binder feel like an unrelated app tab.
+
+8. **Material / object fidelity.** Current physical read is largely flat colored blocks. Improve recognizable furniture, silhouettes, authorized personal/catalog imagery, album/CD/book covers, photocard texture, lightstick/plush/figure representation, Binder materials/pockets/pages, rug/floor/wall distinction, furniture edge, depth cues. Progressive fidelity, not photorealism. Users must recognize objects without text labels.
+
+9. **Lighting / depth.** Current dark aesthetic merges wall/floor/furniture. Reconstruct deliberate lighting inspired by web window/outdoor illumination, Expo-GL-safe: ambient, directional/window-like, restrained shadows, floor/wall separation, readable collectible faces, brightness control. No unsupported post-processing. Physical-device performance is authoritative.
+
+10. **Room customization.** Inspect canonical web customization: wall color, floor, furniture color/material, rug, brightness/lighting, appropriate accents. Do not invent arbitrary theme schema. Theme migration remains unapplied until Slice 7 review.
+
+11. **Touch-first principle.** Invert cursor → click → UI button → transform. Target: finger → touch world → manipulate world/object directly → UI only when needed. No hover, mouse-wheel, or desktop cursor mental model.
+
+12. **Keep the working engine.** Do not throw away working infrastructure without evidence: Three/R3F, Expo GL device compatibility, production RoomPlacement DAL, ownership/placement separation, representation contracts, personal media textures, focus behavior, Binder geometry/data, edit persistence, invalid-placement rollback, store semantics, public Room security, current renderer compatibility fixes.
+
+**Goal:** KEEP THE ENGINE. REBUILD THE EXPERIENCE.
+
 ---
 
 ### Slice 8 — Onboarding and first home

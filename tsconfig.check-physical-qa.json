@@ -17,6 +17,7 @@
     "apps/mobile/src/startup/eligibility.ts",
     "apps/mobile/src/startup/routing.ts",
     "apps/mobile/src/ui/profileContrast.ts",
+    "apps/mobile/src/ui/shellLayout.ts",
     "apps/mobile/src/theme.ts"
   ]
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { AccessibilityInfo, ActivityIndicator, Animated, Easing, FlatList, Image, Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { AccessibilityInfo, ActivityIndicator, Animated, Easing, FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSocialRepository } from "../src/data";
 import type { NativeHolding } from "../src/api";
@@ -110,7 +111,7 @@ export default function BinderScreen() {
     });
   };
 
-  return <SafeAreaView style={styles.safe}><View style={styles.container}>
+  return <SafeAreaView edges={["top"]} style={styles.safe}><View style={styles.container}>
     <ScreenBack label={copy.closeBinder} onPress={closeBinder} />
     <Text style={styles.title}>{copy.binder}</Text>
     <Text style={styles.lead}>{copy.binderLead}</Text>

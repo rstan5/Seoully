@@ -15,17 +15,17 @@ import {
 import { usePathname, useRouter, useGlobalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAskSurfaceOverlay } from "../ask-surface";
-import { contextFromNativeRoute, isAskNavigationAction, mergeAskContext, nativeRouteLeaf, type AskNavigationAction } from "seoully-domain/ask-context";
+import { contextFromNativeRoute, isAskNavigationAction, mergeAskContext, type AskNavigationAction } from "seoully-domain/ask-context";
 import { useSocialRepository, type NativeAskCard } from "../data";
 import { isExploreDestination } from "../explore";
 import { useCopy, useLocale } from "../locale";
 import { useBootstrap } from "../startup/BootstrapProvider";
-import { colors, elevation, radii, sizes } from "../theme";
+import { colors, elevation, faces, radii, sizes } from "../theme";
 import { pressShift, useReduceMotion } from "./motion";
+import { companionPlacement, routeShowsBottomNav } from "./shellLayout";
 import { SeoullyText } from "./SeoullyText";
 
 const HEART = require("../../assets/brand/seoully-heart-mark.png");
-const TAB_LEAF = new Set(["", "search", "create", "messages", "profile", "send-to", "notices", "index"]);
 
 function cardActionLabel(action: AskNavigationAction, copy: ReturnType<typeof useCopy>) {
   if (action.type === "profile" || action.type === "profile_self") return copy.askViewProfile;
@@ -78,8 +78,10 @@ export function SeoullyCompanion() {
 
   if (!boot.companionEligible) return null;
 
-  const tabOffset = TAB_LEAF.has(nativeRouteLeaf(pathname)) ? sizes.tabBar + 8 : 16;
-  const bottom = insets.bottom + tabOffset;
+  const placement = companionPlacement({
+    insets,
+    hasBottomNav: routeShowsBottomNav(pathname),
+  });
 
   function navigateAction(action: AskNavigationAction) {
     if (action.type === "search") {
@@ -143,7 +145,7 @@ export function SeoullyCompanion() {
           accessibilityRole="button"
           accessibilityLabel={copy.askSeoully}
           onPress={() => setOpen(true)}
-          style={({ pressed }) => [styles.heartWrap, { bottom, right: 12 }, pressShift(pressed, reduceMotion)]}
+          style={({ pressed }) => [styles.heartWrap, { bottom: placement.bottom, right: placement.right }, pressShift(pressed, reduceMotion)]}
         >
           <Animated.View style={{ transform: [{ translateY: bounce.interpolate({ inputRange: [0, 1], outputRange: [0, -6] }) }] }}>
             <Image accessibilityIgnoresInvertColors resizeMode="contain" source={HEART} style={styles.heart} />
@@ -209,7 +211,7 @@ export function SeoullyCompanion() {
                 onChangeText={setQuestion}
                 onSubmitEditing={() => { void send(); }}
                 returnKeyType="send"
-                style={styles.input}
+                style={[styles.input, { fontFamily: faces[locale].regular }]}
               />
               <Pressable accessibilityRole="button" accessibilityLabel={copy.askSeoullySend} onPress={() => { void send(); }}>
                 <SeoullyText variant="button" color={colors.plum}>{copy.askSeoullySend}</SeoullyText>

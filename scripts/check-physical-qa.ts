@@ -21,6 +21,7 @@ import {
   identityPalette,
   relativeLuminance,
 } from "../apps/mobile/src/ui/profileContrast";
+import { chrome, companionPlacement, routeShowsBottomNav } from "../apps/mobile/src/ui/shellLayout";
 
 const repoRoot = process.cwd();
 function read(rel: string) {
@@ -194,6 +195,37 @@ assertContains(read("apps/mobile/src/ui/SeoullyProfile.tsx"), "veilLayer", "veil
 assertContains(read("src/world/ui/SocialShell.tsx"), "data-surface={themeUserId ? \"profile\" : \"browse\"}", "web profile surface inspected");
 assertContains(read("src/design/social-app.css"), "--s-profile-veil: 0.85", "web veil is the opacity authority");
 assertContains(read("src/domain/profile-theme.ts"), 'inkHsl && inkHsl.l > 0.55 ? room.theme.ink : "#f3eef6"', "web room-sync compensates ink");
+
+  const brand = read("apps/mobile/src/ui/BrandMark.tsx");
+  const header = read("apps/mobile/src/ui/SeoullyHeader.tsx");
+  const companion = read("apps/mobile/src/ui/SeoullyCompanion.tsx");
+  const roomWorld = read("apps/mobile/src/room/RoomWorldScreen.tsx");
+  const retry = read("apps/mobile/src/components/RetryNotice.tsx");
+  const road = read("docs/native-road-to-ship.md");
+  assertContains(brand, "flexShrink: 0", "wordmark pair does not shrink");
+  assertNotContains(brand, "lineHeight: 22", "wordmark is not clipped to 22px");
+  assertContains(header, "chrome.headerHeight", "header uses shared chrome height");
+  assertContains(header, "chrome.gutter", "header uses shared gutter");
+  assertNotContains(header, "paddingTop: 10", "header is not jammed with extra top padding");
+  assert.equal(routeShowsBottomNav("/profile"), true);
+  assert.equal(routeShowsBottomNav("/(tabs)/search"), true);
+  assert.equal(routeShowsBottomNav("/"), true);
+  assert.equal(routeShowsBottomNav("/room"), false);
+  assert.equal(routeShowsBottomNav("/collector"), false);
+  const tabPlace = companionPlacement({ insets: { top: 59, right: 0, bottom: 34, left: 0 }, hasBottomNav: true });
+  assert.equal(tabPlace.bottom, 34 + chrome.tabBarContent + chrome.companionClearance);
+  assert.equal(tabPlace.right, chrome.gutter);
+  const stackPlace = companionPlacement({ insets: { top: 59, right: 0, bottom: 34, left: 0 }, hasBottomNav: false });
+  assert.ok(stackPlace.bottom < tabPlace.bottom);
+  assert.equal(stackPlace.right, chrome.gutter);
+  assertContains(companion, "companionPlacement", "companion uses shared contract");
+  assertNotContains(companion, "right: 12", "companion is not jammed to 12px");
+  assertContains(retry, "SeoullyText", "shared retry uses Seoully type");
+  assertContains(roomWorld, "SeoullyText", "room chrome uses Seoully type");
+  assertContains(read("apps/mobile/app/room.tsx"), "react-native-safe-area-context", "room uses context safe area");
+  assertContains(road, "KEEP THE ENGINE", "slice 7 lock recorded");
+  assertContains(road, "Touch-first edit mode", "slice 7 lock recorded");
+  assertContains(read("docs/web-native-parity-contract.md"), "KEEP THE ENGINE, REBUILD THE EXPERIENCE", "parity contract records slice 7 lock");
 
   console.log("check:physical-qa passed");
 }

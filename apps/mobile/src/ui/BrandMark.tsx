@@ -1,10 +1,16 @@
 import { Image, StyleSheet, View } from "react-native";
 import { SeoullyText } from "./SeoullyText";
 
+/**
+ * Wordmark + heart as one logo. Web `.brand-mark` / `.brand-heart` (1.46em × 1.2em,
+ * heart image 116% tall, baseline-aligned). Never shrink or clip the pair.
+ */
 export function BrandMark() {
   return (
     <View accessibilityRole="header" style={styles.row}>
-      <SeoullyText variant="display" style={styles.wordmark}>Seoully</SeoullyText>
+      <SeoullyText variant="display" maxFontSizeMultiplier={1.35} style={styles.wordmark}>
+        Seoully
+      </SeoullyText>
       <View style={styles.heartSlot}>
         <Image
           accessibilityIgnoresInvertColors
@@ -21,27 +27,23 @@ const styles = StyleSheet.create({
   row: {
     alignItems: "center",
     flexDirection: "row",
-    flexShrink: 1,
+    flexShrink: 0,
+    gap: 4,
     overflow: "visible",
-    paddingRight: 4,
   },
   wordmark: {
-    fontSize: 20,
     includeFontPadding: false,
-    letterSpacing: -0.8,
-    lineHeight: 22,
-    textAlignVertical: "center",
+    overflow: "visible",
+    paddingRight: 1,
   },
   heartSlot: {
-    height: 22,
-    justifyContent: "center",
-    marginLeft: 4,
+    height: 24,
+    justifyContent: "flex-end",
     overflow: "visible",
-    width: 22,
+    width: 29,
   },
   heart: {
-    height: 22,
-    marginTop: -1,
-    width: 22,
+    height: 28,
+    width: 29,
   },
 });

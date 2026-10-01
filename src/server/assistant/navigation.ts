@@ -80,7 +80,7 @@ export async function validateAskNavigation(
 }
 
 export function navigationFromContext(
-  destination: "profile" | "profile_self" | "room" | "collection" | "wishlist" | "search" | "inbox" | "composer" | "add" | "conversation",
+  destination: "profile" | "profile_self" | "room" | "collection" | "wishlist" | "search" | "inbox" | "composer" | "add" | "discover" | "edit_profile" | "conversation",
   context: AskSurfaceContext,
   query: string,
   searchDestination?: AskSearchDestination,
@@ -103,5 +103,7 @@ export function navigationFromContext(
   if (destination === "inbox") return { type: "inbox" };
   if (destination === "composer") return { type: "composer" };
   if (destination === "add") return { type: "add" };
+  if (destination === "discover") return { type: "discover" };
+  if (destination === "edit_profile") return { type: "edit_profile" };
   return { type: "profile_self" };
 }

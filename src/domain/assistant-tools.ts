@@ -11,6 +11,7 @@ import { translate } from "../locale/translate";
 import { compatibilityLines } from "../locale/copy";
 import type { AskNavigationAction, AskSurfaceContext } from "./ask-context";
 import { helpForQuestion, navigationIntentFromQuestion } from "./ask-help";
+import { classifyAskNeed } from "./ask-intent";
 
 export { translate };
 
@@ -59,7 +60,8 @@ export type AssistantToolName =
   | "get_collectible_details"
   | "estimate_collectible_value"
   | "navigate"
-  | "check_my_collectible_status";
+  | "check_my_collectible_status"
+  | "get_my_profile";
 
 export function assistantPlanForTool(tool: string): AssistantIntent | undefined {
   const mapping: Record<AssistantToolName, AssistantIntent> = {
@@ -80,6 +82,7 @@ export function assistantPlanForTool(tool: string): AssistantIntent | undefined 
     estimate_collectible_value: "price",
     navigate: "help",
     check_my_collectible_status: "collectibles",
+    get_my_profile: "collection",
   };
   return Object.hasOwn(mapping, tool) ? mapping[tool as AssistantToolName] : undefined;
 }
@@ -224,6 +227,9 @@ function collectibleCard(template: CollectibleTemplate): AssistantCard {
 }
 
 function intentFor(question: string, context: AssistantContext): AssistantIntent {
+  const need = classifyAskNeed(question);
+  if (need === "general" || need === "current_info") return "general";
+  if (need === "price") return "price";
   const q = question.toLowerCase();
   const collectorId = context.collectorUserId ?? context.profileUserId;
   if (navigationIntentFromQuestion(question)) return "help";
@@ -465,41 +471,22 @@ export function runAssistantTools(input: {
     return result;
   }
 
-  if (intent === "collectibles" || intent === "price") {
+  if (intent === "price") {
+    result.fallbackKey = "assistant.answer.priceUnavailable";
+    return result;
+  }
+
+  if (intent === "collectibles") {
     const directContext = context.templateId && /\b(this|it|this card|this collectible)\b|이거|이것|이 카드|이 아이템/i.test(question)
       ? repository.getTemplate(context.templateId as TemplateId)
       : undefined;
-    const item = intent === "price"
-      ? identifiedPriceTemplate(query, viewerId, context.templateId, /\b(my|mine)\b|내/.test(question.toLowerCase()))
-      : directContext;
-    const hits = item
-      ? [item]
+    const hits = directContext
+      ? [directContext]
       : [...new Map([
           ...catalogByTerms(query).map((template) => [template.id, template] as const),
           ...searchCollectibles(query, viewerId).map((hit) => [hit.template.id, hit.template] as const),
         ]).values()];
     result.cards = hits.slice(0, 8).map(collectibleCard);
-    if (intent === "price") {
-      if (!item) {
-        result.fallbackKey = "assistant.answer.priceNeedIdentity";
-        return result;
-      }
-      const selected = item;
-      const info = metadata(selected);
-      result.currentCollectible = { id: selected.id, label: info.metadata, metadata: info.metadata };
-      if (selected.estimatedValue) {
-        const amount = selected.estimatedValue.amount;
-        const low = Math.floor(amount * 0.8);
-        const high = Math.ceil(amount * 1.2);
-        result.priceEstimate = { range: `$${low}–${high}`, source: "catalog-estimate", item: info.metadata };
-        result.fallbackKey = "assistant.answer.priceEstimate";
-        result.fallbackParams = { range: result.priceEstimate.range, item: info.metadata };
-      } else {
-        result.fallbackKey = "assistant.answer.priceProviderUnavailable";
-        result.fallbackParams = { item: info.metadata };
-      }
-      return result;
-    }
     result.fallbackKey = result.cards.length ? "assistant.answer.collectibles" : "assistant.answer.noResults";
     return result;
   }
@@ -526,6 +513,10 @@ export function runAssistantTools(input: {
     }
   }
 
+  if (intent === "general") {
+    result.fallbackKey = "assistant.answer.demoGeneral";
+    return result;
+  }
   result.fallbackKey = "assistant.answer.starters";
   result.cards = [
     { kind: "holding", id: "starter-search", title: translate(input.locale, "assistant.findSomething"), action: { type: "search", query: "", destination: "people" } },

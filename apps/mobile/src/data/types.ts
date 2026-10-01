@@ -170,6 +170,7 @@ export type NativeAskCard = {
 export type NativeAskResult = {
   reply: string;
   cards: NativeAskCard[];
+  navigation?: AskNavigationAction;
 };
 
 export type NativeAskContext = AskSurfaceContext;

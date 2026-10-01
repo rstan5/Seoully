@@ -9,6 +9,8 @@ import {
   parseAskContext,
 } from "../src/domain/ask-context";
 import { helpForQuestion, navigationIntentFromQuestion } from "../src/domain/ask-help";
+import { ASK_HISTORY_LIMIT, classifyAskNeed, extractAskSearchQuery } from "../src/domain/ask-intent";
+import { parseAskResult } from "../src/domain/ask-result";
 
 const repoRoot = process.cwd();
 function read(rel: string) {
@@ -191,5 +193,81 @@ assert.equal(helpForQuestion("How do I add a photocard?", "u-soo").action.type, 
 assertContains(read("src/domain/assistant-tools.ts"), 'collectorUserId ?? input.context.profileUserId', "demo collector context");
 
 assertContains(read("docs/native-road-to-ship.md"), "Slice 6", "docs");
+
+// U. General chat is not a canned switch
+assert.equal(classifyAskNeed("When did BTS form?"), "general");
+assert.equal(classifyAskNeed("Who are the members of LE SSERAFIM?"), "general");
+assert.equal(classifyAskNeed("What is a POB?"), "general");
+assert.equal(classifyAskNeed("What's the difference between a lucky draw and a normal photocard?"), "general");
+assertNotContains(demoAsk, "When did BTS form?", "demo ask canned BTS");
+assertNotContains(companion, "When did BTS form?", "companion canned BTS");
+assertContains(companion, "void send(copy.askStarterFind)", "starters use chat pipeline");
+assertContains(read("src/server/assistant-provider.ts"), 'tool_choice: "auto"', "optional tools");
+assertContains(read("src/server/assistant-provider.ts"), "generateGeneralReply", "general OpenAI path");
+
+// V. Seoully data classification
+assert.equal(classifyAskNeed("What BTS stuff do I own?"), "seoully");
+assert.equal(classifyAskNeed("What's on my wishlist?"), "seoully");
+assert.equal(classifyAskNeed("Who are some collectors similar to me?"), "seoully");
+assert.equal(classifyAskNeed("What am I missing?"), "seoully");
+assertContains(registry, "get_my_collection", "holdings tool");
+assertContains(registry, "get_my_wishlist", "wishlist tool");
+assertContains(registry, "get_my_profile", "profile tool");
+assertContains(registry, "searchSharedCatalog", "catalog tool");
+assertContains(registry, "discoverCollectors", "compatibility discovery");
+assertContains(registry, "FUTURE_ASSISTANT_TOOLS", "future current-info slot");
+assertNotContains(registry, 'name: "search_current_information"', "current-info not registered");
+
+// W. Navigation contract
+const addNav = navigationIntentFromQuestion("Take me to add a collectible");
+assert.equal(addNav?.type, "add");
+assert.equal(navigationIntentFromQuestion("Show me my profile")?.type, "profile_self");
+assert.equal(navigationIntentFromQuestion("Where do I edit my profile?")?.type, "edit_profile");
+const btsCollectors = navigationIntentFromQuestion("Find BTS collectors");
+assert.equal(btsCollectors?.type, "search");
+if (btsCollectors?.type === "search") {
+  assert.equal(btsCollectors.query, "BTS");
+  assert.equal(btsCollectors.destination, "people");
+}
+assert.equal(extractAskSearchQuery("Find BTS collectors"), "BTS");
+assert.equal(isAskNavigationAction({ type: "search", query: "BTS", destination: "people" }), true);
+assert.equal(isAskNavigationAction({ type: "search", query: "BTS", pathname: "/evil" }), false);
+assert.equal(isAskNavigationAction({ type: "profile", userId: UUID_A, href: "https://evil" }), false);
+assert.equal(isAskNavigationAction({ type: "javascript", query: "x" }), false);
+assertContains(companion, 'router.push("/edit-profile")', "edit profile route");
+assertContains(companion, "result.navigation", "auto navigation");
+
+// X. Response contract
+const parsed = parseAskResult({
+  reply: "Yep — I’ll take you there ♡",
+  cards: [],
+  navigation: { type: "add" },
+  tool: "navigate",
+  accessToken: "secret",
+});
+assert.equal(parsed.reply.includes("take you there"), true);
+assert.equal(parsed.navigation?.type, "add");
+assert.equal("accessToken" in parsed, false);
+assert.equal("tool" in parsed, false);
+assert.equal(parseAskResult({ reply: "ok", navigation: { type: "search", query: "x", url: "/evil" } }).navigation, undefined);
+
+// Y. Conversation cap + reset
+assert.equal(ASK_HISTORY_LIMIT, 8);
+assertContains(service, ".max(8)", "history cap");
+assertContains(companion, "turns.slice(-8)", "client history cap");
+assertContains(companion, "setTurns([])", "new conversation reset");
+
+// Z. Security / failure
+assertNotContains(read("apps/mobile/src/config.ts"), "OPENAI", "no OpenAI in Expo config");
+assertNotContains(api, "OPENAI", "no OpenAI in mobile api");
+assertNotContains(companion, "OPENAI_API_KEY", "no secret in companion");
+assertContains(api, 'response.status === 401', "unauthenticated ask");
+assertContains(companion, "askRetry", "retry state");
+assertContains(companion, "KeyboardAvoidingView", "keyboard-safe");
+assertContains(service, "assistant.answer.openaiUnavailable", "openai failure copy");
+assertContains(service, "assistant.answer.notConfigured", "missing config copy");
+assertContains(demoAsk, "assistant.answer.demoGeneral", "demo general honesty");
+assertContains(read("src/server/assistant-provider.ts"), "process.env.OPENAI_API_KEY", "server key only");
+assertContains(read("src/server/assistant-provider.ts"), "process.env.OPENAI_MODEL", "server model only");
 
 console.log("check:slice6 passed");

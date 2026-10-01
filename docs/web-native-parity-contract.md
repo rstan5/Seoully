@@ -118,7 +118,7 @@ Bell → `CollectorNotices`. Fixture `pushNotice` on like/comment/follow/repost/
 
 ### 2.12 Ask Seoully
 
-Onboarding `HeartScene`; later `SeoullyHeartCompanion` + `AskSeoullyPanel`. Auth: `/api/assistant/v2`. Fallback: `/api/assistant` + `runAssistantTools`. Actions: profile, room, search (with preset event), collection, wishlist, composer, inbox, add.
+Onboarding `HeartScene`; later `SeoullyHeartCompanion` + `AskSeoullyPanel` on web. Native heart companion is the same Ask Seoully assistant (`SeoullyCompanion`). Live: `/api/mobile/assistant` and web `/api/assistant/v2` share `askSeoullyProduction` — server-owned OpenAI (`OPENAI_API_KEY` / `OPENAI_MODEL`), optional tool calling, production registry/DAL for Seoully facts, allowlisted navigation. General K-pop/collector questions do not require a catalog tool. Current-information and price-intelligence tools are not registered. Demo native Ask uses fixture tools for collection data and does not fake OpenAI general chat. Suggested prompts use the same pipeline. Room-specific heart placement is Slice 7.
 
 ### 2.13 Room (web)
 
@@ -327,7 +327,7 @@ Columns: Capability | Web UX | Web data | Native UX | Native data | Backend | Ex
 | Capability | Web UX | Web data | Native UX | Native data | Backend | Exact gap | Required |
 |------------|--------|----------|-----------|-------------|---------|-----------|----------|
 | Bell list | fixture kinds + dest | memory | Demo list; Live empty banner | stub | **E** | FAKE Live | Table or disable Live bell |
-| Ask tools | v2 + local fallback | DAL / memory | Live DAL; Demo tools | `/assistant` | **B** | Context always `home`; search query dropped | Repair nav+context |
+| Ask tools | v2 OpenAI + DAL tools | DAL / memory | Live OpenAI + DAL; Demo fixtures | `/assistant` | **B** | General chat + allowlisted nav + bounded history | Device QA |
 | Ask motion | heart scene + corner | CSS | FAB | RN | — | Personality thinner | Rebuild from `heart-companion.css` |
 
 ### Room / Binder

@@ -42,6 +42,8 @@ export const ASK_NAVIGATION_TYPES = [
   "composer",
   "inbox",
   "add",
+  "discover",
+  "edit_profile",
   "conversation",
   "collectible",
   "public_collectible",
@@ -62,6 +64,8 @@ export type AskSurfaceContext = {
   searchQuery?: string;
   searchDestination?: AskSearchDestination;
   roomOwnerUserId?: string;
+  recentCollectorIds?: string[];
+  recentTemplateIds?: string[];
 };
 
 export type AskNavigationAction =
@@ -74,6 +78,8 @@ export type AskNavigationAction =
   | { type: "composer" }
   | { type: "inbox" }
   | { type: "add" }
+  | { type: "discover" }
+  | { type: "edit_profile" }
   | { type: "conversation"; conversationId: string; userId?: string }
   | { type: "collectible"; holdingId: string }
   | { type: "public_collectible"; userId: string; templateId?: string; holdingId?: string };
@@ -126,6 +132,17 @@ function optionalQuery(value: unknown): string | undefined {
   return text || undefined;
 }
 
+function optionalIdList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const ids: string[] = [];
+  for (const item of value) {
+    const id = optionalId(item);
+    if (id && !ids.includes(id)) ids.push(id);
+    if (ids.length >= 8) break;
+  }
+  return ids;
+}
+
 export function parseAskContext(raw: unknown): AskSurfaceContext {
   const input = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
   const surface = isAskSurface(input.surface) ? input.surface : "home";
@@ -152,6 +169,10 @@ export function parseAskContext(raw: unknown): AskSurfaceContext {
   if (roomOwnerUserId) context.roomOwnerUserId = roomOwnerUserId;
   if (searchQuery) context.searchQuery = searchQuery;
   if (searchDestination) context.searchDestination = searchDestination;
+  const recentCollectorIds = optionalIdList(input.recentCollectorIds);
+  const recentTemplateIds = optionalIdList(input.recentTemplateIds);
+  if (recentCollectorIds.length) context.recentCollectorIds = recentCollectorIds;
+  if (recentTemplateIds.length) context.recentTemplateIds = recentTemplateIds;
   return context;
 }
 
@@ -188,6 +209,7 @@ export function contextFromNativeRoute(
     });
   }
   if (leaf === "profile") return parseAskContext({ surface: "profile" });
+  if (leaf === "edit-profile") return parseAskContext({ surface: "edit" });
   if (leaf === "collector") {
     return parseAskContext({
       surface: "collector",
@@ -276,7 +298,7 @@ export function isAskNavigationAction(value: unknown): value is AskNavigationAct
       && (action.templateId == null || isSafeEntityId(action.templateId))
       && (action.holdingId == null || isSafeEntityId(action.holdingId));
   }
-  return type === "profile_self" || type === "collection" || type === "wishlist" || type === "composer" || type === "inbox" || type === "add";
+  return type === "profile_self" || type === "collection" || type === "wishlist" || type === "composer" || type === "inbox" || type === "add" || type === "discover" || type === "edit_profile";
 }
 
 export function searchDestinationFromQuestion(question: string, fallback?: AskSearchDestination): AskSearchDestination | undefined {

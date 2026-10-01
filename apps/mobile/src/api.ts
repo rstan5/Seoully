@@ -439,8 +439,9 @@ export async function askSeoullyNative(input: {
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
+  if (response.status === 401) throw new Error("unauthenticated");
   if (!response.ok) throw new Error("assistant_unavailable");
-  return response.json() as Promise<{ reply?: string; cards?: NativeAskCard[] }>;
+  return response.json() as Promise<{ reply?: string; cards?: NativeAskCard[]; navigation?: NativeAskCard["action"] }>;
 }
 
 export async function loadNativeOnboarding(signal?: AbortSignal): Promise<NativeOnboardingState> {

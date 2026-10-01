@@ -256,7 +256,7 @@ Order is dependency-shaped. **Slice 1 is first.**
 
 **Device QA:** From Profile and from a collector, ask collection, similar people, a collectible name; tap each card type.
 
-**Implementation (2026-09-29):** SLICE 6 — CODE VERIFIED / DEVICE QA PENDING. Native Ask sends a typed surface context (collector, collectible/holding, search `q`/`dest`, conversation peer/thread, room owner). Production tools remain the registry/DAL path; navigation is allowlisted and validated (collector exists, room public-or-own, conversation participant). Search cards preserve query and destination. Catalog completeness answers include the known-to-Seoully disclaimer. No Vision. No migration. `20261002` remains unapplied.
+**Implementation (2026-10-01):** SLICE 6 — CODE VERIFIED / DEVICE QA REQUIRED. Ask Seoully is the existing heart companion (one assistant). Live conversation goes through server-side OpenAI (`OPENAI_API_KEY` + `OPENAI_MODEL` on Next only; never Expo / `EXPO_PUBLIC_*`). The model interprets and answers general K-pop/collector questions without a Seoully tool. Authoritative holdings, wishlist, catalog, collector search, compatibility, and profile facts use the production registry/DAL. Tool-choice is optional (`auto`); general questions are not forced through the catalog. Navigation is an allowlisted semantic action (`type` + validated params), never an arbitrary href/route; the client maps it to Expo routes (`/collect`, `/profile`, `/edit-profile`, `/search?q&dest`, `/messages`, `/`, collector/collectible IDs only when repository-validated). History is capped at 8 turns and can be reset. Demo uses fixture tools for Seoully data and honestly refuses general/current/price answers. No current-information tool is registered (`search_current_information` reserved). Price intelligence is deferred. No Vision. No migration. Room heart placement stays as-is until Slice 7. `20261002` remains unapplied.
 
 ---
 
@@ -439,8 +439,11 @@ Consolidated matrix (pulls still-pending physical QA from Slices 1–8):
 - Notices like/comment/follow only; Demo local
 
 ### G. Ask Seoully
-- Typed surface context; allowlisted navigation; “Do I own this?” from real holdings
+- Heart companion is Ask Seoully; free-form chat through server OpenAI
+- General knowledge vs Seoully-authoritative tools; allowlisted navigation; bounded history
+- “Do I own this?” from real holdings; Demo does not pretend to be Live OpenAI
 - Companion visible after onboarding; still on reduced motion
+- Price intelligence and Room spatial heart placement deferred
 
 ### H. Room
 - Authored docks, six zones, edit persist, store does not delete Holding

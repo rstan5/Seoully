@@ -1,6 +1,7 @@
 import type { MessageKey } from "../locale/en";
 import type { AskNavigationAction } from "./ask-context";
 import { searchDestinationFromQuestion } from "./ask-context";
+import { navigationIntentFromAsk } from "./ask-intent";
 
 export function helpForQuestion(question: string, viewerId: string): { key: MessageKey; action: AskNavigationAction } {
   const q = question.toLowerCase();
@@ -31,17 +32,5 @@ export function helpForQuestion(question: string, viewerId: string): { key: Mess
 }
 
 export function navigationIntentFromQuestion(question: string): AskNavigationAction | null {
-  const q = question.toLowerCase();
-  if (!/take me|go to|open|show my|보여줘|열어|가자|가줘/.test(q)) return null;
-  if (/wishlist|위시/.test(q)) return { type: "wishlist" };
-  if (/collection|컬렉션/.test(q)) return { type: "collection" };
-  if (/message|inbox|메시지/.test(q)) return { type: "inbox" };
-  if (/profile|프로필/.test(q)) return { type: "profile_self" };
-  if (/search|검색/.test(q)) {
-    return { type: "search", query: "", destination: searchDestinationFromQuestion(question, "people") };
-  }
-  if (/room|룸/.test(q)) return { type: "profile_self" };
-  if (/add|collect|추가/.test(q)) return { type: "add" };
-  if (/post|compose|게시/.test(q)) return { type: "composer" };
-  return null;
+  return navigationIntentFromAsk(question);
 }

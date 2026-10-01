@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Easing,
@@ -35,6 +35,8 @@ function cardActionLabel(action: AskNavigationAction, copy: ReturnType<typeof us
   if (action.type === "wishlist") return copy.askViewWishlist;
   if (action.type === "composer") return copy.askOpenComposer;
   if (action.type === "inbox" || action.type === "conversation") return copy.askOpenMessages;
+  if (action.type === "edit_profile") return copy.askEditProfile;
+  if (action.type === "discover") return copy.askDiscover;
   if (action.type === "add") return copy.askTakeMeThere;
   return copy.askTakeMeThere;
 }
@@ -52,13 +54,21 @@ export function SeoullyCompanion() {
   const router = useRouter();
   const social = useSocialRepository();
   const boot = useBootstrap();
-  const context = mergeAskContext(contextFromNativeRoute(pathname, params as Record<string, string | string[] | undefined>), overlay);
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastPrompt, setLastPrompt] = useState<string | null>(null);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [bounce] = useState(() => new Animated.Value(0));
+  const threadRef = useRef<ScrollView>(null);
+  const recentCollectorIds = turns.flatMap((turn) => (turn.cards ?? []).filter((card) => card.kind === "collector").map((card) => card.id)).slice(-8);
+  const recentTemplateIds = turns.flatMap((turn) => (turn.cards ?? []).filter((card) => card.kind === "collectible").map((card) => card.id)).slice(-8);
+  const context = mergeAskContext(contextFromNativeRoute(pathname, params as Record<string, string | string[] | undefined>), {
+    ...overlay,
+    ...(recentCollectorIds.length ? { recentCollectorIds } : {}),
+    ...(recentTemplateIds.length ? { recentTemplateIds } : {}),
+  });
 
   useEffect(() => {
     if (reduceMotion) {
@@ -99,6 +109,8 @@ export function SeoullyCompanion() {
     else if (action.type === "composer") router.push("/create");
     else if (action.type === "inbox") router.push("/messages");
     else if (action.type === "add") router.push("/collect");
+    else if (action.type === "edit_profile") router.push("/edit-profile");
+    else if (action.type === "discover") router.push("/");
     else if (action.type === "conversation") {
       router.push({
         pathname: "/thread",
@@ -126,13 +138,19 @@ export function SeoullyCompanion() {
     const history = turns.slice(-8).map(({ role, content }) => ({ role, content }));
     setTurns((current) => [...current, { role: "user" as const, content: prompt }].slice(-18));
     setQuestion("");
+    setLastPrompt(prompt);
     setPending(true);
     setError(null);
     try {
       const result = await social.askSeoully(prompt, locale, history, context);
       setTurns((current) => [...current, { role: "assistant" as const, content: result.reply, cards: result.cards }].slice(-18));
-    } catch {
-      setError(copy.askSeoullyUnavailable);
+      if (result.navigation && isAskNavigationAction(result.navigation)) {
+        navigateAction(result.navigation);
+      }
+      requestAnimationFrame(() => threadRef.current?.scrollToEnd({ animated: !reduceMotion }));
+    } catch (failure) {
+      const reason = failure instanceof Error ? failure.message : "";
+      setError(reason === "unauthenticated" ? copy.askSeoullyUnauthenticated : copy.askSeoullyUnavailable);
     } finally {
       setPending(false);
     }
@@ -158,21 +176,28 @@ export function SeoullyCompanion() {
           <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
             <View style={styles.sheetHead}>
               <SeoullyText variant="title">{copy.askSeoully}</SeoullyText>
-              <Pressable accessibilityRole="button" hitSlop={10} onPress={() => setOpen(false)}>
-                <SeoullyText variant="button" color={colors.plum}>{copy.searchBack}</SeoullyText>
-              </Pressable>
+              <View style={styles.sheetActions}>
+                {turns.length ? (
+                  <Pressable accessibilityRole="button" hitSlop={10} onPress={() => { setTurns([]); setError(null); setLastPrompt(null); }}>
+                    <SeoullyText variant="button" color={colors.plum}>{copy.askNewChat}</SeoullyText>
+                  </Pressable>
+                ) : null}
+                <Pressable accessibilityRole="button" hitSlop={10} onPress={() => setOpen(false)}>
+                  <SeoullyText variant="button" color={colors.plum}>{copy.searchBack}</SeoullyText>
+                </Pressable>
+              </View>
             </View>
-            <ScrollView contentContainerStyle={styles.thread} keyboardShouldPersistTaps="handled">
+            <ScrollView ref={threadRef} contentContainerStyle={styles.thread} keyboardShouldPersistTaps="handled">
               {turns.length === 0 ? (
                 <View style={styles.starters}>
                   <SeoullyText variant="secondary">{copy.askSeoullyEmpty}</SeoullyText>
-                  <Pressable accessibilityRole="button" onPress={() => { void send(locale === "ko" ? "아이템 찾아줘" : "Find collectibles"); }}>
+                  <Pressable accessibilityRole="button" onPress={() => { void send(copy.askStarterFind); }}>
                     <SeoullyText variant="button" color={colors.plum}>{copy.askStarterFind}</SeoullyText>
                   </Pressable>
-                  <Pressable accessibilityRole="button" onPress={() => { void send(locale === "ko" ? "내 컬렉션을 보여줘" : "What is in my collection?"); }}>
+                  <Pressable accessibilityRole="button" onPress={() => { void send(copy.askStarterCollection); }}>
                     <SeoullyText variant="button" color={colors.plum}>{copy.askStarterCollection}</SeoullyText>
                   </Pressable>
-                  <Pressable accessibilityRole="button" onPress={() => { void send(locale === "ko" ? "아이템을 어떻게 추가해?" : "How do I add a collectible?"); }}>
+                  <Pressable accessibilityRole="button" onPress={() => { void send(copy.askStarterHelp); }}>
                     <SeoullyText variant="button" color={colors.plum}>{copy.askStarterHelp}</SeoullyText>
                   </Pressable>
                 </View>
@@ -200,7 +225,16 @@ export function SeoullyCompanion() {
                 </View>
               ))}
               {pending ? <SeoullyText variant="caption" color={colors.muted}>{copy.askLoading}</SeoullyText> : null}
-              {error ? <SeoullyText variant="caption" color={colors.plum}>{error}</SeoullyText> : null}
+              {error ? (
+                <View style={styles.errorRow}>
+                  <SeoullyText variant="caption" color={colors.plum}>{error}</SeoullyText>
+                  {lastPrompt ? (
+                    <Pressable accessibilityRole="button" onPress={() => { void send(lastPrompt); }}>
+                      <SeoullyText variant="button" color={colors.plum}>{copy.askRetry}</SeoullyText>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : null}
             </ScrollView>
             <View style={styles.compose}>
               <TextInput
@@ -260,6 +294,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 8,
+  },
+  sheetActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+  },
+  errorRow: {
+    gap: 6,
   },
   thread: {
     gap: 10,

@@ -31,7 +31,7 @@ import {
   type NativeCollectorMatch,
   type NativeIdentity,
 } from "../api";
-import { isAskNavigationAction } from "seoully-domain/ask-context";
+import { parseAskResult } from "seoully-domain/ask-result";
 import { LIVE_CAPABILITIES } from "./capabilities";
 import { liveNoticePage, liveRepostResult, liveSaveResult, liveShareResult } from "./honesty";
 import type { NativeAskContext, NativeAskResult, SocialCompatibility, SocialConversation, SocialMessage, SocialNotice, SocialRepository, SocialSendMessageInput, SocialShareRecipient, SocialTradeItem } from "./types";
@@ -250,16 +250,12 @@ export const productionRepository: SocialRepository = {
   },
   async askSeoully(question: string, locale: "en" | "ko", history: { role: "user" | "assistant"; content: string }[], context?: NativeAskContext): Promise<NativeAskResult> {
     const payload = await askSeoullyNative({ locale, question, history, context: context ?? { surface: "home" } });
+    const parsed = parseAskResult(payload);
+    if (!parsed.reply && !parsed.cards.length) throw new Error("assistant_unavailable");
     return {
-      reply: payload.reply ?? "",
-      cards: (payload.cards ?? []).map((card) => ({
-        kind: card.kind,
-        id: card.id,
-        title: card.title,
-        ...(card.subtitle ? { subtitle: card.subtitle } : {}),
-        ...(card.detail ? { detail: card.detail } : {}),
-        ...(isAskNavigationAction(card.action) ? { action: card.action } : {}),
-      })),
+      reply: parsed.reply,
+      cards: parsed.cards,
+      ...(parsed.navigation ? { navigation: parsed.navigation } : {}),
     };
   },
 };

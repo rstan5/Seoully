@@ -16,9 +16,10 @@ import { navigationFromContext, validateAskNavigation } from "@/server/assistant
 
 const limitSchema = z.object({ limit: z.number().int().min(1).max(25).default(8) }).strict();
 const querySchema = z.object({ query: z.string().trim().max(120).default(""), limit: z.number().int().min(1).max(25).default(8) }).strict();
+const collectionQuerySchema = z.object({ limit: z.number().int().min(1).max(25).default(8), query: z.string().trim().max(120).optional() }).strict();
 const targetSchema = z.object({ query: z.string().trim().max(120).default(""), targetUserId: z.string().uuid().optional() }).strict();
 const navigationSchema = z.object({
-  destination: z.enum(["profile", "profile_self", "room", "collection", "wishlist", "search", "inbox", "composer", "add", "conversation"]),
+  destination: z.enum(["profile", "profile_self", "room", "collection", "wishlist", "search", "inbox", "composer", "add", "discover", "edit_profile", "conversation"]),
   query: z.string().trim().max(120).optional(),
   searchDestination: z.enum(["people", "rooms", "posts", "collectibles", "entities"]).optional(),
   targetUserId: z.string().uuid().optional(),
@@ -131,9 +132,76 @@ const tools: ToolDefinition[] = [
       return { tool: "check_my_collectible_status", data: { ...status, templateName: item.name, kind: item.kind, groupName: item.groupName, memberName: item.memberName }, cards };
     },
   },
-  { name: "get_my_collection", description: "Read the authenticated user's production Holdings.", input: limitSchema, maxResults: 8, execute: async (input) => { const items = await getMyCollection(input); return { tool: "get_my_collection", data: { count: items.length, items: items.slice(0, 25).map(({ holdingId, templateId, templateName, kind, tradeStatus }) => ({ holdingId, templateId, templateName, kind, tradeStatus })) }, cards: items.slice(0, 8).map((item) => card("holding", item.holdingId, item.templateName, item.kind, item.tradeStatus, { type: "collection" })) }; } },
+  {
+    name: "get_my_collection",
+    description: "Read the authenticated user's production Holdings.",
+    input: collectionQuerySchema,
+    maxResults: 8,
+    execute: async (input) => {
+      const parsed = input as { limit: number; query?: string };
+      const items = await getMyCollection({ limit: 200, offset: 0 });
+      const needle = parsed.query?.trim().toLowerCase() ?? "";
+      const catalogHits = needle ? await searchSharedCatalog({ query: needle, limit: 25, offset: 0 }) : [];
+      const catalogIds = new Set(catalogHits.map((item) => item.id));
+      const filtered = needle
+        ? items.filter((item) => item.templateName.toLowerCase().includes(needle) || catalogIds.has(item.templateId))
+        : items;
+      const page = filtered.slice(0, parsed.limit);
+      return {
+        tool: "get_my_collection",
+        data: { count: filtered.length, query: needle || undefined, items: page.map(({ holdingId, templateId, templateName, kind, tradeStatus }) => ({ holdingId, templateId, templateName, kind, tradeStatus })) },
+        cards: page.slice(0, 8).map((item) => card("holding", item.holdingId, item.templateName, item.kind, item.tradeStatus, { type: "collection" })),
+      };
+    },
+  },
+  {
+    name: "get_my_profile",
+    description: "Read the authenticated collector profile summary and collection counts.",
+    input: z.object({}).strict(),
+    maxResults: 1,
+    execute: async () => {
+      const { identity } = await identityClient();
+      const breakdown = await getCollectionBreakdown({});
+      return {
+        tool: "get_my_profile",
+        data: {
+          handle: identity.user.handle,
+          displayName: identity.user.displayName,
+          tagline: identity.profile.tagline,
+          collectorType: identity.profile.collectorType,
+          favoriteGroupIds: identity.profile.favoriteGroupIds.slice(0, 8),
+          biasMemberIds: identity.profile.biasMemberIds.slice(0, 8),
+          collectorInterests: identity.profile.collectorInterests,
+          holdings: breakdown.totalHoldings,
+          wishlist: breakdown.wishlistCount,
+        },
+        cards: [card("holding", identity.user.id, identity.user.displayName, `@${identity.user.handle}`, undefined, { type: "profile_self" })],
+      };
+    },
+  },
   { name: "get_my_collection_breakdown", description: "Summarize the authenticated user's production collection.", input: z.object({}).strict(), maxResults: 1, execute: async () => ({ tool: "get_my_collection_breakdown", data: await getCollectionBreakdown({}), cards: [{ kind: "holding", id: "open-collection", title: "Collection", action: { type: "collection" } }] }) },
-  { name: "get_my_wishlist", description: "Read the authenticated user's production wishlist.", input: limitSchema, maxResults: 8, execute: async (input) => { const items = await getMyWishlist(input); return { tool: "get_my_wishlist", data: { count: items.length, items: items.slice(0, 25).map(({ templateId, templateName, kind }) => ({ templateId, templateName, kind })) }, cards: items.slice(0, 8).map((item) => card("collectible", item.templateId, item.templateName, item.kind, undefined, { type: "wishlist" })) }; } },
+  {
+    name: "get_my_wishlist",
+    description: "Read the authenticated user's production wishlist.",
+    input: collectionQuerySchema,
+    maxResults: 8,
+    execute: async (input) => {
+      const parsed = input as { limit: number; query?: string };
+      const items = await getMyWishlist({ limit: 200, offset: 0 });
+      const needle = parsed.query?.trim().toLowerCase() ?? "";
+      const catalogHits = needle ? await searchSharedCatalog({ query: needle, limit: 25, offset: 0 }) : [];
+      const catalogIds = new Set(catalogHits.map((item) => item.id));
+      const filtered = needle
+        ? items.filter((item) => item.templateName.toLowerCase().includes(needle) || catalogIds.has(item.templateId))
+        : items;
+      const page = filtered.slice(0, parsed.limit);
+      return {
+        tool: "get_my_wishlist",
+        data: { count: filtered.length, query: needle || undefined, items: page.map(({ templateId, templateName, kind }) => ({ templateId, templateName, kind })) },
+        cards: page.map((item) => card("collectible", item.templateId, item.templateName, item.kind, undefined, { type: "wishlist" })),
+      };
+    },
+  },
   { name: "find_wishlist_owners", description: "Find visible collectors who own items on my wishlist.", input: limitSchema, maxResults: 8, execute: async (input) => { const items = await findOwnersOfMyWishlist(input); return { tool: "find_wishlist_owners", data: items.slice(0, 25), cards: items.slice(0, 8).map((item) => card("collector", item.userId, item.displayName, `@${item.handle}`, `${item.ownedCopies} owned · ${item.forTradeCopies} for trade`, { type: "profile", userId: item.userId })) }; } },
   { name: "find_collectors_wanting_my_items", description: "Find visible collectors whose wishlist contains my owned items.", input: limitSchema, maxResults: 8, execute: async (input) => { const items = await findCollectorsWantingMyItems(input); return { tool: "find_collectors_wanting_my_items", data: items.slice(0, 25), cards: items.slice(0, 8).map((item) => card("collector", item.userId, item.displayName, `@${item.handle}`, item.templateName, { type: "profile", userId: item.userId })) }; } },
   { name: "find_reciprocal_collection_relationships", description: "Find factual reciprocal visible ownership and wishlist relationships.", input: limitSchema, maxResults: 8, execute: async (input) => { void input; const items = await getReciprocalRelationships({}); return { tool: "find_reciprocal_collection_relationships", data: items.slice(0, 25), cards: items.slice(0, 8).map((item) => card("collector", item.collector.userId, item.collector.displayName, `@${item.collector.handle}`, "Reciprocal collection interest", { type: "profile", userId: item.collector.userId })) }; } },
@@ -232,6 +300,8 @@ const tools: ToolDefinition[] = [
 
 const registry = new Map(tools.map((tool) => [tool.name, tool]));
 export const assistantToolDefinitions = tools.map(({ name, description, maxResults }) => ({ name, description, maxResults }));
+/** Reserved names for later current-information tools. Not registered and not executed. */
+export const FUTURE_ASSISTANT_TOOLS = ["search_current_information"] as const;
 
 export async function executeAssistantTool(name: string, rawInput: unknown, context: unknown): Promise<AssistantToolOutput> {
   const tool = registry.get(name);

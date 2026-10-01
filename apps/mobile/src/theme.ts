@@ -4,12 +4,11 @@
  * other screens keep compiling while Feed and chrome adopt the social system.
  */
 /**
- * Web `--s-profile-veil` on `.social-background`. Full-bleed wash only.
- * Section/card fills use `PROFILE_SURFACE_ALPHA` on the resolved theme color.
- * Do not apply either value as component `opacity` — text/icons/media stay opaque.
+ * Native Profile wash over the Room glimpse. Web `--s-profile-veil` is 0.85;
+ * native is 0.80 so slightly more Room shows through. Profile UI stays fully
+ * opaque. Do not apply this as component `opacity` — text/images/buttons stay solid.
  */
-export const PROFILE_VEIL = 0.85;
-export const PROFILE_SURFACE_ALPHA = 0.8;
+export const PROFILE_VEIL = 0.80;
 
 export const colors = {
   ink: "#2c2e4c",

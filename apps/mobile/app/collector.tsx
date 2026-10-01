@@ -8,6 +8,7 @@ import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
 import { collectibleKindLabel, type MobileCopy } from "../src/i18n";
 import { useCopy, useLocale } from "../src/locale";
+import { colors } from "../src/theme";
 import { identityPalette } from "../src/ui/profileContrast";
 import { ProfileIdentityProvider } from "../src/ui/ProfileIdentity";
 import { SeoullyButton, SeoullyChip, SeoullyShelf } from "../src/ui/SeoullyControls";
@@ -19,7 +20,6 @@ import {
   SeoullyHighlight,
   SeoullyProfileChrome,
   SeoullyProfileHead,
-  SeoullyProfileSurface,
   SeoullyProfileMeta,
   SeoullyProfileVeil,
   SeoullyRoomUnderlay,
@@ -224,7 +224,7 @@ export default function CollectorScreen() {
       {error ? <View style={styles.notice}><RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /></View> : null}
       {collector ? (
         <ScrollView contentContainerStyle={styles.container}>
-          <SeoullyProfileSurface style={styles.card}>
+          <View style={styles.card}>
             <SeoullyProfileHead
               name={collector.user.displayName}
               handle={collector.user.handle}
@@ -268,7 +268,7 @@ export default function CollectorScreen() {
             </View>
             {notice ? <SeoullyText variant="secondary" style={styles.inlineNotice}>{notice}</SeoullyText> : null}
             <SeoullyText variant="caption" style={styles.inlineNotice}>{copy.profileUnderlayHint}</SeoullyText>
-          </SeoullyProfileSurface>
+          </View>
 
           {collector.groups.length > 0 || collector.biases.length > 0 || collector.eras.length > 0 || (collector.profile.collectorInterests?.length ?? 0) > 0 ? (
             <View style={styles.chips}>
@@ -294,7 +294,7 @@ export default function CollectorScreen() {
           ) : null}
 
           {collector.compatibility ? (
-            <SeoullyProfileSurface style={styles.compat}>
+            <View style={[styles.compat, { backgroundColor: palette.paper, borderColor: palette.line, borderWidth: StyleSheet.hairlineWidth }]}>
               <SeoullyText variant="title">
                 {copy.compatScore.replace("{score}", String(collector.compatibility.score))}
               </SeoullyText>
@@ -310,7 +310,7 @@ export default function CollectorScreen() {
                 copy={copy}
                 onMessage={messageAboutTrade}
               />
-            </SeoullyProfileSurface>
+            </View>
           ) : null}
 
           <SeoullyShelf title={copy.profilePostsTitle} empty={posts.length === 0 && !postsError ? copy.profileEmptyPosts : undefined}>
@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
   },
   lang: { justifyContent: "center", minHeight: 44, paddingHorizontal: 4 },
   container: { paddingBottom: 48 },
-  card: { marginHorizontal: 16, paddingBottom: 16, paddingHorizontal: 16, paddingTop: 8 },
+  card: { paddingHorizontal: 16, paddingTop: 8 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 16, paddingTop: 14 },
   highlights: { gap: 12, paddingHorizontal: 16, paddingTop: 16 },
   actions: { flexDirection: "row", gap: 8, marginTop: 14 },
@@ -406,6 +406,8 @@ const styles = StyleSheet.create({
   notice: { paddingHorizontal: 16, paddingTop: 12 },
   inlineNotice: { marginTop: 10 },
   compat: {
+    backgroundColor: colors.mist,
+    borderRadius: 16,
     gap: 4,
     marginHorizontal: 16,
     marginTop: 16,

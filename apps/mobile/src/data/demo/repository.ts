@@ -583,6 +583,9 @@ export class DemoSocialRepository implements SocialRepository {
       primaryDeep: tokens.primaryDeep,
       primarySoft: tokens.primarySoft,
       action: tokens.action,
+      onPrimary: tokens.onPrimary,
+      secondary: tokens.secondary,
+      secondarySoft: tokens.secondarySoft,
       cream: tokens.tint,
     };
   }

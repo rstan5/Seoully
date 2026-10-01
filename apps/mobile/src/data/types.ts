@@ -36,6 +36,9 @@ export type SocialTheme = {
   primaryDeep: string;
   primarySoft: string;
   action: string;
+  onPrimary: string;
+  secondary: string;
+  secondarySoft: string;
   cream: string;
 };
 

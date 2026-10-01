@@ -446,6 +446,8 @@ Full-screen Room (no social tab bar, no giant header, no permanent zone pills). 
 
 See `docs/native-road-to-ship.md` Slice 7 “Physical iPhone findings — locked for Slice 7”.
 
+Live Profile Appearance remains a Slice 7 contract gap: Demo can theme Profile controls from fixture `appearance` + room; production mobile APIs have no appearance field, and `20261002` is unapplied. Repair 01 follow-up themes native Profile from whatever `SocialTheme` the current DAL already returns.
+
 ---
 
 ## 12. Validation this pass

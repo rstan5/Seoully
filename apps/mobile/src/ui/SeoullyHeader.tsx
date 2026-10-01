@@ -54,9 +54,15 @@ export function SeoullyHeader({
             accessibilityState={{ checked: demo }}
             accessibilityLabel={demo ? copy.demoWorld : copy.productionData}
             onPress={() => setDemo(!demo)}
-            style={({ pressed }) => [styles.demo, demo && styles.demoOn, pressShift(pressed, reduceMotion)]}
+            style={({ pressed }) => [
+              styles.demo,
+              identity ? { borderColor: identity.line } : null,
+              demo && styles.demoOn,
+              demo && identity ? { backgroundColor: identity.primarySoft, borderColor: identity.primary } : null,
+              pressShift(pressed, reduceMotion),
+            ]}
           >
-            <SeoullyText variant="caption" color={demo ? colors.plum : mute}>
+            <SeoullyText variant="caption" color={demo ? (identity?.primaryDeep ?? colors.plum) : mute}>
               {demo ? copy.demoWorld : copy.productionData}
             </SeoullyText>
           </Pressable>

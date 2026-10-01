@@ -19,6 +19,7 @@ import {
   contrastRatio,
   identityIsReadable,
   identityPalette,
+  profileControlSurfaces,
   relativeLuminance,
 } from "../apps/mobile/src/ui/profileContrast";
 import { chrome, companionPlacement, routeShowsBottomNav } from "../apps/mobile/src/ui/shellLayout";
@@ -189,12 +190,129 @@ const lavender = identityPalette({
 assert.ok(identityIsReadable(lavender));
 assert.equal(roomSyncBrokenInk.ink, IDENTITY_DARK.ink);
 
+const unset = identityPalette(undefined);
+assert.equal(unset.primarySoft, IDENTITY_LIGHT.primarySoft);
+assert.equal(unset.action, IDENTITY_LIGHT.action);
+assert.equal(unset.paper, IDENTITY_LIGHT.paper);
+assert.ok(relativeLuminance(dark.primarySoft) < 0.35, "dark controls are not generic pale pink");
+assert.notEqual(dark.primarySoft, IDENTITY_LIGHT.primarySoft);
+assert.ok(contrastRatio(dark.onPrimary, dark.action) >= 4.5, "dark primary fill keeps on-primary contrast");
+assert.ok(contrastRatio(dark.primaryDeep, dark.primarySoft) >= 4.5, "dark ghost pair stays readable");
+
+const roomSync = identityPalette({
+  scheme: "dark",
+  paper: "#1a1524",
+  mist: "#241c32",
+  ink: "#f3eef6",
+  mute: "#b4a8bc",
+  line: "#3a3148",
+  primary: "#c2a7d2",
+  primaryDeep: "#d1bade",
+  primarySoft: "#352b3b",
+  action: "#9254b6",
+  onPrimary: "#ffffff",
+  secondary: "#d3a6b5",
+  secondarySoft: "#412f35",
+  cream: "#241c32",
+});
+assert.equal(roomSync.primarySoft, "#352b3b");
+assert.equal(roomSync.action, "#9254b6");
+assert.ok(relativeLuminance(roomSync.paper) < 0.2, "room-sync enter surface stays dark");
+
+const rejectedPaleGhost = identityPalette({
+  scheme: "dark",
+  paper: "#1a1524",
+  mist: "#241c32",
+  ink: "#f3eef6",
+  mute: "#b4a8bc",
+  primarySoft: "#ffe8ee",
+  primaryDeep: "#c45374",
+});
+assert.equal(rejectedPaleGhost.primarySoft, IDENTITY_DARK.primarySoft);
+
+const pinkTheme = identityPalette({
+  scheme: "light",
+  paper: "#fdf6f8",
+  mist: "#f8e8ef",
+  ink: "#2b1e24",
+  mute: "#86707a",
+  line: "#f0dee6",
+  primary: "#e1c1cc",
+  primaryDeep: "#92455e",
+  primarySoft: "#f2edef",
+  action: "#92455e",
+  onPrimary: "#ffffff",
+  secondary: "#d5c2e0",
+  secondarySoft: "#f0edf2",
+  cream: "#f8f3ea",
+});
+assert.equal(pinkTheme.primaryDeep, "#92455e");
+assert.notEqual(pinkTheme.paper, IDENTITY_LIGHT.paper);
+assert.ok(identityIsReadable(pinkTheme));
+assert.ok(contrastRatio(pinkTheme.primaryDeep, pinkTheme.primarySoft) >= 4.5);
+
+const lavenderTheme = identityPalette({
+  scheme: "light",
+  paper: "#f7f2fb",
+  mist: "#efe6f6",
+  ink: "#261e2d",
+  mute: "#7d7486",
+  line: "#e7def0",
+  primary: "#d5c2e0",
+  primaryDeep: "#754592",
+  primarySoft: "#f0edf2",
+  action: "#754592",
+  onPrimary: "#ffffff",
+  secondary: "#e1c1cc",
+  secondarySoft: "#f2edef",
+  cream: "#f8f3ea",
+});
+assert.equal(lavenderTheme.primaryDeep, "#754592");
+assert.notEqual(lavenderTheme.primarySoft, pinkTheme.primarySoft);
+assert.ok(identityIsReadable(lavenderTheme));
+
+const saturated = identityPalette({
+  scheme: "dark",
+  paper: "#1f1520",
+  mist: "#2a1c2c",
+  ink: "#f7eef2",
+  mute: "#c0a8b4",
+  line: "#443248",
+  primary: "#d6a4ac",
+  primaryDeep: "#e0b8be",
+  primarySoft: "#3b2b2e",
+  action: "#b85162",
+  onPrimary: "#ffffff",
+  secondary: "#c2a7d2",
+  secondarySoft: "#352b3b",
+  cream: "#2a1c2c",
+});
+assert.equal(saturated.action, "#b85162");
+assert.ok(relativeLuminance(saturated.primarySoft) < 0.35);
+assert.ok(identityIsReadable(saturated));
+assert.ok(contrastRatio(saturated.onPrimary, saturated.action) >= 4.5);
+const surfaces = profileControlSurfaces(roomSync);
+assert.notEqual(surfaces.ghostBorder, IDENTITY_LIGHT.line);
+assert.ok(contrastRatio(surfaces.chipBiasInk, roomSync.secondarySoft) >= 4.5);
+
 assertContains(profile, "identityPalette", "profile uses contrast palette");
 assertContains(profile, "ProfileIdentityProvider", "profile identity context");
+assertContains(profile, "palette.primaryDeep", "profile links use theme accent");
+assertContains(read("apps/mobile/src/ui/SeoullyControls.tsx"), "useProfileIdentity", "shared controls consume profile theme");
+assertContains(read("apps/mobile/src/ui/SeoullyControls.tsx"), "identity.primarySoft", "ghost/chips use theme soft");
+assertContains(read("apps/mobile/src/ui/SeoullyControls.tsx"), "identity.paper", "enter uses theme paper");
+assertContains(read("apps/mobile/src/data/demo/repository.ts"), "onPrimary: tokens.onPrimary", "demo maps web on-primary");
+assertContains(read("apps/mobile/src/data/demo/repository.ts"), "secondarySoft: tokens.secondarySoft", "demo maps web secondary soft");
+assertContains(read("apps/mobile/src/data/demo/repository.ts"), "resolveProfileTheme(profile.appearance, room)", "demo uses web appearance resolver");
+assertNotContains(read("apps/mobile/src/data/production.ts"), "appearance", "live identity has no appearance contract");
 assertContains(read("apps/mobile/src/ui/SeoullyProfile.tsx"), "veilLayer", "veil stacks above room");
 assertContains(read("src/world/ui/SocialShell.tsx"), "data-surface={themeUserId ? \"profile\" : \"browse\"}", "web profile surface inspected");
 assertContains(read("src/design/social-app.css"), "--s-profile-veil: 0.85", "web veil is the opacity authority");
+assertContains(read("src/design/social-app.css"), "background: var(--s-action)", "web primary is --s-action");
+assertContains(read("src/design/social-app.css"), "background: var(--s-lilac-soft)", "web ghost is --s-lilac-soft");
+assertContains(read("src/design/social-app.css"), "background: var(--s-paper)", "web enter is --s-paper");
 assertContains(read("src/domain/profile-theme.ts"), 'inkHsl && inkHsl.l > 0.55 ? room.theme.ink : "#f3eef6"', "web room-sync compensates ink");
+assertContains(read("docs/native-road-to-ship.md"), "Live Profile Appearance / Room Sync", "live appearance gap recorded for slice 7");
 
   const brand = read("apps/mobile/src/ui/BrandMark.tsx");
   const header = read("apps/mobile/src/ui/SeoullyHeader.tsx");
@@ -204,6 +322,9 @@ assertContains(read("src/domain/profile-theme.ts"), 'inkHsl && inkHsl.l > 0.55 ?
   const road = read("docs/native-road-to-ship.md");
   assertContains(brand, "flexShrink: 0", "wordmark pair does not shrink");
   assertNotContains(brand, "lineHeight: 22", "wordmark is not clipped to 22px");
+  assertContains(brand, "BRAND_WORDMARK_OPTICAL_Y", "wordmark has a brand-specific optical offset");
+  assertContains(brand, "translateY: BRAND_WORDMARK_OPTICAL_Y", "optical offset is a translate, not a flex restack");
+  assertContains(brand, "faces.en.bold", "wordmark stays Latin Baloo in EN/KO");
   assertContains(header, "chrome.headerHeight", "header uses shared chrome height");
   assertContains(header, "chrome.gutter", "header uses shared gutter");
   assertNotContains(header, "paddingTop: 10", "header is not jammed with extra top padding");

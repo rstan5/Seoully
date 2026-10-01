@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { colors, elevation, radii } from "../theme";
 import { pressShift, useReduceMotion } from "./motion";
+import { useProfileIdentity } from "./ProfileIdentity";
+import { profileControlSurfaces } from "./profileContrast";
 import { SeoullyText } from "./SeoullyText";
 
 export function SeoullyButton({
@@ -20,6 +22,11 @@ export function SeoullyButton({
   onPress: () => void;
 }) {
   const reduceMotion = useReduceMotion();
+  const identity = useProfileIdentity();
+  const chrome = identity ? profileControlSurfaces(identity) : null;
+  const labelColor = variant === "primary"
+    ? (identity?.onPrimary ?? colors.onPrimary)
+    : (identity?.primaryDeep ?? colors.plum);
   return (
     <Pressable
       accessibilityRole="button"
@@ -28,8 +35,17 @@ export function SeoullyButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
+        identity && variant === "primary"
+          ? { backgroundColor: identity.action, borderColor: chrome?.actionBorder, borderWidth: 1 }
+          : null,
         variant === "ghost" && styles.ghost,
+        identity && variant === "ghost"
+          ? { backgroundColor: identity.primarySoft, borderColor: chrome?.ghostBorder, borderWidth: 1 }
+          : null,
         variant === "enter" && styles.enter,
+        identity && variant === "enter"
+          ? { backgroundColor: identity.paper, borderColor: chrome?.enterBorder }
+          : null,
         block && styles.block,
         fill && styles.fill,
         pressShift(pressed, reduceMotion),
@@ -37,7 +53,7 @@ export function SeoullyButton({
     >
       <SeoullyText
         variant={variant === "enter" ? "handle" : "button"}
-        color={variant === "primary" ? colors.onPrimary : colors.plum}
+        color={labelColor}
         numberOfLines={fill ? 2 : 1}
         style={styles.label}
       >
@@ -59,6 +75,7 @@ export function SeoullyChoiceChip({
   onPress: () => void;
 }) {
   const reduceMotion = useReduceMotion();
+  const identity = useProfileIdentity();
   return (
     <Pressable
       accessibilityRole={role}
@@ -66,11 +83,15 @@ export function SeoullyChoiceChip({
       onPress={onPress}
       style={({ pressed }) => [
         styles.choice,
+        identity ? { backgroundColor: identity.paper, borderColor: identity.line } : null,
         selected && styles.choiceSelected,
+        identity && selected
+          ? { backgroundColor: identity.primarySoft, borderColor: identity.primary }
+          : null,
         pressShift(pressed, reduceMotion),
       ]}
     >
-      <SeoullyText variant="caption" color={selected ? colors.plum : colors.ink}>{label}</SeoullyText>
+      <SeoullyText variant="caption" color={selected ? (identity?.primaryDeep ?? colors.plum) : (identity?.ink ?? colors.ink)}>{label}</SeoullyText>
     </Pressable>
   );
 }
@@ -82,9 +103,22 @@ export function SeoullyChip({
   label: string;
   tone?: "group" | "bias" | "type";
 }) {
+  const identity = useProfileIdentity();
+  const chrome = identity ? profileControlSurfaces(identity) : null;
+  const backgroundColor = identity
+    ? (tone === "group" ? identity.primarySoft : identity.secondarySoft)
+    : undefined;
+  const color = identity
+    ? (tone === "group" ? identity.primaryDeep : tone === "type" ? chrome?.chipTypeInk : chrome?.chipBiasInk)
+    : colors.ink;
   return (
-    <View style={[styles.chip, tone === "bias" && styles.chipBias, tone === "type" && styles.chipType]}>
-      <SeoullyText variant="caption" color={colors.ink}>{label}</SeoullyText>
+    <View style={[
+      styles.chip,
+      tone === "bias" && styles.chipBias,
+      tone === "type" && styles.chipType,
+      backgroundColor ? { backgroundColor } : null,
+    ]}>
+      <SeoullyText variant="caption" color={color}>{label}</SeoullyText>
     </View>
   );
 }
@@ -105,6 +139,8 @@ export function SeoullyShelf({
   children?: ReactNode;
 }) {
   const reduceMotion = useReduceMotion();
+  const identity = useProfileIdentity();
+  const accent = identity?.primaryDeep ?? colors.plum;
   const collapsible = count !== undefined && onToggle !== undefined;
   return (
     <View style={styles.shelf}>
@@ -115,13 +151,13 @@ export function SeoullyShelf({
           onPress={onToggle}
           style={({ pressed }) => [styles.shelfToggle, pressShift(pressed, reduceMotion)]}
         >
-          <SeoullyText variant="handle" color={colors.plum}>{title}</SeoullyText>
-          <View style={styles.shelfCount}>
-            <SeoullyText variant="caption" color={colors.plum}>{count}</SeoullyText>
+          <SeoullyText variant="handle" color={accent}>{title}</SeoullyText>
+          <View style={[styles.shelfCount, identity ? { backgroundColor: identity.primarySoft } : null]}>
+            <SeoullyText variant="caption" color={accent}>{count}</SeoullyText>
           </View>
         </Pressable>
       ) : (
-        <SeoullyText variant="handle" color={colors.plum}>{title}</SeoullyText>
+        <SeoullyText variant="handle" color={accent}>{title}</SeoullyText>
       )}
       {(!collapsible || expanded) ? (
         <View style={styles.shelfBody}>

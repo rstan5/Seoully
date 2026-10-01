@@ -1,5 +1,9 @@
 import { PROFILE_VEIL, colors } from "../theme";
 
+/**
+ * Collector / Profile Appearance tokens. Mirrors web `ProfileThemeTokens`
+ * after `profileThemeVars` (`--s-paper`, `--s-lilac`, `--s-action`, …).
+ */
 export type ContrastTheme = {
   scheme: "light" | "dark";
   paper: string;
@@ -8,6 +12,13 @@ export type ContrastTheme = {
   mute: string;
   line?: string;
   action?: string;
+  primary?: string;
+  primaryDeep?: string;
+  primarySoft?: string;
+  onPrimary?: string;
+  secondary?: string;
+  secondarySoft?: string;
+  cream?: string;
 };
 
 export type IdentityPalette = {
@@ -19,9 +30,16 @@ export type IdentityPalette = {
   line: string;
   action: string;
   counts: string;
+  primary: string;
+  primaryDeep: string;
+  primarySoft: string;
+  onPrimary: string;
+  secondary: string;
+  secondarySoft: string;
+  cream: string;
 };
 
-/** Web default identity tokens (`DEFAULT_PROFILE_THEME` / `--s-ink`). */
+/** Web default identity tokens (`DEFAULT_PROFILE_THEME` / `--s-*`). */
 export const IDENTITY_LIGHT: IdentityPalette = {
   scheme: "light",
   ink: "#2c2e4c",
@@ -31,11 +49,19 @@ export const IDENTITY_LIGHT: IdentityPalette = {
   line: "#f3e4e9",
   action: "#c45374",
   counts: "#555555",
+  primary: "#f6aebf",
+  primaryDeep: "#c45374",
+  primarySoft: "#ffe8ee",
+  onPrimary: "#ffffff",
+  secondary: "#ffc6d2",
+  secondarySoft: "#fff0f3",
+  cream: "#fff6f4",
 };
 
 /**
  * Web dark / room-sync identity. Ink is compensated (`deriveFromRoom` falls
- * back to #f3eef6 when room ink is too dark). Native must not keep navy text.
+ * back to #f3eef6 when room ink is too dark). Control tokens match the
+ * midnight-purple + lavender accent family — not generic Seoully pink/white.
  */
 export const IDENTITY_DARK: IdentityPalette = {
   scheme: "dark",
@@ -44,8 +70,15 @@ export const IDENTITY_DARK: IdentityPalette = {
   paper: "#1a1524",
   mist: "#241c32",
   line: "#3a3148",
-  action: "#d4a0b8",
+  action: "#9254b6",
   counts: "#c8c0d0",
+  primary: "#c2a7d2",
+  primaryDeep: "#d1bade",
+  primarySoft: "#352b3b",
+  onPrimary: "#ffffff",
+  secondary: "#d3a6b5",
+  secondarySoft: "#412f35",
+  cream: "#241c32",
 };
 
 const HEARTH_VOID = "#120e12";
@@ -102,9 +135,46 @@ export function identityIsReadable(palette: IdentityPalette, roomVoid = HEARTH_V
   return contrastRatio(palette.ink, surface) >= 4.5 && contrastRatio(palette.mute, surface) >= 3;
 }
 
+function pickSoft(candidate: string | undefined, dark: boolean, fallback: string): string {
+  if (!candidate) return fallback;
+  const luminance = relativeLuminance(candidate);
+  return dark ? (luminance < 0.35 ? candidate : fallback) : (luminance > 0.7 ? candidate : fallback);
+}
+
+function pickAgainst(candidate: string | undefined, surface: string, fallback: string, min: number): string {
+  return candidate && contrastRatio(candidate, surface) >= min ? candidate : fallback;
+}
+
+function pickFill(candidate: string | undefined, onFill: string, fallback: string): string {
+  return candidate && contrastRatio(onFill, candidate) >= 4.5 ? candidate : fallback;
+}
+
+function readableChipInk(ink: string, secondary: string, surface: string, fallback: string, amount: number): string {
+  const mixed = mixHex(ink, secondary, amount);
+  if (contrastRatio(mixed, surface) >= 4.5) return mixed;
+  if (contrastRatio(ink, surface) >= 4.5) return ink;
+  return fallback;
+}
+
 /**
- * Deterministic Profile identity colors.
- * Room/theme may tint mist/paper. Foreground is contrast-validated, never raw Room ink.
+ * Web `.s-btn` / `.s-chip` / `.s-enter` / `.s-highlight` mixes against
+ * `--s-lilac`, `--s-line`, `--s-pink`, `--s-cream`.
+ */
+export function profileControlSurfaces(palette: IdentityPalette) {
+  return {
+    actionBorder: mixHex(palette.action, palette.paper, 0.82),
+    ghostBorder: mixHex(palette.primary, palette.line, 0.4),
+    enterBorder: mixHex(palette.primary, palette.line, 0.55),
+    highlightBorder: mixHex(palette.cream, palette.line, 0.55),
+    chipBiasInk: readableChipInk(palette.ink, palette.secondary, palette.secondarySoft, palette.primaryDeep, 0.72),
+    chipTypeInk: readableChipInk(palette.ink, palette.secondary, palette.secondarySoft, palette.primaryDeep, 0.65),
+  };
+}
+
+/**
+ * Deterministic Profile identity + control colors.
+ * Room/theme may tint surfaces. Foreground is contrast-validated, never raw Room ink.
+ * Control tokens stay theme-derived (web Appearance / Room Sync), not generic Seoully pink/white.
  */
 export function identityPalette(
   theme?: ContrastTheme | null,
@@ -117,32 +187,45 @@ export function identityPalette(
     || relativeLuminance(mist) < 0.45
     || relativeLuminance(paper) < 0.45
     || relativeLuminance(surface) < 0.45;
+  const base = dark ? IDENTITY_DARK : IDENTITY_LIGHT;
 
-  if (!dark) {
-    const ink = theme?.ink && relativeLuminance(theme.ink) < 0.45 ? theme.ink : IDENTITY_LIGHT.ink;
-    const mute = theme?.mute && contrastRatio(theme.mute, surface) >= 3 ? theme.mute : IDENTITY_LIGHT.mute;
-    return {
-      ...IDENTITY_LIGHT,
-      ink,
-      mute,
-      mist,
-      paper,
-      line: theme?.line ?? IDENTITY_LIGHT.line,
-      action: theme?.action && contrastRatio(theme.action, surface) >= 3 ? theme.action : IDENTITY_LIGHT.action,
-      counts: contrastRatio(IDENTITY_LIGHT.counts, surface) >= 4.5 ? IDENTITY_LIGHT.counts : mute,
-    };
-  }
+  const ink = dark
+    ? (theme?.ink && relativeLuminance(theme.ink) > 0.55 ? theme.ink : IDENTITY_DARK.ink)
+    : (theme?.ink && relativeLuminance(theme.ink) < 0.45 ? theme.ink : IDENTITY_LIGHT.ink);
+  const mute = dark
+    ? (theme?.mute && relativeLuminance(theme.mute) > 0.4 ? theme.mute : IDENTITY_DARK.mute)
+    : (theme?.mute && contrastRatio(theme.mute, surface) >= 3 ? theme.mute : IDENTITY_LIGHT.mute);
+  const line = theme?.line ?? base.line;
+  const onPrimary = theme?.onPrimary && theme.action && contrastRatio(theme.onPrimary, theme.action) >= 4.5
+    ? theme.onPrimary
+    : base.onPrimary;
+  const action = pickFill(theme?.action, onPrimary, base.action);
+  const primarySoft = pickSoft(theme?.primarySoft, dark, base.primarySoft);
+  const secondarySoft = pickSoft(theme?.secondarySoft, dark, base.secondarySoft);
+  const primaryDeep = pickAgainst(theme?.primaryDeep, primarySoft, base.primaryDeep, 4.5);
+  const primary = theme?.primary ?? base.primary;
+  const secondary = theme?.secondary ?? base.secondary;
+  const creamCandidate = theme?.cream ?? base.cream;
+  const cream = contrastRatio(ink, creamCandidate) >= 4.5 ? creamCandidate : (dark ? mist : paper);
+  const counts = dark
+    ? mute
+    : (contrastRatio(IDENTITY_LIGHT.counts, surface) >= 4.5 ? IDENTITY_LIGHT.counts : mute);
 
-  const ink = theme?.ink && relativeLuminance(theme.ink) > 0.55 ? theme.ink : IDENTITY_DARK.ink;
-  const mute = theme?.mute && relativeLuminance(theme.mute) > 0.4 ? theme.mute : IDENTITY_DARK.mute;
   return {
-    ...IDENTITY_DARK,
+    scheme: dark ? "dark" : "light",
     ink,
     mute,
     mist,
     paper,
-    line: theme?.line ?? IDENTITY_DARK.line,
-    action: theme?.action && relativeLuminance(theme.action) > 0.35 ? theme.action : IDENTITY_DARK.action,
-    counts: mute,
+    line,
+    action,
+    counts,
+    primary,
+    primaryDeep,
+    primarySoft,
+    onPrimary,
+    secondary,
+    secondarySoft,
+    cream,
   };
 }

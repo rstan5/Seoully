@@ -336,6 +336,8 @@ Physical device QA after Slice 5–8 proved the current native Room is functiona
 
 12. **Keep the working engine.** Do not throw away working infrastructure without evidence: Three/R3F, Expo GL device compatibility, production RoomPlacement DAL, ownership/placement separation, representation contracts, personal media textures, focus behavior, Binder geometry/data, edit persistence, invalid-placement rollback, store semantics, public Room security, current renderer compatibility fixes.
 
+13. **Live Profile Appearance / Room Sync.** Demo already maps web `resolveProfileTheme(appearance, room)` into native `SocialTheme` (paper / mist / ink / mute / line / primary / primaryDeep / primarySoft / action / onPrimary / secondary / secondarySoft / cream). Production mobile identity/collector contracts have no appearance payload, and `20261002000000_native_room_theme.sql` stays unapplied. Live Profile therefore keeps default Seoully paper tokens until Slice 7 can persist/read appearance on current contracts — do not invent a second theme schema here.
+
 **Goal:** KEEP THE ENGINE. REBUILD THE EXPERIENCE.
 
 ---

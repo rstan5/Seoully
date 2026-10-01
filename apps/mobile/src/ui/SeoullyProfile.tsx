@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import { Image, Pressable, StyleSheet, View } from "react-native";
 import type { SocialTheme } from "../data/types";
 import { PROFILE_VEIL, colors, elevation } from "../theme";
-import { hexToRgba } from "./profileContrast";
-import { useProfileIdentity } from "./ProfileIdentity";
+import { hexToRgba, profileControlSurfaces } from "./profileContrast";
+import { useProfileAccent, useProfileIdentity } from "./ProfileIdentity";
 import { SeoullyAvatar } from "./SeoullyAvatar";
 import { SeoullyChip } from "./SeoullyControls";
 import { SeoullyText } from "./SeoullyText";
@@ -69,7 +69,7 @@ export function SeoullyProfileHead({
         <SeoullyText variant="handle" color={identity?.mute} style={styles.handle}>@{handle}</SeoullyText>
         {editLabel && onEdit ? (
           <Pressable accessibilityRole="button" hitSlop={8} onPress={onEdit} style={styles.edit}>
-            <SeoullyText variant="caption" color={colors.plum}>{editLabel}</SeoullyText>
+            <SeoullyText variant="caption" color={identity?.primaryDeep ?? colors.plum}>{editLabel}</SeoullyText>
           </Pressable>
         ) : null}
         <View style={styles.counts}>
@@ -132,6 +132,7 @@ export function SeoullyOwnedRow({
   onToggleTrade?: () => void;
   onRemove?: () => void;
 }) {
+  const accent = useProfileAccent();
   return (
     <View style={styles.owned}>
       <SeoullyShelfRow
@@ -145,12 +146,12 @@ export function SeoullyOwnedRow({
         <View style={styles.ownedActions}>
           {tradeLabel && onToggleTrade ? (
             <Pressable accessibilityRole="button" onPress={onToggleTrade} style={styles.ownedAction}>
-              <SeoullyText variant="caption" color={colors.plum}>{tradeLabel}</SeoullyText>
+              <SeoullyText variant="caption" color={accent}>{tradeLabel}</SeoullyText>
             </Pressable>
           ) : null}
           {removeLabel && onRemove ? (
             <Pressable accessibilityRole="button" onPress={onRemove} style={styles.ownedAction}>
-              <SeoullyText variant="caption" color={colors.plum}>{removeLabel}</SeoullyText>
+              <SeoullyText variant="caption" color={accent}>{removeLabel}</SeoullyText>
             </Pressable>
           ) : null}
         </View>
@@ -168,21 +169,22 @@ export function SeoullyObjectTile({
   imageUrl?: string;
   height?: number;
 }) {
+  const identity = useProfileIdentity();
   const width = height * 0.68;
   if (imageUrl) {
     return <Image accessibilityIgnoresInvertColors source={{ uri: imageUrl }} style={{ borderRadius: 4, height, width }} />;
   }
   return (
     <View style={{
-      backgroundColor: colorway?.base ?? colors.lilacSoft,
-      borderColor: colorway?.accent ?? colors.lilac,
+      backgroundColor: colorway?.base ?? identity?.primarySoft ?? colors.lilacSoft,
+      borderColor: colorway?.accent ?? identity?.primary ?? colors.lilac,
       borderRadius: 4,
       borderWidth: StyleSheet.hairlineWidth,
       height,
       overflow: "hidden",
       width,
     }}>
-      <View style={{ backgroundColor: colorway?.accent ?? colors.pink, height: 6, opacity: 0.7 }} />
+      <View style={{ backgroundColor: colorway?.accent ?? identity?.secondary ?? colors.pink, height: 6, opacity: 0.7 }} />
     </View>
   );
 }
@@ -198,10 +200,15 @@ export function SeoullyHighlight({
   imageUrl?: string;
   colorway?: { base: string; accent: string; ink: string };
 }) {
+  const identity = useProfileIdentity();
+  const chrome = identity ? profileControlSurfaces(identity) : null;
   return (
-    <View style={styles.highlight}>
+    <View style={[
+      styles.highlight,
+      identity ? { backgroundColor: identity.cream, borderColor: chrome?.highlightBorder } : null,
+    ]}>
       <SeoullyObjectTile colorway={colorway} imageUrl={imageUrl} />
-      <SeoullyText variant="caption" color={colors.ink} numberOfLines={1} style={styles.highlightName}>{name}</SeoullyText>
+      <SeoullyText variant="caption" color={identity?.ink ?? colors.ink} numberOfLines={1} style={styles.highlightName}>{name}</SeoullyText>
       <SeoullyText variant="caption">{countLabel}</SeoullyText>
     </View>
   );
@@ -222,6 +229,7 @@ export function SeoullyShelfRow({
   action?: string;
   onPress?: () => void;
 }) {
+  const accent = useProfileAccent();
   const body = (
     <>
       <SeoullyObjectTile colorway={colorway} imageUrl={imageUrl} height={52} />
@@ -229,7 +237,7 @@ export function SeoullyShelfRow({
         <SeoullyText variant="handle" numberOfLines={1}>{title}</SeoullyText>
         {meta ? <SeoullyText variant="caption" numberOfLines={1}>{meta}</SeoullyText> : null}
       </View>
-      {action ? <SeoullyText variant="caption" color={colors.plum}>{action}</SeoullyText> : null}
+      {action ? <SeoullyText variant="caption" color={accent}>{action}</SeoullyText> : null}
     </>
   );
   if (!onPress) return <View style={styles.row}>{body}</View>;

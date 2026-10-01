@@ -28,7 +28,7 @@ export function SeoullyText({
   const spec = type[variant];
   const inherited = identity
     ? (variant === "section"
-      ? identity.action
+      ? identity.primaryDeep
       : variant === "secondary" || variant === "caption" || variant === "metadata"
         ? identity.mute
         : identity.ink)

@@ -267,7 +267,7 @@ export default function CollectorScreen() {
               />
             </View>
             {notice ? <SeoullyText variant="secondary" style={styles.inlineNotice}>{notice}</SeoullyText> : null}
-            <SeoullyText variant="caption" color={colors.muted} style={styles.inlineNotice}>{copy.profileUnderlayHint}</SeoullyText>
+            <SeoullyText variant="caption" style={styles.inlineNotice}>{copy.profileUnderlayHint}</SeoullyText>
           </View>
 
           {collector.groups.length > 0 || collector.biases.length > 0 || collector.eras.length > 0 || (collector.profile.collectorInterests?.length ?? 0) > 0 ? (
@@ -294,7 +294,7 @@ export default function CollectorScreen() {
           ) : null}
 
           {collector.compatibility ? (
-            <View style={styles.compat}>
+            <View style={[styles.compat, { backgroundColor: palette.paper, borderColor: palette.line, borderWidth: StyleSheet.hairlineWidth }]}>
               <SeoullyText variant="title">
                 {copy.compatScore.replace("{score}", String(collector.compatibility.score))}
               </SeoullyText>
@@ -302,7 +302,7 @@ export default function CollectorScreen() {
               {displayReasons(collector.compatibility, copy).slice(0, 4).map((reason) => (
                 <SeoullyText key={reason} variant="secondary" style={styles.compatReason}>{reason}</SeoullyText>
               ))}
-              <SeoullyText variant="caption" color={colors.muted} style={styles.compatReason}>
+              <SeoullyText variant="caption" style={styles.compatReason}>
                 {collector.compatibility.source === "production" ? copy.compatEngineProduction : copy.compatEngineDemo}
               </SeoullyText>
               <SeoullyTradeMatch
@@ -326,7 +326,7 @@ export default function CollectorScreen() {
             ))}
             {postCursor ? (
               <Pressable accessibilityRole="button" disabled={loadingMore} onPress={() => { void loadMorePosts(); }} style={styles.more}>
-                <SeoullyText variant="button" color={colors.plum}>{loadingMore ? copy.saving : copy.loadMorePosts}</SeoullyText>
+                <SeoullyText variant="button" color={palette.primaryDeep}>{loadingMore ? copy.saving : copy.loadMorePosts}</SeoullyText>
               </Pressable>
             ) : null}
           </SeoullyShelf>

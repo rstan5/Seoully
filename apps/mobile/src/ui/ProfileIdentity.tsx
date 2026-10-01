@@ -23,4 +23,8 @@ export function useProfileMute(): string {
   return useContext(ProfileIdentityContext)?.mute ?? colors.muted;
 }
 
+export function useProfileAccent(): string {
+  return useContext(ProfileIdentityContext)?.primaryDeep ?? colors.plum;
+}
+
 export { IDENTITY_LIGHT };

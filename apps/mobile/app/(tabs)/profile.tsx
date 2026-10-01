@@ -16,7 +16,6 @@ import { RetryNotice } from "../../src/components/RetryNotice";
 import { collectibleKindLabel } from "../../src/i18n";
 import { useCopy, useLocale } from "../../src/locale";
 import { supabase } from "../../src/supabase";
-import { colors } from "../../src/theme";
 import { identityPalette } from "../../src/ui/profileContrast";
 import { ProfileIdentityProvider } from "../../src/ui/ProfileIdentity";
 import { SeoullyButton, SeoullyChip, SeoullyShelf } from "../../src/ui/SeoullyControls";
@@ -296,11 +295,11 @@ export default function ProfileScreen() {
             ))}
             {holdings.length === 0 ? (
               <Pressable accessibilityRole="button" onPress={addToCollection} style={styles.shelfAction}>
-                <SeoullyText variant="button" color={colors.plum}>{copy.profileAddToCollection}</SeoullyText>
+                <SeoullyText variant="button" color={palette.primaryDeep}>{copy.profileAddToCollection}</SeoullyText>
               </Pressable>
             ) : (
               <Pressable accessibilityRole="button" onPress={() => { void openCollection("collection"); }}>
-                <SeoullyText variant="button" color={colors.plum}>{copy.profileSeeAll}</SeoullyText>
+                <SeoullyText variant="button" color={palette.primaryDeep}>{copy.profileSeeAll}</SeoullyText>
               </Pressable>
             )}
           </SeoullyShelf>
@@ -324,7 +323,7 @@ export default function ProfileScreen() {
             ))}
             {wishlist.length > 0 ? (
               <Pressable accessibilityRole="button" onPress={() => { void openCollection("wishlist"); }}>
-                <SeoullyText variant="button" color={colors.plum}>{copy.profileSeeAll}</SeoullyText>
+                <SeoullyText variant="button" color={palette.primaryDeep}>{copy.profileSeeAll}</SeoullyText>
               </Pressable>
             ) : null}
           </SeoullyShelf>

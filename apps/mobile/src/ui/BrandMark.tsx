@@ -1,5 +1,12 @@
 import { Image, StyleSheet, View } from "react-native";
+import { faces } from "../theme";
 import { SeoullyText } from "./SeoullyText";
+
+/**
+ * Baloo 2 Bold sits high in its line box. Header flex stays mathematically
+ * centered; only the visible Latin wordmark is nudged down to the shared axis.
+ */
+export const BRAND_WORDMARK_OPTICAL_Y = 2;
 
 /**
  * Wordmark + heart as one logo. Web `.brand-mark` / `.brand-heart` (1.46em × 1.2em,
@@ -32,9 +39,11 @@ const styles = StyleSheet.create({
     overflow: "visible",
   },
   wordmark: {
+    fontFamily: faces.en.bold,
     includeFontPadding: false,
     overflow: "visible",
     paddingRight: 1,
+    transform: [{ translateY: BRAND_WORDMARK_OPTICAL_Y }],
   },
   heartSlot: {
     height: 24,

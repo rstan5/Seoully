@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { colors, elevation, radii } from "../theme";
 import { pressShift, useReduceMotion } from "./motion";
 import { useProfileIdentity } from "./ProfileIdentity";
-import { profileControlSurfaces } from "./profileContrast";
+import { profileControlSurfaces, profileSurfaceFill } from "./profileContrast";
 import { SeoullyText } from "./SeoullyText";
 
 export function SeoullyButton({
@@ -143,7 +143,19 @@ export function SeoullyShelf({
   const accent = identity?.primaryDeep ?? colors.plum;
   const collapsible = count !== undefined && onToggle !== undefined;
   return (
-    <View style={styles.shelf}>
+    <View style={[
+      styles.shelf,
+      identity
+        ? {
+            backgroundColor: profileSurfaceFill(identity.paper),
+            borderColor: identity.line,
+            borderRadius: 16,
+            borderWidth: StyleSheet.hairlineWidth,
+            marginHorizontal: 16,
+            paddingBottom: 8,
+          }
+        : null,
+    ]}>
       {collapsible ? (
         <Pressable
           accessibilityRole="button"

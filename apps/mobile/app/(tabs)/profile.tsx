@@ -28,6 +28,7 @@ import {
   SeoullyOwnedRow,
   SeoullyProfileChrome,
   SeoullyProfileHead,
+  SeoullyProfileSurface,
   SeoullyProfileMeta,
   SeoullyProfileVeil,
   SeoullyRoomUnderlay,
@@ -209,7 +210,7 @@ export default function ProfileScreen() {
       {error ? <View style={styles.notice}><RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /></View> : null}
       {identity ? (
         <ScrollView contentContainerStyle={styles.container}>
-          <View style={styles.card}>
+          <SeoullyProfileSurface style={styles.card}>
             <SeoullyProfileHead
               name={identity.user.displayName}
               handle={identity.user.handle}
@@ -237,7 +238,7 @@ export default function ProfileScreen() {
               <SeoullyButton label={copy.viewCollectorRoom} variant="enter" onPress={enterRoom} />
             </View>
             {notice ? <SeoullyText variant="secondary" style={styles.inlineNotice}>{notice}</SeoullyText> : null}
-          </View>
+          </SeoullyProfileSurface>
 
           {groups.length > 0 || biases.length > 0 || (identity.profile.collectorInterests?.length ?? 0) > 0 ? (
             <View style={styles.chips}>
@@ -338,7 +339,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { paddingBottom: 120 },
-  card: { paddingHorizontal: 16, paddingTop: 18 },
+  card: { marginHorizontal: 16, paddingBottom: 16, paddingHorizontal: 16, paddingTop: 18 },
   actions: { alignItems: "stretch", flexDirection: "row", gap: 8, marginTop: 14 },
   enter: { marginTop: 10 },
   inlineNotice: { marginTop: 10 },

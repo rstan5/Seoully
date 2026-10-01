@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
-import { Image, Pressable, StyleSheet, View } from "react-native";
+import { Image, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import type { SocialTheme } from "../data/types";
 import { PROFILE_VEIL, colors, elevation } from "../theme";
-import { hexToRgba, profileControlSurfaces } from "./profileContrast";
+import { hexToRgba, profileControlSurfaces, profileSurfaceFill } from "./profileContrast";
 import { useProfileAccent, useProfileIdentity } from "./ProfileIdentity";
 import { SeoullyAvatar } from "./SeoullyAvatar";
 import { SeoullyChip } from "./SeoullyControls";
@@ -41,6 +41,40 @@ export function SeoullyProfileVeil({ theme, mist }: { theme?: SocialTheme; mist?
 
 export function SeoullyProfileChrome({ children }: { children: ReactNode }) {
   return <View style={styles.chrome}>{children}</View>;
+}
+
+/** Paper/mist/cream panel over the Room. Fill is 80% alpha; children stay opaque. */
+export function SeoullyProfileSurface({
+  token = "paper",
+  children,
+  style,
+}: {
+  token?: "paper" | "mist" | "cream";
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const identity = useProfileIdentity();
+  const resolved = identity
+    ? identity[token]
+    : token === "cream"
+      ? colors.cream
+      : token === "mist"
+        ? colors.mist
+        : colors.surface;
+  return (
+    <View
+      style={[
+        styles.surface,
+        {
+          backgroundColor: profileSurfaceFill(resolved),
+          borderColor: identity?.line ?? colors.border,
+        },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
 }
 
 export function SeoullyProfileHead({
@@ -205,7 +239,8 @@ export function SeoullyHighlight({
   return (
     <View style={[
       styles.highlight,
-      identity ? { backgroundColor: identity.cream, borderColor: chrome?.highlightBorder } : null,
+      { backgroundColor: profileSurfaceFill(identity?.cream ?? colors.cream) },
+      identity ? { borderColor: chrome?.highlightBorder } : null,
     ]}>
       <SeoullyObjectTile colorway={colorway} imageUrl={imageUrl} />
       <SeoullyText variant="caption" color={identity?.ink ?? colors.ink} numberOfLines={1} style={styles.highlightName}>{name}</SeoullyText>
@@ -252,6 +287,10 @@ const styles = StyleSheet.create({
   worldLayer: { ...StyleSheet.absoluteFill, zIndex: 0 },
   veilLayer: { ...StyleSheet.absoluteFill, zIndex: 1 },
   chrome: { flex: 1, zIndex: 2 },
+  surface: {
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
   head: { alignItems: "center", flexDirection: "row", gap: 16 },
   avatarRing: {
     backgroundColor: colors.surface,

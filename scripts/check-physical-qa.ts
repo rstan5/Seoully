@@ -19,10 +19,13 @@ import {
   contrastRatio,
   identityIsReadable,
   identityPalette,
+  hexToRgba,
   profileControlSurfaces,
+  profileSurfaceFill,
   profileTabChrome,
   relativeLuminance,
 } from "../apps/mobile/src/ui/profileContrast";
+import { PROFILE_SURFACE_ALPHA, PROFILE_VEIL } from "../apps/mobile/src/theme";
 import { chrome, companionPlacement, routeShowsBottomNav } from "../apps/mobile/src/ui/shellLayout";
 
 const repoRoot = process.cwd();
@@ -328,6 +331,22 @@ const saturatedTabs = profileTabChrome(saturated);
 assert.ok(relativeLuminance(saturatedTabs.bar) < 0.2);
 assert.ok(contrastRatio(saturatedTabs.inactive, saturatedTabs.bar) >= 3);
 assert.ok(contrastRatio(saturatedTabs.createFg, saturatedTabs.createBg) >= 3);
+
+assert.equal(PROFILE_SURFACE_ALPHA, 0.8);
+assert.equal(PROFILE_VEIL, 0.85);
+assert.equal(profileSurfaceFill(IDENTITY_LIGHT.paper), hexToRgba(IDENTITY_LIGHT.paper, 0.8));
+assert.equal(profileSurfaceFill(roomSync.paper), hexToRgba(roomSync.paper, 0.8));
+assert.equal(profileSurfaceFill(pinkTheme.cream), hexToRgba(pinkTheme.cream, 0.8));
+assert.equal(profileSurfaceFill(lavenderTheme.mist), hexToRgba(lavenderTheme.mist, 0.8));
+assert.notEqual(profileSurfaceFill(roomSync.paper), profileSurfaceFill(IDENTITY_LIGHT.paper));
+assertContains(read("apps/mobile/src/ui/SeoullyProfile.tsx"), "profileSurfaceFill", "profile surfaces use themed 80% fill");
+assertContains(read("apps/mobile/src/ui/SeoullyProfile.tsx"), "SeoullyProfileSurface", "identity panels are a shared surface");
+assertContains(profile, "SeoullyProfileSurface", "own profile identity sits on a translucent panel");
+assertContains(read("apps/mobile/app/collector.tsx"), "SeoullyProfileSurface", "collector identity/compat sit on translucent panels");
+assertContains(read("apps/mobile/src/ui/SeoullyControls.tsx"), "profileSurfaceFill(identity.paper)", "shelves use themed 80% paper");
+assertNotContains(read("apps/mobile/src/ui/SeoullyControls.tsx"), "opacity: 0.8", "buttons/chips are not component-faded");
+assertNotContains(read("apps/mobile/src/ui/SeoullyTabBar.tsx"), "profileSurfaceFill", "tab bar is not a profile section surface");
+assertNotContains(read("apps/mobile/src/ui/SeoullyHeader.tsx"), "profileSurfaceFill", "header is not a profile section surface");
 
 assertContains(profile, "identityPalette", "profile uses contrast palette");
 assertContains(profile, "ProfileIdentityProvider", "profile identity context");

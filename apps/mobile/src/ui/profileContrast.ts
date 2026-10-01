@@ -1,4 +1,4 @@
-import { PROFILE_VEIL, colors } from "../theme";
+import { PROFILE_SURFACE_ALPHA, PROFILE_VEIL, colors } from "../theme";
 
 /**
  * Collector / Profile Appearance tokens. Mirrors web `ProfileThemeTokens`
@@ -122,6 +122,11 @@ export function hexToRgba(hex: string, alpha: number): string {
   const rgb = parseHex(hex);
   if (!rgb) return `rgba(255, 241, 244, ${alpha})`;
   return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+}
+
+/** Theme-derived Profile section fill. Color stays resolved; only alpha is 80%. */
+export function profileSurfaceFill(hex: string, alpha = PROFILE_SURFACE_ALPHA): string {
+  return hexToRgba(hex, alpha);
 }
 
 /** Veil over the current Room glimpse, matching web `--s-profile-veil`. */

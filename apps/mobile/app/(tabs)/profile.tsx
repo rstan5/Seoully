@@ -17,7 +17,7 @@ import { collectibleKindLabel } from "../../src/i18n";
 import { useCopy, useLocale } from "../../src/locale";
 import { supabase } from "../../src/supabase";
 import { identityPalette } from "../../src/ui/profileContrast";
-import { ProfileIdentityProvider } from "../../src/ui/ProfileIdentity";
+import { ProfileIdentityProvider, usePublishProfileIdentity } from "../../src/ui/ProfileIdentity";
 import { SeoullyButton, SeoullyChip, SeoullyShelf } from "../../src/ui/SeoullyControls";
 import { SeoullyFeedPost } from "../../src/ui/SeoullyFeedPost";
 import { SeoullyHeader } from "../../src/ui/SeoullyHeader";
@@ -194,7 +194,8 @@ export default function ProfileScreen() {
     router.push("/room");
   }
 
-  const palette = identityPalette(theme);
+  const palette = useMemo(() => identityPalette(theme), [theme]);
+  usePublishProfileIdentity(palette);
 
   return (
     <SeoullyScreen backgroundColor={palette.mist}>

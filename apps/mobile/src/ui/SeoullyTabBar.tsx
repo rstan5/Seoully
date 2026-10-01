@@ -3,6 +3,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, elevation, radii, sizes } from "../theme";
 import { IconChat, IconHome, IconPlus, IconSearch, IconUser } from "./icons";
 import { pressShift, useReduceMotion } from "./motion";
+import { usePublishedProfileIdentity } from "./ProfileIdentity";
+import { profileTabChrome } from "./profileContrast";
 
 type TabRoute = { key: string; name: string; params?: object };
 type TabOptions = { title?: string; tabBarAccessibilityLabel?: string };
@@ -27,15 +29,26 @@ const icons = {
 export function SeoullyTabBar({ state, descriptors, navigation }: SeoullyTabBarProps) {
   const insets = useSafeAreaInsets();
   const reduceMotion = useReduceMotion();
+  const identity = usePublishedProfileIdentity();
+  const chrome = identity ? profileTabChrome(identity) : null;
 
   return (
-    <View style={[styles.bar, { paddingBottom: insets.bottom }]}>
+    <View style={[
+      styles.bar,
+      { paddingBottom: insets.bottom },
+      chrome ? { backgroundColor: chrome.bar, borderTopColor: chrome.border } : null,
+    ]}>
       {state.routes.filter((route) => route.name in icons).map((route) => {
         const focused = state.routes[state.index]?.name === route.name;
         const { options } = descriptors[route.key];
         const label = options.tabBarAccessibilityLabel ?? options.title ?? route.name;
         const Icon = icons[route.name as keyof typeof icons] ?? IconHome;
         const isCreate = route.name === "create";
+        const iconColor = isCreate && focused
+          ? (chrome?.createOnFg ?? colors.onPrimary)
+          : focused || isCreate
+            ? (chrome?.active ?? colors.plum)
+            : (chrome?.inactive ?? colors.muted);
 
         return (
           <Pressable
@@ -50,13 +63,16 @@ export function SeoullyTabBar({ state, descriptors, navigation }: SeoullyTabBarP
             style={({ pressed }) => [
               styles.tab,
               focused && !isCreate && styles.tabOn,
+              focused && !isCreate && chrome ? { backgroundColor: chrome.activeBg } : null,
               isCreate && styles.create,
+              isCreate && chrome ? { backgroundColor: chrome.createBg, borderColor: chrome.createBorder } : null,
               isCreate && focused && styles.createOn,
+              isCreate && focused && chrome ? { backgroundColor: chrome.createOnBg, borderColor: chrome.createOnBg } : null,
               pressShift(pressed, reduceMotion),
             ]}
           >
             <Icon
-              color={isCreate && focused ? colors.onPrimary : focused || isCreate ? colors.plum : colors.muted}
+              color={iconColor}
               filled={focused && (route.name === "index" || route.name === "messages" || route.name === "profile")}
             />
           </Pressable>

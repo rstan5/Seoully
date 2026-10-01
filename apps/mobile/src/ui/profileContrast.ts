@@ -172,6 +172,36 @@ export function profileControlSurfaces(palette: IdentityPalette) {
 }
 
 /**
+ * Web `.s-nav` sits on themed mist (`background: transparent` + `--s-line`).
+ * Tabs / `.s-nav-tab.is-on` / `.s-nav-create` map to lilac-soft / lilac-deep / mute.
+ */
+export function profileTabChrome(palette: IdentityPalette) {
+  const icon = 3;
+  const inactive = contrastRatio(palette.mute, palette.mist) >= icon ? palette.mute : palette.ink;
+  const active = contrastRatio(palette.primaryDeep, palette.primarySoft) >= icon
+    ? palette.primaryDeep
+    : (contrastRatio(palette.ink, palette.primarySoft) >= icon ? palette.ink : palette.onPrimary);
+  const createOnBg = contrastRatio(palette.onPrimary, palette.primary) >= icon
+    ? palette.primary
+    : palette.action;
+  const createOnFg = contrastRatio(palette.onPrimary, createOnBg) >= icon
+    ? palette.onPrimary
+    : palette.ink;
+  return {
+    bar: palette.mist,
+    border: palette.line,
+    inactive,
+    active,
+    activeBg: palette.primarySoft,
+    createBg: palette.primarySoft,
+    createFg: active,
+    createBorder: mixHex(palette.primary, palette.scheme === "dark" ? palette.line : "#ffffff", 0.45),
+    createOnBg,
+    createOnFg,
+  };
+}
+
+/**
  * Deterministic Profile identity + control colors.
  * Room/theme may tint surfaces. Foreground is contrast-validated, never raw Room ink.
  * Control tokens stay theme-derived (web Appearance / Room Sync), not generic Seoully pink/white.

@@ -20,6 +20,7 @@ import {
   identityIsReadable,
   identityPalette,
   profileControlSurfaces,
+  profileTabChrome,
   relativeLuminance,
 } from "../apps/mobile/src/ui/profileContrast";
 import { chrome, companionPlacement, routeShowsBottomNav } from "../apps/mobile/src/ui/shellLayout";
@@ -295,9 +296,53 @@ const surfaces = profileControlSurfaces(roomSync);
 assert.notEqual(surfaces.ghostBorder, IDENTITY_LIGHT.line);
 assert.ok(contrastRatio(surfaces.chipBiasInk, roomSync.secondarySoft) >= 4.5);
 
+const defaultTabs = profileTabChrome(unset);
+assert.equal(defaultTabs.bar, IDENTITY_LIGHT.mist);
+assert.equal(defaultTabs.border, IDENTITY_LIGHT.line);
+assert.equal(defaultTabs.inactive, IDENTITY_LIGHT.mute);
+assert.equal(defaultTabs.active, IDENTITY_LIGHT.primaryDeep);
+assert.equal(defaultTabs.activeBg, IDENTITY_LIGHT.primarySoft);
+assert.ok(contrastRatio(defaultTabs.inactive, defaultTabs.bar) >= 3);
+assert.ok(contrastRatio(defaultTabs.active, defaultTabs.activeBg) >= 3);
+
+const darkTabs = profileTabChrome(roomSync);
+assert.equal(darkTabs.bar, roomSync.mist);
+assert.ok(relativeLuminance(darkTabs.bar) < 0.2, "dark profile tab bar is not a cream slab");
+assert.notEqual(darkTabs.bar, IDENTITY_LIGHT.mist);
+assert.ok(contrastRatio(darkTabs.inactive, darkTabs.bar) >= 3);
+assert.ok(contrastRatio(darkTabs.active, darkTabs.activeBg) >= 3);
+assert.ok(contrastRatio(darkTabs.createOnFg, darkTabs.createOnBg) >= 3);
+
+const pinkTabs = profileTabChrome(pinkTheme);
+assert.equal(pinkTabs.bar, pinkTheme.mist);
+assert.notEqual(pinkTabs.active, darkTabs.active);
+assert.ok(contrastRatio(pinkTabs.inactive, pinkTabs.bar) >= 3);
+assert.ok(contrastRatio(pinkTabs.active, pinkTabs.activeBg) >= 3);
+
+const lavenderTabs = profileTabChrome(lavenderTheme);
+assert.equal(lavenderTabs.bar, lavenderTheme.mist);
+assert.notEqual(lavenderTabs.activeBg, pinkTabs.activeBg);
+assert.ok(contrastRatio(lavenderTabs.active, lavenderTabs.activeBg) >= 3);
+
+const saturatedTabs = profileTabChrome(saturated);
+assert.ok(relativeLuminance(saturatedTabs.bar) < 0.2);
+assert.ok(contrastRatio(saturatedTabs.inactive, saturatedTabs.bar) >= 3);
+assert.ok(contrastRatio(saturatedTabs.createFg, saturatedTabs.createBg) >= 3);
+
 assertContains(profile, "identityPalette", "profile uses contrast palette");
 assertContains(profile, "ProfileIdentityProvider", "profile identity context");
+assertContains(profile, "usePublishProfileIdentity", "profile publishes identity to tab chrome");
 assertContains(profile, "palette.primaryDeep", "profile links use theme accent");
+assertContains(read("apps/mobile/app/(tabs)/_layout.tsx"), "ProfileIdentityScope", "tabs shell owns published identity");
+assertContains(read("apps/mobile/src/ui/SeoullyTabBar.tsx"), "usePublishedProfileIdentity", "tab bar reads published identity");
+assertContains(read("apps/mobile/src/ui/SeoullyTabBar.tsx"), "profileTabChrome", "tab bar uses shared identity tokens");
+assertContains(read("apps/mobile/src/ui/ProfileIdentity.tsx"), "return () => publish(null)", "leaving profile clears tab chrome");
+assertContains(read("apps/mobile/src/ui/ProfileIdentity.tsx"), "return useContext(ProfileIdentityContext);", "screen identity stays local");
+assertContains(read("apps/mobile/src/ui/ProfileIdentity.tsx"), "return useContext(PublishedIdentityContext);", "tab chrome has a separate reader");
+assertNotContains(read("apps/mobile/app/(tabs)/index.tsx"), "usePublishProfileIdentity", "discover does not publish profile chrome");
+assertContains(read("src/design/social-app.css"), "background: transparent", "web nav is transparent over themed mist");
+assertContains(read("src/design/social-app.css"), "color: var(--s-mute)", "web inactive nav is mute");
+assertContains(read("src/design/social-app.css"), "color: var(--s-lilac-deep)", "web active nav is lilac-deep");
 assertContains(read("apps/mobile/src/ui/SeoullyControls.tsx"), "useProfileIdentity", "shared controls consume profile theme");
 assertContains(read("apps/mobile/src/ui/SeoullyControls.tsx"), "identity.primarySoft", "ghost/chips use theme soft");
 assertContains(read("apps/mobile/src/ui/SeoullyControls.tsx"), "identity.paper", "enter uses theme paper");

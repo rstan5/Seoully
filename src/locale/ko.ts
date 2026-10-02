@@ -174,7 +174,7 @@ export const ko: Record<MessageKey, string> = {
   "assistant.answer.followupWants": "방금 찾은 컬렉터 중 위시리스트 아이템을 가진 사람이에요 ♡",
   "assistant.answer.followupWantsEmpty": "방금 찾은 컬렉터 중 현재 위시리스트 아이템을 가진 사람은 없어요.",
   "assistant.answer.starters": "컬렉터나 아이템 찾기, 내 컬렉션 보기, 서울리 기능에 대해 물어보세요 ♡",
-  "assistant.answer.demoGeneral": "데모 Ask Seoully는 픽스처 컬렉션 데이터만 찾아볼 수 있어요. 일반 케이팝 대화는 Live Ask Seoully에서 사용할 수 있어요.",
+  "assistant.answer.demoGeneral": "데모에서는 이 컬렉션 세계를 찾아볼 수 있어요. 일반 케이팝 질문은 Live에서 물어봐 주세요 ♡",
   "assistant.answer.notConfigured": "서버에 Ask Seoully가 아직 설정되지 않았어요. 컬렉션 질문은 내 데이터로 답할 수 있지만, 일반 대화는 OpenAI 어시스턴트가 필요해요.",
   "assistant.answer.currentInfo": "실시간 정보 소스가 없어서 순위, 차트, 최신 소식을 지어내지 않을게요 ♡",
   "assistant.answer.priceUnavailable": "서울리에는 아직 포토카드 시세 기능이 없어서 가격을 추측하지 않을게요.",

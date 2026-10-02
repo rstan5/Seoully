@@ -172,7 +172,7 @@ export const en = {
   "assistant.answer.followupWants": "Of the collectors we just found, these have something on your wishlist ♡",
   "assistant.answer.followupWantsEmpty": "None of the collectors we just found currently own an item on your wishlist.",
   "assistant.answer.starters": "Try asking me to find a collector or collectible, look at your collection, or explain a Seoully feature ♡",
-  "assistant.answer.demoGeneral": "Demo Ask Seoully can look up fixture collection data. General K-pop conversation uses Live Ask Seoully.",
+  "assistant.answer.demoGeneral": "In Demo I can look through this collection world. For general K-pop questions, switch to Live ♡",
   "assistant.answer.notConfigured": "Ask Seoully isn’t configured on the server yet. Seoully collection questions can still use your data, but general conversation needs the OpenAI assistant service.",
   "assistant.answer.currentInfo": "I don’t have a current-information source, so I won’t invent rankings, charts, or live updates ♡",
   "assistant.answer.priceUnavailable": "Seoully doesn’t have photocard market pricing yet, so I won’t guess a value.",

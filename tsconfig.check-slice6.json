@@ -5,7 +5,8 @@
     "moduleResolution": "Node",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "seoully-domain/*": ["src/domain/*"]
     },
     "outDir": ".tmp/build",
     "skipLibCheck": true,
@@ -14,9 +15,6 @@
   },
   "include": [
     "scripts/check-slice6.ts",
-    "src/domain/ask-context.ts",
-    "src/domain/ask-help.ts",
-    "src/domain/ask-intent.ts",
-    "src/domain/ask-result.ts"
+    "apps/mobile/src/data/demo/ask.ts"
   ]
 }

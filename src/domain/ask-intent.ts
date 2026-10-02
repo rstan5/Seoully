@@ -3,6 +3,24 @@ import { searchDestinationFromQuestion, type AskNavigationAction, type AskSearch
 export const ASK_HISTORY_LIMIT = 8;
 export const ASK_QUESTION_MAX = 800;
 
+export type AskChatTurn = { role: "user" | "assistant"; content: string };
+
+/** Build the next visible thread and the bounded history to send. Retry does not duplicate the failed user turn. */
+export function planAskSend<T extends AskChatTurn>(
+  turns: T[],
+  prompt: string,
+  retry = false,
+): { turns: T[]; history: AskChatTurn[] } {
+  const last = turns[turns.length - 1];
+  const alreadyQueued = Boolean(retry && last?.role === "user" && last.content === prompt);
+  const nextTurns = alreadyQueued ? turns : [...turns, { role: "user" as const, content: prompt } as T].slice(-18);
+  const historySource = alreadyQueued ? turns.slice(0, -1) : turns;
+  return {
+    turns: nextTurns,
+    history: historySource.slice(-ASK_HISTORY_LIMIT).map(({ role, content }) => ({ role, content })),
+  };
+}
+
 export type AskNeed = "general" | "seoully" | "navigate" | "help" | "current_info" | "price";
 
 const NAV_VERB = /take me|go to|open|show me|show my|help me find|\bfind\b|\bsearch\b|보여줘|열어|가자|가줘|찾아줘|찾아|검색/;

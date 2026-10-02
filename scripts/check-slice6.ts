@@ -9,8 +9,9 @@ import {
   parseAskContext,
 } from "../src/domain/ask-context";
 import { helpForQuestion, navigationIntentFromQuestion } from "../src/domain/ask-help";
-import { ASK_HISTORY_LIMIT, classifyAskNeed, extractAskSearchQuery } from "../src/domain/ask-intent";
+import { ASK_HISTORY_LIMIT, classifyAskNeed, extractAskSearchQuery, planAskSend } from "../src/domain/ask-intent";
 import { parseAskResult } from "../src/domain/ask-result";
+import { askDemo } from "../apps/mobile/src/data/demo/ask";
 
 const repoRoot = process.cwd();
 function read(rel: string) {
@@ -92,7 +93,7 @@ assertContains(collectibleScreen, 'surface: "collectible"', "collectible.tsx con
 assertContains(searchScreen, "searchQuery: activeQuery", "search.tsx context");
 assertContains(threadScreen, 'surface: "conversation"', "thread.tsx context");
 assertContains(companion, "mergeAskContext", "SeoullyCompanion");
-assertContains(companion, "social.askSeoully(prompt, locale, history, context)", "SeoullyCompanion");
+assertContains(companion, "social.askSeoully(prompt, locale, planned.history, context)", "SeoullyCompanion");
 assertNotContains(companion, 'surface: "home"', "SeoullyCompanion");
 
 // E. Production tools grounded
@@ -254,8 +255,15 @@ assert.equal(parseAskResult({ reply: "ok", navigation: { type: "search", query: 
 // Y. Conversation cap + reset
 assert.equal(ASK_HISTORY_LIMIT, 8);
 assertContains(service, ".max(8)", "history cap");
-assertContains(companion, "turns.slice(-8)", "client history cap");
+assertContains(companion, "planAskSend", "client history cap");
 assertContains(companion, "setTurns([])", "new conversation reset");
+assertContains(companion, "send(lastPrompt, true)", "retry without duplicate send");
+assertContains(companion, "styles.sheetHeart", "sheet heart identity");
+assertNotContains(companion, "free-form", "companion empty copy");
+assertNotContains(en, "free-form", "i18n empty copy");
+assertContains(en, "Seoully is here for anything K-pop", "human empty copy");
+assertNotContains(demoAsk, "void history", "no module-scope history");
+assertNotContains(demoAsk, "void context", "no module-scope context");
 
 // Z. Security / failure
 assertNotContains(read("apps/mobile/src/config.ts"), "OPENAI", "no OpenAI in Expo config");
@@ -269,5 +277,54 @@ assertContains(service, "assistant.answer.notConfigured", "missing config copy")
 assertContains(demoAsk, "assistant.answer.demoGeneral", "demo general honesty");
 assertContains(read("src/server/assistant-provider.ts"), "process.env.OPENAI_API_KEY", "server key only");
 assertContains(read("src/server/assistant-provider.ts"), "process.env.OPENAI_MODEL", "server model only");
+
+function assertDemoAsk(
+  question: string,
+  locale: "en" | "ko",
+  history: { role: "user" | "assistant"; content: string }[],
+  context?: { surface: "home" | "profile" },
+) {
+  let result;
+  try {
+    result = askDemo(question, locale, history, context);
+  } catch (error) {
+    assert.fail(`Demo askSeoully threw for ${JSON.stringify(question)}: ${error instanceof Error ? error.message : error}`);
+  }
+  const parsed = parseAskResult(result);
+  assert.ok(parsed.reply.length > 0, `Demo askSeoully empty reply for ${JSON.stringify(question)}`);
+  assert.ok(!/couldn't reach Ask Seoully|연결하지 못했어요/.test(parsed.reply), `Demo limitation must not look like a network failure: ${parsed.reply}`);
+  return parsed;
+}
+
+const demoRepositoryAsk = {
+  askSeoully(
+    question: string,
+    locale: "en" | "ko",
+    history: { role: "user" | "assistant"; content: string }[],
+    context?: { surface: "home" | "profile" },
+  ) {
+    return askDemo(question, locale, history, context);
+  },
+};
+
+assertDemoAsk("Find collectors like me", "en", []);
+assertDemoAsk("What am I missing?", "en", []);
+assertDemoAsk("How do I add a collectible?", "en", []);
+assertDemoAsk("What's on my wishlist?", "en", [{ role: "user", content: "hi" }, { role: "assistant", content: "hey" }], { surface: "profile" });
+assertDemoAsk("custom question about my wishlist", "en", []);
+const general = assertDemoAsk("When did BTS form?", "en", []);
+assert.ok(/Live/.test(general.reply), "Demo general question stays an in-chat Demo limitation");
+assert.equal(general.mode, "demo");
+
+const retryPlan = planAskSend([{ role: "user" as const, content: "What am I missing?" }], "What am I missing?", true);
+assert.equal(retryPlan.turns.length, 1);
+assert.equal(retryPlan.history.length, 0);
+const firstPlan = planAskSend([], "What am I missing?", false);
+assert.equal(firstPlan.turns.length, 1);
+assert.equal(firstPlan.history.length, 0);
+
+assertDemoAsk("Find collectors like me", "ko", []);
+const viaRepo = demoRepositoryAsk.askSeoully("What am I missing?", "en", []);
+assert.ok(parseAskResult(viaRepo).reply.length > 0);
 
 console.log("check:slice6 passed");

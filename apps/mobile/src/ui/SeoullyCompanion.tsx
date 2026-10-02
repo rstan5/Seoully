@@ -16,6 +16,7 @@ import { usePathname, useRouter, useGlobalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAskSurfaceOverlay } from "../ask-surface";
 import { contextFromNativeRoute, isAskNavigationAction, mergeAskContext, type AskNavigationAction } from "seoully-domain/ask-context";
+import { planAskSend } from "seoully-domain/ask-intent";
 import { useSocialRepository, type NativeAskCard } from "../data";
 import { isExploreDestination } from "../explore";
 import { useCopy, useLocale } from "../locale";
@@ -132,17 +133,17 @@ export function SeoullyCompanion() {
     }
   }
 
-  async function send(raw?: string) {
+  async function send(raw?: string, retry = false) {
     const prompt = (raw ?? question).trim();
     if (!prompt || pending) return;
-    const history = turns.slice(-8).map(({ role, content }) => ({ role, content }));
-    setTurns((current) => [...current, { role: "user" as const, content: prompt }].slice(-18));
+    const planned = planAskSend(turns, prompt, retry);
+    setTurns(planned.turns);
     setQuestion("");
     setLastPrompt(prompt);
     setPending(true);
     setError(null);
     try {
-      const result = await social.askSeoully(prompt, locale, history, context);
+      const result = await social.askSeoully(prompt, locale, planned.history, context);
       setTurns((current) => [...current, { role: "assistant" as const, content: result.reply, cards: result.cards }].slice(-18));
       if (result.navigation && isAskNavigationAction(result.navigation)) {
         navigateAction(result.navigation);
@@ -175,7 +176,10 @@ export function SeoullyCompanion() {
           <Pressable accessibilityRole="button" onPress={() => setOpen(false)} style={styles.veil} />
           <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
             <View style={styles.sheetHead}>
-              <SeoullyText variant="title">{copy.askSeoully}</SeoullyText>
+              <View style={styles.sheetIdentity} accessible accessibilityRole="header">
+                <Image accessibilityIgnoresInvertColors resizeMode="contain" source={HEART} style={styles.sheetHeart} />
+                <SeoullyText variant="title">{copy.askSeoully}</SeoullyText>
+              </View>
               <View style={styles.sheetActions}>
                 {turns.length ? (
                   <Pressable accessibilityRole="button" hitSlop={10} onPress={() => { setTurns([]); setError(null); setLastPrompt(null); }}>
@@ -229,7 +233,7 @@ export function SeoullyCompanion() {
                 <View style={styles.errorRow}>
                   <SeoullyText variant="caption" color={colors.plum}>{error}</SeoullyText>
                   {lastPrompt ? (
-                    <Pressable accessibilityRole="button" onPress={() => { void send(lastPrompt); }}>
+                    <Pressable accessibilityRole="button" onPress={() => { void send(lastPrompt, true); }}>
                       <SeoullyText variant="button" color={colors.plum}>{copy.askRetry}</SeoullyText>
                     </Pressable>
                   ) : null}
@@ -284,16 +288,26 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     maxHeight: "78%",
-    minHeight: 280,
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 14,
     ...elevation.card,
   },
   sheetHead: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 8,
+    marginBottom: 6,
+  },
+  sheetIdentity: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexShrink: 1,
+    gap: 8,
+    paddingRight: 8,
+  },
+  sheetHeart: {
+    height: 28,
+    width: 28,
   },
   sheetActions: {
     alignItems: "center",
@@ -304,12 +318,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   thread: {
-    gap: 10,
-    paddingBottom: 12,
-    paddingTop: 4,
+    gap: 8,
+    paddingBottom: 8,
+    paddingTop: 2,
   },
   starters: {
-    gap: 10,
+    gap: 8,
   },
   bubble: {
     borderRadius: radii.card,

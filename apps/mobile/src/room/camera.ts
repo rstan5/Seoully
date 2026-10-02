@@ -14,6 +14,7 @@ type FocusedItem = {
   placement?: { surfaceId?: string | null };
 };
 
+/** Portrait window into the Room — not a fit-the-whole-set framing. */
 export const HOME_POSE: CameraPose = {
   position: { x: 0.55, y: 1.92, z: 5.25 },
   lookAt: { x: 0.18, y: -0.12, z: -2.35 },
@@ -89,47 +90,94 @@ export function cameraLerpAlpha(delta: number, reducedMotion: boolean) {
   return 1 - Math.exp(-6.2 * delta);
 }
 
-/** Constrained diorama explore — not free orbit / CAD. */
+/**
+ * Constrained window travel — not orbit / CAD.
+ * The phone is a portrait window into a wider Room. One-finger drag pans the
+ * authored camera and look target together; pinch dollies along the look ray.
+ */
 export type ExploreOffset = {
-  yaw: number;
-  pitch: number;
+  panX: number;
+  panY: number;
   dolly: number;
 };
 
-export const IDENTITY_EXPLORE: ExploreOffset = { yaw: 0, pitch: 0, dolly: 1 };
+export const IDENTITY_EXPLORE: ExploreOffset = { panX: 0, panY: 0, dolly: 1 };
+
+/** Interior from RoomShell / furniture: walls ±4.72, back z=-4.22, floor y=-2.15. */
+export const ROOM_INTERIOR = {
+  xMin: -4.55,
+  xMax: 4.55,
+  yMin: -1.85,
+  yMax: 2.15,
+  backZ: -4.14,
+  cameraMinZ: 2.85,
+} as const;
+
+export const CAMERA_FOV_DEG = 46;
+/** Typical portrait phone, not one device. */
+export const PORTRAIT_ASPECT = 9 / 19.5;
 
 export const EXPLORE_LIMITS = {
-  homeYaw: 0.55,
-  homePitchMin: -0.18,
-  homePitchMax: 0.28,
+  homePanY: 0.72,
   homeDollyMin: 0.78,
   homeDollyMax: 1.22,
-  homeX: [-1.8, 2.4] as const,
-  homeY: [1.15, 2.62] as const,
-  homeZ: [3.55, 6.75] as const,
-  zoneYaw: 0.28,
-  zonePitchMin: -0.1,
-  zonePitchMax: 0.16,
+  zonePanX: 0.55,
+  zonePanY: 0.28,
   zoneDollyMin: 0.88,
   zoneDollyMax: 1.12,
 } as const;
 
 export type ExploreSpace = "home" | "zone";
 
+export type ExplorePanLimits = {
+  panXMin: number;
+  panXMax: number;
+  panYMin: number;
+  panYMax: number;
+};
+
 export function exploreAllowedForView(view: NativeWorldView): boolean {
   return view.kind === "home" || view.kind === "zone";
 }
 
+export function authoredLookDepth(pose: CameraPose) {
+  return Math.abs(pose.position.z - pose.lookAt.z) || 1;
+}
+
+export function visibleHalfWidth(depth: number, aspect = PORTRAIT_ASPECT) {
+  return Math.tan((CAMERA_FOV_DEG * Math.PI) / 360) * depth * aspect;
+}
+
+export function explorePanLimits(dolly: number, space: ExploreSpace = "home"): ExplorePanLimits {
+  if (space === "zone") {
+    return {
+      panXMin: -EXPLORE_LIMITS.zonePanX,
+      panXMax: EXPLORE_LIMITS.zonePanX,
+      panYMin: -EXPLORE_LIMITS.zonePanY,
+      panYMax: EXPLORE_LIMITS.zonePanY,
+    };
+  }
+  const clampedDolly = clampNumber(dolly, EXPLORE_LIMITS.homeDollyMin, EXPLORE_LIMITS.homeDollyMax);
+  const halfW = visibleHalfWidth(authoredLookDepth(HOME_POSE) * clampedDolly);
+  const lookX = HOME_POSE.lookAt.x;
+  const lookY = HOME_POSE.lookAt.y;
+  return {
+    panXMin: Math.min(-0.85, ROOM_INTERIOR.xMin + halfW - lookX),
+    panXMax: Math.max(0.85, ROOM_INTERIOR.xMax - halfW - lookX),
+    panYMin: Math.max(-EXPLORE_LIMITS.homePanY, ROOM_INTERIOR.yMin - lookY),
+    panYMax: Math.min(EXPLORE_LIMITS.homePanY, ROOM_INTERIOR.yMax - lookY),
+  };
+}
+
 export function clampExplore(offset: ExploreOffset, space: ExploreSpace = "home"): ExploreOffset {
-  const yawMax = space === "zone" ? EXPLORE_LIMITS.zoneYaw : EXPLORE_LIMITS.homeYaw;
-  const pitchMin = space === "zone" ? EXPLORE_LIMITS.zonePitchMin : EXPLORE_LIMITS.homePitchMin;
-  const pitchMax = space === "zone" ? EXPLORE_LIMITS.zonePitchMax : EXPLORE_LIMITS.homePitchMax;
   const dollyMin = space === "zone" ? EXPLORE_LIMITS.zoneDollyMin : EXPLORE_LIMITS.homeDollyMin;
   const dollyMax = space === "zone" ? EXPLORE_LIMITS.zoneDollyMax : EXPLORE_LIMITS.homeDollyMax;
+  const dolly = clampNumber(offset.dolly, dollyMin, dollyMax);
+  const limits = explorePanLimits(dolly, space);
   return {
-    yaw: clampNumber(offset.yaw, -yawMax, yawMax),
-    pitch: clampNumber(offset.pitch, pitchMin, pitchMax),
-    dolly: clampNumber(offset.dolly, dollyMin, dollyMax),
+    panX: clampNumber(offset.panX, limits.panXMin, limits.panXMax),
+    panY: clampNumber(offset.panY, limits.panYMin, limits.panYMax),
+    dolly,
   };
 }
 
@@ -139,11 +187,11 @@ export function nudgeExploreFromDrag(
   dy: number,
   space: ExploreSpace = "home",
 ): ExploreOffset {
-  const yawSense = space === "zone" ? 0.0032 : 0.0042;
-  const pitchSense = space === "zone" ? 0.0024 : 0.0031;
+  const xSense = space === "zone" ? 0.006 : 0.011;
+  const ySense = space === "zone" ? 0.003 : 0.005;
   return clampExplore({
-    yaw: current.yaw - dx * yawSense,
-    pitch: current.pitch + dy * pitchSense,
+    panX: current.panX - dx * xSense,
+    panY: current.panY + dy * ySense,
     dolly: current.dolly,
   }, space);
 }
@@ -157,8 +205,8 @@ export function nudgeExploreFromPinch(
 ): ExploreOffset {
   if (!(startSpan > 0) || !(span > 0) || !Number.isFinite(startDolly)) return current;
   return clampExplore({
-    yaw: current.yaw,
-    pitch: current.pitch,
+    panX: current.panX,
+    panY: current.panY,
     dolly: startDolly * (startSpan / span),
   }, space);
 }
@@ -172,30 +220,27 @@ export function applyExploreOffset(
   const ox = base.position.x - base.lookAt.x;
   const oy = base.position.y - base.lookAt.y;
   const oz = base.position.z - base.lookAt.z;
-  const dist = Math.hypot(ox, oy, oz) || 1;
-  const horiz = Math.hypot(ox, oz) || 0.001;
-  const baseYaw = Math.atan2(ox, oz);
-  const basePitch = Math.atan2(oy, horiz);
-  const pitch = clampNumber(basePitch + clamped.pitch, -0.72, 0.82);
-  const yaw = baseYaw + clamped.yaw;
-  const distance = dist * clamped.dolly;
-  const cosPitch = Math.cos(pitch);
-  let x = base.lookAt.x + Math.sin(yaw) * distance * cosPitch;
-  let y = base.lookAt.y + Math.sin(pitch) * distance;
-  let z = base.lookAt.z + Math.cos(yaw) * distance * cosPitch;
-  const authoredHoriz = ox * (x - base.lookAt.x) + oz * (z - base.lookAt.z);
-  if (authoredHoriz < 0) {
-    const scale = distance / dist;
-    x = base.lookAt.x + ox * scale;
-    z = base.lookAt.z + oz * scale;
+  const lookAt = {
+    x: base.lookAt.x + clamped.panX,
+    y: base.lookAt.y + clamped.panY,
+    z: base.lookAt.z,
+  };
+  let position = {
+    x: lookAt.x + ox * clamped.dolly,
+    y: lookAt.y + oy * clamped.dolly,
+    z: lookAt.z + oz * clamped.dolly,
+  };
+  if (oz * (position.z - lookAt.z) < 0) {
+    position = { x: lookAt.x + ox * clamped.dolly, y: lookAt.y + oy * clamped.dolly, z: lookAt.z + oz * clamped.dolly };
   }
-  y = Math.max(base.lookAt.y + 0.22, y);
+  position.y = Math.max(lookAt.y + 0.22, position.y);
   if (space === "home") {
-    x = clampNumber(x, EXPLORE_LIMITS.homeX[0], EXPLORE_LIMITS.homeX[1]);
-    y = clampNumber(y, EXPLORE_LIMITS.homeY[0], EXPLORE_LIMITS.homeY[1]);
-    z = clampNumber(z, EXPLORE_LIMITS.homeZ[0], EXPLORE_LIMITS.homeZ[1]);
+    position.y = clampNumber(position.y, ROOM_INTERIOR.yMin + 1.15, ROOM_INTERIOR.yMax + 0.7);
+    position.z = Math.max(ROOM_INTERIOR.cameraMinZ, position.z);
+    lookAt.x = clampNumber(lookAt.x, ROOM_INTERIOR.xMin, ROOM_INTERIOR.xMax);
+    lookAt.y = clampNumber(lookAt.y, ROOM_INTERIOR.yMin, ROOM_INTERIOR.yMax);
   }
-  return { position: { x, y, z }, lookAt: base.lookAt };
+  return { position, lookAt };
 }
 
 function clampNumber(value: number, min: number, max: number) {

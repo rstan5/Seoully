@@ -1,5 +1,5 @@
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSocialRepository } from "../src/data";
 import { useReportAskSurface } from "../src/ask-surface";
 import { useCopy } from "../src/locale";
@@ -13,7 +13,9 @@ export default function RoomScreen() {
   useReportAskSurface({ surface: "room" });
   // Slice 2 stored tray: snapshot?.holdings.filter((holding) => !placedIds.has(holding.id))
   // storedCollection chrome is rendered by RoomWorldScreen; this route still gates persistRoom.
-  return <SafeAreaView edges={[]} style={{ flex: 1 }}>
+  return <>
+    <Stack.Screen options={{ gestureEnabled: false, fullScreenGestureEnabled: false }} />
+    <SafeAreaView edges={[]} style={{ flex: 1 }}>
     <RoomWorldScreen
       mode="own"
       demo={social.kind === "demo"}
@@ -23,5 +25,6 @@ export default function RoomScreen() {
       onLeave={() => { if (router.canGoBack()) router.back(); else router.replace("/(tabs)/profile"); }}
       onInspectCollectible={(holdingId) => router.push({ pathname: "/collectible", params: { holdingId } })}
     />
-  </SafeAreaView>;
+  </SafeAreaView>
+  </>;
 }

@@ -444,7 +444,7 @@ Physical iPhone QA after the native slices proved Room is useful but not product
 
 Decomposition:
 
-- **7A** — immersive Room + touch camera. Implemented in tree: Room is not a bottom tab; social tabs disappear inside Room; world replaces zone-pill navigation; constrained diorama drag/pinch; object inspection preserved; heart is the existing Ask Seoully. **DEVICE QA REQUIRED** before 7B.
+- **7A** — immersive Room + touch camera. Implemented, then repaired: Room is not a bottom tab; social tabs disappear inside Room; swipe-back disabled on Room routes only; world replaces zone-pill navigation; one-finger pan across the Room (window, not miniature fit); pinch dolly; object inspection restores prior framing; heart is the existing Ask Seoully. **DEVICE RETEST REQUIRED** before 7B.
 - **7B** — touch-first editing + world storage. Not started.
 - **7C** — Binder as part of the world. Not started.
 - **7D** — materials / lighting / customization. Not started.

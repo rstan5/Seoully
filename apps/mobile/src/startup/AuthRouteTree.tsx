@@ -53,10 +53,10 @@ export function AuthRouteTree() {
         <Stack.Screen name="binder" />
         <Stack.Screen name="collection" />
         <Stack.Screen name="collector" />
-        <Stack.Screen name="collector-room" />
+        <Stack.Screen name="collector-room" options={{ gestureEnabled: false, fullScreenGestureEnabled: false }} />
         <Stack.Screen name="edit-profile" />
         <Stack.Screen name="public-collectible" />
-        <Stack.Screen name="room" />
+        <Stack.Screen name="room" options={{ gestureEnabled: false, fullScreenGestureEnabled: false }} />
         <Stack.Screen name="thread" />
       </Stack.Protected>
       <Stack.Protected guard={screens.shared}>

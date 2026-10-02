@@ -8,10 +8,12 @@ import {
   applyExploreOffset,
   clampExplore,
   exploreAllowedForView,
+  explorePanLimits,
   HOME_POSE,
   IDENTITY_EXPLORE,
   nudgeExploreFromDrag,
   nudgeExploreFromPinch,
+  ROOM_INTERIOR,
 } from "../apps/mobile/src/room/camera";
 import { CANONICAL_ZONE_KINDS, stepBack } from "../apps/mobile/src/room/worldView";
 
@@ -177,25 +179,50 @@ assertContains(read("apps/mobile/app/collector-room.tsx"), 'edges={[]}', "collec
 assertContains(read("apps/mobile/app/(tabs)/profile.tsx"), 'router.push("/room")', "Profile enters stack Room");
 assertContains(read("apps/mobile/src/i18n.ts"), 'editRoom: "Edit Room"', "Edit Room copy");
 assertContains(read("apps/mobile/src/ui/shellLayout.ts"), "safe-area + gutter only", "immersive companion contract");
+const authTree = read("apps/mobile/src/startup/AuthRouteTree.tsx");
+assertContains(authTree, 'name="room" options={{ gestureEnabled: false, fullScreenGestureEnabled: false }}', "own Room disables swipe-back");
+assertContains(authTree, 'name="collector-room" options={{ gestureEnabled: false, fullScreenGestureEnabled: false }}', "collector Room disables swipe-back");
+assertContains(read("apps/mobile/app/room.tsx"), "gestureEnabled: false", "own Room route gesture off");
+assertContains(read("apps/mobile/app/collector-room.tsx"), "gestureEnabled: false", "collector Room route gesture off");
+assertNotContains(read("apps/mobile/app/collectible.tsx"), "gestureEnabled: false", "other stack routes keep swipe-back");
 assert.equal(exploreAllowedForView({ kind: "home" }), true);
 assert.equal(exploreAllowedForView({ kind: "zone", zone: "shelf" }), true);
 assert.equal(exploreAllowedForView({ kind: "inspect", zone: "desk", holdingId: "h" }), false);
 assert.equal(exploreAllowedForView({ kind: "binder", spread: 0 }), false);
 assert.equal(exploreAllowedForView({ kind: "edit" }), false);
+assertContains(read("apps/mobile/src/room/camera.ts"), "panX: number", "explore state is panX");
+assertContains(read("apps/mobile/src/room/camera.ts"), "panY: number", "explore state is panY");
+assertNotContains(read("apps/mobile/src/room/camera.ts"), "yaw: number", "explore is not yaw-primary");
+assertContains(worldScreen, "frozenExploreRef", "inspection stores explore framing");
+assertContains(worldScreen, "exploreRef.current = { ...frozenExploreRef.current }", "close inspect restores pan/dolly");
 const identity = applyExploreOffset(HOME_POSE, IDENTITY_EXPLORE, "home");
 assert.ok(Math.abs(identity.position.x - HOME_POSE.position.x) < 0.08);
 assert.ok(Math.abs(identity.position.z - HOME_POSE.position.z) < 0.08);
-const extreme = clampExplore({ yaw: 9, pitch: -9, dolly: 0.05 }, "home");
-assert.ok(Math.abs(extreme.yaw) <= 0.55);
-assert.ok(extreme.pitch >= -0.18 && extreme.pitch <= 0.28);
+assert.ok(Math.abs(identity.lookAt.x - HOME_POSE.lookAt.x) < 0.08);
+const extreme = clampExplore({ panX: 99, panY: -99, dolly: 0.05 }, "home");
+const limits = explorePanLimits(extreme.dolly, "home");
+assert.ok(extreme.panX >= limits.panXMin && extreme.panX <= limits.panXMax);
+assert.ok(extreme.panY >= limits.panYMin && extreme.panY <= limits.panYMax);
 assert.ok(extreme.dolly >= 0.78 && extreme.dolly <= 1.22);
-const flipped = applyExploreOffset(HOME_POSE, { yaw: 0, pitch: Math.PI, dolly: 0.4 }, "home");
-assert.ok(flipped.position.y > 0, "camera cannot invert");
-assert.ok(flipped.position.z >= 3.55, "home camera stays in the room");
+assert.ok((limits.panXMax - limits.panXMin) > (limits.panYMax - limits.panYMin) * 2, "horizontal pan larger than vertical");
+const panned = applyExploreOffset(HOME_POSE, { panX: 1.4, panY: 0.2, dolly: 1 }, "home");
+assert.ok(Math.abs(panned.lookAt.x - HOME_POSE.lookAt.x) > 0.5, "pan moves look target");
+assert.ok(Math.abs((panned.position.x - panned.lookAt.x) - (HOME_POSE.position.x - HOME_POSE.lookAt.x)) < 0.08, "pan translates framing");
+assert.ok(panned.lookAt.x >= ROOM_INTERIOR.xMin && panned.lookAt.x <= ROOM_INTERIOR.xMax);
+assert.ok(panned.position.z > panned.lookAt.z, "camera stays in front of the look plane");
+assert.ok(panned.position.z >= ROOM_INTERIOR.cameraMinZ, "home camera stays in the room");
+const escaped = applyExploreOffset(HOME_POSE, { panX: 40, panY: 20, dolly: 0.4 }, "home");
+assert.ok(escaped.position.y > 0, "camera cannot invert");
+assert.ok(escaped.lookAt.x <= ROOM_INTERIOR.xMax && escaped.lookAt.x >= ROOM_INTERIOR.xMin, "lookAt stays interior");
+assert.ok(escaped.position.z > escaped.lookAt.z, "no behind-wall pose");
 const dragged = nudgeExploreFromDrag(IDENTITY_EXPLORE, 80, 0, "home");
-assert.ok(dragged.yaw !== 0);
+assert.ok(dragged.panX < 0, "direct-manipulation pan");
+assert.equal(dragged.dolly, 1);
+const vertical = nudgeExploreFromDrag(IDENTITY_EXPLORE, 0, 80, "home");
+assert.ok(Math.abs(vertical.panY) < Math.abs(dragged.panX), "vertical travel is smaller");
 const pinched = nudgeExploreFromPinch(IDENTITY_EXPLORE, 1, 100, 140, "home");
 assert.ok(pinched.dolly < 1);
 assert.ok(pinched.dolly >= 0.78);
+assert.equal(pinched.panX, 0);
 
 console.log("check:slice7 passed");

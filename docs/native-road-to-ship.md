@@ -282,13 +282,13 @@ Order is dependency-shaped. **Slice 1 is first.**
 
 **Device QA:** Web’s physical Room checklist: enter from Profile, place album on shelf, photocard to binder, back, visit someone else’s public room, relaunch.
 
-**Implementation (2026-10-01):** SLICE 7A — CODE VERIFIED / DEVICE QA REQUIRED. Keep the engine; rebuild the experience. Room is **not** a bottom tab. Profile / collector identity → stack `/room` or `/collector-room` → full-screen immersive world; Back returns to identity/social. Social tabs are absent inside Room (no `(tabs)/room` route). Permanent giant header, Move Objects header, and Home/Shelf/Wall/Case/Desk/Binder/Archive pills are removed. Navigation is spatial (world hotspots + desk Binder tap) plus constrained direct-touch camera (one-finger empty-world drag, pinch dolly, authored docks + explore clamps). Tap-to-focus / inspection / existing edit engine / in-world Binder / Ask Seoully heart are preserved. Companion uses safe-area + gutter only. `20261002000000_native_room_theme.sql` remains **unapplied**. No Closet. Slices 7B–7E and Slice 8 work are not started here.
+**Implementation (2026-10-01):** SLICE 7A — CODE VERIFIED / DEVICE QA REQUIRED, then **CAMERA REPAIR 01 — CODE VERIFIED / DEVICE RETEST REQUIRED**. Keep the engine; rebuild the experience. Room is **not** a bottom tab. Profile / collector identity → stack `/room` or `/collector-room` → full-screen immersive world; Back returns to identity/social. Social tabs are absent inside Room (no `(tabs)/room` route). Permanent giant header, Move Objects header, and Home/Shelf/Wall/Case/Desk/Binder/Archive pills are removed. Navigation is spatial (world hotspots + desk Binder tap). Interactive swipe-back is disabled on Room routes only. Primary camera travel is a portrait **window into the Room**: one-finger empty-world drag pans `panX`/`panY` (camera + lookAt together; horizontal range larger than vertical), pinch dollies, authored docks remain. The whole Room is not fitted into the phone. Tap-to-focus / inspection restores the previous pan/dolly framing. Existing edit engine / in-world Binder / Ask Seoully heart are preserved. Companion uses safe-area + gutter only. `20261002000000_native_room_theme.sql` remains **unapplied**. No Closet. Slices 7B–7E and Slice 8 work are not started here.
 
 #### Slice 7 decomposition
 
 | Block | Scope | Status |
 | --- | --- | --- |
-| **7A** | Immersive Room shell + direct-touch constrained camera | CODE VERIFIED / DEVICE QA REQUIRED |
+| **7A** | Immersive Room shell + direct-touch constrained camera | CAMERA REPAIR 01 — CODE VERIFIED / DEVICE RETEST REQUIRED |
 | **7B** | Touch-first editing + world storage (long-press, drag/drop, merch-box / stored holdings sheet) | Not started |
 | **7C** | Binder as part of the world (continuous camera travel, spatial open/close) | Not started — preserve current Binder |
 | **7D** | Materials, lighting, and Room customization (review `20261002` before applying) | Not started — migration unapplied |

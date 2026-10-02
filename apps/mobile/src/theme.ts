@@ -75,6 +75,13 @@ export const type = {
   handle: { fontSize: 14, letterSpacing: -0.2, lineHeight: 18, face: "semibold" as const },
 } as const;
 
+/**
+ * Baloo 2 semibold glyphs sit high in the em-box, so a mathematically
+ * centered button label looks optically high. Nudge only button labels
+ * down; body/title/caption stay on the typographic baseline.
+ */
+export const BUTTON_LABEL_OPTICAL_Y = 1.5;
+
 export const radii = {
   card: 14,
   button: 12,

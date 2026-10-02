@@ -19,6 +19,9 @@
     "apps/mobile/src/room/editSession.ts",
     "apps/mobile/src/room/worldView.ts",
     "apps/mobile/src/room/camera.ts",
-    "apps/mobile/src/room/entrance.ts"
+    "apps/mobile/src/room/entrance.ts",
+    "apps/mobile/src/room/theme.ts",
+    "apps/mobile/src/theme.ts",
+    "apps/mobile/src/ui/profileContrast.ts"
   ]
 }

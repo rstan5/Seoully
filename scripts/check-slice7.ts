@@ -17,6 +17,9 @@ import {
   visibleFrustumY,
 } from "../apps/mobile/src/room/camera";
 import { entranceForeground, isInternalCollectorId, roomEntranceCopy } from "../apps/mobile/src/room/entrance";
+import { roomOverlayChrome, roomPalette } from "../apps/mobile/src/room/theme";
+import { BUTTON_LABEL_OPTICAL_Y } from "../apps/mobile/src/theme";
+import { contrastRatio, relativeLuminance } from "../apps/mobile/src/ui/profileContrast";
 import { CANONICAL_ZONE_KINDS, stepBack } from "../apps/mobile/src/room/worldView";
 
 const repoRoot = process.cwd();
@@ -230,19 +233,26 @@ assert.ok(pinched.dolly < 1);
 assert.ok(pinched.dolly >= 0.78);
 assert.equal(pinched.panX, 0);
 
-function assertCeilingHolds(dolly: number, panY: number) {
+function assertWorldEnvelope(dolly: number, panY: number) {
   const pose = applyExploreOffset(HOME_POSE, { panX: 0, panY, dolly }, "home");
-  const vis = visibleFrustumY(pose, ROOM_INTERIOR.backZ);
-  assert.ok(vis.top <= ROOM_INTERIOR.ceiling + 0.02, `dolly ${dolly} panY ${panY} top ${vis.top}`);
+  const ceiling = visibleFrustumY(pose, ROOM_INTERIOR.backZ);
+  const floor = visibleFrustumY(pose, ROOM_INTERIOR.floorNearZ);
+  assert.ok(ceiling.top <= ROOM_INTERIOR.ceiling + 0.02, `dolly ${dolly} panY ${panY} top ${ceiling.top}`);
+  assert.ok(floor.bottom >= ROOM_INTERIOR.floor - 0.02, `dolly ${dolly} panY ${panY} bottom ${floor.bottom}`);
 }
+
+const identityLimits = explorePanLimits(1, "home");
+assert.ok(Math.abs(identityLimits.panXMin + 3.241072952372463) < 1e-9, "horizontal min bound unchanged");
+assert.ok(Math.abs(identityLimits.panXMax - 2.8810729523724627) < 1e-9, "horizontal max bound unchanged");
 
 for (const dolly of [1, 0.78, 1.22]) {
   const up = clampExplore({ panX: 0, panY: 9, dolly }, "home");
-  assertCeilingHolds(up.dolly, up.panY);
+  assertWorldEnvelope(up.dolly, up.panY);
   const down = clampExplore({ panX: 0, panY: -9, dolly }, "home");
   const downPose = applyExploreOffset(HOME_POSE, down, "home");
-  assert.ok(downPose.position.y > ROOM_INTERIOR.floor, "downward pan keeps the camera above the floor");
-  assertCeilingHolds(down.dolly, down.panY);
+  assert.ok(downPose.position.y > ROOM_INTERIOR.floorGuard, "downward pan keeps the camera above the floor");
+  assertWorldEnvelope(down.dolly, down.panY);
+  assertWorldEnvelope(dolly, 0);
 }
 
 assertNotContains(worldScreen, "identity={", "no permanent Room identity chrome");
@@ -283,5 +293,50 @@ assert.equal(isInternalCollectorId("u-minji"), true);
 assert.equal(isInternalCollectorId("Minji"), false);
 assert.equal(entranceForeground("#120e12").color, "#f7f1f4");
 assert.equal(entranceForeground("#efe8da").color, "#2c2e4c");
+
+assertContains(worldScreen, "roomOverlayChrome", "Room overlays use Room chrome");
+assertContains(worldScreen, "backgroundColor: roomTheme.void", "Room void fills the world, not a hardcoded slice");
+assertContains(worldScreen, "chrome.color", "Back/Edit inherit Room chrome ink");
+assertNotContains(worldScreen, 'color={colors.plum}>{copy.back}', "Back is not generic Seoully pink");
+assertNotContains(worldScreen, 'color={colors.plum}>{editing ? copy.finishEditing : copy.editRoom}', "Edit Room is not generic Seoully pink");
+assertNotContains(worldScreen, 'overlayChip: { backgroundColor: "rgba(247,241,244,0.88)"', "overlay chips are not generic paper pills");
+assertNotContains(read("apps/mobile/src/ui/SeoullyCompanion.tsx"), "roomOverlayChrome", "Ask Seoully heart stays the companion");
+assertContains(read("apps/mobile/src/ui/SeoullyCompanion.tsx"), "seoully-heart-mark", "Ask Seoully heart mark unchanged");
+
+for (const themeId of ["hearth", "midnight", "blossom"] as const) {
+  const chrome = roomOverlayChrome(roomPalette(themeId));
+  assert.equal(chrome.dark, true, `${themeId} Room chrome follows dark atmosphere`);
+  assert.ok(contrastRatio(chrome.color, chrome.background) >= 4.5, `${themeId} overlay contrast`);
+  assert.ok(relativeLuminance(chrome.background) < 0.45, `${themeId} overlay stays on the Room`);
+  assert.notEqual(chrome.color.toLowerCase(), "#c45374");
+  assert.notEqual(chrome.background.toLowerCase(), "#fffafb");
+}
+
+const lightChrome = roomOverlayChrome({
+  ...roomPalette("blossom"),
+  void: "#efe8da",
+  wall: "#f4dce4",
+  furniture: "#e8d0c8",
+  paper: "#fff6f4",
+  ink: "#2c2e4c",
+  fill: "#f3d4e2",
+});
+assert.equal(lightChrome.dark, false);
+assert.ok(contrastRatio(lightChrome.color, lightChrome.background) >= 4.5, "light Room overlay contrast");
+assert.ok(relativeLuminance(lightChrome.background) > 0.55, "light Room overlay stays cream/paper");
+
+const seoullyText = read("apps/mobile/src/ui/SeoullyText.tsx");
+assertContains(seoullyText, "BUTTON_LABEL_OPTICAL_Y", "button optical correction is shared");
+assertContains(seoullyText, 'variant === "button" && locale === "en"', "optical Y is button-label + Baloo only");
+assertContains(read("apps/mobile/src/theme.ts"), "export const BUTTON_LABEL_OPTICAL_Y = 1.5", "named button optical token");
+assert.equal(BUTTON_LABEL_OPTICAL_Y, 1.5);
+assertNotContains(read("apps/mobile/src/theme.ts"), "translateY", "body/title tokens do not carry a screen hack");
+assertNotContains(worldScreen, "translateY:", "Room overlays do not add a local label offset");
+assertContains(read("apps/mobile/src/i18n.ts"), 'back: "Back"', "EN Back label");
+assertContains(read("apps/mobile/src/i18n.ts"), 'editRoom: "Edit Room"', "EN Edit Room label");
+assertContains(read("apps/mobile/src/i18n.ts"), "back: \"뒤로\"", "KO Back label");
+assertContains(read("apps/mobile/src/i18n.ts"), 'editRoom: "룸 편집"', "KO Edit Room label");
+assertNotContains(worldScreen, "onLongPress", "Slice 7B long-press editing is not introduced");
+assertNotContains(worldScreen, "merch-box", "Slice 7B storage sheet is not introduced");
 
 console.log("check:slice7 passed");

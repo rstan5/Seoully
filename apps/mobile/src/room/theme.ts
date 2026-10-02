@@ -1,4 +1,4 @@
-import type { NativeRoomThemeId } from "../api";
+import { contrastRatio, mixHex, relativeLuminance } from "../ui/profileContrast";
 
 /**
  * Native materials translated from web `roomTheme` + CSS (`m-paper`, `m-velvet`,
@@ -56,8 +56,42 @@ export const ROOM_THEMES = {
   },
 } as const;
 
+export type NativeRoomThemeId = keyof typeof ROOM_THEMES;
 export type NativeRoomPalette = (typeof ROOM_THEMES)[NativeRoomThemeId];
+export type RoomChromeSource = {
+  void: string;
+  wall: string;
+  furniture: string;
+  paper: string;
+  ink: string;
+  fill: string;
+  edge: string;
+  accent: string;
+};
 
 export function roomPalette(themeId: NativeRoomThemeId | undefined): NativeRoomPalette {
   return ROOM_THEMES[themeId ?? "hearth"] ?? ROOM_THEMES.hearth;
+}
+
+function firstReadable(candidates: string[], surface: string, fallback: string) {
+  return candidates.find((color) => contrastRatio(color, surface) >= 4.5) ?? fallback;
+}
+
+/**
+ * Room overlay chips (Back / Edit Room) follow the active Room palette.
+ * Dark rooms keep a furniture/wall surface; light rooms use paper/fill.
+ * Never falls back to generic Seoully pink/paper just because this is Seoully.
+ */
+export function roomOverlayChrome(theme: RoomChromeSource) {
+  const dark = relativeLuminance(theme.void) < 0.45 || relativeLuminance(theme.wall) < 0.45;
+  const background = dark
+    ? mixHex(theme.furniture, theme.wall, 0.68)
+    : mixHex(theme.paper, theme.fill, 0.72);
+  const border = dark
+    ? mixHex(theme.edge, theme.accent, 0.55)
+    : mixHex(theme.accent, theme.paper, 0.42);
+  const color = dark
+    ? firstReadable([theme.ink, theme.paper, theme.accent, "#f7f1f4"], background, "#f7f1f4")
+    : firstReadable([theme.ink, theme.furniture, "#2c2e4c"], background, "#2c2e4c");
+  return { background, border, color, dark };
 }

@@ -103,13 +103,19 @@ export type ExploreOffset = {
 
 export const IDENTITY_EXPLORE: ExploreOffset = { panX: 0, panY: 0, dolly: 1 };
 
-/** Interior from RoomShell / furniture: walls ±4.72, back z=-4.22, floor y=-2.15, wall top y=3.45. */
+/**
+ * Interior from RoomShell / furniture: walls ±4.72, back z=-4.22,
+ * floor plane y=-2.15 at z=-1.2 size 6.2 (z ∈ [-4.3, 1.9]), wall top y=3.45.
+ */
 export const ROOM_INTERIOR = {
   xMin: -4.55,
   xMax: 4.55,
   yMin: -1.85,
   ceiling: 3.4,
-  floor: -2.08,
+  floor: -2.15,
+  floorGuard: -2.08,
+  floorNearZ: 1.9,
+  floorFarZ: -4.3,
   backZ: -4.14,
   cameraMinZ: 2.85,
 } as const;
@@ -174,7 +180,7 @@ export function framedPose(base: CameraPose, offset: Pick<ExploreOffset, "panX" 
 }
 
 /** Visible world-Y envelope of the portrait frustum at the back-wall plane. */
-export function visibleFrustumY(pose: CameraPose, planeZ = ROOM_INTERIOR.backZ) {
+export function visibleFrustumY(pose: CameraPose, planeZ: number = ROOM_INTERIOR.backZ) {
   const oz = pose.lookAt.z - pose.position.z;
   const t = Math.abs(oz) < 1e-6 ? 1 : (planeZ - pose.position.z) / oz;
   const lookX = pose.position.x + t * (pose.lookAt.x - pose.position.x);
@@ -195,18 +201,43 @@ export function visibleFrustumY(pose: CameraPose, planeZ = ROOM_INTERIOR.backZ) 
   return { top: lookY + rise, bottom: lookY - rise };
 }
 
+function explorePanYRange(space: ExploreSpace) {
+  const span = space === "zone" ? EXPLORE_LIMITS.zonePanY : EXPLORE_LIMITS.homePanY;
+  return { low: -span, high: span };
+}
+
+function framedAt(base: CameraPose, panY: number, dolly: number) {
+  return framedPose(base, { panX: 0, panY, dolly });
+}
+
 export function maxPanYForCeiling(base: CameraPose, dolly: number, space: ExploreSpace = "home") {
-  const low = space === "zone" ? -EXPLORE_LIMITS.zonePanY : -EXPLORE_LIMITS.homePanY;
-  const high = space === "zone" ? EXPLORE_LIMITS.zonePanY : EXPLORE_LIMITS.homePanY;
-  if (visibleFrustumY(framedPose(base, { panX: 0, panY: low, dolly })).top > ROOM_INTERIOR.ceiling) return low;
+  const { low, high } = explorePanYRange(space);
+  if (visibleFrustumY(framedAt(base, low, dolly)).top > ROOM_INTERIOR.ceiling) return low;
   let lo: number = low;
   let hi: number = high;
   for (let step = 0; step < 18; step += 1) {
     const mid = (lo + hi) / 2;
-    if (visibleFrustumY(framedPose(base, { panX: 0, panY: mid, dolly })).top <= ROOM_INTERIOR.ceiling) lo = mid;
+    if (visibleFrustumY(framedAt(base, mid, dolly)).top <= ROOM_INTERIOR.ceiling) lo = mid;
     else hi = mid;
   }
   return lo;
+}
+
+/** Most downward pan whose visible bottom stays on the authored floor at the floor's near lip. */
+export function minPanYForFloor(base: CameraPose, dolly: number, space: ExploreSpace = "home") {
+  const { low, high } = explorePanYRange(space);
+  const floorHolds = (panY: number) =>
+    visibleFrustumY(framedAt(base, panY, dolly), ROOM_INTERIOR.floorNearZ).bottom >= ROOM_INTERIOR.floor;
+  if (floorHolds(low)) return low;
+  if (!floorHolds(high)) return high;
+  let lo: number = low;
+  let hi: number = high;
+  for (let step = 0; step < 18; step += 1) {
+    const mid = (lo + hi) / 2;
+    if (floorHolds(mid)) hi = mid;
+    else lo = mid;
+  }
+  return hi;
 }
 
 export function explorePanLimits(
@@ -215,22 +246,23 @@ export function explorePanLimits(
   base: CameraPose = HOME_POSE,
 ): ExplorePanLimits {
   if (space === "zone") {
+    const panYMax = maxPanYForCeiling(base, dolly, "zone");
     return {
       panXMin: -EXPLORE_LIMITS.zonePanX,
       panXMax: EXPLORE_LIMITS.zonePanX,
-      panYMin: -EXPLORE_LIMITS.zonePanY,
-      panYMax: maxPanYForCeiling(base, dolly, "zone"),
+      panYMin: Math.min(minPanYForFloor(base, dolly, "zone"), panYMax),
+      panYMax,
     };
   }
   const clampedDolly = clampNumber(dolly, EXPLORE_LIMITS.homeDollyMin, EXPLORE_LIMITS.homeDollyMax);
   const halfW = visibleHalfWidth(authoredLookDepth(base) * clampedDolly);
   const lookX = base.lookAt.x;
-  const lookY = base.lookAt.y;
+  const panYMax = maxPanYForCeiling(base, clampedDolly, "home");
   return {
     panXMin: Math.min(-0.85, ROOM_INTERIOR.xMin + halfW - lookX),
     panXMax: Math.max(0.85, ROOM_INTERIOR.xMax - halfW - lookX),
-    panYMin: Math.max(-EXPLORE_LIMITS.homePanY, ROOM_INTERIOR.yMin - lookY),
-    panYMax: maxPanYForCeiling(base, clampedDolly, "home"),
+    panYMin: Math.min(minPanYForFloor(base, clampedDolly, "home"), panYMax),
+    panYMax,
   };
 }
 
@@ -291,7 +323,7 @@ export function applyExploreOffset(
   const position = { ...framed.position };
   position.y = Math.max(lookAt.y + 0.22, position.y);
   if (space === "home") {
-    position.y = Math.max(ROOM_INTERIOR.floor + 1.15, position.y);
+    position.y = Math.max(ROOM_INTERIOR.floorGuard + 1.15, position.y);
     position.z = Math.max(ROOM_INTERIOR.cameraMinZ, position.z);
     lookAt.x = clampNumber(lookAt.x, ROOM_INTERIOR.xMin, ROOM_INTERIOR.xMax);
     lookAt.y = clampNumber(lookAt.y, ROOM_INTERIOR.yMin, ROOM_INTERIOR.ceiling);

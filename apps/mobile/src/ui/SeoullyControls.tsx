@@ -52,7 +52,7 @@ export function SeoullyButton({
       ]}
     >
       <SeoullyText
-        variant={variant === "enter" ? "handle" : "button"}
+        variant="button"
         color={labelColor}
         numberOfLines={fill ? 2 : 1}
         style={styles.label}

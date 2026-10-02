@@ -34,7 +34,7 @@ import {
   type ExploreSpace,
 } from "./camera";
 import { entranceForeground, roomEntranceCopy } from "./entrance";
-import { roomPalette } from "./theme";
+import { roomOverlayChrome, roomPalette } from "./theme";
 import { inspectView, openBinderView, stepBack, zoneFromSurfaceId, type CanonicalZoneKind, type NativeWorldView } from "./worldView";
 
 const NativeRoomRenderer = lazy(async () => {
@@ -276,7 +276,9 @@ export function RoomWorldScreen({
     ownLabel: copy.enteringYourRoom,
     visitorLabel: copy.enteringCollectorRoom,
   });
-  const entranceTone = entranceForeground(roomPalette(themeId).void);
+  const roomTheme = roomPalette(themeId);
+  const entranceTone = entranceForeground(roomTheme.void);
+  const overlayTheme = roomOverlayChrome(roomTheme);
 
   function goBack() {
     const current = viewRef.current;
@@ -467,9 +469,10 @@ export function RoomWorldScreen({
   };
 
   if (privateRoom && !loading) {
-    return <View style={styles.world}>
+    return <View style={[styles.world, { backgroundColor: roomTheme.void }]}>
       <OverlayChrome
         copy={copy}
+        chrome={overlayTheme}
         onBack={onLeave}
         style={overlayPad}
       />
@@ -478,7 +481,7 @@ export function RoomWorldScreen({
     </View>;
   }
 
-  return <View style={styles.world}>
+  return <View style={[styles.world, { backgroundColor: roomTheme.void }]}>
     {!loading && snapshot ? <View style={styles.stage} {...panResponder.panHandlers}>
       <Suspense fallback={null}>
         <NativeRoomRenderer
@@ -531,6 +534,7 @@ export function RoomWorldScreen({
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       <OverlayChrome
         copy={copy}
+        chrome={overlayTheme}
         onBack={goBack}
         editing={editing}
         readOnly={readOnly}
@@ -573,6 +577,7 @@ export function RoomWorldScreen({
 
 function OverlayChrome({
   copy,
+  chrome,
   onBack,
   editing,
   readOnly,
@@ -582,6 +587,7 @@ function OverlayChrome({
   style,
 }: {
   copy: MobileCopy;
+  chrome: ReturnType<typeof roomOverlayChrome>;
   onBack: () => void;
   editing?: boolean;
   readOnly?: boolean;
@@ -590,15 +596,16 @@ function OverlayChrome({
   onSave?: () => void;
   style?: object;
 }) {
+  const chip = [styles.overlayChip, { backgroundColor: chrome.background, borderColor: chrome.border }];
   return <View pointerEvents="box-none" style={[styles.overlayBar, style]}>
-    <Pressable accessibilityRole="button" onPress={onBack} style={styles.overlayChip}>
-      <SeoullyText variant="button" color={colors.plum}>{copy.back}</SeoullyText>
+    <Pressable accessibilityRole="button" onPress={onBack} style={chip}>
+      <SeoullyText variant="button" color={chrome.color}>{copy.back}</SeoullyText>
     </Pressable>
     <View style={styles.overlaySpacer} />
     {readOnly || !onEdit ? <View style={styles.overlaySpacer} /> : <View style={styles.overlayActions}>
-      {editing ? <Pressable onPress={onCancel} style={styles.overlayChip}><SeoullyText variant="button" color={colors.plum}>{copy.cancelEditing}</SeoullyText></Pressable> : null}
-      <Pressable onPress={editing ? onSave : onEdit} style={styles.overlayChip}>
-        <SeoullyText variant="button" color={colors.plum}>{editing ? copy.finishEditing : copy.editRoom}</SeoullyText>
+      {editing ? <Pressable onPress={onCancel} style={chip}><SeoullyText variant="button" color={chrome.color}>{copy.cancelEditing}</SeoullyText></Pressable> : null}
+      <Pressable onPress={editing ? onSave : onEdit} style={chip}>
+        <SeoullyText variant="button" color={chrome.color}>{editing ? copy.finishEditing : copy.editRoom}</SeoullyText>
       </Pressable>
     </View>}
   </View>;
@@ -664,9 +671,9 @@ function loadDemoRoom(): typeof import("./demoRoom") {
 }
 
 const styles = StyleSheet.create({
-  world: { backgroundColor: "#1c1418", flex: 1 },
+  world: { flex: 1 },
   overlayBar: { alignItems: "center", flexDirection: "row", gap: spacing.sm },
-  overlayChip: { backgroundColor: "rgba(247,241,244,0.88)", borderRadius: 999, justifyContent: "center", minHeight: 36, paddingHorizontal: spacing.sm },
+  overlayChip: { alignItems: "center", borderRadius: 999, borderWidth: 1, justifyContent: "center", minHeight: 36, paddingHorizontal: spacing.sm },
   overlaySpacer: { flex: 1 },
   entrance: { alignItems: "center", bottom: 0, justifyContent: "center", left: 0, paddingHorizontal: 28, position: "absolute", right: 0, top: 0 },
   entranceText: { fontSize: 22, lineHeight: 28, textAlign: "center", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 8 },

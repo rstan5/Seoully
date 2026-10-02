@@ -1,6 +1,6 @@
 import { Text, type StyleProp, type TextProps, type TextStyle } from "react-native";
 import { useLocale } from "../locale";
-import { colors, faces, type } from "../theme";
+import { BUTTON_LABEL_OPTICAL_Y, colors, faces, type } from "../theme";
 import { useProfileIdentity } from "./ProfileIdentity";
 
 export type SeoullyTextVariant = keyof typeof type;
@@ -43,6 +43,9 @@ export function SeoullyText({
           includeFontPadding: false,
           letterSpacing: "letterSpacing" in spec ? spec.letterSpacing : 0,
           lineHeight: spec.lineHeight,
+          ...(variant === "button" && locale === "en"
+            ? { transform: [{ translateY: BUTTON_LABEL_OPTICAL_Y }] }
+            : null),
         },
         { color: color ?? inherited },
         style,

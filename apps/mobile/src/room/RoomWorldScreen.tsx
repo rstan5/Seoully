@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { Stack, useFocusEffect } from "expo-router";
 import { AccessibilityInfo, Animated, AppState, Easing, PanResponder, Pressable, ScrollView, StyleSheet, View, type GestureResponderEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { loadCollectorRoom, loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomPlacement, type NativeHolding, type NativeRoomPlacement, type NativeRoomSnapshot } from "../api";
@@ -7,7 +7,7 @@ import { binderSpreads, buildNativeBinderPages, spreadIndexForHolding } from "..
 import { collectibleKindLabel, type MobileCopy } from "../i18n";
 import { CachedSignedImage } from "../media/cachedMedia";
 import { colors, spacing } from "../theme";
-import { chrome } from "../ui/shellLayout";
+import { chrome, immersiveRoomFill } from "../ui/shellLayout";
 import { SeoullyText } from "../ui/SeoullyText";
 import { cloneRenderables, holdingRemainsAfterStore, restoreEditBaseline, revertDrop, storeRenderable } from "./editSession";
 import {
@@ -469,7 +469,8 @@ export function RoomWorldScreen({
   };
 
   if (privateRoom && !loading) {
-    return <View style={[styles.world, { backgroundColor: roomTheme.void }]}>
+    return <View style={[styles.world, immersiveRoomFill(roomTheme.void)]}>
+      <Stack.Screen options={{ contentStyle: immersiveRoomFill(roomTheme.void) }} />
       <OverlayChrome
         copy={copy}
         chrome={overlayTheme}
@@ -481,7 +482,8 @@ export function RoomWorldScreen({
     </View>;
   }
 
-  return <View style={[styles.world, { backgroundColor: roomTheme.void }]}>
+  return <View style={[styles.world, immersiveRoomFill(roomTheme.void)]}>
+    <Stack.Screen options={{ contentStyle: immersiveRoomFill(roomTheme.void) }} />
     {!loading && snapshot ? <View style={styles.stage} {...panResponder.panHandlers}>
       <Suspense fallback={null}>
         <NativeRoomRenderer

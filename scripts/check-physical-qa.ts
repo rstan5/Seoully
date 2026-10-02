@@ -399,7 +399,9 @@ assertContains(read("docs/native-road-to-ship.md"), "Live Profile Appearance / R
   assertContains(roomWorld, "SeoullyText", "room chrome uses Seoully type");
   assertContains(roomWorld, "OverlayChrome", "immersive Room overlays");
   assertNotContains(roomWorld, "LookChip", "no permanent zone pills");
-  assertContains(read("apps/mobile/app/room.tsx"), "react-native-safe-area-context", "room uses context safe area");
+  assertContains(roomWorld, "useSafeAreaInsets", "Room overlays use context safe area");
+  assertContains(read("apps/mobile/app/room.tsx"), "immersiveRoomFill", "Room route fills the physical viewport");
+  assertNotContains(read("apps/mobile/app/room.tsx"), "SafeAreaView", "Room canvas is not inset by SafeAreaView");
   assertContains(road, "KEEP THE ENGINE", "slice 7 lock recorded");
   assertContains(road, "Touch-first edit mode", "slice 7 lock recorded");
   assertContains(read("docs/web-native-parity-contract.md"), "KEEP THE ENGINE, REBUILD THE EXPERIENCE", "parity contract records slice 7 lock");

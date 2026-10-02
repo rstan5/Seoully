@@ -69,7 +69,7 @@ export function SeoullyProfileHead({
         <SeoullyText variant="handle" color={identity?.mute} style={styles.handle}>@{handle}</SeoullyText>
         {editLabel && onEdit ? (
           <Pressable accessibilityRole="button" hitSlop={8} onPress={onEdit} style={styles.edit}>
-            <SeoullyText variant="caption" color={identity?.primaryDeep ?? colors.plum}>{editLabel}</SeoullyText>
+            <SeoullyText control variant="caption" color={identity?.primaryDeep ?? colors.plum}>{editLabel}</SeoullyText>
           </Pressable>
         ) : null}
         <View style={styles.counts}>
@@ -146,12 +146,12 @@ export function SeoullyOwnedRow({
         <View style={styles.ownedActions}>
           {tradeLabel && onToggleTrade ? (
             <Pressable accessibilityRole="button" onPress={onToggleTrade} style={styles.ownedAction}>
-              <SeoullyText variant="caption" color={accent}>{tradeLabel}</SeoullyText>
+              <SeoullyText control variant="caption" color={accent}>{tradeLabel}</SeoullyText>
             </Pressable>
           ) : null}
           {removeLabel && onRemove ? (
             <Pressable accessibilityRole="button" onPress={onRemove} style={styles.ownedAction}>
-              <SeoullyText variant="caption" color={accent}>{removeLabel}</SeoullyText>
+              <SeoullyText control variant="caption" color={accent}>{removeLabel}</SeoullyText>
             </Pressable>
           ) : null}
         </View>

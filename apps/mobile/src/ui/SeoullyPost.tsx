@@ -5,7 +5,7 @@ import type { NativeFeedPost, NativePostComment } from "../api";
 import type { MobileCopy } from "../i18n";
 import { IconBookmark, IconComment, IconHeart, IconPlay, IconRepost, IconShare } from "./icons";
 import { pressShift, useReduceMotion } from "./motion";
-import { useProfileInk } from "./ProfileIdentity";
+import { useProfileIdentity, useProfileInk } from "./ProfileIdentity";
 import { SeoullyAvatar } from "./SeoullyAvatar";
 import { SeoullyIconButton } from "./SeoullyIconButton";
 import { SeoullyText } from "./SeoullyText";
@@ -94,12 +94,17 @@ export function SeoullyCollectiblePreview({
   colorway?: { base: string; accent: string; ink: string };
 }) {
   const ink = useProfileInk();
+  const identity = useProfileIdentity();
+  const surface = identity
+    ? { backgroundColor: identity.paper, borderColor: identity.line }
+    : { backgroundColor: colors.blush, borderColor: colors.lilac };
+  const kindColor = identity?.mute ?? colors.muted;
   return (
-    <View style={styles.collectible}>
+    <View style={[styles.collectible, surface]}>
       <View style={[styles.collectibleSwatch, colorway ? { backgroundColor: colorway.base, borderColor: colorway.accent } : null]} />
       <View style={styles.collectibleCopy}>
         <SeoullyText variant="caption" color={ink} numberOfLines={1}>{name}</SeoullyText>
-        <SeoullyText variant="metadata" numberOfLines={1}>{kind}</SeoullyText>
+        <SeoullyText variant="metadata" color={kindColor} numberOfLines={1}>{kind}</SeoullyText>
       </View>
     </View>
   );
@@ -321,8 +326,6 @@ const styles = StyleSheet.create({
   collectibles: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8, paddingHorizontal: spacing.post },
   collectible: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
     borderRadius: 11,
     borderWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",

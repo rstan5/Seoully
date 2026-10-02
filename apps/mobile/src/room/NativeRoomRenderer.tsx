@@ -1,6 +1,7 @@
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
 import "./threeFiberCompat";
 import { Suspense, useMemo, type MutableRefObject } from "react";
+import { StyleSheet } from "react-native";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber/native";
 import { Color, TextureLoader, Vector3 } from "three";
 import type { NativeBinderSpread } from "../binder/model";
@@ -71,6 +72,7 @@ export function NativeRoomRenderer({
   const worldItems = binderOpen ? items.filter((item) => item.geometry !== "photocard") : items;
   return <Canvas
     frameloop={paused ? "never" : "always"}
+    style={StyleSheet.absoluteFill}
     camera={{ position: [0.55, 1.92, 5.25], fov: 46 }}
     onPointerMissed={onClearSelection}
     onCreated={({ camera, scene }) => {

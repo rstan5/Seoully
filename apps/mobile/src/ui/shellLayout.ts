@@ -51,6 +51,11 @@ export function identityPublicationSurvives(pathname: string): boolean {
   return leaf === "profile" || leaf === "collector" || leaf === "room" || leaf === "collector-room";
 }
 
+/** Full-bleed Room surface. Safe-area insets belong to overlays, not this fill. */
+export function immersiveRoomFill(voidColor: string) {
+  return { backgroundColor: voidColor, flex: 1 as const };
+}
+
 export type EdgeInsets = { top: number; right: number; bottom: number; left: number };
 
 /** One companion. Immersive Room uses safe-area + gutter only — no tab-bar clearance. */

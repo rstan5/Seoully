@@ -152,7 +152,7 @@ function SuggestedPerson({ person, copy }: { person: SocialSuggested; copy: Mobi
       <SeoullyAvatar name={person.user.displayName} size={56} imageUrl={person.avatarUrl} />
       <SeoullyText variant="handle" numberOfLines={1} style={styles.personName}>{person.user.handle}</SeoullyText>
       <View style={styles.personScore}>
-        <SeoullyText variant="caption" color={colors.plum}>{copy.feedMatchScore.replace("{score}", String(person.score))}</SeoullyText>
+        <SeoullyText control variant="caption" color={colors.plum}>{copy.feedMatchScore.replace("{score}", String(person.score))}</SeoullyText>
       </View>
       {person.subtitleKind === "reciprocal" ? (
         <SeoullyText variant="caption" numberOfLines={2} style={styles.personMeta}>{copy.feedSuggestedReciprocal}</SeoullyText>

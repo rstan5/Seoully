@@ -76,11 +76,13 @@ export const type = {
 } as const;
 
 /**
- * Baloo 2 semibold glyphs sit high in the em-box, so a mathematically
- * centered button label looks optically high. Nudge only button labels
- * down; body/title/caption stay on the typographic baseline.
+ * Baloo 2 control-label glyphs sit high in the em-box. Apply only to
+ * button/chip/pill/badge labels — never body, title, caption, or post copy.
+ * Noto Sans KR is optically even and must not inherit this nudge.
  */
-export const BUTTON_LABEL_OPTICAL_Y = 1.5;
+export const CONTROL_LABEL_OPTICAL_Y = 1.5;
+/** @deprecated Use CONTROL_LABEL_OPTICAL_Y. Same token; kept for existing checks. */
+export const BUTTON_LABEL_OPTICAL_Y = CONTROL_LABEL_OPTICAL_Y;
 
 export const radii = {
   card: 14,

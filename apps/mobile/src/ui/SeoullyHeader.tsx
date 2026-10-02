@@ -62,7 +62,7 @@ export function SeoullyHeader({
               pressShift(pressed, reduceMotion),
             ]}
           >
-            <SeoullyText variant="caption" color={demo ? (identity?.primaryDeep ?? colors.plum) : mute}>
+            <SeoullyText control variant="caption" color={demo ? (identity?.primaryDeep ?? colors.plum) : mute}>
               {demo ? copy.demoWorld : copy.productionData}
             </SeoullyText>
           </Pressable>
@@ -86,7 +86,7 @@ export function SeoullyHeader({
           <IconBell color={ink} />
           {unread > 0 ? (
             <View style={styles.badge}>
-              <SeoullyText variant="caption" color={colors.onPrimary} style={styles.badgeText}>
+              <SeoullyText control variant="caption" color={colors.onPrimary} style={styles.badgeText}>
                 {unread > 9 ? "9+" : String(unread)}
               </SeoullyText>
             </View>

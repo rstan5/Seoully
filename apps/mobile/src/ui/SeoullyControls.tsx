@@ -91,7 +91,7 @@ export function SeoullyChoiceChip({
         pressShift(pressed, reduceMotion),
       ]}
     >
-      <SeoullyText variant="caption" color={selected ? (identity?.primaryDeep ?? colors.plum) : (identity?.ink ?? colors.ink)}>{label}</SeoullyText>
+      <SeoullyText control variant="caption" color={selected ? (identity?.primaryDeep ?? colors.plum) : (identity?.ink ?? colors.ink)}>{label}</SeoullyText>
     </Pressable>
   );
 }
@@ -118,7 +118,7 @@ export function SeoullyChip({
       tone === "type" && styles.chipType,
       backgroundColor ? { backgroundColor } : null,
     ]}>
-      <SeoullyText variant="caption" color={color}>{label}</SeoullyText>
+      <SeoullyText control variant="caption" color={color}>{label}</SeoullyText>
     </View>
   );
 }
@@ -153,7 +153,7 @@ export function SeoullyShelf({
         >
           <SeoullyText variant="handle" color={accent}>{title}</SeoullyText>
           <View style={[styles.shelfCount, identity ? { backgroundColor: identity.primarySoft } : null]}>
-            <SeoullyText variant="caption" color={accent}>{count}</SeoullyText>
+            <SeoullyText control variant="caption" color={accent}>{count}</SeoullyText>
           </View>
         </Pressable>
       ) : (

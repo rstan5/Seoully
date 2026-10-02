@@ -288,7 +288,7 @@ Order is dependency-shaped. **Slice 1 is first.**
 
 | Block | Scope | Status |
 | --- | --- | --- |
-| **7A** | Immersive Room shell + direct-touch constrained camera | CAMERA/SHELL REPAIR 03 — CODE VERIFIED / DEVICE RETEST REQUIRED |
+| **7A** | Immersive Room shell + direct-touch constrained camera | CAMERA/SHELL REPAIR 04 — CODE VERIFIED / DEVICE RETEST REQUIRED |
 | **7B** | Touch-first editing + world storage (long-press, drag/drop, merch-box / stored holdings sheet) | Not started |
 | **7C** | Binder as part of the world (continuous camera travel, spatial open/close) | Not started — preserve current Binder |
 | **7D** | Materials, lighting, and Room customization (review `20261002` before applying) | Not started — migration unapplied |

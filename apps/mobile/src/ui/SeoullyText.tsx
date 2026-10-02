@@ -1,6 +1,6 @@
 import { Text, type StyleProp, type TextProps, type TextStyle } from "react-native";
 import { useLocale } from "../locale";
-import { BUTTON_LABEL_OPTICAL_Y, colors, faces, type } from "../theme";
+import { CONTROL_LABEL_OPTICAL_Y, colors, faces, type } from "../theme";
 import { useProfileIdentity } from "./ProfileIdentity";
 
 export type SeoullyTextVariant = keyof typeof type;
@@ -20,9 +20,10 @@ const variantColor: Record<SeoullyTextVariant, string> = {
 export function SeoullyText({
   variant = "body",
   color,
+  control,
   style,
   ...props
-}: TextProps & { variant?: SeoullyTextVariant; color?: string; style?: StyleProp<TextStyle> }) {
+}: TextProps & { variant?: SeoullyTextVariant; color?: string; control?: boolean; style?: StyleProp<TextStyle> }) {
   const { locale } = useLocale();
   const identity = useProfileIdentity();
   const spec = type[variant];
@@ -33,6 +34,7 @@ export function SeoullyText({
         ? identity.mute
         : identity.ink)
     : variantColor[variant];
+  const optical = locale === "en" && (control || variant === "button");
   return (
     <Text
       {...props}
@@ -43,9 +45,7 @@ export function SeoullyText({
           includeFontPadding: false,
           letterSpacing: "letterSpacing" in spec ? spec.letterSpacing : 0,
           lineHeight: spec.lineHeight,
-          ...(variant === "button" && locale === "en"
-            ? { transform: [{ translateY: BUTTON_LABEL_OPTICAL_Y }] }
-            : null),
+          ...(optical ? { transform: [{ translateY: CONTROL_LABEL_OPTICAL_Y }] } : null),
         },
         { color: color ?? inherited },
         style,

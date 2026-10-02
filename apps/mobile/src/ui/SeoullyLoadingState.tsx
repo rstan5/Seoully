@@ -12,6 +12,12 @@ export function SeoullyLoadingState({ label }: { label: string }) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { alignItems: "center", gap: 12, marginTop: 36, paddingHorizontal: 24 },
+  wrap: {
+    alignItems: "center",
+    flex: 1,
+    gap: 12,
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
   label: { textAlign: "center" },
 });

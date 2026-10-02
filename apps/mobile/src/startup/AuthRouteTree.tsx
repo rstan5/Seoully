@@ -1,7 +1,9 @@
 import { View } from "react-native";
 import { Stack } from "expo-router";
 import { useCopy } from "../locale";
+import { ROOM_THEMES } from "../room/theme";
 import { colors } from "../theme";
+import { immersiveRoomFill } from "../ui/shellLayout";
 import { SeoullyButton } from "../ui/SeoullyControls";
 import { SeoullyLoadingState } from "../ui/SeoullyLoadingState";
 import { SeoullyScreen } from "../ui/SeoullyScreen";
@@ -17,7 +19,7 @@ export function AuthRouteTree() {
   const screens = screensForDestination(boot.destination);
 
   if (boot.destination === "loading") {
-    return <SeoullyScreen><SeoullyLoadingState label={t.brand} /></SeoullyScreen>;
+    return <SeoullyScreen edges={["top", "bottom"]}><SeoullyLoadingState label={t.brand} /></SeoullyScreen>;
   }
 
   if (boot.destination === "error") {
@@ -52,10 +54,10 @@ export function AuthRouteTree() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="binder" />
         <Stack.Screen name="collection" />
-        <Stack.Screen name="collector-room" options={{ gestureEnabled: false, fullScreenGestureEnabled: false }} />
+        <Stack.Screen name="collector-room" options={{ contentStyle: immersiveRoomFill(ROOM_THEMES.hearth.void), gestureEnabled: false, fullScreenGestureEnabled: false }} />
         <Stack.Screen name="edit-profile" />
         <Stack.Screen name="public-collectible" />
-        <Stack.Screen name="room" options={{ gestureEnabled: false, fullScreenGestureEnabled: false }} />
+        <Stack.Screen name="room" options={{ contentStyle: immersiveRoomFill(ROOM_THEMES.hearth.void), gestureEnabled: false, fullScreenGestureEnabled: false }} />
         <Stack.Screen name="thread" />
       </Stack.Protected>
       <Stack.Protected guard={screens.shared}>

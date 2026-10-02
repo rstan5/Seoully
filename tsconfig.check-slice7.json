@@ -18,6 +18,7 @@
     "apps/mobile/src/data/ownership.ts",
     "apps/mobile/src/room/editSession.ts",
     "apps/mobile/src/room/worldView.ts",
-    "apps/mobile/src/room/camera.ts"
+    "apps/mobile/src/room/camera.ts",
+    "apps/mobile/src/room/entrance.ts"
   ]
 }

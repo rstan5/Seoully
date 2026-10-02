@@ -9,6 +9,7 @@ import {
   PLACEMENTS_FIXTURE,
   ROOMS,
   SOO,
+  USERS,
 } from "seoully-domain/fixtures/collectors";
 import type { CollectibleTemplate, Placement } from "seoully-domain/types";
 import type { NativeCatalogTemplate, NativeHolding, NativeRoomPlacement, NativeRoomSnapshot } from "../api";
@@ -125,4 +126,8 @@ export function resetDemoRoomSession() {
 
 export function demoRoomOwnerId() {
   return SOO;
+}
+
+export function demoCollectorDisplayName(ownerId: string) {
+  return USERS.find((user) => String(user.id) === ownerId)?.displayName ?? "";
 }

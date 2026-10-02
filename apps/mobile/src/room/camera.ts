@@ -103,12 +103,13 @@ export type ExploreOffset = {
 
 export const IDENTITY_EXPLORE: ExploreOffset = { panX: 0, panY: 0, dolly: 1 };
 
-/** Interior from RoomShell / furniture: walls ±4.72, back z=-4.22, floor y=-2.15. */
+/** Interior from RoomShell / furniture: walls ±4.72, back z=-4.22, floor y=-2.15, wall top y=3.45. */
 export const ROOM_INTERIOR = {
   xMin: -4.55,
   xMax: 4.55,
   yMin: -1.85,
-  yMax: 2.15,
+  ceiling: 3.4,
+  floor: -2.08,
   backZ: -4.14,
   cameraMinZ: 2.85,
 } as const;
@@ -148,32 +149,100 @@ export function visibleHalfWidth(depth: number, aspect = PORTRAIT_ASPECT) {
   return Math.tan((CAMERA_FOV_DEG * Math.PI) / 360) * depth * aspect;
 }
 
-export function explorePanLimits(dolly: number, space: ExploreSpace = "home"): ExplorePanLimits {
+export function visibleHalfHeight(depth: number) {
+  return Math.tan((CAMERA_FOV_DEG * Math.PI) / 360) * depth;
+}
+
+/** Translate the authored window without orbiting. */
+export function framedPose(base: CameraPose, offset: Pick<ExploreOffset, "panX" | "panY" | "dolly">): CameraPose {
+  const ox = base.position.x - base.lookAt.x;
+  const oy = base.position.y - base.lookAt.y;
+  const oz = base.position.z - base.lookAt.z;
+  const lookAt = {
+    x: base.lookAt.x + offset.panX,
+    y: base.lookAt.y + offset.panY,
+    z: base.lookAt.z,
+  };
+  return {
+    position: {
+      x: lookAt.x + ox * offset.dolly,
+      y: lookAt.y + oy * offset.dolly,
+      z: lookAt.z + oz * offset.dolly,
+    },
+    lookAt,
+  };
+}
+
+/** Visible world-Y envelope of the portrait frustum at the back-wall plane. */
+export function visibleFrustumY(pose: CameraPose, planeZ = ROOM_INTERIOR.backZ) {
+  const oz = pose.lookAt.z - pose.position.z;
+  const t = Math.abs(oz) < 1e-6 ? 1 : (planeZ - pose.position.z) / oz;
+  const lookX = pose.position.x + t * (pose.lookAt.x - pose.position.x);
+  const lookY = pose.position.y + t * (pose.lookAt.y - pose.position.y);
+  const dist = Math.hypot(lookX - pose.position.x, lookY - pose.position.y, planeZ - pose.position.z) || 1;
+  const halfH = visibleHalfHeight(dist);
+  const vx = pose.lookAt.x - pose.position.x;
+  const vy = pose.lookAt.y - pose.position.y;
+  const vz = pose.lookAt.z - pose.position.z;
+  const inv = 1 / (Math.hypot(vx, vy, vz) || 1);
+  const vnx = vx * inv;
+  const vnz = vz * inv;
+  const rx = -vnz;
+  const rz = vnx;
+  const rlen = Math.hypot(rx, rz) || 1;
+  const upY = (rz / rlen) * vnx - (rx / rlen) * vnz;
+  const rise = halfH * Math.abs(upY);
+  return { top: lookY + rise, bottom: lookY - rise };
+}
+
+export function maxPanYForCeiling(base: CameraPose, dolly: number, space: ExploreSpace = "home") {
+  const low = space === "zone" ? -EXPLORE_LIMITS.zonePanY : -EXPLORE_LIMITS.homePanY;
+  const high = space === "zone" ? EXPLORE_LIMITS.zonePanY : EXPLORE_LIMITS.homePanY;
+  if (visibleFrustumY(framedPose(base, { panX: 0, panY: low, dolly })).top > ROOM_INTERIOR.ceiling) return low;
+  let lo: number = low;
+  let hi: number = high;
+  for (let step = 0; step < 18; step += 1) {
+    const mid = (lo + hi) / 2;
+    if (visibleFrustumY(framedPose(base, { panX: 0, panY: mid, dolly })).top <= ROOM_INTERIOR.ceiling) lo = mid;
+    else hi = mid;
+  }
+  return lo;
+}
+
+export function explorePanLimits(
+  dolly: number,
+  space: ExploreSpace = "home",
+  base: CameraPose = HOME_POSE,
+): ExplorePanLimits {
   if (space === "zone") {
     return {
       panXMin: -EXPLORE_LIMITS.zonePanX,
       panXMax: EXPLORE_LIMITS.zonePanX,
       panYMin: -EXPLORE_LIMITS.zonePanY,
-      panYMax: EXPLORE_LIMITS.zonePanY,
+      panYMax: maxPanYForCeiling(base, dolly, "zone"),
     };
   }
   const clampedDolly = clampNumber(dolly, EXPLORE_LIMITS.homeDollyMin, EXPLORE_LIMITS.homeDollyMax);
-  const halfW = visibleHalfWidth(authoredLookDepth(HOME_POSE) * clampedDolly);
-  const lookX = HOME_POSE.lookAt.x;
-  const lookY = HOME_POSE.lookAt.y;
+  const halfW = visibleHalfWidth(authoredLookDepth(base) * clampedDolly);
+  const lookX = base.lookAt.x;
+  const lookY = base.lookAt.y;
   return {
     panXMin: Math.min(-0.85, ROOM_INTERIOR.xMin + halfW - lookX),
     panXMax: Math.max(0.85, ROOM_INTERIOR.xMax - halfW - lookX),
     panYMin: Math.max(-EXPLORE_LIMITS.homePanY, ROOM_INTERIOR.yMin - lookY),
-    panYMax: Math.min(EXPLORE_LIMITS.homePanY, ROOM_INTERIOR.yMax - lookY),
+    panYMax: maxPanYForCeiling(base, clampedDolly, "home"),
   };
 }
 
-export function clampExplore(offset: ExploreOffset, space: ExploreSpace = "home"): ExploreOffset {
+export function clampExplore(
+  offset: ExploreOffset,
+  space: ExploreSpace = "home",
+  base: CameraPose = HOME_POSE,
+): ExploreOffset {
   const dollyMin = space === "zone" ? EXPLORE_LIMITS.zoneDollyMin : EXPLORE_LIMITS.homeDollyMin;
   const dollyMax = space === "zone" ? EXPLORE_LIMITS.zoneDollyMax : EXPLORE_LIMITS.homeDollyMax;
   const dolly = clampNumber(offset.dolly, dollyMin, dollyMax);
-  const limits = explorePanLimits(dolly, space);
+  const limits = explorePanLimits(dolly, space, base);
   return {
     panX: clampNumber(offset.panX, limits.panXMin, limits.panXMax),
     panY: clampNumber(offset.panY, limits.panYMin, limits.panYMax),
@@ -216,29 +285,16 @@ export function applyExploreOffset(
   offset: ExploreOffset,
   space: ExploreSpace = "home",
 ): CameraPose {
-  const clamped = clampExplore(offset, space);
-  const ox = base.position.x - base.lookAt.x;
-  const oy = base.position.y - base.lookAt.y;
-  const oz = base.position.z - base.lookAt.z;
-  const lookAt = {
-    x: base.lookAt.x + clamped.panX,
-    y: base.lookAt.y + clamped.panY,
-    z: base.lookAt.z,
-  };
-  let position = {
-    x: lookAt.x + ox * clamped.dolly,
-    y: lookAt.y + oy * clamped.dolly,
-    z: lookAt.z + oz * clamped.dolly,
-  };
-  if (oz * (position.z - lookAt.z) < 0) {
-    position = { x: lookAt.x + ox * clamped.dolly, y: lookAt.y + oy * clamped.dolly, z: lookAt.z + oz * clamped.dolly };
-  }
+  const clamped = clampExplore(offset, space, base);
+  const framed = framedPose(base, clamped);
+  const lookAt = { ...framed.lookAt };
+  const position = { ...framed.position };
   position.y = Math.max(lookAt.y + 0.22, position.y);
   if (space === "home") {
-    position.y = clampNumber(position.y, ROOM_INTERIOR.yMin + 1.15, ROOM_INTERIOR.yMax + 0.7);
+    position.y = Math.max(ROOM_INTERIOR.floor + 1.15, position.y);
     position.z = Math.max(ROOM_INTERIOR.cameraMinZ, position.z);
     lookAt.x = clampNumber(lookAt.x, ROOM_INTERIOR.xMin, ROOM_INTERIOR.xMax);
-    lookAt.y = clampNumber(lookAt.y, ROOM_INTERIOR.yMin, ROOM_INTERIOR.yMax);
+    lookAt.y = clampNumber(lookAt.y, ROOM_INTERIOR.yMin, ROOM_INTERIOR.ceiling);
   }
   return { position, lookAt };
 }

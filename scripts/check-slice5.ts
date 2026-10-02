@@ -40,7 +40,7 @@ const sendTo = read("apps/mobile/app/(tabs)/send-to.tsx");
 const thread = read("apps/mobile/app/thread.tsx");
 const inbox = read("apps/mobile/app/(tabs)/messages.tsx");
 const notices = read("apps/mobile/app/(tabs)/notices.tsx");
-const collector = read("apps/mobile/app/collector.tsx");
+const collector = read("apps/mobile/app/(tabs)/collector.tsx");
 const roomTheme = read("supabase/migrations/20261002000000_native_room_theme.sql");
 
 assert.equal(LIVE_CAPABILITIES.persistMessages, true);

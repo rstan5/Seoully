@@ -80,7 +80,7 @@ assertContains(demo, "collectionPublic: true", "demo/repository.ts");
 assertNotContains(demo, "loadCollectorCollection", "demo/repository.ts");
 assertNotContains(demo, "productApiBase", "demo/repository.ts");
 
-const collector = read("apps/mobile/app/collector.tsx");
+const collector = read("apps/mobile/app/(tabs)/collector.tsx");
 assertContains(collector, "social.setFollowing", "collector.tsx");
 assertContains(collector, "social.loadCollector", "collector.tsx");
 assertContains(collector, "social.loadCollectorPosts", "collector.tsx");

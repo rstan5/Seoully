@@ -103,7 +103,7 @@ assertContains(collectible, 'social.kind === "demo"', "collectible.tsx");
 assertContains(collectible, "social.setHoldingTradeStatus", "collectible.tsx");
 assertNotContains(collectible, "updateHoldingTradeStatus", "collectible.tsx");
 
-const collector = read("apps/mobile/app/collector.tsx");
+const collector = read("apps/mobile/app/(tabs)/collector.tsx");
 assertNotContains(collector, "ensureConversation", "collector.tsx");
 assertContains(collector, "persistMessages", "collector.tsx");
 assertContains(collector, "collectionPrivate", "collector.tsx");

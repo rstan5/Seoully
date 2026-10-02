@@ -337,7 +337,8 @@ assertContains(profile, "palette.primaryDeep", "profile links use theme accent")
 assertContains(read("apps/mobile/app/(tabs)/_layout.tsx"), "ProfileIdentityScope", "tabs shell owns published identity");
 assertContains(read("apps/mobile/src/ui/SeoullyTabBar.tsx"), "usePublishedProfileIdentity", "tab bar reads published identity");
 assertContains(read("apps/mobile/src/ui/SeoullyTabBar.tsx"), "profileTabChrome", "tab bar uses shared identity tokens");
-assertContains(read("apps/mobile/src/ui/ProfileIdentity.tsx"), "return () => publish(null)", "leaving profile clears tab chrome");
+assertContains(read("apps/mobile/src/ui/ProfileIdentity.tsx"), "identityPublicationSurvives", "theme survives visible Room transition");
+assertContains(read("apps/mobile/src/ui/shellLayout.ts"), "identityPublicationSurvives", "publication keep-set is shared");
 assertContains(read("apps/mobile/src/ui/ProfileIdentity.tsx"), "return useContext(ProfileIdentityContext);", "screen identity stays local");
 assertContains(read("apps/mobile/src/ui/ProfileIdentity.tsx"), "return useContext(PublishedIdentityContext);", "tab chrome has a separate reader");
 assertNotContains(read("apps/mobile/app/(tabs)/index.tsx"), "usePublishProfileIdentity", "discover does not publish profile chrome");
@@ -384,7 +385,8 @@ assertContains(read("docs/native-road-to-ship.md"), "Live Profile Appearance / R
   assert.equal(routeShowsBottomNav("/(tabs)/search"), true);
   assert.equal(routeShowsBottomNav("/"), true);
   assert.equal(routeShowsBottomNav("/room"), false);
-  assert.equal(routeShowsBottomNav("/collector"), false);
+  assert.equal(routeShowsBottomNav("/collector"), true);
+  assert.equal(routeShowsBottomNav("/collector-room"), false);
   const tabPlace = companionPlacement({ insets: { top: 59, right: 0, bottom: 34, left: 0 }, hasBottomNav: true });
   assert.equal(tabPlace.bottom, 34 + chrome.tabBarContent + chrome.companionClearance);
   assert.equal(tabPlace.right, chrome.gutter);

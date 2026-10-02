@@ -1,20 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import type { NativeFeedPost } from "../src/api";
-import { useSocialRepository, type SocialCollector, type SocialCompatibility } from "../src/data";
-import { useReportAskSurface } from "../src/ask-surface";
-import { RetryNotice } from "../src/components/RetryNotice";
-import { ScreenBack } from "../src/components/ScreenBack";
-import { collectibleKindLabel, type MobileCopy } from "../src/i18n";
-import { useCopy, useLocale } from "../src/locale";
-import { colors } from "../src/theme";
-import { identityPalette } from "../src/ui/profileContrast";
-import { ProfileIdentityProvider } from "../src/ui/ProfileIdentity";
-import { SeoullyButton, SeoullyChip, SeoullyShelf } from "../src/ui/SeoullyControls";
-import { SeoullyEmptyState } from "../src/ui/SeoullyEmptyState";
-import { SeoullyFeedPost } from "../src/ui/SeoullyFeedPost";
-import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
+import type { NativeFeedPost } from "../../src/api";
+import { useSocialRepository, type SocialCollector, type SocialCompatibility } from "../../src/data";
+import { useReportAskSurface } from "../../src/ask-surface";
+import { RetryNotice } from "../../src/components/RetryNotice";
+import { ScreenBack } from "../../src/components/ScreenBack";
+import { collectibleKindLabel, type MobileCopy } from "../../src/i18n";
+import { useCopy, useLocale } from "../../src/locale";
+import { colors } from "../../src/theme";
+import { identityPalette } from "../../src/ui/profileContrast";
+import { ProfileIdentityProvider, usePublishProfileIdentity } from "../../src/ui/ProfileIdentity";
+import { SeoullyButton, SeoullyChip, SeoullyShelf } from "../../src/ui/SeoullyControls";
+import { SeoullyEmptyState } from "../../src/ui/SeoullyEmptyState";
+import { SeoullyFeedPost } from "../../src/ui/SeoullyFeedPost";
+import { SeoullyLoadingState } from "../../src/ui/SeoullyLoadingState";
 import {
   formatCollectingSince,
   SeoullyHighlight,
@@ -24,10 +24,10 @@ import {
   SeoullyProfileVeil,
   SeoullyRoomUnderlay,
   SeoullyShelfRow,
-} from "../src/ui/SeoullyProfile";
-import { SeoullyScreen } from "../src/ui/SeoullyScreen";
-import { SeoullyText } from "../src/ui/SeoullyText";
-import { SeoullyTradeMatch } from "../src/ui/SeoullyTradeMatch";
+} from "../../src/ui/SeoullyProfile";
+import { SeoullyScreen } from "../../src/ui/SeoullyScreen";
+import { SeoullyText } from "../../src/ui/SeoullyText";
+import { SeoullyTradeMatch } from "../../src/ui/SeoullyTradeMatch";
 
 function highlightsFromCollector(collector: SocialCollector, allowPersonalMedia: boolean) {
   const groups = new Map<string, { name: string; count: number; imageUrl?: string; colorway?: { base: string; accent: string; ink: string } }>();
@@ -207,6 +207,7 @@ export default function CollectorScreen() {
   }
 
   const palette = identityPalette(collector?.theme);
+  usePublishProfileIdentity(palette);
 
   return (
     <SeoullyScreen backgroundColor={palette.mist}>

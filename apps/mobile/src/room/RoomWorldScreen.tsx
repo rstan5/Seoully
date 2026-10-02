@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
-import { AccessibilityInfo, AppState, PanResponder, Pressable, ScrollView, StyleSheet, View, type GestureResponderEvent } from "react-native";
+import { AccessibilityInfo, Animated, AppState, Easing, PanResponder, Pressable, ScrollView, StyleSheet, View, type GestureResponderEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { loadCollectorRoom, loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomPlacement, type NativeHolding, type NativeRoomPlacement, type NativeRoomSnapshot } from "../api";
 import { binderSpreads, buildNativeBinderPages, spreadIndexForHolding } from "../binder/model";
@@ -33,6 +33,8 @@ import {
   type ExploreOffset,
   type ExploreSpace,
 } from "./camera";
+import { entranceForeground, roomEntranceCopy } from "./entrance";
+import { roomPalette } from "./theme";
 import { inspectView, openBinderView, stepBack, zoneFromSurfaceId, type CanonicalZoneKind, type NativeWorldView } from "./worldView";
 
 const NativeRoomRenderer = lazy(async () => {
@@ -112,7 +114,7 @@ export function RoomWorldScreen({
           setSnapshot(next);
           setHoldings(next.holdings);
           setItems(buildRoomRenderables(next.holdings, next.placements));
-          setOwnerName(userId);
+          setOwnerName(demoRoom.demoCollectorDisplayName(userId));
           setPrivateRoom(false);
         } else {
           const next = demoRoom.buildFixtureRoomSnapshot();
@@ -267,6 +269,14 @@ export function RoomWorldScreen({
   const editing = view.kind === "edit";
   const readOnly = mode === "public";
   const themeId = snapshot?.room.themeId ?? "hearth";
+  const entranceLabel = roomEntranceCopy({
+    mode,
+    displayName: ownerName,
+    fallbackName: copy.collectorFallback,
+    ownLabel: copy.enteringYourRoom,
+    visitorLabel: copy.enteringCollectorRoom,
+  });
+  const entranceTone = entranceForeground(roomPalette(themeId).void);
 
   function goBack() {
     const current = viewRef.current;
@@ -460,10 +470,10 @@ export function RoomWorldScreen({
     return <View style={styles.world}>
       <OverlayChrome
         copy={copy}
-        identity={ownerName || copy.room}
         onBack={onLeave}
         style={overlayPad}
       />
+      <RoomEntranceTitle key={entranceLabel} label={entranceLabel} color={entranceTone.color} shadow={entranceTone.shadow} reducedMotion={reducedMotion} />
       <SeoullyText variant="secondary" style={styles.empty}>{copy.roomPrivate}</SeoullyText>
     </View>;
   }
@@ -521,7 +531,6 @@ export function RoomWorldScreen({
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       <OverlayChrome
         copy={copy}
-        identity={mode === "public" ? (ownerName || copy.room) : undefined}
         onBack={goBack}
         editing={editing}
         readOnly={readOnly}
@@ -530,6 +539,7 @@ export function RoomWorldScreen({
         onSave={() => void saveEditing()}
         style={overlayPad}
       />
+      {!loading ? <RoomEntranceTitle key={entranceLabel} label={entranceLabel} color={entranceTone.color} shadow={entranceTone.shadow} reducedMotion={reducedMotion} /> : null}
       {error ? <Pressable onPress={() => void refresh()} style={styles.error}><SeoullyText variant="secondary" color={colors.plum}>{error} · {copy.retry}</SeoullyText></Pressable> : null}
       {hint ? <View pointerEvents="none" style={[styles.hint, { bottom: insets.bottom + chrome.companionSize + chrome.gutter }]}><SeoullyText variant="caption" color={colors.ink} style={styles.hintText}>{hint}</SeoullyText></View> : null}
       {selectedItem && !editing && view.kind !== "binder" ? <View style={[styles.inspection, trayPad]}>
@@ -563,7 +573,6 @@ export function RoomWorldScreen({
 
 function OverlayChrome({
   copy,
-  identity,
   onBack,
   editing,
   readOnly,
@@ -573,7 +582,6 @@ function OverlayChrome({
   style,
 }: {
   copy: MobileCopy;
-  identity?: string;
   onBack: () => void;
   editing?: boolean;
   readOnly?: boolean;
@@ -586,7 +594,7 @@ function OverlayChrome({
     <Pressable accessibilityRole="button" onPress={onBack} style={styles.overlayChip}>
       <SeoullyText variant="button" color={colors.plum}>{copy.back}</SeoullyText>
     </Pressable>
-    {identity ? <SeoullyText numberOfLines={1} variant="caption" color={colors.ink} style={styles.overlayIdentity}>{identity}</SeoullyText> : <View style={styles.overlaySpacer} />}
+    <View style={styles.overlaySpacer} />
     {readOnly || !onEdit ? <View style={styles.overlaySpacer} /> : <View style={styles.overlayActions}>
       {editing ? <Pressable onPress={onCancel} style={styles.overlayChip}><SeoullyText variant="button" color={colors.plum}>{copy.cancelEditing}</SeoullyText></Pressable> : null}
       <Pressable onPress={editing ? onSave : onEdit} style={styles.overlayChip}>
@@ -594,6 +602,40 @@ function OverlayChrome({
       </Pressable>
     </View>}
   </View>;
+}
+
+function RoomEntranceTitle({
+  label,
+  color,
+  shadow,
+  reducedMotion,
+}: {
+  label: string;
+  color: string;
+  shadow: string;
+  reducedMotion: boolean;
+}) {
+  const [opacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    opacity.setValue(reducedMotion ? 1 : 0);
+    if (reducedMotion) {
+      const hide = setTimeout(() => { if (!cancelled) setVisible(false); }, 1800);
+      return () => { cancelled = true; clearTimeout(hide); };
+    }
+    const fade = Animated.sequence([
+      Animated.timing(opacity, { toValue: 1, duration: 280, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.delay(1500),
+      Animated.timing(opacity, { toValue: 0, duration: 520, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+    ]);
+    fade.start(({ finished }) => { if (finished && !cancelled) setVisible(false); });
+    return () => { cancelled = true; fade.stop(); };
+  }, [label, opacity, reducedMotion]);
+  if (!visible) return null;
+  return <Animated.View pointerEvents="none" style={[styles.entrance, { opacity }]}>
+    <SeoullyText variant="title" color={color} style={[styles.entranceText, { textShadowColor: shadow }]}>{label}</SeoullyText>
+  </Animated.View>;
 }
 
 function touchSpan(event: GestureResponderEvent) {
@@ -625,8 +667,9 @@ const styles = StyleSheet.create({
   world: { backgroundColor: "#1c1418", flex: 1 },
   overlayBar: { alignItems: "center", flexDirection: "row", gap: spacing.sm },
   overlayChip: { backgroundColor: "rgba(247,241,244,0.88)", borderRadius: 999, justifyContent: "center", minHeight: 36, paddingHorizontal: spacing.sm },
-  overlayIdentity: { flex: 1, textAlign: "center" },
   overlaySpacer: { flex: 1 },
+  entrance: { alignItems: "center", bottom: 0, justifyContent: "center", left: 0, paddingHorizontal: 28, position: "absolute", right: 0, top: 0 },
+  entranceText: { fontSize: 22, lineHeight: 28, textAlign: "center", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 8 },
   overlayActions: { flexDirection: "row", flexShrink: 0, gap: spacing.xs },
   error: { paddingHorizontal: chrome.gutter, paddingTop: spacing.xs },
   empty: { padding: chrome.gutter },

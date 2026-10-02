@@ -52,7 +52,6 @@ export function AuthRouteTree() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="binder" />
         <Stack.Screen name="collection" />
-        <Stack.Screen name="collector" />
         <Stack.Screen name="collector-room" options={{ gestureEnabled: false, fullScreenGestureEnabled: false }} />
         <Stack.Screen name="edit-profile" />
         <Stack.Screen name="public-collectible" />

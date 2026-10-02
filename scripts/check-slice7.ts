@@ -14,7 +14,9 @@ import {
   nudgeExploreFromDrag,
   nudgeExploreFromPinch,
   ROOM_INTERIOR,
+  visibleFrustumY,
 } from "../apps/mobile/src/room/camera";
+import { entranceForeground, isInternalCollectorId, roomEntranceCopy } from "../apps/mobile/src/room/entrance";
 import { CANONICAL_ZONE_KINDS, stepBack } from "../apps/mobile/src/room/worldView";
 
 const repoRoot = process.cwd();
@@ -42,7 +44,10 @@ assertContains(tabs, 'name="create"', "tabs");
 assertContains(tabs, 'name="messages"', "tabs");
 assertContains(tabs, 'name="profile"', "tabs");
 assertNotContains(tabs, 'name="room"', "tabs");
+assertContains(tabs, 'name="collector" options={{ href: null', "collector profile is a hidden social screen");
 assert.equal(fs.existsSync(path.join(repoRoot, "apps/mobile/app/(tabs)/room.tsx")), false, "room is stack-only");
+assert.equal(fs.existsSync(path.join(repoRoot, "apps/mobile/app/(tabs)/collector.tsx")), true, "collector profile is in the social shell");
+assert.equal(fs.existsSync(path.join(repoRoot, "apps/mobile/app/collector.tsx")), false, "collector is not a stack-only profile");
 const tabBar = read("apps/mobile/src/ui/SeoullyTabBar.tsx");
 assertContains(tabBar, "index: IconHome", "tab bar");
 assertNotContains(tabBar, "room: ", "tab bar must not show Room");
@@ -224,5 +229,59 @@ const pinched = nudgeExploreFromPinch(IDENTITY_EXPLORE, 1, 100, 140, "home");
 assert.ok(pinched.dolly < 1);
 assert.ok(pinched.dolly >= 0.78);
 assert.equal(pinched.panX, 0);
+
+function assertCeilingHolds(dolly: number, panY: number) {
+  const pose = applyExploreOffset(HOME_POSE, { panX: 0, panY, dolly }, "home");
+  const vis = visibleFrustumY(pose, ROOM_INTERIOR.backZ);
+  assert.ok(vis.top <= ROOM_INTERIOR.ceiling + 0.02, `dolly ${dolly} panY ${panY} top ${vis.top}`);
+}
+
+for (const dolly of [1, 0.78, 1.22]) {
+  const up = clampExplore({ panX: 0, panY: 9, dolly }, "home");
+  assertCeilingHolds(up.dolly, up.panY);
+  const down = clampExplore({ panX: 0, panY: -9, dolly }, "home");
+  const downPose = applyExploreOffset(HOME_POSE, down, "home");
+  assert.ok(downPose.position.y > ROOM_INTERIOR.floor, "downward pan keeps the camera above the floor");
+  assertCeilingHolds(down.dolly, down.panY);
+}
+
+assertNotContains(worldScreen, "identity={", "no permanent Room identity chrome");
+assertNotContains(worldScreen, "setOwnerName(userId)", "demo Room does not show raw user ids");
+assertContains(worldScreen, "demoCollectorDisplayName", "demo Room uses display names");
+assertContains(worldScreen, "RoomEntranceTitle", "transient entrance title");
+assertContains(worldScreen, "pointerEvents=\"none\"", "entrance title does not intercept touches");
+assertContains(worldScreen, "reducedMotion", "entrance respects reduced motion");
+assertContains(read("apps/mobile/app/(tabs)/collector.tsx"), "usePublishProfileIdentity", "collector profile publishes tab theme");
+assertContains(read("apps/mobile/src/ui/ProfileIdentity.tsx"), "identityPublicationSurvives", "theme survives Room transition");
+assertContains(read("apps/mobile/src/ui/shellLayout.ts"), 'leaf === "profile" || leaf === "collector" || leaf === "room" || leaf === "collector-room"', "theme keep-set");
+assertContains(read("apps/mobile/src/ui/ProfileIdentity.tsx"), "identityPublicationSurvives(pathname) ? published : null", "do not clear during Room");
+assertNotContains(read("apps/mobile/src/ui/ProfileIdentity.tsx"), "return () => publish(null);", "blur does not flash default chrome");
+assertContains(read("apps/mobile/src/i18n.ts"), 'enteringYourRoom: "Entering your room"', "own entrance copy");
+assertContains(read("apps/mobile/src/i18n.ts"), 'enteringCollectorRoom: "Entering {name}\'s room"', "visitor entrance copy");
+assert.equal(roomEntranceCopy({
+  mode: "own",
+  displayName: "u-soo",
+  fallbackName: "Seoully collector",
+  ownLabel: "Entering your room",
+  visitorLabel: "Entering {name}'s room",
+}), "Entering your room");
+assert.equal(roomEntranceCopy({
+  mode: "public",
+  displayName: "Minji",
+  fallbackName: "Seoully collector",
+  ownLabel: "Entering your room",
+  visitorLabel: "Entering {name}'s room",
+}), "Entering Minji's room");
+assert.equal(roomEntranceCopy({
+  mode: "public",
+  displayName: "u-minji",
+  fallbackName: "Seoully collector",
+  ownLabel: "Entering your room",
+  visitorLabel: "Entering {name}'s room",
+}), "Entering Seoully collector's room");
+assert.equal(isInternalCollectorId("u-minji"), true);
+assert.equal(isInternalCollectorId("Minji"), false);
+assert.equal(entranceForeground("#120e12").color, "#f7f1f4");
+assert.equal(entranceForeground("#efe8da").color, "#2c2e4c");
 
 console.log("check:slice7 passed");

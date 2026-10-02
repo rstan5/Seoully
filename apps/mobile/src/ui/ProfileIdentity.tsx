@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useState, type PropsWithChildren } from "react";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, usePathname } from "expo-router";
 import { colors } from "../theme";
 import { IDENTITY_LIGHT, type IdentityPalette } from "./profileContrast";
+import { identityPublicationSurvives } from "./shellLayout";
 
 const ProfileIdentityContext = createContext<IdentityPalette | null>(null);
 const PublishedIdentityContext = createContext<IdentityPalette | null>(null);
@@ -21,9 +22,11 @@ export function ProfileIdentityProvider({
  */
 export function ProfileIdentityScope({ children }: PropsWithChildren) {
   const [published, setPublished] = useState<IdentityPalette | null>(null);
+  const pathname = usePathname();
+  const live = identityPublicationSurvives(pathname) ? published : null;
   return (
     <PublishIdentityContext.Provider value={setPublished}>
-      <PublishedIdentityContext.Provider value={published}>
+      <PublishedIdentityContext.Provider value={live}>
         {children}
       </PublishedIdentityContext.Provider>
     </PublishIdentityContext.Provider>
@@ -42,7 +45,6 @@ export function usePublishProfileIdentity(palette: IdentityPalette) {
   const publish = useContext(PublishIdentityContext);
   useFocusEffect(useCallback(() => {
     publish(palette);
-    return () => publish(null);
   }, [publish, palette]));
 }
 

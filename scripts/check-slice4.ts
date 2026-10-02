@@ -120,7 +120,9 @@ assertContains(tabs, 'name="create"', "tabs/_layout.tsx");
 assertContains(tabs, 'name="messages"', "tabs/_layout.tsx");
 assertContains(tabs, 'name="profile"', "tabs/_layout.tsx");
 assertNotContains(tabs, 'name="room"', "tabs/_layout.tsx");
+assertContains(tabs, 'name="collector" options={{ href: null', "tabs/_layout.tsx");
 assert.equal(fs.existsSync(path.join(repoRoot, "apps/mobile/app/(tabs)/room.tsx")), false, "no tabs/room route");
+assert.equal(fs.existsSync(path.join(repoRoot, "apps/mobile/app/collector.tsx")), false, "collector profile lives in tabs");
 assertNotContains(tabs, "binder", "tabs/_layout.tsx");
 
 const tabBar = read("apps/mobile/src/ui/SeoullyTabBar.tsx");

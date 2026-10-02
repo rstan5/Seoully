@@ -12,7 +12,7 @@ export const chrome = {
   companionClearance: 16,
 } as const;
 
-const TAB_SURFACES = new Set(["", "index", "search", "create", "messages", "profile", "notices", "send-to"]);
+const TAB_SURFACES = new Set(["", "index", "search", "create", "messages", "profile", "notices", "send-to", "collector"]);
 const STACK_SURFACES = new Set([
   "onboarding",
   "room",
@@ -21,7 +21,6 @@ const STACK_SURFACES = new Set([
   "add",
   "collectible",
   "collection",
-  "collector",
   "edit-profile",
   "thread",
   "binder",
@@ -34,7 +33,7 @@ export function nativePathLeaf(pathname: string): string {
   return parts[0] ?? "";
 }
 
-/** Bottom tab bar is visible on the five social peers only. Room is a stack immersive child. */
+/** Bottom tab bar is visible on the five social peers and hidden social screens (collector profile). Room is immersive. */
 export function routeShowsBottomNav(pathname: string): boolean {
   const normalized = pathname.replace(/\/+$/, "") || "/";
   const leaf = nativePathLeaf(normalized);
@@ -44,6 +43,12 @@ export function routeShowsBottomNav(pathname: string): boolean {
     return TAB_SURFACES.has(leaf) || leaf === "index";
   }
   return TAB_SURFACES.has(leaf);
+}
+
+/** Keep published Profile chrome through the visible Profile/collector → Room transition. */
+export function identityPublicationSurvives(pathname: string): boolean {
+  const leaf = nativePathLeaf(pathname);
+  return leaf === "profile" || leaf === "collector" || leaf === "room" || leaf === "collector-room";
 }
 
 export type EdgeInsets = { top: number; right: number; bottom: number; left: number };

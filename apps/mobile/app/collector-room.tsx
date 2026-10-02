@@ -15,7 +15,7 @@ export default function CollectorRoomScreen() {
     ...(userId ? { collectorUserId: userId, roomOwnerUserId: userId } : {}),
   });
   // Demo isolation: fixture rooms only. copy.demoRoomUnavailable is the Live-off message.
-  return <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
+  return <SafeAreaView edges={[]} style={{ flex: 1 }}>
     <RoomWorldScreen
       mode="public"
       userId={userId}

@@ -34,20 +34,21 @@ export function nativePathLeaf(pathname: string): string {
   return parts[0] ?? "";
 }
 
-/** Bottom tab bar is visible on the five social peers (and hidden tab routes). */
+/** Bottom tab bar is visible on the five social peers only. Room is a stack immersive child. */
 export function routeShowsBottomNav(pathname: string): boolean {
   const normalized = pathname.replace(/\/+$/, "") || "/";
   const leaf = nativePathLeaf(normalized);
+  if (leaf === "room" || leaf === "collector-room") return false;
   if (STACK_SURFACES.has(leaf)) return false;
-  if (normalized === "/" || normalized === "/(tabs)" || normalized.startsWith("/(tabs)/") || normalized === "/(tabs)") {
-    return leaf !== "room";
+  if (normalized === "/" || normalized === "/(tabs)" || normalized.startsWith("/(tabs)/")) {
+    return TAB_SURFACES.has(leaf) || leaf === "index";
   }
   return TAB_SURFACES.has(leaf);
 }
 
 export type EdgeInsets = { top: number; right: number; bottom: number; left: number };
 
-/** One companion placement for every surface. Room-specific docking is Slice 7. */
+/** One companion. Immersive Room uses safe-area + gutter only — no tab-bar clearance. */
 export function companionPlacement(input: { insets: EdgeInsets; hasBottomNav: boolean }) {
   const aboveChrome = input.hasBottomNav
     ? chrome.tabBarContent + chrome.companionClearance

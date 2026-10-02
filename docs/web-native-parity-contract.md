@@ -31,7 +31,7 @@ Do **not** ship a “mobile-inspired” subset. Do **not** add Seoully Vision. D
 | Role | Web | Native today | Contract |
 |------|-----|--------------|----------|
 | Primary tabs | Discover (feed) · Search · Create · Messages · Profile | Feed · Search · Create · Messages · Profile | Same five peers. Native label should match web: first tab is **Discover** (`nav.discover`), action is still the feed. |
-| Room | Not a tab. Entered from Profile, Search rooms, Ask, doorway, onboarding reveal, `/@handle/room` | Hidden tab route; Profile **Enter Room** | Keep Room out of the tab bar. |
+| Room | Not a tab. Entered from Profile, Search rooms, Ask, doorway, onboarding reveal, `/@handle/room` | Stack immersive `/room` + `/collector-room`; Profile **Enter Room** | Room is **not** a primary bottom tab. Social tabs disappear inside Room. |
 | Notices | Header bell | Header bell + hidden route | Keep off the tab bar. |
 | Ask | Floating heart companion | Floating companion | Keep off the tab bar. |
 | World vs chrome | Room always mounted; social is overlay; “back” zooms out | Room is a separate stack screen; social is opaque pages | **Replace presentation of the world relationship.** Native may use a separate GL screen for performance, but Profile must still be identity **over the owner’s Room**, not over paper. |
@@ -118,7 +118,7 @@ Bell → `CollectorNotices`. Fixture `pushNotice` on like/comment/follow/repost/
 
 ### 2.12 Ask Seoully
 
-Onboarding `HeartScene`; later `SeoullyHeartCompanion` + `AskSeoullyPanel` on web. Native heart companion is the same Ask Seoully assistant (`SeoullyCompanion`). Live: `/api/mobile/assistant` and web `/api/assistant/v2` share `askSeoullyProduction` — server-owned OpenAI (`OPENAI_API_KEY` / `OPENAI_MODEL`), optional tool calling, production registry/DAL for Seoully facts, allowlisted navigation. General K-pop/collector questions do not require a catalog tool. Current-information and price-intelligence tools are not registered. Demo native Ask uses fixture tools for collection data and does not fake OpenAI general chat. Suggested prompts use the same pipeline. Room-specific heart placement is Slice 7.
+Onboarding `HeartScene`; later `SeoullyHeartCompanion` + `AskSeoullyPanel` on web. Native heart companion is the same Ask Seoully assistant (`SeoullyCompanion`). Live: `/api/mobile/assistant` and web `/api/assistant/v2` share `askSeoullyProduction` — server-owned OpenAI (`OPENAI_API_KEY` / `OPENAI_MODEL`), optional tool calling, production registry/DAL for Seoully facts, allowlisted navigation. General K-pop/collector questions do not require a catalog tool. Current-information and price-intelligence tools are not registered. Demo native Ask uses fixture tools for collection data and does not fake OpenAI general chat. Suggested prompts use the same pipeline. Slice 7A places that same heart in immersive Room with safe-area + gutter only (no tab-bar clearance).
 
 ### 2.13 Room (web)
 
@@ -438,13 +438,19 @@ Recommended comms shape (specification only): text + `kind` + `post_id` + templa
 
 ---
 
-## 11b. Slice 7 physical lock (Repair 01 — document only)
+## 11b. Slice 7 physical lock
 
-Physical iPhone QA after the native slices proved Room is useful but not product-parity. **Do not implement these in Repair 01.** They remain the Slice 7 reconstruction contract. `20261002000000_native_room_theme.sql` stays unapplied until Slice 7 review.
+Physical iPhone QA after the native slices proved Room is useful but not product-parity. **KEEP THE ENGINE, REBUILD THE EXPERIENCE** (R3F, Expo GL, RoomPlacement DAL, representation, media, focus, Binder data, persist/rollback, public security). `20261002000000_native_room_theme.sql` stays unapplied until Slice 7D review. There is **no Closet**.
 
-Full-screen Room (no social tab bar, no giant header, no permanent zone pills). Direct touch camera (constrained pan/pinch/focus; diorama, not CAD). Keep inspect/lift/details; wishlist/message via Slice 5. Touch-first edit (long-press, drag, settle, rollback) — not Turn/Scale buttons as primary UX. Ownership ≠ placement; reuse existing placement rules. Stored collection as a world object, not a giant list tray. Binder stays in-world with camera continuity. Material/lighting/depth so objects are recognizable without labels. Web-faithful customization without inventing schema. Invert cursor/button mental model to finger → world. **KEEP THE ENGINE, REBUILD THE EXPERIENCE** (R3F, Expo GL, RoomPlacement DAL, representation, media, focus, Binder data, persist/rollback, public security).
+Decomposition:
 
-See `docs/native-road-to-ship.md` Slice 7 “Physical iPhone findings — locked for Slice 7”.
+- **7A** — immersive Room + touch camera. Implemented in tree: Room is not a bottom tab; social tabs disappear inside Room; world replaces zone-pill navigation; constrained diorama drag/pinch; object inspection preserved; heart is the existing Ask Seoully. **DEVICE QA REQUIRED** before 7B.
+- **7B** — touch-first editing + world storage. Not started.
+- **7C** — Binder as part of the world. Not started.
+- **7D** — materials / lighting / customization. Not started.
+- **7E** — physical integration QA. Not started.
+
+See `docs/native-road-to-ship.md` Slice 7.
 
 Live Profile Appearance remains a Slice 7 contract gap: Demo can theme Profile controls and the focused Profile tab bar from fixture `appearance` + room; production mobile APIs have no appearance field, and `20261002` is unapplied. Repair 01 follow-up themes native Profile (and Profile-tab chrome only) from whatever `SocialTheme` the current DAL already returns. Collector theme must not leak into Discover.
 

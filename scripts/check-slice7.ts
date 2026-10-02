@@ -4,6 +4,15 @@ import path from "node:path";
 import { buildPages } from "../src/world/objects/binderGeometry";
 import { isBinderEligible } from "../apps/mobile/src/data/ownership";
 import { holdingRemainsAfterStore, restoreEditBaseline, revertDrop, storeRenderable } from "../apps/mobile/src/room/editSession";
+import {
+  applyExploreOffset,
+  clampExplore,
+  exploreAllowedForView,
+  HOME_POSE,
+  IDENTITY_EXPLORE,
+  nudgeExploreFromDrag,
+  nudgeExploreFromPinch,
+} from "../apps/mobile/src/room/camera";
 import { CANONICAL_ZONE_KINDS, stepBack } from "../apps/mobile/src/room/worldView";
 
 const repoRoot = process.cwd();
@@ -30,7 +39,8 @@ assertContains(tabs, 'name="search"', "tabs");
 assertContains(tabs, 'name="create"', "tabs");
 assertContains(tabs, 'name="messages"', "tabs");
 assertContains(tabs, 'name="profile"', "tabs");
-assertContains(tabs, 'name="room" options={{ href: null', "tabs");
+assertNotContains(tabs, 'name="room"', "tabs");
+assert.equal(fs.existsSync(path.join(repoRoot, "apps/mobile/app/(tabs)/room.tsx")), false, "room is stack-only");
 const tabBar = read("apps/mobile/src/ui/SeoullyTabBar.tsx");
 assertContains(tabBar, "index: IconHome", "tab bar");
 assertNotContains(tabBar, "room: ", "tab bar must not show Room");
@@ -141,9 +151,51 @@ assertContains(read("src/server/dal/room-schema.ts"), 'ROOM_OWNER_SELECT = "id,o
 assertContains(read("src/server/dal/rooms.ts"), "room_theme_unavailable", "theme write blocked");
 assertNotContains(read("apps/mobile/app/room.tsx"), "saveNativeRoomTheme", "room does not write theme");
 
-assertNotContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "cameraYaw", "no orbit yaw");
+assertNotContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "OrbitControls", "no orbit controls");
 assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "AuthoredCamera", "authored camera");
+assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "applyExploreOffset", "constrained explore");
 assertContains(read("apps/mobile/src/ui/SeoullyProfile.tsx"), "RoomWorldGlimpse", "profile glimpse");
 assertNotContains(read("apps/mobile/src/ui/SeoullyProfile.tsx"), "theme?.paper ?? colors.canvas", "no paper placeholder");
+
+// Slice 7A — immersive shell + direct-touch camera
+assertNotContains(worldScreen, "LookChip", "no permanent zone pills");
+assertNotContains(worldScreen, "roomLookHome", "no Home pill");
+assertNotContains(worldScreen, "fontSize: 30", "no giant Room title");
+assertNotContains(worldScreen, "copy.roomLead", "no explanatory Room lead");
+assertContains(worldScreen, "OverlayChrome", "minimal overlays");
+assertContains(worldScreen, "copy.editRoom", "Edit Room entry");
+assertContains(worldScreen, "nudgeExploreFromDrag", "one-finger explore");
+assertContains(worldScreen, "nudgeExploreFromPinch", "pinch zoom");
+assertContains(worldScreen, "Math.hypot(gesture.dx, gesture.dy) > 10", "drag threshold");
+assertContains(worldScreen, "exploreRef={exploreRef}", "camera reads explore ref");
+assertContains(worldScreen, "onOpenBinder={readOnly || editing ? undefined : () => openBinder()}", "desk Binder tap");
+assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "ZONE_HOTSPOTS", "world zone taps");
+assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), 'onSelectZone?.("shelf")', "shelf furniture tap");
+assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "onOpenBinder", "desk Binder tap");
+assertContains(read("apps/mobile/app/room.tsx"), 'edges={[]}', "own Room is full-bleed");
+assertContains(read("apps/mobile/app/collector-room.tsx"), 'edges={[]}', "collector Room is full-bleed");
+assertContains(read("apps/mobile/app/(tabs)/profile.tsx"), 'router.push("/room")', "Profile enters stack Room");
+assertContains(read("apps/mobile/src/i18n.ts"), 'editRoom: "Edit Room"', "Edit Room copy");
+assertContains(read("apps/mobile/src/ui/shellLayout.ts"), "safe-area + gutter only", "immersive companion contract");
+assert.equal(exploreAllowedForView({ kind: "home" }), true);
+assert.equal(exploreAllowedForView({ kind: "zone", zone: "shelf" }), true);
+assert.equal(exploreAllowedForView({ kind: "inspect", zone: "desk", holdingId: "h" }), false);
+assert.equal(exploreAllowedForView({ kind: "binder", spread: 0 }), false);
+assert.equal(exploreAllowedForView({ kind: "edit" }), false);
+const identity = applyExploreOffset(HOME_POSE, IDENTITY_EXPLORE, "home");
+assert.ok(Math.abs(identity.position.x - HOME_POSE.position.x) < 0.08);
+assert.ok(Math.abs(identity.position.z - HOME_POSE.position.z) < 0.08);
+const extreme = clampExplore({ yaw: 9, pitch: -9, dolly: 0.05 }, "home");
+assert.ok(Math.abs(extreme.yaw) <= 0.55);
+assert.ok(extreme.pitch >= -0.18 && extreme.pitch <= 0.28);
+assert.ok(extreme.dolly >= 0.78 && extreme.dolly <= 1.22);
+const flipped = applyExploreOffset(HOME_POSE, { yaw: 0, pitch: Math.PI, dolly: 0.4 }, "home");
+assert.ok(flipped.position.y > 0, "camera cannot invert");
+assert.ok(flipped.position.z >= 3.55, "home camera stays in the room");
+const dragged = nudgeExploreFromDrag(IDENTITY_EXPLORE, 80, 0, "home");
+assert.ok(dragged.yaw !== 0);
+const pinched = nudgeExploreFromPinch(IDENTITY_EXPLORE, 1, 100, 140, "home");
+assert.ok(pinched.dolly < 1);
+assert.ok(pinched.dolly >= 0.78);
 
 console.log("check:slice7 passed");

@@ -282,14 +282,24 @@ Order is dependency-shaped. **Slice 1 is first.**
 
 **Device QA:** Web’s physical Room checklist: enter from Profile, place album on shelf, photocard to binder, back, visit someone else’s public room, relaunch.
 
-**Implementation (2026-09-29):** SLICE 7 — CODE VERIFIED / DEVICE QA PENDING. Native Room is one authored-camera world (HOME / six canonical docks / inspect / edit / open Binder). Desk Binder is a physical object; tap flies the camera into an in-scene OpenBinder (pages, pockets, lift). Profile uses `RoomWorldGlimpse` derived from the real room palette, not paper. Theme column `20261002` was reviewed and **not applied** — production rooms have no theme persist; hearth default matches starter HEARTH. Demo Rooms use fixture placements in-memory; Live uses `rooms` + `room_placements`. Standalone `/binder` remains a data fallback for older checks; product path is in-room.
+**Implementation (2026-10-01):** SLICE 7A — CODE VERIFIED / DEVICE QA REQUIRED. Keep the engine; rebuild the experience. Room is **not** a bottom tab. Profile / collector identity → stack `/room` or `/collector-room` → full-screen immersive world; Back returns to identity/social. Social tabs are absent inside Room (no `(tabs)/room` route). Permanent giant header, Move Objects header, and Home/Shelf/Wall/Case/Desk/Binder/Archive pills are removed. Navigation is spatial (world hotspots + desk Binder tap) plus constrained direct-touch camera (one-finger empty-world drag, pinch dolly, authored docks + explore clamps). Tap-to-focus / inspection / existing edit engine / in-world Binder / Ask Seoully heart are preserved. Companion uses safe-area + gutter only. `20261002000000_native_room_theme.sql` remains **unapplied**. No Closet. Slices 7B–7E and Slice 8 work are not started here.
+
+#### Slice 7 decomposition
+
+| Block | Scope | Status |
+| --- | --- | --- |
+| **7A** | Immersive Room shell + direct-touch constrained camera | CODE VERIFIED / DEVICE QA REQUIRED |
+| **7B** | Touch-first editing + world storage (long-press, drag/drop, merch-box / stored holdings sheet) | Not started |
+| **7C** | Binder as part of the world (continuous camera travel, spatial open/close) | Not started — preserve current Binder |
+| **7D** | Materials, lighting, and Room customization (review `20261002` before applying) | Not started — migration unapplied |
+| **7E** | Physical integration QA of the reconstructed world | Not started — required after 7A device proof |
 
 #### Slice 7 visual / interaction QA map
 
 | State | Web target | Native implementation | Device-QA risk |
 | --- | --- | --- | --- |
 | Room home | Overview dock, crop into furniture on phone | `HOME_POSE` authored camera, no orbit | Framing vs web CSS 3D scale |
-| Shelf | Zone dock + shelf hotspots | Tap shelf hotspot / chip → `ZONE_DOCKS.shelf` | Hotspot vs object hit-testing |
+| Shelf | Zone dock + shelf hotspots | Tap shelf geometry / hotspot → `ZONE_DOCKS.shelf` | Hotspot vs object hit-testing |
 | Wall | Poster wall dock | Wall plane + dock | Poster scale / lighting |
 | Case | Display case dock, glass | Case furniture + glass plane | Glass opacity/readability |
 | Desk | Desk dock, lamp | Desk + lamp + binder object | Binder vs desk objects |

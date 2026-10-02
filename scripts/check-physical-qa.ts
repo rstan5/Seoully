@@ -395,6 +395,8 @@ assertContains(read("docs/native-road-to-ship.md"), "Live Profile Appearance / R
   assertNotContains(companion, "right: 12", "companion is not jammed to 12px");
   assertContains(retry, "SeoullyText", "shared retry uses Seoully type");
   assertContains(roomWorld, "SeoullyText", "room chrome uses Seoully type");
+  assertContains(roomWorld, "OverlayChrome", "immersive Room overlays");
+  assertNotContains(roomWorld, "LookChip", "no permanent zone pills");
   assertContains(read("apps/mobile/app/room.tsx"), "react-native-safe-area-context", "room uses context safe area");
   assertContains(road, "KEEP THE ENGINE", "slice 7 lock recorded");
   assertContains(road, "Touch-first edit mode", "slice 7 lock recorded");

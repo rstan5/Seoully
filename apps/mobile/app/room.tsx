@@ -13,7 +13,7 @@ export default function RoomScreen() {
   useReportAskSurface({ surface: "room" });
   // Slice 2 stored tray: snapshot?.holdings.filter((holding) => !placedIds.has(holding.id))
   // storedCollection chrome is rendered by RoomWorldScreen; this route still gates persistRoom.
-  return <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
+  return <SafeAreaView edges={[]} style={{ flex: 1 }}>
     <RoomWorldScreen
       mode="own"
       demo={social.kind === "demo"}

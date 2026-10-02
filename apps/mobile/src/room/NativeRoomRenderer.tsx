@@ -1,12 +1,12 @@
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
 import "./threeFiberCompat";
-import { Suspense, useMemo } from "react";
+import { Suspense, useMemo, type MutableRefObject } from "react";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber/native";
 import { Color, TextureLoader, Vector3 } from "three";
 import type { NativeBinderSpread } from "../binder/model";
 import type { NativeHolding } from "../api";
 import { useCachedSignedMedia } from "../media/cachedMedia";
-import { cameraLerpAlpha, DESK_BINDER_AT, poseForView } from "./camera";
+import { applyExploreOffset, cameraLerpAlpha, DESK_BINDER_AT, exploreAllowedForView, IDENTITY_EXPLORE, poseForView, type ExploreOffset } from "./camera";
 import { NativeOpenBinder } from "./NativeOpenBinder";
 import { extentsForGeometry } from "./representation";
 import { roomPalette } from "./theme";
@@ -41,6 +41,7 @@ export function NativeRoomRenderer({
   onHoldCard,
   onTurnEdge,
   onTurnComplete,
+  exploreRef,
 }: {
   items: RoomRenderable[];
   selectedId: string | null;
@@ -60,6 +61,7 @@ export function NativeRoomRenderer({
   onHoldCard?: (holding: NativeHolding | null) => void;
   onTurnEdge?: (dir: 1 | -1) => void;
   onTurnComplete?: () => void;
+  exploreRef?: MutableRefObject<ExploreOffset>;
 }) {
   const focused = items.find((item) => item.holding.id === focusedId) ?? null;
   const theme = roomPalette(themeId);
@@ -80,9 +82,9 @@ export function NativeRoomRenderer({
     <ambientLight intensity={0.72} color={theme.fill} />
     <directionalLight color={theme.light} intensity={1.85} position={[-2.8, 5.4, 3.6]} castShadow={false} />
     <pointLight color={theme.light} intensity={reducedMotion ? 0.15 : 0.35} position={[1.2, 1.4, -2.1]} />
-    <AuthoredCamera view={view} focused={focused} reducedMotion={reducedMotion} paused={paused} />
-    <RoomShell theme={theme} />
-    <RoomFurniture theme={theme} hideClosedBinder={binderOpen} onOpenBinder={readOnly || view.kind === "edit" ? undefined : onOpenBinder} />
+    <AuthoredCamera view={view} focused={focused} reducedMotion={reducedMotion} paused={paused} exploreRef={exploreRef} />
+    <RoomShell theme={theme} onSelectZone={view.kind === "home" || view.kind === "zone" ? onSelectZone : undefined} />
+    <RoomFurniture theme={theme} hideClosedBinder={binderOpen} onOpenBinder={readOnly || view.kind === "edit" ? undefined : onOpenBinder} onSelectZone={view.kind === "home" || view.kind === "zone" ? onSelectZone : undefined} />
     {view.kind === "home" ? CANONICAL_ZONE_KINDS.map((zone) => (
       <ZoneHotspot key={zone} zone={zone} onSelect={onSelectZone} />
     )) : null}
@@ -121,11 +123,13 @@ function AuthoredCamera({
   focused,
   reducedMotion,
   paused,
+  exploreRef,
 }: {
   view: NativeWorldView;
   focused: RoomRenderable | null;
   reducedMotion: boolean;
   paused: boolean;
+  exploreRef?: MutableRefObject<ExploreOffset>;
 }) {
   const { camera } = useThree();
   const targetPosition = useMemo(() => new Vector3(), []);
@@ -133,7 +137,11 @@ function AuthoredCamera({
   const desiredLook = useMemo(() => new Vector3(), []);
   useFrame((_, delta) => {
     if (paused) return;
-    const pose = poseForView(view, focused);
+    const authored = poseForView(view, focused);
+    const offset = exploreRef?.current ?? IDENTITY_EXPLORE;
+    const pose = exploreAllowedForView(view)
+      ? applyExploreOffset(authored, offset, view.kind === "zone" ? "zone" : "home")
+      : authored;
     targetPosition.set(pose.position.x, pose.position.y, pose.position.z);
     desiredLook.set(pose.lookAt.x, pose.lookAt.y, pose.lookAt.z);
     const alpha = cameraLerpAlpha(delta, reducedMotion);
@@ -155,9 +163,9 @@ function ZoneHotspot({ zone, onSelect }: { zone: CanonicalZoneKind; onSelect: (z
   </mesh>;
 }
 
-function RoomShell({ theme }: { theme: ReturnType<typeof roomPalette> }) {
+function RoomShell({ theme, onSelectZone }: { theme: ReturnType<typeof roomPalette>; onSelectZone?: (zone: CanonicalZoneKind) => void }) {
   return <>
-    <mesh position={[0, 0.15, -4.22]}><boxGeometry args={[9.6, 6.6, 0.16]} /><meshStandardMaterial color={theme.wall} roughness={0.92} /></mesh>
+    <mesh position={[0, 0.15, -4.22]} onClick={(event) => { event.stopPropagation(); onSelectZone?.("wall"); }}><boxGeometry args={[9.6, 6.6, 0.16]} /><meshStandardMaterial color={theme.wall} roughness={0.92} /></mesh>
     <mesh position={[0, 2.55, -3.4]}><boxGeometry args={[9.4, 0.08, 1.8]} /><meshStandardMaterial color={theme.wallAccent} roughness={0.85} /></mesh>
     <mesh position={[0, -2.15, -1.2]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[9.5, 6.2]} /><meshStandardMaterial color={theme.floor} roughness={0.78} /></mesh>
     <mesh position={[-4.72, 0.1, -1.25]} rotation={[0, Math.PI / 2, 0]}><planeGeometry args={[5.9, 6.5]} /><meshStandardMaterial color={theme.sideWall} roughness={0.9} /></mesh>
@@ -171,15 +179,17 @@ function RoomFurniture({
   theme,
   hideClosedBinder,
   onOpenBinder,
+  onSelectZone,
 }: {
   theme: ReturnType<typeof roomPalette>;
   hideClosedBinder: boolean;
   onOpenBinder?: () => void;
+  onSelectZone?: (zone: CanonicalZoneKind) => void;
 }) {
   return <>
-    <mesh position={[-3.15, -0.55, -3.78]}><boxGeometry args={[2.28, 3.15, 0.42]} /><meshStandardMaterial color={theme.furniture} roughness={0.78} /></mesh>
+    <mesh position={[-3.15, -0.55, -3.78]} onClick={(event) => { event.stopPropagation(); onSelectZone?.("shelf"); }}><boxGeometry args={[2.28, 3.15, 0.42]} /><meshStandardMaterial color={theme.furniture} roughness={0.78} /></mesh>
     {[-1.45, -0.55, 0.35].map((y) => <mesh key={y} position={[-3.15, y, -3.48]}><boxGeometry args={[2.12, 0.08, 0.64]} /><meshStandardMaterial color={theme.edge} roughness={0.62} /></mesh>)}
-    <mesh position={[1.45, -0.82, -2.85]}><boxGeometry args={[3.28, 0.16, 1.68]} /><meshStandardMaterial color={theme.edge} roughness={0.68} /></mesh>
+    <mesh position={[1.45, -0.82, -2.85]} onClick={(event) => { event.stopPropagation(); onSelectZone?.("desk"); }}><boxGeometry args={[3.28, 0.16, 1.68]} /><meshStandardMaterial color={theme.edge} roughness={0.68} /></mesh>
     <mesh position={[0.05, -1.42, -2.85]}><boxGeometry args={[0.12, 1.05, 1.5]} /><meshStandardMaterial color={theme.furniture} roughness={0.8} /></mesh>
     <mesh position={[2.85, -1.42, -2.85]}><boxGeometry args={[0.12, 1.05, 1.5]} /><meshStandardMaterial color={theme.furniture} roughness={0.8} /></mesh>
     {!hideClosedBinder ? <group position={[DESK_BINDER_AT.x, DESK_BINDER_AT.y, DESK_BINDER_AT.z]} rotation={[-0.18, -0.22, 0]} onClick={(event) => { event.stopPropagation(); onOpenBinder?.(); }}>
@@ -187,10 +197,10 @@ function RoomFurniture({
       <mesh position={[0.04, 0, 0]}><boxGeometry args={[0.72, 0.7, 0.5]} /><meshStandardMaterial color={theme.binder} roughness={0.62} /></mesh>
       <mesh position={[0.4, 0, 0]}><boxGeometry args={[0.04, 0.66, 0.46]} /><meshStandardMaterial color={theme.paper} roughness={0.85} /></mesh>
     </group> : null}
-    <mesh position={[3.65, -0.55, -3.78]}><boxGeometry args={[1.6, 3.18, 0.34]} /><meshStandardMaterial color={theme.furniture} roughness={0.76} /></mesh>
+    <mesh position={[3.65, -0.55, -3.78]} onClick={(event) => { event.stopPropagation(); onSelectZone?.("case"); }}><boxGeometry args={[1.6, 3.18, 0.34]} /><meshStandardMaterial color={theme.furniture} roughness={0.76} /></mesh>
     {[-0.55, 0.43].map((y) => <mesh key={`case-${y}`} position={[3.65, y, -3.5]}><boxGeometry args={[1.46, 0.07, 0.66]} /><meshStandardMaterial color={theme.edge} roughness={0.55} /></mesh>)}
     <mesh position={[3.65, 0, -3.42]}><boxGeometry args={[1.42, 2.85, 0.04]} /><meshStandardMaterial color="#d8ecec" roughness={0.12} metalness={0.15} transparent opacity={0.22} /></mesh>
-    <mesh position={[-1.2, -1.86, -0.65]}><boxGeometry args={[1.84, 0.58, 1.18]} /><meshStandardMaterial color={theme.furniture} roughness={0.88} /></mesh>
+    <mesh position={[-1.2, -1.86, -0.65]} onClick={(event) => { event.stopPropagation(); onSelectZone?.("archive"); }}><boxGeometry args={[1.84, 0.58, 1.18]} /><meshStandardMaterial color={theme.furniture} roughness={0.88} /></mesh>
     <mesh position={[0.2, -1.28, -1.15]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[1.38, 48]} /><meshStandardMaterial color={theme.accent} roughness={1} /></mesh>
     <mesh position={[-3.95, -0.85, -1.15]}><cylinderGeometry args={[0.08, 0.12, 2.4, 10]} /><meshStandardMaterial color={theme.edge} roughness={0.45} metalness={0.25} /></mesh>
     <mesh position={[-3.95, 0.42, -1.15]}><sphereGeometry args={[0.22, 16, 12]} /><meshStandardMaterial color={theme.light} emissive={theme.light} emissiveIntensity={0.4} roughness={0.3} /></mesh>

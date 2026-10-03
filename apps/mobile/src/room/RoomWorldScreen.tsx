@@ -46,8 +46,10 @@ import { entranceForeground, roomEntranceCopy } from "./entrance";
 import { roomOverlayChrome, roomPalette } from "./theme";
 import { inspectView, openBinderView, stepBack, zoneFromSurfaceId, type CanonicalZoneKind, type NativeWorldView } from "./worldView";
 
-const nativeRoomRendererImport = import("./NativeRoomRenderer").then((mod) => ({ default: mod.NativeRoomRenderer }));
-const NativeRoomRenderer = lazy(() => nativeRoomRendererImport);
+const NativeRoomRenderer = lazy(async () => {
+  const mod = await import("./NativeRoomRenderer");
+  return { default: mod.NativeRoomRenderer };
+});
 
 type RoomWorldMode = "own" | "public";
 
@@ -640,10 +642,6 @@ export function RoomWorldScreen({
     paddingRight: chrome.companionSize + chrome.gutter + chrome.companionClearance,
   };
 
-  // World mounts on its own. RoomEntranceTitle is overlay copy, never a renderer gate.
-  const showWorld = !privateRoom && (mode === "own" || snapshot !== null);
-  const showEntranceTitle = mode === "own" || Boolean(ownerName) || (privateRoom && !loading);
-
   if (privateRoom && !loading) {
     return <View style={[styles.world, immersiveRoomFill(roomTheme.void)]}>
       <Stack.Screen options={{ contentStyle: immersiveRoomFill(roomTheme.void) }} />
@@ -653,14 +651,14 @@ export function RoomWorldScreen({
         onBack={onLeave}
         style={overlayPad}
       />
-      {showEntranceTitle ? <RoomEntranceTitle key={entranceLabel} label={entranceLabel} color={entranceTone.color} shadow={entranceTone.shadow} reducedMotion={reducedMotion} /> : null}
+      <RoomEntranceTitle key={entranceLabel} label={entranceLabel} color={entranceTone.color} shadow={entranceTone.shadow} reducedMotion={reducedMotion} />
       <SeoullyText variant="secondary" style={styles.empty}>{copy.roomPrivate}</SeoullyText>
     </View>;
   }
 
   return <View style={[styles.world, immersiveRoomFill(roomTheme.void)]}>
     <Stack.Screen options={{ contentStyle: immersiveRoomFill(roomTheme.void) }} />
-    {showWorld ? <View
+    {!loading && snapshot ? <View
       ref={stageRef}
       style={styles.stage}
       onLayout={(event) => {
@@ -745,7 +743,7 @@ export function RoomWorldScreen({
         onRedo={() => void redoPlacement()}
         style={overlayPad}
       />
-      {showEntranceTitle ? <RoomEntranceTitle key={entranceLabel} label={entranceLabel} color={entranceTone.color} shadow={entranceTone.shadow} reducedMotion={reducedMotion} /> : null}
+      {!loading ? <RoomEntranceTitle key={entranceLabel} label={entranceLabel} color={entranceTone.color} shadow={entranceTone.shadow} reducedMotion={reducedMotion} /> : null}
       {error ? <Pressable onPress={() => void refresh()} style={styles.error}><SeoullyText variant="secondary" color={colors.plum}>{error} · {copy.retry}</SeoullyText></Pressable> : null}
       {hint ? <View pointerEvents="none" style={[styles.hint, { bottom: insets.bottom + chrome.companionSize + chrome.gutter }]}><SeoullyText variant="caption" color={colors.ink} style={styles.hintText}>{hint}</SeoullyText></View> : null}
       {selectedItem && !editing && view.kind !== "binder" ? <View style={[styles.inspection, trayPad]}>

@@ -286,13 +286,7 @@ Order is dependency-shaped. **Slice 1 is first.**
 
 **7A deferred to 7D — world envelope / visual reconstruction.** At some permitted pan/dolly framings a thin SLANTED sliver can still appear below the Room floor. Multiple 7A camera/shell repairs did not kill it. The slant suggests world/floor geometry, envelope, camera/world intersection, or exterior rendering — not merely safe-area layout. **DEFERRED TO 7D.** 7D acceptance: at every permitted pan/dolly position the viewport must contain only intentional Room/world imagery — never exterior void, unfinished geometry, or native shell. Do not chase this by changing the accepted 7A camera.
 
-**Implementation (2026-10-02):** SLICE 7B — **PHYSICALLY VERIFIED** on iPhone (`1916f58`). Touch-first direct manipulation of placed Room objects is **frozen**. Own Room keeps the 7A `Edit Room` overlay; public Rooms stay read-only. Long-press a movable collectible to acquire it, lift it, and drag through Room-space via landing-plane projection. Compatible surfaces highlight; valid release settles and persists through the existing RoomPlacement path; invalid release restores the original placement and writes no history. Empty-world pan and pinch survive in Edit Room until an object is acquired. Turn left / Turn right / Smaller / Larger are no longer primary editing UI (engine scale/rotate remain internal). Store still removes placement only.
-
-**Post-7B entrance repair:** the entrance title is an overlay, not a renderer gate. Own Room mounts the real Canvas as soon as the route is up; the title (`Entering your room` / `Entering {name}'s room`) plays over the world. Do not hide the Room until the title timer finishes. Public Rooms still wait for a real snapshot so private rooms stay unread. World-storage / merch-box reconstruction is **NEXT after entrance device QA** — not started here.
-
-**Known temporary defect:** legacy Stored tray has layering/layout problems, including the search field being obscured by collectible cards. Do not polish the legacy tray; replace it during world-storage implementation.
-
-Binder reconstruction, 7D envelope work, Slice 8, Closet, and Vision are not started.
+**Implementation (2026-10-02):** SLICE 7B — CODE VERIFIED / DEVICE QA REQUIRED. Touch-first direct manipulation of placed Room objects. Own Room keeps the 7A `Edit Room` overlay; public Rooms stay read-only. Long-press a movable collectible to acquire it, lift it, and drag through Room-space via landing-plane projection. Compatible surfaces highlight; valid release settles and persists through the existing RoomPlacement path; invalid release restores the original placement and writes no history. Empty-world pan and pinch survive in Edit Room until an object is acquired. Turn left / Turn right / Smaller / Larger are no longer primary editing UI (engine scale/rotate remain internal). Store still removes placement only. Temporary stored tray is an unpolished bridge. World-storage / merch-box reconstruction is **NEXT after 7B physical QA** — not started here. Binder reconstruction, 7D envelope work, Slice 8, Closet, and Vision are not started.
 
 Locked gesture model:
 
@@ -304,7 +298,7 @@ Locked gesture model:
 | Block | Scope | Status |
 | --- | --- | --- |
 | **7A** | Immersive Room shell + direct-touch constrained camera | Physically accepted (REPAIR 04 `7dbc60d`); one slanted floor sliver **DEFERRED TO 7D** |
-| **7B** | Touch-first editing (long-press, world-space drag, settle/rollback) | PHYSICALLY VERIFIED (`1916f58`) — interaction frozen. Entrance overlay repair CODE VERIFIED / DEVICE QA REQUIRED. World storage is NEXT, not started. |
+| **7B** | Touch-first editing (long-press, world-space drag, settle/rollback) | CODE VERIFIED / DEVICE QA REQUIRED — world storage is NEXT, not in this block |
 | **7C** | Binder as part of the world (continuous camera travel, spatial open/close) | Not started — preserve current Binder |
 | **7D** | Materials, lighting, world envelope, and Room customization (review `20261002` before applying) | Not started — migration unapplied. Must kill the 7A slanted floor/exterior sliver. |
 | **7E** | Physical integration QA of the reconstructed world | Not started — required after 7A device proof |

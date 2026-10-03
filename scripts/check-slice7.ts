@@ -154,8 +154,7 @@ assertContains(read("apps/mobile/src/room/camera.ts"), "if (reducedMotion) retur
 // U. GL import safety
 assertNotContains(read("apps/mobile/app/_layout.tsx"), "NativeRoomRenderer", "root layout");
 assertNotContains(read("apps/mobile/app/(tabs)/_layout.tsx"), "NativeRoomRenderer", "tabs layout");
-assertContains(worldScreen, "const nativeRoomRendererImport = import(\"./NativeRoomRenderer\")", "Room route preloads the renderer");
-assertContains(worldScreen, "lazy(() => nativeRoomRendererImport)", "lazy room");
+assertContains(worldScreen, "lazy(async () =>", "lazy room");
 assertContains(read("apps/mobile/src/room/threeFiberCompat.ts"), "extractUrlBase", "LoaderUtils guard");
 
 // V. Migration safety
@@ -189,7 +188,7 @@ assertContains(read("apps/mobile/app/room.tsx"), "immersiveRoomFill", "own Room 
 assertContains(read("apps/mobile/app/collector-room.tsx"), "immersiveRoomFill", "collector Room fills the physical viewport");
 assertNotContains(read("apps/mobile/app/room.tsx"), "SafeAreaView", "own Room canvas is not shrunk by SafeAreaView");
 assertNotContains(read("apps/mobile/app/collector-room.tsx"), "SafeAreaView", "collector Room canvas is not shrunk by SafeAreaView");
-assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "StyleSheet.absoluteFill", "Canvas covers the Room viewport");
+assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "style={StyleSheet.absoluteFill}", "Canvas covers the Room viewport");
 assertContains(read("apps/mobile/src/ui/shellLayout.ts"), "Safe-area insets belong to overlays, not this fill", "safe area does not shrink the world");
 assertContains(read("apps/mobile/app/(tabs)/profile.tsx"), 'router.push("/room")', "Profile enters stack Room");
 assertContains(read("apps/mobile/src/i18n.ts"), 'editRoom: "Edit Room"', "Edit Room copy");
@@ -269,17 +268,6 @@ assertContains(worldScreen, "demoCollectorDisplayName", "demo Room uses display 
 assertContains(worldScreen, "RoomEntranceTitle", "transient entrance title");
 assertContains(worldScreen, "pointerEvents=\"none\"", "entrance title does not intercept touches");
 assertContains(worldScreen, "reducedMotion", "entrance respects reduced motion");
-assertContains(worldScreen, "World mounts on its own. RoomEntranceTitle is overlay copy, never a renderer gate.", "title does not gate the world");
-assertContains(worldScreen, "const showWorld = !privateRoom && (mode === \"own\" || snapshot !== null)", "own Room mounts before data; public waits for a real snapshot");
-assertContains(worldScreen, "const showEntranceTitle = mode === \"own\" || Boolean(ownerName) || (privateRoom && !loading)", "entrance overlay is independent of Canvas lifetime");
-assertNotContains(worldScreen, "{!loading && snapshot ? <View", "loading no longer holds the Canvas");
-assertNotContains(worldScreen, "{!loading ? <RoomEntranceTitle", "title does not wait for the data spinner");
-assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "setSurfaceReady(true)", "first GL frame presents the world");
-assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "opacity: surfaceReady ? 1 : 0", "unready GL stays transparent over Room void");
-assertContains(worldScreen, "LONG_PRESS_MS", "7B long-press remains");
-assertContains(worldScreen, "projectTouchOntoSurfaces", "7B world-space drag remains");
-assertContains(worldScreen, "copy.storedCollection", "legacy stored tray remains a temporary bridge");
-assertNotContains(worldScreen, "merch-box", "world-storage reconstruction is not started");
 assertContains(read("apps/mobile/app/(tabs)/collector.tsx"), "usePublishProfileIdentity", "collector profile publishes tab theme");
 assertContains(read("apps/mobile/src/ui/ProfileIdentity.tsx"), "identityPublicationSurvives", "theme survives Room transition");
 assertContains(read("apps/mobile/src/ui/shellLayout.ts"), 'leaf === "profile" || leaf === "collector" || leaf === "room" || leaf === "collector-room"', "theme keep-set");
@@ -446,9 +434,7 @@ assert.ok(Math.abs(ray.dir.z) > 0.2, "touch ray points into the Room");
 
 assertContains(read("docs/native-road-to-ship.md"), "DEFERRED TO 7D", "slanted floor sliver is documented for 7D");
 assertContains(read("docs/native-road-to-ship.md"), "long-press object = acquire", "7B gesture model is documented");
-assertContains(read("docs/native-road-to-ship.md"), "legacy Stored tray has layering/layout problems", "legacy stored tray defect is documented");
 assertContains(read("docs/web-native-parity-contract.md"), "DEFERRED TO 7D", "parity contract records the 7D envelope defect");
-assertContains(read("docs/web-native-parity-contract.md"), "legacy Stored tray has layering/layout problems", "parity contract defers stored-tray polish");
 assertNotContains(read("apps/mobile/src/room/camera.ts"), "ceiling: 3.41", "7B does not chase the 7A camera envelope");
 assertContains(read("apps/mobile/src/room/camera.ts"), "ceiling: 3.4", "accepted 7A ceiling bound remains");
 assertContains(read("apps/mobile/src/room/camera.ts"), "floorGuard: -2.08", "accepted 7A floor guard remains");

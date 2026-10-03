@@ -1,6 +1,6 @@
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
 import "./threeFiberCompat";
-import { Suspense, useMemo, useRef, type MutableRefObject } from "react";
+import { Suspense, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { StyleSheet } from "react-native";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber/native";
 import { Color, Group, MeshBasicMaterial, TextureLoader, Vector3 } from "three";
@@ -83,14 +83,16 @@ export function NativeRoomRenderer({
   const binderOpen = view.kind === "binder";
   const examining = Boolean(view.kind === "binder" && view.heldHoldingId);
   const worldItems = binderOpen ? items.filter((item) => item.geometry !== "photocard") : items;
+  const [surfaceReady, setSurfaceReady] = useState(false);
   return <Canvas
     frameloop={paused ? "never" : "always"}
-    style={StyleSheet.absoluteFill}
+    style={StyleSheet.flatten([StyleSheet.absoluteFill, { opacity: surfaceReady ? 1 : 0 }])}
     camera={{ position: [0.55, 1.92, 5.25], fov: 46 }}
     onPointerMissed={onClearSelection}
     onCreated={({ camera, scene }) => {
       camera.lookAt(0.18, -0.12, -2.35);
       scene.background = new Color(theme.void);
+      setSurfaceReady(true);
     }}
   >
     <color attach="background" args={[theme.void]} />

@@ -444,10 +444,10 @@ Physical iPhone QA after the native slices proved Room is useful but not product
 
 Decomposition:
 
-- **7A** — immersive Room + touch camera. Implemented, then repaired: Room is not a bottom tab; social tabs disappear inside Room; swipe-back disabled on Room routes only; world replaces zone-pill navigation; one-finger pan across the Room (window, not miniature fit); pinch dolly; object inspection restores prior framing; heart is the existing Ask Seoully. **DEVICE RETEST REQUIRED** before 7B.
-- **7B** — touch-first editing + world storage. Not started.
+- **7A** — immersive Room + touch camera. Physically accepted after CAMERA/SHELL REPAIR 04 (`7dbc60d`): Room is not a bottom tab; social tabs disappear inside Room; swipe-back disabled on Room routes only; world replaces zone-pill navigation; one-finger pan across the Room (window, not miniature fit); pinch dolly; object inspection restores prior framing; heart is the existing Ask Seoully. One known defect remains: a thin **slanted** sliver can appear below the floor at some framings. **DEFERRED TO 7D** — world envelope / visual reconstruction. 7D acceptance: no permitted camera framing may expose unfinished world/exterior/native shell. Do not chase it by changing the accepted 7A camera.
+- **7B** — touch-first direct object manipulation. CODE VERIFIED / DEVICE QA REQUIRED. Locked gestures: normal Room tap = inspect, empty drag = pan, pinch = dolly; Edit Room empty drag = pan, pinch = dolly, long-press object = acquire, drag acquired object = move object, valid release = settle/persist RoomPlacement, invalid release = return origin. Arbitrary user scaling and Turn left/right are no longer primary editing interactions. World-storage / merch-box reconstruction is **NEXT after 7B physical QA**.
 - **7C** — Binder as part of the world. Not started.
-- **7D** — materials / lighting / customization. Not started.
+- **7D** — materials / lighting / world envelope / customization. Not started. Owns the deferred 7A slanted floor sliver.
 - **7E** — physical integration QA. Not started.
 
 See `docs/native-road-to-ship.md` Slice 7.

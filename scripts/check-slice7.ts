@@ -3,7 +3,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { buildPages } from "../src/world/objects/binderGeometry";
 import { isBinderEligible } from "../apps/mobile/src/data/ownership";
-import { holdingRemainsAfterStore, restoreEditBaseline, revertDrop, storeRenderable } from "../apps/mobile/src/room/editSession";
+import { holdingRemainsAfterStore, pushPlacementHistory, restoreEditBaseline, revertDrop, storeRenderable } from "../apps/mobile/src/room/editSession";
+import { nativeRoomSurfaces, surfaceAcceptsGeometry } from "../apps/mobile/src/room/model";
+import { acquireHeld, compatibleSurfaces, LONG_PRESS_MS, placementsMatch, projectTouchOntoSurfaces, screenRay } from "../apps/mobile/src/room/touchEdit";
 import {
   applyExploreOffset,
   clampExplore,
@@ -91,7 +93,7 @@ assertContains(representation, 'return "generic"', "generic fallback");
 const model = read("apps/mobile/src/room/model.ts");
 assertContains(model, "surfaceAcceptsGeometry", "surface rules");
 assertContains(model, 'if (geometry === "poster") return surface.kind === "wall"', "poster wall only");
-assertContains(worldScreen, "revertDrop(all, origin)", "invalid drop revert");
+assertContains(worldScreen, "revertDrop(all, held.origin)", "invalid drop revert");
 const origin = { holding: { id: "drop" }, position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } };
 const moved = { ...origin, position: { x: 99, y: 99, z: 99 } };
 assert.equal(revertDrop([moved], origin)[0]?.position.x, 0);
@@ -202,7 +204,7 @@ assert.equal(exploreAllowedForView({ kind: "home" }), true);
 assert.equal(exploreAllowedForView({ kind: "zone", zone: "shelf" }), true);
 assert.equal(exploreAllowedForView({ kind: "inspect", zone: "desk", holdingId: "h" }), false);
 assert.equal(exploreAllowedForView({ kind: "binder", spread: 0 }), false);
-assert.equal(exploreAllowedForView({ kind: "edit" }), false);
+assert.equal(exploreAllowedForView({ kind: "edit" }), true);
 assertContains(read("apps/mobile/src/room/camera.ts"), "panX: number", "explore state is panX");
 assertContains(read("apps/mobile/src/room/camera.ts"), "panY: number", "explore state is panY");
 assertNotContains(read("apps/mobile/src/room/camera.ts"), "yaw: number", "explore is not yaw-primary");
@@ -354,7 +356,88 @@ assertContains(read("apps/mobile/src/i18n.ts"), 'back: "Back"', "EN Back label")
 assertContains(read("apps/mobile/src/i18n.ts"), 'editRoom: "Edit Room"', "EN Edit Room label");
 assertContains(read("apps/mobile/src/i18n.ts"), "back: \"뒤로\"", "KO Back label");
 assertContains(read("apps/mobile/src/i18n.ts"), 'editRoom: "룸 편집"', "KO Edit Room label");
-assertNotContains(worldScreen, "onLongPress", "Slice 7B long-press editing is not introduced");
-assertNotContains(worldScreen, "merch-box", "Slice 7B storage sheet is not introduced");
+assertNotContains(worldScreen, "merch-box", "world-storage reconstruction is not started");
+assertNotContains(worldScreen, "copy.rotateLeft", "Turn left is not a primary edit control");
+assertNotContains(worldScreen, "copy.rotateRight", "Turn right is not a primary edit control");
+assertNotContains(worldScreen, "copy.scaleDown", "Smaller is not a primary edit control");
+assertNotContains(worldScreen, "copy.scaleUp", "Larger is not a primary edit control");
+assertNotContains(worldScreen, "applyLocal(turnRenderable", "rotate buttons removed from Edit Room");
+assertNotContains(worldScreen, "applyLocal(resizeRenderable", "scale buttons removed from Edit Room");
+assertContains(worldScreen, "LONG_PRESS_MS", "long-press acquisition");
+assertContains(worldScreen, "onCollectiblePressStart", "edit press starts a hold timer");
+assertContains(worldScreen, "projectTouchOntoSurfaces", "drag projects into Room space");
+assertContains(worldScreen, "previewRef", "drag preview is ref-driven");
+assertContains(worldScreen, "heldRef.current", "acquired object owns the drag");
+assertContains(worldScreen, "if (heldRef.current) {", "held drag does not pan the camera");
+assertContains(worldScreen, "async function releaseHeld", "release commits or rolls back");
+assertContains(worldScreen, "rememberPlacement(held.origin, held.rest)", "committed move is undoable");
+assertContains(worldScreen, "revertDrop(all, held.origin)", "invalid release restores origin");
+assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "onPressStart", "collectibles receive long-press");
+assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "LandingHighlights", "compatible surfaces highlight while held");
+assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "held={heldId === item.holding.id}", "held object lifts");
+assert.equal(LONG_PRESS_MS, 320);
+assert.ok(LONG_PRESS_MS >= 250 && LONG_PRESS_MS <= 450, "long-press is between tap and a long wait");
+
+const roomSurfaces = nativeRoomSurfaces("room-qa");
+const shelf = roomSurfaces.find((surface) => surface.id.includes("shelf-bay-0"));
+const desk = roomSurfaces.find((surface) => surface.id.endsWith("-desk"));
+const wall = roomSurfaces.find((surface) => surface.kind === "wall");
+const floor = roomSurfaces.find((surface) => surface.id.endsWith("-floor"));
+const binder = roomSurfaces.find((surface) => surface.id.endsWith("-binder"));
+const display = roomSurfaces.find((surface) => surface.id.includes("display-case"));
+assert.ok(shelf && desk && wall && floor && binder && display);
+assert.equal(surfaceAcceptsGeometry(shelf, "album"), true);
+assert.equal(surfaceAcceptsGeometry(desk, "album"), true);
+assert.equal(surfaceAcceptsGeometry(floor, "album"), false);
+assert.equal(surfaceAcceptsGeometry(wall, "album"), false);
+assert.equal(surfaceAcceptsGeometry(wall, "poster"), true);
+assert.equal(surfaceAcceptsGeometry(floor, "poster"), false);
+assert.equal(surfaceAcceptsGeometry(desk, "poster"), false);
+assert.equal(surfaceAcceptsGeometry(binder, "photocard"), true);
+assert.equal(surfaceAcceptsGeometry(desk, "photocard"), true);
+assert.equal(surfaceAcceptsGeometry(floor, "photocard"), false);
+assert.equal(surfaceAcceptsGeometry(display, "figure"), true);
+assert.equal(surfaceAcceptsGeometry(floor, "figure"), false);
+assert.equal(compatibleSurfaces("room-qa", "poster").every((surface) => surface.kind === "wall"), true);
+
+const originAlbum = {
+  holding: { id: "h-album" },
+  position: { x: -3.15, y: 0, z: -3.48 },
+  rotation: { x: 0, y: 0, z: 0 },
+  scale: 1,
+  geometry: "album" as const,
+  color: "#000",
+  accent: "#111",
+  placement: { id: "p", roomId: "room-qa", holdingId: "h-album", zoneId: "room-qa-shelf", slot: 0, offset: null, transform: null, surfaceId: "room-qa-shelf-bay-0" },
+};
+const held = acquireHeld(originAlbum as never);
+assert.equal(held.holdingId, "h-album");
+assert.ok(held.preview.position.y > originAlbum.position.y, "acquired object lifts");
+assert.equal(placementsMatch(originAlbum as never, originAlbum as never), true);
+const undo: { before: typeof originAlbum; after: typeof originAlbum }[] = [];
+const redo: typeof undo = [];
+pushPlacementHistory(undo, redo, { before: originAlbum, after: { ...originAlbum, position: { ...originAlbum.position, x: 1 } } });
+assert.equal(undo.length, 1);
+assert.equal(redo.length, 0);
+const deskHit = projectTouchOntoSurfaces(180, 420, 390, 844, {
+  position: { x: 0.42, y: 2.45, z: 5.95 },
+  lookAt: { x: 1.45, y: -0.72, z: -2.85 },
+}, "room-qa", originAlbum as never);
+assert.ok(!deskHit || deskHit.valid === false || deskHit.surface.id.includes("desk") || deskHit.surface.id.includes("shelf"));
+const floorReject = projectTouchOntoSurfaces(195, 820, 390, 844, {
+  position: { x: 0.42, y: 2.45, z: 5.95 },
+  lookAt: { x: 0, y: -2.15, z: -1.2 },
+}, "room-qa", { ...originAlbum, geometry: "poster" } as never);
+assert.ok(!floorReject || floorReject.valid === false, "poster cannot settle on the floor");
+const ray = screenRay(195, 400, 390, 844, { position: { x: 0.55, y: 1.92, z: 5.25 }, lookAt: { x: 0.18, y: -0.12, z: -2.35 } });
+assert.ok(Math.abs(ray.dir.z) > 0.2, "touch ray points into the Room");
+
+assertContains(read("docs/native-road-to-ship.md"), "DEFERRED TO 7D", "slanted floor sliver is documented for 7D");
+assertContains(read("docs/native-road-to-ship.md"), "long-press object = acquire", "7B gesture model is documented");
+assertContains(read("docs/web-native-parity-contract.md"), "DEFERRED TO 7D", "parity contract records the 7D envelope defect");
+assertNotContains(read("apps/mobile/src/room/camera.ts"), "ceiling: 3.41", "7B does not chase the 7A camera envelope");
+assertContains(read("apps/mobile/src/room/camera.ts"), "ceiling: 3.4", "accepted 7A ceiling bound remains");
+assertContains(read("apps/mobile/src/room/camera.ts"), "floorGuard: -2.08", "accepted 7A floor guard remains");
+assertNotContains(worldScreen, "saveNativeRoomTheme", "theme writes stay blocked");
 
 console.log("check:slice7 passed");

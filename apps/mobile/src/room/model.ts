@@ -144,12 +144,17 @@ export function moveRenderable(renderable: RoomRenderable, dx: number, depthOrVe
 export function surfaceAcceptsGeometry(surface: NativeRoomSurface, geometry: RoomRenderable["geometry"]) {
   if (geometry === "poster") return surface.kind === "wall";
   if (geometry === "photocard") return surface.id.includes("binder") || surface.id.includes("desk");
-  if (geometry === "apparel") return surface.id.includes("archive") || surface.id.includes("desk") || surface.id.includes("floor");
+  if (geometry === "album" || geometry === "vinyl" || geometry === "book" || geometry === "disc-case") {
+    return surface.id.includes("shelf") || surface.id.includes("desk");
+  }
   if (geometry === "lightstick" || geometry === "figure" || geometry === "plushie") {
     return surface.id.includes("display-case") || surface.id.includes("desk") || surface.id.includes("shelf");
   }
+  if (geometry === "apparel" || geometry === "ticket" || geometry === "memorabilia") {
+    return surface.id.includes("archive") || surface.id.includes("desk") || surface.id.includes("shelf");
+  }
   if (surface.kind === "wall") return false;
-  return true;
+  return surface.id.includes("shelf") || surface.id.includes("desk") || surface.id.includes("display-case");
 }
 
 export function isSupportedRoomPlacement(renderable: RoomRenderable, roomId: string) {

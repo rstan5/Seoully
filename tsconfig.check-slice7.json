@@ -5,7 +5,8 @@
     "moduleResolution": "Node",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "seoully-domain/*": ["src/domain/*"]
     },
     "outDir": ".tmp/build",
     "skipLibCheck": true,
@@ -17,6 +18,9 @@
     "src/world/objects/binderGeometry.ts",
     "apps/mobile/src/data/ownership.ts",
     "apps/mobile/src/room/editSession.ts",
+    "apps/mobile/src/room/touchEdit.ts",
+    "apps/mobile/src/room/model.ts",
+    "apps/mobile/src/room/representation.ts",
     "apps/mobile/src/room/worldView.ts",
     "apps/mobile/src/room/camera.ts",
     "apps/mobile/src/room/entrance.ts",

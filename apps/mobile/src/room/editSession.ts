@@ -27,3 +27,19 @@ export function revertDrop<T extends { holding: { id: string }; position: object
 export function cloneRenderables<T extends { position: object; rotation: object }>(items: T[]): T[] {
   return restoreEditBaseline(items);
 }
+
+/** One committed placement change. Canceled / invalid drags must not push. */
+export type PlacementHistoryEntry<T> = {
+  before: T;
+  after: T | { storedHoldingId: string };
+};
+
+export function pushPlacementHistory<T>(
+  undo: PlacementHistoryEntry<T>[],
+  redo: PlacementHistoryEntry<T>[],
+  entry: PlacementHistoryEntry<T>,
+) {
+  undo.push(entry);
+  redo.length = 0;
+  return { undo, redo };
+}

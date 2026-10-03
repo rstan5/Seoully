@@ -1,9 +1,9 @@
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
 import "./threeFiberCompat";
-import { Suspense, useMemo, type MutableRefObject } from "react";
+import { Suspense, useMemo, useRef, type MutableRefObject } from "react";
 import { StyleSheet } from "react-native";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber/native";
-import { Color, TextureLoader, Vector3 } from "three";
+import { Color, Group, MeshBasicMaterial, TextureLoader, Vector3 } from "three";
 import type { NativeBinderSpread } from "../binder/model";
 import type { NativeHolding } from "../api";
 import { useCachedSignedMedia } from "../media/cachedMedia";
@@ -11,7 +11,8 @@ import { applyExploreOffset, cameraLerpAlpha, DESK_BINDER_AT, exploreAllowedForV
 import { NativeOpenBinder } from "./NativeOpenBinder";
 import { extentsForGeometry } from "./representation";
 import { roomPalette } from "./theme";
-import { roomTextureIds, type RoomRenderable } from "./model";
+import { HELD_SCALE } from "./touchEdit";
+import { roomTextureIds, type NativeRoomSurface, type RoomRenderable } from "./model";
 import { CANONICAL_ZONE_KINDS, zoneInteractive, type CanonicalZoneKind, type NativeWorldView } from "./worldView";
 
 const ZONE_HOTSPOTS: Record<CanonicalZoneKind, { position: [number, number, number]; size: [number, number, number] }> = {
@@ -27,6 +28,7 @@ export function NativeRoomRenderer({
   items,
   selectedId,
   focusedId,
+  heldId = null,
   themeId,
   view,
   binderSpread,
@@ -43,10 +45,16 @@ export function NativeRoomRenderer({
   onTurnEdge,
   onTurnComplete,
   exploreRef,
+  previewRef,
+  highlightSurfaceIdRef,
+  compatibleSurfaces = [],
+  onPressStart,
+  onPressEnd,
 }: {
   items: RoomRenderable[];
   selectedId: string | null;
   focusedId: string | null;
+  heldId?: string | null;
   themeId: import("../api").NativeRoomThemeId;
   view: NativeWorldView;
   binderSpread?: NativeBinderSpread;
@@ -63,6 +71,11 @@ export function NativeRoomRenderer({
   onTurnEdge?: (dir: 1 | -1) => void;
   onTurnComplete?: () => void;
   exploreRef?: MutableRefObject<ExploreOffset>;
+  previewRef?: MutableRefObject<RoomRenderable | null>;
+  highlightSurfaceIdRef?: MutableRefObject<string | null>;
+  compatibleSurfaces?: NativeRoomSurface[];
+  onPressStart?: (holdingId: string) => void;
+  onPressEnd?: (holdingId: string) => void;
 }) {
   const focused = items.find((item) => item.holding.id === focusedId) ?? null;
   const theme = roomPalette(themeId);
@@ -90,6 +103,11 @@ export function NativeRoomRenderer({
     {view.kind === "home" ? CANONICAL_ZONE_KINDS.map((zone) => (
       <ZoneHotspot key={zone} zone={zone} onSelect={onSelectZone} />
     )) : null}
+    {heldId && compatibleSurfaces.length ? <LandingHighlights
+      surfaces={compatibleSurfaces}
+      activeIdRef={highlightSurfaceIdRef}
+      color={theme.light}
+    /> : null}
     {worldItems.map((item) => {
       const zone = zoneOfItem(item);
       const live = zoneInteractive(view, zone) || view.kind === "edit" || view.kind === "inspect";
@@ -98,9 +116,13 @@ export function NativeRoomRenderer({
         item={item}
         selected={selectedId === item.holding.id}
         focused={focusedId === item.holding.id}
+        held={heldId === item.holding.id}
         loadTexture={textured.has(item.holding.id)}
         interactive={live}
+        previewRef={previewRef}
         onSelect={onSelect}
+        onPressStart={view.kind === "edit" && !readOnly ? onPressStart : undefined}
+        onPressEnd={view.kind === "edit" && !readOnly ? onPressEnd : undefined}
       />;
     })}
     {binderOpen ? <NativeOpenBinder
@@ -209,33 +231,101 @@ function RoomFurniture({
   </>;
 }
 
+function LandingHighlights({
+  surfaces,
+  activeIdRef,
+  color,
+}: {
+  surfaces: NativeRoomSurface[];
+  activeIdRef?: MutableRefObject<string | null>;
+  color: string;
+}) {
+  return <>{surfaces.map((surface) => <LandingPlane key={surface.id} surface={surface} activeIdRef={activeIdRef} color={color} />)}</>;
+}
+
+function LandingPlane({
+  surface,
+  activeIdRef,
+  color,
+}: {
+  surface: NativeRoomSurface;
+  activeIdRef?: MutableRefObject<string | null>;
+  color: string;
+}) {
+  const material = useRef<MeshBasicMaterial>(null);
+  useFrame(() => {
+    if (!material.current) return;
+    material.current.opacity = activeIdRef?.current === surface.id ? 0.3 : 0.12;
+  });
+  if (surface.kind === "wall") {
+    return <mesh position={[surface.x, surface.y, surface.z + 0.03]}>
+      <planeGeometry args={[surface.width, surface.depth]} />
+      <meshBasicMaterial ref={material} color={color} transparent opacity={0.12} depthWrite={false} />
+    </mesh>;
+  }
+  return <mesh position={[surface.x, surface.y + 0.02, surface.z]} rotation={[-Math.PI / 2, 0, 0]}>
+    <planeGeometry args={[surface.width, surface.depth]} />
+    <meshBasicMaterial ref={material} color={color} transparent opacity={0.12} depthWrite={false} />
+  </mesh>;
+}
+
 function RoomObject({
   item,
   selected,
   focused,
+  held,
   loadTexture,
   interactive,
+  previewRef,
   onSelect,
+  onPressStart,
+  onPressEnd,
 }: {
   item: RoomRenderable;
   selected: boolean;
   focused: boolean;
+  held: boolean;
   loadTexture: boolean;
   interactive: boolean;
+  previewRef?: MutableRefObject<RoomRenderable | null>;
   onSelect: (id: string) => void;
+  onPressStart?: (id: string) => void;
+  onPressEnd?: (id: string) => void;
 }) {
+  const group = useRef<Group>(null);
   const wall = item.placement?.surfaceId?.endsWith("-wall") || item.position.z < -3.9;
+  const restY = item.position.y + (focused && !wall ? 0.16 : 0) + (held && !wall ? 0.22 : 0);
+  const restZ = item.position.z + (focused && !wall ? 0.14 : 0) + (held && wall ? 0.12 : 0);
+  useFrame(() => {
+    const mesh = group.current;
+    const preview = previewRef?.current;
+    if (!mesh || !held || !preview || preview.holding.id !== item.holding.id) return;
+    mesh.position.set(preview.position.x, preview.position.y, preview.position.z);
+    mesh.rotation.set(preview.rotation.x, preview.rotation.y, preview.rotation.z);
+    mesh.scale.setScalar(preview.scale * HELD_SCALE);
+  });
   return <group
-    position={[item.position.x, item.position.y + (focused && !wall ? 0.16 : 0), item.position.z + (focused && !wall ? 0.14 : 0)]}
+    ref={group}
+    position={[item.position.x, restY, restZ]}
     rotation={[item.rotation.x + (focused && wall ? -0.18 : 0), item.rotation.y, item.rotation.z]}
-    scale={item.scale * (selected ? 1.08 : 1) * (focused ? 1.04 : 1)}
+    scale={item.scale * (held ? HELD_SCALE : selected ? 1.08 : 1) * (focused ? 1.04 : 1)}
+    onPointerDown={(event) => {
+      if (!interactive) return;
+      event.stopPropagation();
+      onPressStart?.(item.holding.id);
+    }}
+    onPointerUp={(event) => {
+      if (!interactive) return;
+      event.stopPropagation();
+      onPressEnd?.(item.holding.id);
+    }}
     onClick={(event) => {
       if (!interactive) return;
       event.stopPropagation();
       onSelect(item.holding.id);
     }}
   >
-    <CollectibleForm item={item} selected={selected} loadTexture={loadTexture} />
+    <CollectibleForm item={item} selected={selected || held} loadTexture={loadTexture} />
   </group>;
 }
 

@@ -144,7 +144,7 @@ export type ExplorePanLimits = {
 };
 
 export function exploreAllowedForView(view: NativeWorldView): boolean {
-  return view.kind === "home" || view.kind === "zone";
+  return view.kind === "home" || view.kind === "zone" || view.kind === "edit";
 }
 
 export function authoredLookDepth(pose: CameraPose) {

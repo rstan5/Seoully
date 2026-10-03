@@ -9,30 +9,39 @@ import { CachedSignedImage } from "../media/cachedMedia";
 import { colors, spacing } from "../theme";
 import { chrome, immersiveRoomFill } from "../ui/shellLayout";
 import { SeoullyText } from "../ui/SeoullyText";
-import { cloneRenderables, holdingRemainsAfterStore, restoreEditBaseline, revertDrop, storeRenderable } from "./editSession";
+import { cloneRenderables, holdingRemainsAfterStore, pushPlacementHistory, restoreEditBaseline, revertDrop, storeRenderable, type PlacementHistoryEntry } from "./editSession";
 import {
   buildRoomRenderables,
   buildPublicRoomRenderables,
   createInitialRoomRenderable,
   isSupportedRoomPlacement,
-  moveRenderable,
   nativeHomeForHolding,
   nextNativeSlot,
-  resizeRenderable,
   settleRoomRenderable,
   toPersistedTransform,
-  turnRenderable,
   zoneIdForNativeSurface,
   type RoomRenderable,
 } from "./model";
 import {
   IDENTITY_EXPLORE,
+  applyExploreOffset,
   exploreAllowedForView,
   nudgeExploreFromDrag,
   nudgeExploreFromPinch,
+  poseForView,
   type ExploreOffset,
   type ExploreSpace,
 } from "./camera";
+import {
+  LONG_PRESS_MS,
+  LONG_PRESS_SLOP_PX,
+  acquireHeld,
+  cloneRenderable,
+  compatibleSurfaces,
+  placementsMatch,
+  projectTouchOntoSurfaces,
+  type HeldEdit,
+} from "./touchEdit";
 import { entranceForeground, roomEntranceCopy } from "./entrance";
 import { roomOverlayChrome, roomPalette } from "./theme";
 import { inspectView, openBinderView, stepBack, zoneFromSurfaceId, type CanonicalZoneKind, type NativeWorldView } from "./worldView";
@@ -79,21 +88,36 @@ export function RoomWorldScreen({
   const [canvasEpoch, setCanvasEpoch] = useState(0);
   const [turnDir, setTurnDir] = useState<1 | -1 | 0>(0);
   const [turningSpreadIndex, setTurningSpreadIndex] = useState<number | null>(null);
+  const [heldId, setHeldId] = useState<string | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
   const insets = useSafeAreaInsets();
   const editBaseline = useRef<RoomRenderable[]>([]);
-  const dragOrigin = useRef<RoomRenderable | null>(null);
   const latestItems = useRef(items);
   const viewRef = useRef(view);
   const selectedRef = useRef(selectedId);
   const onOwnRoomRef = useRef(onOwnRoom);
+  const snapshotRef = useRef(snapshot);
+  const reducedMotionRef = useRef(reducedMotion);
   const exploreRef = useRef<ExploreOffset>({ ...IDENTITY_EXPLORE });
   const homeExploreRef = useRef<ExploreOffset>({ ...IDENTITY_EXPLORE });
   const frozenExploreRef = useRef<ExploreOffset>({ ...IDENTITY_EXPLORE });
-  const gestureRef = useRef({ lastDx: 0, lastDy: 0, pinching: false, pinchStart: 0, dollyStart: 1 });
+  const gestureRef = useRef({ lastDx: 0, lastDy: 0, pinching: false, pinchStart: 0, dollyStart: 1, objectDrag: false, releasing: false });
+  const heldRef = useRef<HeldEdit | null>(null);
+  const previewRef = useRef<RoomRenderable | null>(null);
+  const highlightSurfaceIdRef = useRef<string | null>(null);
+  const pendingPressRef = useRef<{ holdingId: string; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const suppressTapRef = useRef(false);
+  const undoStack = useRef<PlacementHistoryEntry<RoomRenderable>[]>([]);
+  const redoStack = useRef<PlacementHistoryEntry<RoomRenderable>[]>([]);
+  const layoutRef = useRef({ width: 1, height: 1, x: 0, y: 0 });
+  const stageRef = useRef<View>(null);
   useEffect(() => { latestItems.current = items; }, [items]);
   useEffect(() => { viewRef.current = view; }, [view]);
   useEffect(() => { selectedRef.current = selectedId; }, [selectedId]);
   useEffect(() => { onOwnRoomRef.current = onOwnRoom; }, [onOwnRoom]);
+  useEffect(() => { snapshotRef.current = snapshot; }, [snapshot]);
+  useEffect(() => { reducedMotionRef.current = reducedMotion; }, [reducedMotion]);
   useEffect(() => { void AccessibilityInfo.isReduceMotionEnabled().then(setReducedMotion); }, []);
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
@@ -176,34 +200,86 @@ export function RoomWorldScreen({
     return () => clearTimeout(task);
   }, [initialHoldingId, spreads]);
 
+  function clearPendingPress() {
+    if (pendingPressRef.current) clearTimeout(pendingPressRef.current.timer);
+    pendingPressRef.current = null;
+  }
+
+  function clearHeldVisual() {
+    heldRef.current = null;
+    previewRef.current = null;
+    highlightSurfaceIdRef.current = null;
+    gestureRef.current.objectDrag = false;
+    setHeldId(null);
+  }
+
+  function syncHistory() {
+    setCanUndo(undoStack.current.length > 0);
+    setCanRedo(redoStack.current.length > 0);
+  }
+
+  function rememberPlacement(before: RoomRenderable, after: RoomRenderable | { storedHoldingId: string }) {
+    if (!("storedHoldingId" in after) && placementsMatch(before, after)) return;
+    pushPlacementHistory(undoStack.current, redoStack.current, { before: cloneRenderable(before), after: "storedHoldingId" in after ? after : cloneRenderable(after) });
+    syncHistory();
+  }
+
+  /* PanResponder callbacks fire on gestures and read live refs, not render values. */
+  /* eslint-disable react-hooks/refs -- responder object is event handlers */
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => false,
     onMoveShouldSetPanResponder: (event, gesture) => {
       if (viewRef.current.kind === "inspect") return false;
+      if (heldRef.current) return Math.hypot(gesture.dx, gesture.dy) > 2;
+      if (pendingPressRef.current && Math.hypot(gesture.dx, gesture.dy) > LONG_PRESS_SLOP_PX) {
+        if (pendingPressRef.current) clearTimeout(pendingPressRef.current.timer);
+        pendingPressRef.current = null;
+      }
       if (event.nativeEvent.touches.length >= 2 && exploreAllowedForView(viewRef.current)) return true;
       return Math.hypot(gesture.dx, gesture.dy) > 10;
     },
     onPanResponderGrant: (event) => {
       gestureRef.current.lastDx = 0;
       gestureRef.current.lastDy = 0;
+      gestureRef.current.objectDrag = Boolean(heldRef.current);
       const span = touchSpan(event);
-      if (span > 0 && exploreAllowedForView(viewRef.current)) {
+      if (span > 0 && exploreAllowedForView(viewRef.current) && !heldRef.current) {
         gestureRef.current.pinching = true;
         gestureRef.current.pinchStart = span;
         gestureRef.current.dollyStart = exploreRef.current.dolly;
       } else {
         gestureRef.current.pinching = false;
       }
-      if (viewRef.current.kind === "edit" && selectedRef.current) {
-        dragOrigin.current = latestItems.current.find((item) => item.holding.id === selectedRef.current) ?? null;
-      }
     },
     onPanResponderMove: (event, gesture) => {
-      if (viewRef.current.kind === "edit" && selectedRef.current) {
-        const origin = dragOrigin.current;
-        if (!origin) return;
-        const moved = moveRenderable(origin, gesture.dx * 0.008, gesture.dy * 0.008);
-        setItems((current) => current.map((item) => item.holding.id === moved.holding.id ? moved : item));
+      if (heldRef.current) {
+        gestureRef.current.objectDrag = true;
+        const held = heldRef.current;
+        const room = snapshotRef.current?.room;
+        if (!held || !room) return;
+        const pose = applyExploreOffset(poseForView(viewRef.current, null), exploreRef.current, "home");
+        const candidate = projectTouchOntoSurfaces(
+          gesture.moveX - layoutRef.current.x,
+          gesture.moveY - layoutRef.current.y,
+          layoutRef.current.width,
+          layoutRef.current.height,
+          pose,
+          room.id,
+          held.origin,
+          reducedMotionRef.current,
+        );
+        if (!candidate) {
+          held.valid = false;
+          held.surfaceId = null;
+          highlightSurfaceIdRef.current = null;
+          return;
+        }
+        held.preview = candidate.preview;
+        held.rest = candidate.rest;
+        held.valid = candidate.valid;
+        held.surfaceId = candidate.valid ? candidate.surface.id : null;
+        previewRef.current = candidate.preview;
+        highlightSurfaceIdRef.current = held.surfaceId;
         return;
       }
       if (viewRef.current.kind === "binder" && !viewRef.current.heldHoldingId && Math.abs(gesture.dx) > 48 && turnDir === 0) {
@@ -242,25 +318,14 @@ export function RoomWorldScreen({
     },
     onPanResponderRelease: () => {
       gestureRef.current.pinching = false;
-      if (viewRef.current.kind !== "edit") {
-        dragOrigin.current = null;
-        return;
-      }
-      const id = selectedRef.current;
-      const room = snapshot?.room;
-      const current = latestItems.current.find((item) => item.holding.id === id);
-      const origin = dragOrigin.current;
-      dragOrigin.current = null;
-      if (!id || !room || !current) return;
-      if (!isSupportedRoomPlacement(current, room.id)) {
-        if (origin) setItems((all) => revertDrop(all, origin));
-        setError(copy.roomInvalidPlacement);
-      }
+      if (heldRef.current) void releaseHeld();
     },
     onPanResponderTerminate: () => {
       gestureRef.current.pinching = false;
+      if (heldRef.current) void releaseHeld();
     },
   });
+  /* eslint-enable react-hooks/refs */
 
   const placedIds = new Set(items.map((item) => item.holding.id));
   const unplaced = holdings.filter((holding) => !placedIds.has(holding.id));
@@ -301,6 +366,10 @@ export function RoomWorldScreen({
     if (next.kind === "zone" && current.kind === "binder") {
       exploreRef.current = { ...IDENTITY_EXPLORE };
     }
+    if (current.kind === "edit") {
+      clearPendingPress();
+      clearHeldVisual();
+    }
     setSelectedId(null);
     setView(next);
   }
@@ -318,6 +387,10 @@ export function RoomWorldScreen({
   }
 
   function selectObject(holdingId: string) {
+    if (heldRef.current || suppressTapRef.current) {
+      suppressTapRef.current = false;
+      return;
+    }
     const item = latestItems.current.find((entry) => entry.holding.id === holdingId);
     if (!item) {
       setSelectedId(holdingId);
@@ -339,6 +412,35 @@ export function RoomWorldScreen({
     setView(inspectView(canonical, holdingId));
   }
 
+  function onCollectiblePressStart(holdingId: string) {
+    if (viewRef.current.kind !== "edit" || readOnly) return;
+    clearPendingPress();
+    pendingPressRef.current = {
+      holdingId,
+      timer: setTimeout(() => {
+        pendingPressRef.current = null;
+        const item = latestItems.current.find((entry) => entry.holding.id === holdingId);
+        if (!item || viewRef.current.kind !== "edit") return;
+        const held = acquireHeld(item, reducedMotionRef.current);
+        heldRef.current = held;
+        previewRef.current = held.preview;
+        highlightSurfaceIdRef.current = held.surfaceId;
+        suppressTapRef.current = true;
+        setSelectedId(holdingId);
+        setHeldId(holdingId);
+      }, LONG_PRESS_MS),
+    };
+  }
+
+  function onCollectiblePressEnd(holdingId: string) {
+    const pending = pendingPressRef.current;
+    clearPendingPress();
+    if (pending && pending.holdingId === holdingId) return;
+    if (heldRef.current?.holdingId === holdingId && !gestureRef.current.objectDrag) {
+      void releaseHeld();
+    }
+  }
+
   function openBinder(holdingId?: string) {
     const index = holdingId ? spreadIndexForHolding(spreads, holdingId) : 0;
     setSelectedId(null);
@@ -350,46 +452,108 @@ export function RoomWorldScreen({
     if (viewRef.current.kind === "home") homeExploreRef.current = { ...exploreRef.current };
     exploreRef.current = { ...IDENTITY_EXPLORE };
     editBaseline.current = cloneRenderables(items);
+    undoStack.current = [];
+    redoStack.current = [];
+    setCanUndo(false);
+    setCanRedo(false);
+    clearPendingPress();
+    clearHeldVisual();
     setView({ kind: "edit" });
     setSelectedId(null);
   }
 
-  function cancelEditing() {
-    setItems(restoreEditBaseline(editBaseline.current));
+  async function cancelEditing() {
+    clearPendingPress();
+    clearHeldVisual();
+    const room = snapshotRef.current?.room;
+    const baseline = restoreEditBaseline(editBaseline.current);
+    const currentIds = new Set(latestItems.current.map((item) => item.holding.id));
+    const baselineIds = new Set(baseline.map((item) => item.holding.id));
+    setItems(baseline);
+    if (room) {
+      try {
+        await Promise.all([
+          ...baseline.map((item) => persistPlacement(item, { silent: true })),
+          ...[...currentIds].filter((id) => !baselineIds.has(id)).map((id) => demo
+            ? Promise.resolve(loadDemoRoom().removeDemoPlacement(room.id, id))
+            : removeNativeRoomPlacement(room.id, id)),
+        ]);
+      } catch {
+        setError(copy.roomSaveFailed);
+      }
+    }
     exploreRef.current = { ...homeExploreRef.current };
     setView({ kind: "home" });
     setSelectedId(null);
   }
 
-  function applyLocal(next: RoomRenderable) {
-    const room = snapshot?.room;
-    if (!room) return;
-    if (!isSupportedRoomPlacement(next, room.id)) {
-      setError(copy.roomInvalidPlacement);
-      return;
-    }
-    const settled = settleRoomRenderable(next, room.id, next.placement?.surfaceId ?? undefined);
-    setItems((all) => all.map((item) => item.holding.id === next.holding.id ? { ...settled.renderable, placement: item.placement } : item));
-  }
-
-  async function persistPlacement(next: RoomRenderable) {
-    const room = snapshot?.room;
+  async function persistPlacement(next: RoomRenderable, options?: { silent?: boolean }) {
+    const room = snapshotRef.current?.room ?? snapshot?.room;
     if (!room) return;
     const settled = settleRoomRenderable(next, room.id, next.placement?.surfaceId ?? undefined);
     const payload = {
       roomId: room.id,
       holdingId: next.holding.id,
       zoneId: zoneIdForNativeSurface(room.id, settled.surfaceId),
-      slot: next.placement?.slot ?? items.findIndex((item) => item.holding.id === next.holding.id),
+      slot: next.placement?.slot ?? latestItems.current.findIndex((item) => item.holding.id === next.holding.id),
       transform: toPersistedTransform(settled.renderable),
       surfaceId: settled.surfaceId,
     };
     try {
       const placement = demo ? loadDemoRoom().saveDemoPlacement(payload) : await saveNativeRoomPlacement(payload);
-      setItems((all) => all.map((item) => item.holding.id === next.holding.id ? { ...settled.renderable, placement } : item));
+      setItems((all) => {
+        const mapped = all.map((item) => item.holding.id === next.holding.id ? { ...settled.renderable, placement } : item);
+        return mapped.some((item) => item.holding.id === next.holding.id) ? mapped : [...mapped, { ...settled.renderable, placement }];
+      });
     } catch {
-      setError(copy.roomSaveFailed);
+      if (!options?.silent) setError(copy.roomSaveFailed);
     }
+  }
+
+  async function releaseHeld() {
+    const held = heldRef.current;
+    const room = snapshotRef.current?.room;
+    if (!held || gestureRef.current.releasing) return;
+    gestureRef.current.releasing = true;
+    suppressTapRef.current = true;
+    try {
+      if (!room || !held.valid || !held.surfaceId || !isSupportedRoomPlacement(held.rest, room.id)) {
+        setItems((all) => revertDrop(all, held.origin));
+        if (held.valid === false) setError(copy.roomInvalidPlacement);
+        return;
+      }
+      if (placementsMatch(held.origin, held.rest)) return;
+      await persistPlacement(held.rest);
+      rememberPlacement(held.origin, held.rest);
+    } finally {
+      clearHeldVisual();
+      gestureRef.current.releasing = false;
+    }
+  }
+
+  async function undoPlacement() {
+    const entry = undoStack.current.pop();
+    if (!entry) return;
+    redoStack.current.push(entry);
+    syncHistory();
+    await persistPlacement(entry.before);
+  }
+
+  async function redoPlacement() {
+    const entry = redoStack.current.pop();
+    if (!entry) return;
+    undoStack.current.push(entry);
+    syncHistory();
+    const after = entry.after;
+    if ("storedHoldingId" in after) {
+      const room = snapshotRef.current?.room;
+      if (!room) return;
+      if (demo) loadDemoRoom().removeDemoPlacement(room.id, after.storedHoldingId);
+      else await removeNativeRoomPlacement(room.id, after.storedHoldingId);
+      setItems((current) => storeRenderable(current, after.storedHoldingId));
+      return;
+    }
+    await persistPlacement(after);
   }
 
   async function saveEditing() {
@@ -401,6 +565,8 @@ export function RoomWorldScreen({
     const baselineIds = new Set(editBaseline.current.map((item) => item.holding.id));
     const currentIds = new Set(items.map((item) => item.holding.id));
     try {
+      clearPendingPress();
+      clearHeldVisual();
       await Promise.all([
         ...items.map((item) => persistPlacement(item)),
         ...[...baselineIds].filter((id) => !currentIds.has(id)).map((id) => demo
@@ -443,16 +609,24 @@ export function RoomWorldScreen({
     if (!snapshot || !selectedId || readOnly) return;
     const kept = holdings;
     void holdingRemainsAfterStore(kept, selectedId);
+    const stored = latestItems.current.find((item) => item.holding.id === selectedId);
+    clearPendingPress();
+    clearHeldVisual();
     try {
       if (demo) loadDemoRoom().removeDemoPlacement(snapshot.room.id, selectedId);
       else await removeNativeRoomPlacement(snapshot.room.id, selectedId);
       setItems((current) => storeRenderable(current, selectedId));
+      if (stored) rememberPlacement(stored, { storedHoldingId: selectedId });
       setSelectedId(null);
     } catch {
       setError(copy.roomSaveFailed);
     }
   }
 
+  const heldItem = items.find((item) => item.holding.id === heldId) ?? selectedItem;
+  const landingSurfaces = editing && heldId && snapshot && heldItem
+    ? compatibleSurfaces(snapshot.room.id, heldItem.geometry)
+    : [];
   const hint = editing
     ? copy.roomDragHint
     : view.kind === "binder"
@@ -484,13 +658,27 @@ export function RoomWorldScreen({
 
   return <View style={[styles.world, immersiveRoomFill(roomTheme.void)]}>
     <Stack.Screen options={{ contentStyle: immersiveRoomFill(roomTheme.void) }} />
-    {!loading && snapshot ? <View style={styles.stage} {...panResponder.panHandlers}>
+    {!loading && snapshot ? <View
+      ref={stageRef}
+      style={styles.stage}
+      onLayout={(event) => {
+        const { width, height } = event.nativeEvent.layout;
+        layoutRef.current.width = width;
+        layoutRef.current.height = height;
+        stageRef.current?.measureInWindow((x, y) => {
+          layoutRef.current.x = x;
+          layoutRef.current.y = y;
+        });
+      }}
+      {...panResponder.panHandlers}
+    >
       <Suspense fallback={null}>
         <NativeRoomRenderer
           key={canvasEpoch}
           items={items}
           selectedId={selectedId}
           focusedId={editing ? null : selectedId}
+          heldId={heldId}
           themeId={themeId}
           view={view}
           binderSpread={currentSpread}
@@ -500,9 +688,15 @@ export function RoomWorldScreen({
           paused={paused}
           readOnly={readOnly}
           exploreRef={exploreRef}
+          previewRef={previewRef}
+          highlightSurfaceIdRef={highlightSurfaceIdRef}
+          compatibleSurfaces={landingSurfaces}
+          onPressStart={onCollectiblePressStart}
+          onPressEnd={onCollectiblePressEnd}
           onSelectZone={selectZone}
           onSelect={selectObject}
           onClearSelection={() => {
+            if (heldRef.current) return;
             if (view.kind === "inspect") {
               exploreRef.current = { ...frozenExploreRef.current };
               setView({ kind: "zone", zone: view.zone });
@@ -541,8 +735,12 @@ export function RoomWorldScreen({
         editing={editing}
         readOnly={readOnly}
         onEdit={beginEditing}
-        onCancel={cancelEditing}
+        onCancel={() => void cancelEditing()}
         onSave={() => void saveEditing()}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={() => void undoPlacement()}
+        onRedo={() => void redoPlacement()}
         style={overlayPad}
       />
       {!loading ? <RoomEntranceTitle key={entranceLabel} label={entranceLabel} color={entranceTone.color} shadow={entranceTone.shadow} reducedMotion={reducedMotion} /> : null}
@@ -561,16 +759,8 @@ export function RoomWorldScreen({
         <SeoullyText variant="handle" style={styles.inspectionTitle}>{holdings.find((item) => item.id === view.heldHoldingId)?.template.name ?? copy.binder}</SeoullyText>
         <Pressable onPress={() => setView({ kind: "binder", spread: view.spread })} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.returnToBinder}</SeoullyText></Pressable>
       </View> : null}
-      {editing ? <View style={[styles.editTray, trayPad]}>
-        {selectedItem ? <>
-          <View style={styles.selectionRow}><SeoullyText numberOfLines={1} variant="handle" color={colors.plum} style={styles.selection}>{selectedItem.holding.template.name}</SeoullyText><Pressable onPress={() => void storeSelected()}><SeoullyText variant="caption" color={colors.muted}>{copy.removeFromRoom}</SeoullyText></Pressable></View>
-          <View style={styles.transformRow}>
-            <Pressable onPress={() => applyLocal(turnRenderable(selectedItem, -Math.PI / 12))} style={styles.transformButton}><SeoullyText variant="caption" color={colors.plum}>{copy.rotateLeft}</SeoullyText></Pressable>
-            <Pressable onPress={() => applyLocal(turnRenderable(selectedItem, Math.PI / 12))} style={styles.transformButton}><SeoullyText variant="caption" color={colors.plum}>{copy.rotateRight}</SeoullyText></Pressable>
-            <Pressable onPress={() => applyLocal(resizeRenderable(selectedItem, 0.9))} style={styles.transformButton}><SeoullyText variant="caption" color={colors.plum}>{copy.scaleDown}</SeoullyText></Pressable>
-            <Pressable onPress={() => applyLocal(resizeRenderable(selectedItem, 1.1))} style={styles.transformButton}><SeoullyText variant="caption" color={colors.plum}>{copy.scaleUp}</SeoullyText></Pressable>
-          </View>
-        </> : null}
+      {editing && !heldId ? <View style={[styles.editTray, trayPad]}>
+        {selectedItem ? <View style={styles.selectionRow}><SeoullyText numberOfLines={1} variant="handle" color={colors.plum} style={styles.selection}>{selectedItem.holding.template.name}</SeoullyText><Pressable onPress={() => void storeSelected()}><SeoullyText variant="caption" color={colors.muted}>{copy.removeFromRoom}</SeoullyText></Pressable></View> : null}
         {storedGroups.length ? <View style={styles.stored}><SeoullyText variant="handle" style={styles.storedTitle}>{copy.storedCollection}</SeoullyText>{storedGroups.map(([kind, group]) => <View key={kind} style={styles.storedGroup}><SeoullyText variant="caption" color={colors.muted} style={styles.storedKind}>{collectibleKindLabel(kind, copy)}</SeoullyText><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storedList}>{group.map((holding) => <Pressable key={holding.id} onPress={() => void placeHolding(holding)} style={styles.storedItem}>{holding.personalMediaUrl ? <CachedSignedImage cacheKey={holding.id} url={holding.personalMediaUrl} style={styles.storedImage} /> : null}<SeoullyText numberOfLines={2} variant="caption" color={colors.plum} style={styles.storedItemText}>+ {holding.template.name}</SeoullyText></Pressable>)}</ScrollView></View>)}</View> : null}
       </View> : null}
     </View>
@@ -586,6 +776,10 @@ function OverlayChrome({
   onEdit,
   onCancel,
   onSave,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
   style,
 }: {
   copy: MobileCopy;
@@ -596,6 +790,10 @@ function OverlayChrome({
   onEdit?: () => void;
   onCancel?: () => void;
   onSave?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
   style?: object;
 }) {
   const chip = [styles.overlayChip, { backgroundColor: chrome.background, borderColor: chrome.border }];
@@ -605,6 +803,8 @@ function OverlayChrome({
     </Pressable>
     <View style={styles.overlaySpacer} />
     {readOnly || !onEdit ? <View style={styles.overlaySpacer} /> : <View style={styles.overlayActions}>
+      {editing && canUndo ? <Pressable onPress={onUndo} style={chip}><SeoullyText variant="button" color={chrome.color}>{copy.roomUndo}</SeoullyText></Pressable> : null}
+      {editing && canRedo ? <Pressable onPress={onRedo} style={chip}><SeoullyText variant="button" color={chrome.color}>{copy.roomRedo}</SeoullyText></Pressable> : null}
       {editing ? <Pressable onPress={onCancel} style={chip}><SeoullyText variant="button" color={chrome.color}>{copy.cancelEditing}</SeoullyText></Pressable> : null}
       <Pressable onPress={editing ? onSave : onEdit} style={chip}>
         <SeoullyText variant="button" color={chrome.color}>{editing ? copy.finishEditing : copy.editRoom}</SeoullyText>

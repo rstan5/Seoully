@@ -1,21 +1,19 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Stack, useFocusEffect } from "expo-router";
-import { AccessibilityInfo, Animated, AppState, Easing, PanResponder, Pressable, ScrollView, StyleSheet, View, type GestureResponderEvent } from "react-native";
+import { AccessibilityInfo, Animated, AppState, Easing, PanResponder, Pressable, StyleSheet, View, type GestureResponderEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { loadCollectorRoom, loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomPlacement, type NativeHolding, type NativeRoomPlacement, type NativeRoomSnapshot } from "../api";
+import { loadCollectorRoom, loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomPlacement, type NativeHolding, type NativeRoomSnapshot } from "../api";
 import { binderSpreads, buildNativeBinderPages, spreadIndexForHolding } from "../binder/model";
 import { collectibleKindLabel, type MobileCopy } from "../i18n";
-import { CachedSignedImage } from "../media/cachedMedia";
 import { colors, spacing } from "../theme";
 import { chrome, immersiveRoomFill } from "../ui/shellLayout";
 import { SeoullyText } from "../ui/SeoullyText";
-import { cloneRenderables, holdingRemainsAfterStore, pushPlacementHistory, restoreEditBaseline, revertDrop, storeRenderable, type PlacementHistoryEntry } from "./editSession";
+import { cloneRenderables, holdingRemainsAfterStore, isStoredHistoryMarker, pushPlacementHistory, restoreEditBaseline, revertDrop, storeRenderable, type PlacementHistoryEntry } from "./editSession";
 import {
   buildRoomRenderables,
   buildPublicRoomRenderables,
   createInitialRoomRenderable,
   isSupportedRoomPlacement,
-  nativeHomeForHolding,
   nextNativeSlot,
   settleRoomRenderable,
   toPersistedTransform,
@@ -36,12 +34,14 @@ import {
   LONG_PRESS_MS,
   LONG_PRESS_SLOP_PX,
   acquireHeld,
+  acquirePlaceFromStorage,
   cloneRenderable,
   compatibleSurfaces,
   placementsMatch,
   projectTouchOntoSurfaces,
   type HeldEdit,
 } from "./touchEdit";
+import { StoredCollectionSheet } from "./StoredCollectionSheet";
 import { entranceForeground, roomEntranceCopy } from "./entrance";
 import { roomOverlayChrome, roomPalette } from "./theme";
 import { inspectView, openBinderView, stepBack, zoneFromSurfaceId, type CanonicalZoneKind, type NativeWorldView } from "./worldView";
@@ -89,6 +89,9 @@ export function RoomWorldScreen({
   const [turnDir, setTurnDir] = useState<1 | -1 | 0>(0);
   const [turningSpreadIndex, setTurningSpreadIndex] = useState<number | null>(null);
   const [heldId, setHeldId] = useState<string | null>(null);
+  const [placingItem, setPlacingItem] = useState<RoomRenderable | null>(null);
+  const [storageOpen, setStorageOpen] = useState(false);
+  const [storageQuery, setStorageQuery] = useState("");
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const insets = useSafeAreaInsets();
@@ -110,6 +113,7 @@ export function RoomWorldScreen({
   const suppressTapRef = useRef(false);
   const undoStack = useRef<PlacementHistoryEntry<RoomRenderable>[]>([]);
   const redoStack = useRef<PlacementHistoryEntry<RoomRenderable>[]>([]);
+  const binderReturnRef = useRef<{ view: NativeWorldView; explore: ExploreOffset } | null>(null);
   const layoutRef = useRef({ width: 1, height: 1, x: 0, y: 0 });
   const stageRef = useRef<View>(null);
   useEffect(() => { latestItems.current = items; }, [items]);
@@ -196,7 +200,10 @@ export function RoomWorldScreen({
     if (!initialHoldingId || !spreads.length) return;
     const index = spreadIndexForHolding(spreads, initialHoldingId);
     if (index < 0) return;
-    const task = setTimeout(() => setView(openBinderView(index)), 0);
+    const task = setTimeout(() => {
+      binderReturnRef.current = { view: { kind: "home" }, explore: { ...exploreRef.current } };
+      setView(openBinderView(index));
+    }, 0);
     return () => clearTimeout(task);
   }, [initialHoldingId, spreads]);
 
@@ -211,6 +218,7 @@ export function RoomWorldScreen({
     highlightSurfaceIdRef.current = null;
     gestureRef.current.objectDrag = false;
     setHeldId(null);
+    setPlacingItem(null);
   }
 
   function syncHistory() {
@@ -218,14 +226,16 @@ export function RoomWorldScreen({
     setCanRedo(redoStack.current.length > 0);
   }
 
-  function rememberPlacement(before: RoomRenderable, after: RoomRenderable | { storedHoldingId: string }) {
-    if (!("storedHoldingId" in after) && placementsMatch(before, after)) return;
-    pushPlacementHistory(undoStack.current, redoStack.current, { before: cloneRenderable(before), after: "storedHoldingId" in after ? after : cloneRenderable(after) });
+  function rememberPlacement(before: RoomRenderable | { storedHoldingId: string }, after: RoomRenderable | { storedHoldingId: string }) {
+    if (!isStoredHistoryMarker(before) && !isStoredHistoryMarker(after) && placementsMatch(before, after)) return;
+    pushPlacementHistory(undoStack.current, redoStack.current, {
+      before: isStoredHistoryMarker(before) ? before : cloneRenderable(before),
+      after: isStoredHistoryMarker(after) ? after : cloneRenderable(after),
+    });
     syncHistory();
   }
 
   /* PanResponder callbacks fire on gestures and read live refs, not render values. */
-  /* eslint-disable react-hooks/refs -- responder object is event handlers */
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => false,
     onMoveShouldSetPanResponder: (event, gesture) => {
@@ -265,7 +275,7 @@ export function RoomWorldScreen({
           layoutRef.current.height,
           pose,
           room.id,
-          held.origin,
+          held.origin ?? held.rest,
           reducedMotionRef.current,
         );
         if (!candidate) {
@@ -329,7 +339,6 @@ export function RoomWorldScreen({
 
   const placedIds = new Set(items.map((item) => item.holding.id));
   const unplaced = holdings.filter((holding) => !placedIds.has(holding.id));
-  const storedGroups = groupStoredHoldings(unplaced);
   const selectedItem = items.find((item) => item.holding.id === selectedId) ?? null;
   const editing = view.kind === "edit";
   const readOnly = mode === "public";
@@ -347,8 +356,17 @@ export function RoomWorldScreen({
 
   function goBack() {
     const current = viewRef.current;
+    if (placingItem) {
+      clearPendingPress();
+      clearHeldVisual();
+      return;
+    }
     if (current.kind === "binder" && current.heldHoldingId) {
       setView({ kind: "binder", spread: current.spread });
+      return;
+    }
+    if (current.kind === "binder") {
+      closeBinder();
       return;
     }
     const next = stepBack(current);
@@ -358,13 +376,10 @@ export function RoomWorldScreen({
     }
     if (current.kind === "inspect") {
       exploreRef.current = { ...frozenExploreRef.current };
-    } else if (current.kind === "zone" || current.kind === "edit" || (current.kind === "binder" && next.kind === "home")) {
+    } else if (current.kind === "zone" || current.kind === "edit") {
       exploreRef.current = { ...homeExploreRef.current };
     } else if (next.kind === "home") {
       exploreRef.current = { ...homeExploreRef.current };
-    }
-    if (next.kind === "zone" && current.kind === "binder") {
-      exploreRef.current = { ...IDENTITY_EXPLORE };
     }
     if (current.kind === "edit") {
       clearPendingPress();
@@ -379,7 +394,7 @@ export function RoomWorldScreen({
     if (viewRef.current.kind === "home") homeExploreRef.current = { ...exploreRef.current };
     exploreRef.current = { ...IDENTITY_EXPLORE };
     if (zone === "binder") {
-      openBinder();
+      openBinderFromWorld();
       return;
     }
     setSelectedId(null);
@@ -405,8 +420,7 @@ export function RoomWorldScreen({
     const canonical = zone === "floor" ? "desk" : zone;
     setSelectedId(holdingId);
     if (item.holding.template.kind === "photocard") {
-      const index = spreadIndexForHolding(spreads, holdingId);
-      setView(openBinderView(Math.max(0, index)));
+      openBinderFromWorld(holdingId);
       return;
     }
     setView(inspectView(canonical, holdingId));
@@ -441,10 +455,31 @@ export function RoomWorldScreen({
     }
   }
 
-  function openBinder(holdingId?: string) {
+  function captureBinderReturn() {
+    const current = viewRef.current;
+    if (current.kind === "binder") return;
+    binderReturnRef.current = { view: current, explore: { ...exploreRef.current } };
+  }
+
+  function openBinderFromWorld(holdingId?: string) {
+    captureBinderReturn();
     const index = holdingId ? spreadIndexForHolding(spreads, holdingId) : 0;
     setSelectedId(null);
+    setStorageOpen(false);
     setView(openBinderView(Math.max(0, index)));
+  }
+
+  function closeBinder() {
+    const ret = binderReturnRef.current;
+    binderReturnRef.current = null;
+    setSelectedId(null);
+    if (ret) {
+      exploreRef.current = { ...ret.explore };
+      setView(ret.view);
+      return;
+    }
+    exploreRef.current = { ...homeExploreRef.current };
+    setView({ kind: "home" });
   }
 
   function beginEditing() {
@@ -518,13 +553,14 @@ export function RoomWorldScreen({
     suppressTapRef.current = true;
     try {
       if (!room || !held.valid || !held.surfaceId || !isSupportedRoomPlacement(held.rest, room.id)) {
-        setItems((all) => revertDrop(all, held.origin));
+        const origin = held.origin;
+        if (origin) setItems((all) => revertDrop(all, origin));
         if (held.valid === false) setError(copy.roomInvalidPlacement);
         return;
       }
-      if (placementsMatch(held.origin, held.rest)) return;
+      if (held.origin && placementsMatch(held.origin, held.rest)) return;
       await persistPlacement(held.rest);
-      rememberPlacement(held.origin, held.rest);
+      rememberPlacement(held.origin ?? { storedHoldingId: held.holdingId }, held.rest);
     } finally {
       clearHeldVisual();
       gestureRef.current.releasing = false;
@@ -536,7 +572,16 @@ export function RoomWorldScreen({
     if (!entry) return;
     redoStack.current.push(entry);
     syncHistory();
-    await persistPlacement(entry.before);
+    const before = entry.before;
+    if (isStoredHistoryMarker(before)) {
+      const room = snapshotRef.current?.room;
+      if (!room) return;
+      if (demo) loadDemoRoom().removeDemoPlacement(room.id, before.storedHoldingId);
+      else await removeNativeRoomPlacement(room.id, before.storedHoldingId);
+      setItems((current) => storeRenderable(current, before.storedHoldingId));
+      return;
+    }
+    await persistPlacement(before);
   }
 
   async function redoPlacement() {
@@ -545,7 +590,7 @@ export function RoomWorldScreen({
     undoStack.current.push(entry);
     syncHistory();
     const after = entry.after;
-    if ("storedHoldingId" in after) {
+    if (isStoredHistoryMarker(after)) {
       const room = snapshotRef.current?.room;
       if (!room) return;
       if (demo) loadDemoRoom().removeDemoPlacement(room.id, after.storedHoldingId);
@@ -581,28 +626,19 @@ export function RoomWorldScreen({
     }
   }
 
-  async function placeHolding(holding: NativeHolding) {
-    if (!snapshot || readOnly) return;
-    const homeZone = nativeHomeForHolding(holding, snapshot.room.id, 0).zoneId;
-    const slot = nextNativeSlot(items.filter((item) => item.placement?.zoneId === homeZone).map((item) => item.placement?.slot ?? 0));
-    const home = nativeHomeForHolding(holding, snapshot.room.id, slot);
-    const initial = createInitialRoomRenderable(holding, slot, snapshot.room.id);
-    const settled = settleRoomRenderable(initial, snapshot.room.id, home.surfaceId);
-    try {
-      const payload = {
-        roomId: snapshot.room.id,
-        holdingId: holding.id,
-        zoneId: home.zoneId,
-        slot,
-        transform: toPersistedTransform(settled.renderable),
-        surfaceId: settled.surfaceId,
-      };
-      const placement: NativeRoomPlacement = demo ? loadDemoRoom().saveDemoPlacement(payload) : await saveNativeRoomPlacement(payload);
-      setItems((current) => [...current, { ...settled.renderable, placement }]);
-      setSelectedId(holding.id);
-    } catch {
-      setError(copy.roomSaveFailed);
-    }
+  function beginPlaceFromStorage(holding: NativeHolding) {
+    if (!snapshot || readOnly || viewRef.current.kind !== "edit") return;
+    const draft = createInitialRoomRenderable(holding, nextNativeSlot(items.map((item) => item.placement?.slot ?? 0)), snapshot.room.id);
+    const held = acquirePlaceFromStorage(draft, reducedMotionRef.current);
+    heldRef.current = held;
+    previewRef.current = held.preview;
+    highlightSurfaceIdRef.current = null;
+    suppressTapRef.current = true;
+    setSelectedId(holding.id);
+    setHeldId(holding.id);
+    setPlacingItem(held.preview);
+    setStorageOpen(false);
+    setStorageQuery("");
   }
 
   async function storeSelected() {
@@ -623,15 +659,17 @@ export function RoomWorldScreen({
     }
   }
 
-  const heldItem = items.find((item) => item.holding.id === heldId) ?? selectedItem;
+  const heldItem = placingItem ?? items.find((item) => item.holding.id === heldId) ?? selectedItem;
   const landingSurfaces = editing && heldId && snapshot && heldItem
     ? compatibleSurfaces(snapshot.room.id, heldItem.geometry)
     : [];
-  const hint = editing
-    ? copy.roomDragHint
-    : view.kind === "binder"
-      ? copy.binderLead
-      : null;
+  const hint = placingItem
+    ? copy.roomPlaceHint
+    : editing
+      ? copy.roomDragHint
+      : view.kind === "binder"
+        ? copy.binderLead
+        : null;
   const overlayPad = {
     paddingTop: insets.top + 8,
     paddingLeft: Math.max(insets.left, chrome.gutter),
@@ -703,7 +741,9 @@ export function RoomWorldScreen({
             }
             setSelectedId(null);
           }}
-          onOpenBinder={readOnly || editing ? undefined : () => openBinder()}
+          onOpenBinder={() => openBinderFromWorld()}
+          onOpenStorage={readOnly ? undefined : () => setStorageOpen(true)}
+          placingItem={placingItem}
           onHoldCard={(holding) => {
             if (view.kind !== "binder") return;
             setView({ kind: "binder", spread: view.spread, ...(holding ? { heldHoldingId: holding.id } : {}) });
@@ -752,17 +792,35 @@ export function RoomWorldScreen({
           <SeoullyText numberOfLines={1} variant="caption" style={styles.inspectionMeta}>{[selectedItem.holding.template.groupName, selectedItem.holding.template.memberName, collectibleKindLabel(selectedItem.holding.template.kind, copy)].filter(Boolean).join(" · ")}</SeoullyText>
         </View>
         {onInspectCollectible && !readOnly ? <Pressable onPress={() => onInspectCollectible(selectedItem.holding.id)} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.viewCollectible}</SeoullyText></Pressable> : null}
-        {selectedItem.holding.template.kind === "photocard" && !readOnly ? <Pressable onPress={() => openBinder(selectedItem.holding.id)} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.openBinder}</SeoullyText></Pressable> : null}
+        {selectedItem.holding.template.kind === "photocard" ? <Pressable onPress={() => openBinderFromWorld(selectedItem.holding.id)} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.openBinder}</SeoullyText></Pressable> : null}
         <Pressable onPress={goBack} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.close}</SeoullyText></Pressable>
       </View> : null}
       {view.kind === "binder" && view.heldHoldingId ? <View style={[styles.inspection, trayPad]}>
         <SeoullyText variant="handle" style={styles.inspectionTitle}>{holdings.find((item) => item.id === view.heldHoldingId)?.template.name ?? copy.binder}</SeoullyText>
         <Pressable onPress={() => setView({ kind: "binder", spread: view.spread })} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.returnToBinder}</SeoullyText></Pressable>
       </View> : null}
-      {editing && !heldId ? <View style={[styles.editTray, trayPad]}>
-        {selectedItem ? <View style={styles.selectionRow}><SeoullyText numberOfLines={1} variant="handle" color={colors.plum} style={styles.selection}>{selectedItem.holding.template.name}</SeoullyText><Pressable onPress={() => void storeSelected()}><SeoullyText variant="caption" color={colors.muted}>{copy.removeFromRoom}</SeoullyText></Pressable></View> : null}
-        {storedGroups.length ? <View style={styles.stored}><SeoullyText variant="handle" style={styles.storedTitle}>{copy.storedCollection}</SeoullyText>{storedGroups.map(([kind, group]) => <View key={kind} style={styles.storedGroup}><SeoullyText variant="caption" color={colors.muted} style={styles.storedKind}>{collectibleKindLabel(kind, copy)}</SeoullyText><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storedList}>{group.map((holding) => <Pressable key={holding.id} onPress={() => void placeHolding(holding)} style={styles.storedItem}>{holding.personalMediaUrl ? <CachedSignedImage cacheKey={holding.id} url={holding.personalMediaUrl} style={styles.storedImage} /> : null}<SeoullyText numberOfLines={2} variant="caption" color={colors.plum} style={styles.storedItemText}>+ {holding.template.name}</SeoullyText></Pressable>)}</ScrollView></View>)}</View> : null}
+      {editing && !heldId && selectedItem ? <View style={[styles.editTray, trayPad]}>
+        <View style={styles.selectionRow}><SeoullyText numberOfLines={1} variant="handle" color={colors.plum} style={styles.selection}>{selectedItem.holding.template.name}</SeoullyText><Pressable onPress={() => void storeSelected()}><SeoullyText variant="caption" color={colors.muted}>{copy.removeFromRoom}</SeoullyText></Pressable></View>
       </View> : null}
+      {placingItem ? <View style={[styles.editTray, trayPad]}>
+        <Pressable onPress={() => { clearPendingPress(); clearHeldVisual(); }} style={styles.inspectAction}>
+          <SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.cancelPlacement}</SeoullyText>
+        </Pressable>
+      </View> : null}
+      {!readOnly ? <StoredCollectionSheet
+        visible={storageOpen}
+        holdings={unplaced}
+        query={storageQuery}
+        editing={editing}
+        reducedMotion={reducedMotion}
+        copy={copy}
+        bottomInset={insets.bottom}
+        onChangeQuery={setStorageQuery}
+        onClose={() => { setStorageOpen(false); setStorageQuery(""); }}
+        onInspect={onInspectCollectible}
+        onPlace={beginPlaceFromStorage}
+        onEditToPlace={() => { beginEditing(); }}
+      /> : null}
     </View>
   </View>;
 }
@@ -853,16 +911,6 @@ function touchSpan(event: GestureResponderEvent) {
   return Math.hypot(touches[0].pageX - touches[1].pageX, touches[0].pageY - touches[1].pageY);
 }
 
-function groupStoredHoldings(holdings: NativeHolding[]) {
-  const groups = new Map<string, NativeHolding[]>();
-  for (const holding of holdings) {
-    const list = groups.get(holding.template.kind) ?? [];
-    list.push(holding);
-    groups.set(holding.template.kind, list);
-  }
-  return [...groups.entries()];
-}
-
 function loadDemoRoom(): typeof import("./demoRoom") {
   if (__DEV__) {
     // Dev-only fixture world. Production Metro never evaluates this module.
@@ -891,14 +939,6 @@ const styles = StyleSheet.create({
   selection: { color: colors.plum, flexShrink: 1, fontWeight: "700" },
   transformRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, justifyContent: "center" },
   transformButton: { borderColor: colors.border, borderRadius: 999, borderWidth: 1, justifyContent: "center", minHeight: 34, paddingHorizontal: spacing.sm },
-  stored: { paddingTop: spacing.xs },
-  storedTitle: { color: colors.ink, fontSize: 13, fontWeight: "700", marginBottom: spacing.xs },
-  storedGroup: { marginBottom: spacing.xs },
-  storedKind: { color: colors.muted, fontSize: 11, fontWeight: "700", marginBottom: 4, textTransform: "uppercase" },
-  storedList: { gap: spacing.xs },
-  storedItem: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: 10, borderWidth: 1, overflow: "hidden", width: 92 },
-  storedImage: { aspectRatio: 55 / 85, width: "100%" },
-  storedItemText: { color: colors.plum, fontSize: 11, fontWeight: "600", padding: spacing.xs },
   inspection: { alignItems: "center", backgroundColor: "rgba(247,241,244,0.94)", borderTopColor: colors.border, borderTopWidth: 1, bottom: 0, flexDirection: "row", gap: spacing.sm, left: 0, paddingHorizontal: spacing.sm, paddingTop: spacing.sm, position: "absolute", right: 0 },
   inspectionCopy: { flex: 1 },
   inspectionTitle: { color: colors.ink, fontSize: 15, fontWeight: "700" },

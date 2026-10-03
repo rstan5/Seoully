@@ -19,12 +19,16 @@ const SURFACE_MARGIN = 0.06;
 
 export type HeldEdit = {
   holdingId: string;
-  origin: RoomRenderable;
+  /** Existing RoomPlacement being moved. Null means a new place-from-storage session. */
+  origin: RoomRenderable | null;
   rest: RoomRenderable;
   preview: RoomRenderable;
   surfaceId: string | null;
   valid: boolean;
 };
+
+/** Lifted takeout pose above the Archive crate — not a fake persisted origin. */
+export const STORAGE_TAKEOUT = { x: -1.2, y: -1.12, z: -0.65 };
 
 export type PlacementCandidate = {
   surface: NativeRoomSurface;
@@ -213,6 +217,21 @@ export function acquireHeld(origin: RoomRenderable, reducedMotion = false): Held
     preview: liftHeldRenderable(rest, surfaceKind, reducedMotion),
     surfaceId: origin.placement?.surfaceId ?? null,
     valid: Boolean(origin.placement?.surfaceId),
+  };
+}
+
+export function acquirePlaceFromStorage(draft: RoomRenderable, reducedMotion = false): HeldEdit {
+  const rest = cloneRenderable({
+    ...draft,
+    position: { ...STORAGE_TAKEOUT },
+  });
+  return {
+    holdingId: draft.holding.id,
+    origin: null,
+    rest,
+    preview: liftHeldRenderable(rest, "horizontal", reducedMotion),
+    surfaceId: null,
+    valid: false,
   };
 }
 

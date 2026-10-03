@@ -19,6 +19,7 @@
     "apps/mobile/src/data/ownership.ts",
     "apps/mobile/src/room/editSession.ts",
     "apps/mobile/src/room/touchEdit.ts",
+    "apps/mobile/src/room/storedHoldings.ts",
     "apps/mobile/src/room/model.ts",
     "apps/mobile/src/room/representation.ts",
     "apps/mobile/src/room/worldView.ts",

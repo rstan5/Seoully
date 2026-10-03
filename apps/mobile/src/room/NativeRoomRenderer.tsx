@@ -50,6 +50,8 @@ export function NativeRoomRenderer({
   compatibleSurfaces = [],
   onPressStart,
   onPressEnd,
+  onOpenStorage,
+  placingItem = null,
 }: {
   items: RoomRenderable[];
   selectedId: string | null;
@@ -76,13 +78,19 @@ export function NativeRoomRenderer({
   compatibleSurfaces?: NativeRoomSurface[];
   onPressStart?: (holdingId: string) => void;
   onPressEnd?: (holdingId: string) => void;
+  onOpenStorage?: () => void;
+  placingItem?: RoomRenderable | null;
 }) {
   const focused = items.find((item) => item.holding.id === focusedId) ?? null;
   const theme = roomPalette(themeId);
   const textured = roomTextureIds(items, selectedId, focusedId);
+  if (placingItem?.imageUrl) textured.add(placingItem.holding.id);
   const binderOpen = view.kind === "binder";
   const examining = Boolean(view.kind === "binder" && view.heldHoldingId);
-  const worldItems = binderOpen ? items.filter((item) => item.geometry !== "photocard") : items;
+  const placedItems = binderOpen ? items.filter((item) => item.geometry !== "photocard") : items;
+  const worldItems = placingItem && !placedItems.some((item) => item.holding.id === placingItem.holding.id)
+    ? [...placedItems, placingItem]
+    : placedItems;
   return <Canvas
     frameloop={paused ? "never" : "always"}
     style={StyleSheet.absoluteFill}
@@ -99,8 +107,14 @@ export function NativeRoomRenderer({
     <pointLight color={theme.light} intensity={reducedMotion ? 0.15 : 0.35} position={[1.2, 1.4, -2.1]} />
     <AuthoredCamera view={view} focused={focused} reducedMotion={reducedMotion} paused={paused} exploreRef={exploreRef} />
     <RoomShell theme={theme} onSelectZone={view.kind === "home" || view.kind === "zone" ? onSelectZone : undefined} />
-    <RoomFurniture theme={theme} hideClosedBinder={binderOpen} onOpenBinder={readOnly || view.kind === "edit" ? undefined : onOpenBinder} onSelectZone={view.kind === "home" || view.kind === "zone" ? onSelectZone : undefined} />
-    {view.kind === "home" ? CANONICAL_ZONE_KINDS.map((zone) => (
+    <RoomFurniture
+      theme={theme}
+      hideClosedBinder={binderOpen}
+      onOpenBinder={view.kind === "binder" || view.kind === "edit" || Boolean(heldId) ? undefined : onOpenBinder}
+      onOpenStorage={readOnly || view.kind === "binder" || Boolean(heldId) ? undefined : onOpenStorage}
+      onSelectZone={view.kind === "home" || view.kind === "zone" ? onSelectZone : undefined}
+    />
+    {view.kind === "home" ? CANONICAL_ZONE_KINDS.filter((zone) => zone !== "archive").map((zone) => (
       <ZoneHotspot key={zone} zone={zone} onSelect={onSelectZone} />
     )) : null}
     {heldId && compatibleSurfaces.length ? <LandingHighlights
@@ -203,11 +217,13 @@ function RoomFurniture({
   theme,
   hideClosedBinder,
   onOpenBinder,
+  onOpenStorage,
   onSelectZone,
 }: {
   theme: ReturnType<typeof roomPalette>;
   hideClosedBinder: boolean;
   onOpenBinder?: () => void;
+  onOpenStorage?: () => void;
   onSelectZone?: (zone: CanonicalZoneKind) => void;
 }) {
   return <>
@@ -217,6 +233,7 @@ function RoomFurniture({
     <mesh position={[0.05, -1.42, -2.85]}><boxGeometry args={[0.12, 1.05, 1.5]} /><meshStandardMaterial color={theme.furniture} roughness={0.8} /></mesh>
     <mesh position={[2.85, -1.42, -2.85]}><boxGeometry args={[0.12, 1.05, 1.5]} /><meshStandardMaterial color={theme.furniture} roughness={0.8} /></mesh>
     {!hideClosedBinder ? <group position={[DESK_BINDER_AT.x, DESK_BINDER_AT.y, DESK_BINDER_AT.z]} rotation={[-0.18, -0.22, 0]} onClick={(event) => { event.stopPropagation(); onOpenBinder?.(); }}>
+      <mesh position={[0, 0.02, 0.02]}><boxGeometry args={[1.15, 1.02, 0.82]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>
       <mesh position={[-0.36, 0, 0]}><boxGeometry args={[0.08, 0.74, 0.52]} /><meshStandardMaterial color={theme.binder} roughness={0.5} /></mesh>
       <mesh position={[0.04, 0, 0]}><boxGeometry args={[0.72, 0.7, 0.5]} /><meshStandardMaterial color={theme.binder} roughness={0.62} /></mesh>
       <mesh position={[0.4, 0, 0]}><boxGeometry args={[0.04, 0.66, 0.46]} /><meshStandardMaterial color={theme.paper} roughness={0.85} /></mesh>
@@ -224,7 +241,12 @@ function RoomFurniture({
     <mesh position={[3.65, -0.55, -3.78]} onClick={(event) => { event.stopPropagation(); onSelectZone?.("case"); }}><boxGeometry args={[1.6, 3.18, 0.34]} /><meshStandardMaterial color={theme.furniture} roughness={0.76} /></mesh>
     {[-0.55, 0.43].map((y) => <mesh key={`case-${y}`} position={[3.65, y, -3.5]}><boxGeometry args={[1.46, 0.07, 0.66]} /><meshStandardMaterial color={theme.edge} roughness={0.55} /></mesh>)}
     <mesh position={[3.65, 0, -3.42]}><boxGeometry args={[1.42, 2.85, 0.04]} /><meshStandardMaterial color="#d8ecec" roughness={0.12} metalness={0.15} transparent opacity={0.22} /></mesh>
-    <mesh position={[-1.2, -1.86, -0.65]} onClick={(event) => { event.stopPropagation(); onSelectZone?.("archive"); }}><boxGeometry args={[1.84, 0.58, 1.18]} /><meshStandardMaterial color={theme.furniture} roughness={0.88} /></mesh>
+    <group position={[-1.2, -1.86, -0.65]} onClick={(event) => { event.stopPropagation(); if (onOpenStorage) onOpenStorage(); else onSelectZone?.("archive"); }}>
+      <mesh position={[0, 0.22, 0]}><boxGeometry args={[2.15, 1.15, 1.55]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>
+      <mesh><boxGeometry args={[1.84, 0.58, 1.18]} /><meshStandardMaterial color={theme.furniture} roughness={0.88} /></mesh>
+      <mesh position={[0, 0.34, 0]}><boxGeometry args={[1.72, 0.1, 1.08]} /><meshStandardMaterial color={theme.edge} roughness={0.7} /></mesh>
+      <mesh position={[0, 0.06, 0.6]}><boxGeometry args={[0.72, 0.18, 0.04]} /><meshStandardMaterial color={theme.paper} roughness={0.82} /></mesh>
+    </group>
     <mesh position={[0.2, -1.28, -1.15]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[1.38, 48]} /><meshStandardMaterial color={theme.accent} roughness={1} /></mesh>
     <mesh position={[-3.95, -0.85, -1.15]}><cylinderGeometry args={[0.08, 0.12, 2.4, 10]} /><meshStandardMaterial color={theme.edge} roughness={0.45} metalness={0.25} /></mesh>
     <mesh position={[-3.95, 0.42, -1.15]}><sphereGeometry args={[0.22, 16, 12]} /><meshStandardMaterial color={theme.light} emissive={theme.light} emissiveIntensity={0.4} roughness={0.3} /></mesh>

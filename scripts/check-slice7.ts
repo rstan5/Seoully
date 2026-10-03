@@ -5,7 +5,8 @@ import { buildPages } from "../src/world/objects/binderGeometry";
 import { isBinderEligible } from "../apps/mobile/src/data/ownership";
 import { holdingRemainsAfterStore, pushPlacementHistory, restoreEditBaseline, revertDrop, storeRenderable } from "../apps/mobile/src/room/editSession";
 import { nativeRoomSurfaces, surfaceAcceptsGeometry } from "../apps/mobile/src/room/model";
-import { acquireHeld, compatibleSurfaces, LONG_PRESS_MS, placementsMatch, projectTouchOntoSurfaces, screenRay } from "../apps/mobile/src/room/touchEdit";
+import { acquireHeld, acquirePlaceFromStorage, compatibleSurfaces, LONG_PRESS_MS, placementsMatch, projectTouchOntoSurfaces, screenRay } from "../apps/mobile/src/room/touchEdit";
+import { filterStoredHoldings } from "../apps/mobile/src/room/storedHoldings";
 import {
   applyExploreOffset,
   clampExplore,
@@ -93,7 +94,7 @@ assertContains(representation, 'return "generic"', "generic fallback");
 const model = read("apps/mobile/src/room/model.ts");
 assertContains(model, "surfaceAcceptsGeometry", "surface rules");
 assertContains(model, 'if (geometry === "poster") return surface.kind === "wall"', "poster wall only");
-assertContains(worldScreen, "revertDrop(all, held.origin)", "invalid drop revert");
+assertContains(worldScreen, "revertDrop(all, origin)", "invalid drop revert");
 const origin = { holding: { id: "drop" }, position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } };
 const moved = { ...origin, position: { x: 99, y: 99, z: 99 } };
 assert.equal(revertDrop([moved], origin)[0]?.position.x, 0);
@@ -136,8 +137,8 @@ assert.deepEqual(stepBack({ kind: "zone", zone: "desk" }), { kind: "home" });
 assert.equal(stepBack({ kind: "home" }), "leave");
 
 // R. Public binder
-assertContains(worldScreen, "onOpenBinder={readOnly || editing ? undefined : () => openBinder()}", "public binder tap");
-assertContains(worldScreen, "if (!snapshot || readOnly) return;", "public cannot place");
+assertContains(worldScreen, "onOpenBinder={() => openBinderFromWorld()}", "Binder opens from the world object");
+assertContains(worldScreen, "if (!snapshot || readOnly || viewRef.current.kind !== \"edit\") return;", "public cannot place from storage");
 
 // S. Demo/Live isolation
 assertContains(worldScreen, "loadDemoRoom", "demo require");
@@ -180,7 +181,7 @@ assertContains(worldScreen, "nudgeExploreFromDrag", "one-finger explore");
 assertContains(worldScreen, "nudgeExploreFromPinch", "pinch zoom");
 assertContains(worldScreen, "Math.hypot(gesture.dx, gesture.dy) > 10", "drag threshold");
 assertContains(worldScreen, "exploreRef={exploreRef}", "camera reads explore ref");
-assertContains(worldScreen, "onOpenBinder={readOnly || editing ? undefined : () => openBinder()}", "desk Binder tap");
+assertContains(worldScreen, "onOpenBinder={() => openBinderFromWorld()}", "desk Binder tap");
 assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "ZONE_HOTSPOTS", "world zone taps");
 assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), 'onSelectZone?.("shelf")', "shelf furniture tap");
 assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "onOpenBinder", "desk Binder tap");
@@ -356,7 +357,12 @@ assertContains(read("apps/mobile/src/i18n.ts"), 'back: "Back"', "EN Back label")
 assertContains(read("apps/mobile/src/i18n.ts"), 'editRoom: "Edit Room"', "EN Edit Room label");
 assertContains(read("apps/mobile/src/i18n.ts"), "back: \"뒤로\"", "KO Back label");
 assertContains(read("apps/mobile/src/i18n.ts"), 'editRoom: "룸 편집"', "KO Edit Room label");
-assertNotContains(worldScreen, "merch-box", "world-storage reconstruction is not started");
+assertNotContains(worldScreen, "merch-box", "storage is an Archive crate, not a merch-box zone");
+assertNotContains(worldScreen, "groupStoredHoldings", "legacy Stored tray grouping is gone");
+assertContains(worldScreen, "StoredCollectionSheet", "stored collection uses a sheet");
+assertContains(worldScreen, "beginPlaceFromStorage", "Edit Room places from storage");
+assertContains(worldScreen, "binderReturnRef", "Binder captures the Room framing");
+assertContains(worldScreen, "onOpenStorage={readOnly ? undefined", "public storage stays closed");
 assertNotContains(worldScreen, "copy.rotateLeft", "Turn left is not a primary edit control");
 assertNotContains(worldScreen, "copy.rotateRight", "Turn right is not a primary edit control");
 assertNotContains(worldScreen, "copy.scaleDown", "Smaller is not a primary edit control");
@@ -370,8 +376,8 @@ assertContains(worldScreen, "previewRef", "drag preview is ref-driven");
 assertContains(worldScreen, "heldRef.current", "acquired object owns the drag");
 assertContains(worldScreen, "if (heldRef.current) {", "held drag does not pan the camera");
 assertContains(worldScreen, "async function releaseHeld", "release commits or rolls back");
-assertContains(worldScreen, "rememberPlacement(held.origin, held.rest)", "committed move is undoable");
-assertContains(worldScreen, "revertDrop(all, held.origin)", "invalid release restores origin");
+assertContains(worldScreen, "rememberPlacement(held.origin ?? { storedHoldingId: held.holdingId }, held.rest)", "committed move or place is undoable");
+assertContains(worldScreen, "revertDrop(all, origin)", "invalid release restores origin");
 assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "onPressStart", "collectibles receive long-press");
 assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "LandingHighlights", "compatible surfaces highlight while held");
 assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "held={heldId === item.holding.id}", "held object lifts");
@@ -439,5 +445,66 @@ assertNotContains(read("apps/mobile/src/room/camera.ts"), "ceiling: 3.41", "7B d
 assertContains(read("apps/mobile/src/room/camera.ts"), "ceiling: 3.4", "accepted 7A ceiling bound remains");
 assertContains(read("apps/mobile/src/room/camera.ts"), "floorGuard: -2.08", "accepted 7A floor guard remains");
 assertNotContains(worldScreen, "saveNativeRoomTheme", "theme writes stay blocked");
+
+// Slice 7C — storage + Binder world integration
+const renderer = read("apps/mobile/src/room/NativeRoomRenderer.tsx");
+const storedHoldings = [
+  {
+    id: "h-card",
+    templateId: "t-card",
+    acquiredAt: "2026-01-01",
+    tradeStatus: "not-for-trade" as const,
+    template: { id: "t-card", groupId: "g", memberId: "m", releaseId: "r", kind: "photocard", name: "Love Dive", descriptor: "pob", status: "complete", groupName: "IVE", memberName: "Yujin", releaseName: "Love Dive" },
+  },
+  {
+    id: "h-album",
+    templateId: "t-album",
+    acquiredAt: "2026-01-01",
+    tradeStatus: "not-for-trade" as const,
+    template: { id: "t-album", groupId: "g", memberId: null, releaseId: "r", kind: "album", name: "Get Up", descriptor: "", status: "complete", groupName: "NewJeans", memberName: null, releaseName: "Get Up" },
+  },
+];
+assert.equal(filterStoredHoldings(storedHoldings, "yujin").map((holding) => holding.id).join(), "h-card");
+assert.equal(filterStoredHoldings(storedHoldings, "Get Up").map((holding) => holding.id).join(), "h-album");
+assert.equal(filterStoredHoldings(storedHoldings, "").length, 2);
+const takeout = acquirePlaceFromStorage({
+  holding: { id: "h-new", template: { id: "t", kind: "album", name: "Get Up" } },
+  position: { x: 0, y: 0, z: 0 },
+  rotation: { x: 0, y: 0, z: 0 },
+  scale: 1,
+  geometry: "album",
+  color: "#000",
+  accent: "#111",
+} as never);
+assert.equal(takeout.origin, null);
+assert.equal(takeout.valid, false);
+assert.equal(takeout.surfaceId, null);
+assertContains(worldScreen, "acquirePlaceFromStorage", "new placement reuses 7B takeout");
+assertContains(worldScreen, "openBinderFromWorld", "Binder opens from the world");
+assertContains(worldScreen, "closeBinder", "Binder close restores framing");
+assertContains(worldScreen, "explore: { ...exploreRef.current }", "Binder captures explore");
+assertContains(renderer, "onOpenStorage", "Archive crate is the storage hit target");
+assertContains(renderer, "boxGeometry args={[2.15, 1.15, 1.55]}", "storage hit geometry is world-attached");
+assertContains(renderer, "boxGeometry args={[1.15, 1.02, 0.82]}", "Binder has a forgiving world hit");
+assertContains(renderer, "placingItem", "new placement preview is in-world");
+assertContains(renderer, "style={StyleSheet.absoluteFill}", "Canvas still fills without an opacity gate");
+assertNotContains(renderer, "surfaceReady", "failed entrance repair is not reintroduced");
+assertNotContains(worldScreen, "surfaceReady", "Room screen has no renderer readiness gate");
+assertNotContains(renderer, "opacity: surfaceReady", "Canvas is not gated on surfaceReady");
+assertNotContains(worldScreen, "closet", "no Closet");
+assertNotContains(renderer, "closet", "renderer has no Closet");
+assert.equal(CANONICAL_ZONE_KINDS.length, 6);
+assert.deepEqual([...CANONICAL_ZONE_KINDS], ["shelf", "wall", "case", "desk", "binder", "archive"]);
+assertContains(read("apps/mobile/src/i18n.ts"), 'storedSearch: "Search stored collection"', "EN stored search");
+assertContains(read("apps/mobile/src/i18n.ts"), "storedSearch: \"보관 컬렉션 검색\"", "KO stored search");
+assertContains(read("apps/mobile/app/(tabs)/_layout.tsx"), "profile", "tabs still exist");
+assertNotContains(read("apps/mobile/app/(tabs)/_layout.tsx"), "binder", "Binder is not a bottom tab");
+assertNotContains(read("apps/mobile/app/(tabs)/_layout.tsx"), "room", "Room is not a bottom tab");
+assertContains(read("docs/native-road-to-ship.md"), "SLICE 7C — ROOM WORLD INTEGRATION", "7C is documented");
+assertContains(read("docs/native-road-to-ship.md"), "physically verified", "7B physical QA is recorded");
+assertContains(read("docs/native-road-to-ship.md"), "failed entrance repair", "reverted entrance repair is recorded");
+assertContains(read("docs/native-road-to-ship.md"), "0.5s", "own-Room initialization blank is deferred");
+assertContains(read("docs/web-native-parity-contract.md"), "SLICE 7C — ROOM WORLD INTEGRATION", "parity contract records 7C");
+assertContains(read("docs/web-native-parity-contract.md"), "public storage", "public storage privacy is documented");
 
 console.log("check:slice7 passed");

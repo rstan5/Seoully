@@ -30,9 +30,13 @@ export function cloneRenderables<T extends { position: object; rotation: object 
 
 /** One committed placement change. Canceled / invalid drags must not push. */
 export type PlacementHistoryEntry<T> = {
-  before: T;
+  before: T | { storedHoldingId: string };
   after: T | { storedHoldingId: string };
 };
+
+export function isStoredHistoryMarker(value: object): value is { storedHoldingId: string } {
+  return "storedHoldingId" in value;
+}
 
 export function pushPlacementHistory<T>(
   undo: PlacementHistoryEntry<T>[],

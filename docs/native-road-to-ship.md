@@ -286,21 +286,25 @@ Order is dependency-shaped. **Slice 1 is first.**
 
 **7A deferred to 7D — world envelope / visual reconstruction.** At some permitted pan/dolly framings a thin SLANTED sliver can still appear below the Room floor. Multiple 7A camera/shell repairs did not kill it. The slant suggests world/floor geometry, envelope, camera/world intersection, or exterior rendering — not merely safe-area layout. **DEFERRED TO 7D.** 7D acceptance: at every permitted pan/dolly position the viewport must contain only intentional Room/world imagery — never exterior void, unfinished geometry, or native shell. Do not chase this by changing the accepted 7A camera.
 
-**Implementation (2026-10-02):** SLICE 7B — CODE VERIFIED / DEVICE QA REQUIRED. Touch-first direct manipulation of placed Room objects. Own Room keeps the 7A `Edit Room` overlay; public Rooms stay read-only. Long-press a movable collectible to acquire it, lift it, and drag through Room-space via landing-plane projection. Compatible surfaces highlight; valid release settles and persists through the existing RoomPlacement path; invalid release restores the original placement and writes no history. Empty-world pan and pinch survive in Edit Room until an object is acquired. Turn left / Turn right / Smaller / Larger are no longer primary editing UI (engine scale/rotate remain internal). Store still removes placement only. Temporary stored tray is an unpolished bridge. World-storage / merch-box reconstruction is **NEXT after 7B physical QA** — not started here. Binder reconstruction, 7D envelope work, Slice 8, Closet, and Vision are not started.
+**Implementation (2026-10-02):** SLICE 7B — **physically verified** at `1916f58`. Freeze the touch model. Own Room keeps the 7A `Edit Room` overlay; public Rooms stay read-only. Long-press a movable collectible to acquire it, lift it, and drag through Room-space via landing-plane projection. Compatible surfaces highlight; valid release settles and persists through the existing RoomPlacement path; invalid release restores the original placement and writes no history. Empty-world pan and pinch survive in Edit Room until an object is acquired. Turn left / Turn right / Smaller / Larger are no longer primary editing UI. Store still removes placement only.
+
+A post-7B **failed entrance repair** (`485e5ee`, `surfaceReady` / Canvas-opacity) physically failed — own/public Rooms could stay a solid theme color. It was reverted at `63e1a8f`. Do not reintroduce that gate. After revert the 3D Room renders again. Own Room may show ~0.5s of theme-color initialization before the first 3D frame — **accepted and DEFERRED TO 7D**. The 7A slanted floor/exterior sliver remains **DEFERRED TO 7D**. Do not change accepted camera bounds to chase either defect.
+
+**Implementation (2026-10-02):** SLICE 7C — ROOM WORLD INTEGRATION — CODE VERIFIED / DEVICE QA REQUIRED. Physical storage and Binder are part of the Room world. One unified `Edit Room` mode (no separate Customize Room; customization stays 7D). The legacy Stored tray is replaced — it had layering/layout problems, including the search field being obscured by collectible cards; do not polish that tray. An Archive crate is the storage entry (not a seventh zone, not a Closet). The same stored-collection sheet opens from Normal and Edit Room; Normal may inspect or offer `Edit Room to place` without starting placement; Edit Room choose → dismiss sheet → 7B new-placement preview (`origin: null`) → valid drop creates RoomPlacement; cancel/invalid leaves the Holding stored with no undo entry. Store → storage → place is one ownership loop. Public storage is non-interactive; private unplaced Holdings are not exposed. Binder remains a physical desk object (not a bottom tab). Tap captures current view + `panX`/`panY`/`dolly`, camera travels to the Binder, close restores that framing. Visitors browse Binder only under existing public/privacy contracts. Ask Seoully is unchanged. Vision is not reintroduced. `20261002000000_native_room_theme.sql` remains unapplied. 7D / Slice 8 are not started.
 
 Locked gesture model:
 
-- **NORMAL ROOM:** tap object = inspect; empty drag = camera pan; pinch = camera dolly
-- **EDIT ROOM:** empty drag = camera pan; pinch = camera dolly; long-press object = acquire; drag acquired object = move object; valid release = settle/persist; invalid release = return origin
+- **NORMAL ROOM:** tap object = inspect; empty drag = camera pan; pinch = camera dolly; tap storage crate = stored sheet; tap Binder = spatial Binder
+- **EDIT ROOM:** empty drag = camera pan; pinch = camera dolly; long-press object = acquire; drag acquired object = move object; valid release = settle/persist; invalid release = return origin; tap storage crate = same stored sheet; choose stored item = new-placement preview; valid drop = create RoomPlacement; cancel = remains stored
 
 #### Slice 7 decomposition
 
 | Block | Scope | Status |
 | --- | --- | --- |
-| **7A** | Immersive Room shell + direct-touch constrained camera | Physically accepted (REPAIR 04 `7dbc60d`); one slanted floor sliver **DEFERRED TO 7D** |
-| **7B** | Touch-first editing (long-press, world-space drag, settle/rollback) | CODE VERIFIED / DEVICE QA REQUIRED — world storage is NEXT, not in this block |
-| **7C** | Binder as part of the world (continuous camera travel, spatial open/close) | Not started — preserve current Binder |
-| **7D** | Materials, lighting, world envelope, and Room customization (review `20261002` before applying) | Not started — migration unapplied. Must kill the 7A slanted floor/exterior sliver. |
+| **7A** | Immersive Room shell + direct-touch constrained camera | Physically accepted (REPAIR 04 `7dbc60d`); slanted floor sliver **DEFERRED TO 7D** |
+| **7B** | Touch-first editing (long-press, world-space drag, settle/rollback) | **Physically verified** (`1916f58`) — freeze the touch model |
+| **7C** | Storage + Binder as physical Room world objects | CODE VERIFIED / DEVICE QA REQUIRED — failed entrance repair stayed reverted |
+| **7D** | Materials, lighting, world envelope, Room customization (review `20261002` before applying) | Not started — migration unapplied. Owns the slanted sliver and the own-Room ~0.5s init blank. |
 | **7E** | Physical integration QA of the reconstructed world | Not started — required after 7A device proof |
 
 #### Slice 7 visual / interaction QA map
@@ -314,8 +318,8 @@ Locked gesture model:
 | Desk | Desk dock, lamp | Desk + lamp + binder object | Binder vs desk objects |
 | Archive | Floor crate dock | Archive crate dock | Easy to miss at home crop |
 | Object focus | Inspect pose, object lifts | Inspect dock + lift offset | Overlay vs in-world primacy |
-| Edit mode | Overview+tilt, grab/settle | `EDIT_POSE`, long-press acquire, landing-plane drag, temporary stored tray | Gesture vs camera |
-| Stored tray | EditChrome unplaced holdings | Compact tray, place/store | Tray crowding |
+| Edit mode | Overview+tilt, grab/settle | `EDIT_POSE`, long-press acquire, landing-plane drag; place-from-storage reuses the same engine | Gesture vs camera |
+| Stored collection | World storage object + sheet | Archive crate + `StoredCollectionSheet` of unplaced owned Holdings | Search must stay unobscured; public storage private |
 | Binder closed/desk | BinderZone on desk | Closed binder mesh on desk | Tap target size |
 | Binder open | OpenBinder lift off desk | `NativeOpenBinder` same Canvas | Continuity / scale |
 | Page turn | Leaf pivots on spine | rotateY leaf + reduced-motion snap | Gesture collision |

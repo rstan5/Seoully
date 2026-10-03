@@ -18,7 +18,7 @@ export type NativeRepresentationKind =
 export type NativeDigitalRepresentation = {
   geometry: NativeRepresentationKind;
   imageUrl?: string;
-  source: "personal-media" | "type-fallback" | "generic-fallback";
+  source: "personal-media" | "catalog-reference" | "type-fallback" | "generic-fallback";
   color: string;
   accent: string;
 };
@@ -42,13 +42,13 @@ const KIND_COLORS: Record<NativeRepresentationKind, [string, string]> = {
 export function representationForHolding(holding: NativeHolding): NativeDigitalRepresentation {
   const geometry = representationKindForHolding(holding);
   const [base, accent] = KIND_COLORS[geometry];
-  const imageUrl = holding.personalMediaUrl;
+  const imageUrl = holding.personalMediaUrl ?? holding.template.imageUrl;
   return {
     geometry,
     color: mixSeed(base, holding.templateId),
     accent: mixSeed(accent, holding.template.id),
     ...(imageUrl ? { imageUrl } : {}),
-    source: imageUrl ? "personal-media" : geometry === "generic" ? "generic-fallback" : "type-fallback",
+    source: holding.personalMediaUrl ? "personal-media" : holding.template.imageUrl ? "catalog-reference" : geometry === "generic" ? "generic-fallback" : "type-fallback",
   };
 }
 

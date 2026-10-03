@@ -10,7 +10,8 @@ import { useCachedSignedMedia } from "../media/cachedMedia";
 import { applyExploreOffset, cameraLerpAlpha, DESK_BINDER_AT, exploreAllowedForView, IDENTITY_EXPLORE, poseForView, type ExploreOffset } from "./camera";
 import { NativeOpenBinder } from "./NativeOpenBinder";
 import { extentsForGeometry } from "./representation";
-import { roomPalette } from "./theme";
+import { WORLD_ENVELOPE } from "./envelope";
+import { defaultStyleForTheme, resolveRoomLook, type NativeRoomStyle, type RoomLook } from "./roomStyle";
 import { HELD_SCALE } from "./touchEdit";
 import { roomTextureIds, type NativeRoomSurface, type RoomRenderable } from "./model";
 import { CANONICAL_ZONE_KINDS, zoneInteractive, type CanonicalZoneKind, type NativeWorldView } from "./worldView";
@@ -30,6 +31,7 @@ export function NativeRoomRenderer({
   focusedId,
   heldId = null,
   themeId,
+  style,
   view,
   binderSpread,
   turningSpread,
@@ -58,6 +60,7 @@ export function NativeRoomRenderer({
   focusedId: string | null;
   heldId?: string | null;
   themeId: import("../api").NativeRoomThemeId;
+  style?: NativeRoomStyle;
   view: NativeWorldView;
   binderSpread?: NativeBinderSpread;
   turningSpread?: NativeBinderSpread;
@@ -82,7 +85,7 @@ export function NativeRoomRenderer({
   placingItem?: RoomRenderable | null;
 }) {
   const focused = items.find((item) => item.holding.id === focusedId) ?? null;
-  const theme = roomPalette(themeId);
+  const theme = resolveRoomLook(style ?? defaultStyleForTheme(themeId));
   const textured = roomTextureIds(items, selectedId, focusedId);
   if (placingItem?.imageUrl) textured.add(placingItem.holding.id);
   const binderOpen = view.kind === "binder";
@@ -102,9 +105,9 @@ export function NativeRoomRenderer({
     }}
   >
     <color attach="background" args={[theme.void]} />
-    <ambientLight intensity={0.72} color={theme.fill} />
-    <directionalLight color={theme.light} intensity={1.85} position={[-2.8, 5.4, 3.6]} castShadow={false} />
-    <pointLight color={theme.light} intensity={reducedMotion ? 0.15 : 0.35} position={[1.2, 1.4, -2.1]} />
+    <ambientLight intensity={0.55 * theme.brightness} color={theme.fill} />
+    <directionalLight color={theme.light} intensity={1.55 * theme.brightness} position={[-3.4, 4.8, 2.8]} castShadow={false} />
+    <pointLight color={theme.light} intensity={(reducedMotion ? 0.12 : 0.28) * theme.brightness} position={[1.4, 1.2, -1.8]} />
     <AuthoredCamera view={view} focused={focused} reducedMotion={reducedMotion} paused={paused} exploreRef={exploreRef} />
     <RoomShell theme={theme} onSelectZone={view.kind === "home" || view.kind === "zone" ? onSelectZone : undefined} />
     <RoomFurniture
@@ -201,15 +204,30 @@ function ZoneHotspot({ zone, onSelect }: { zone: CanonicalZoneKind; onSelect: (z
   </mesh>;
 }
 
-function RoomShell({ theme, onSelectZone }: { theme: ReturnType<typeof roomPalette>; onSelectZone?: (zone: CanonicalZoneKind) => void }) {
+function RoomShell({ theme, onSelectZone }: { theme: RoomLook; onSelectZone?: (zone: CanonicalZoneKind) => void }) {
+  const env = WORLD_ENVELOPE;
+  const floorH = env.floorTop - env.floorBottom;
+  const floorZ = (env.floorNearZ + env.floorFarZ) / 2;
+  const floorDepth = env.floorNearZ - env.floorFarZ;
+  const wallH = env.wallTop - env.wallBottom;
+  const wallZ = (env.wallNearZ + env.wallFarZ) / 2;
+  const wallDepth = env.wallNearZ - env.wallFarZ;
+  const ceilZ = (env.ceilingNearZ + env.ceilingFarZ) / 2;
+  const ceilDepth = env.ceilingNearZ - env.ceilingFarZ;
   return <>
-    <mesh position={[0, 0.15, -4.22]} onClick={(event) => { event.stopPropagation(); onSelectZone?.("wall"); }}><boxGeometry args={[9.6, 6.6, 0.16]} /><meshStandardMaterial color={theme.wall} roughness={0.92} /></mesh>
-    <mesh position={[0, 2.55, -3.4]}><boxGeometry args={[9.4, 0.08, 1.8]} /><meshStandardMaterial color={theme.wallAccent} roughness={0.85} /></mesh>
-    <mesh position={[0, -2.15, -1.2]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[9.5, 6.2]} /><meshStandardMaterial color={theme.floor} roughness={0.78} /></mesh>
-    <mesh position={[-4.72, 0.1, -1.25]} rotation={[0, Math.PI / 2, 0]}><planeGeometry args={[5.9, 6.5]} /><meshStandardMaterial color={theme.sideWall} roughness={0.9} /></mesh>
-    <mesh position={[4.72, 0.1, -1.25]} rotation={[0, -Math.PI / 2, 0]}><planeGeometry args={[5.9, 6.5]} /><meshStandardMaterial color={theme.sideWall} roughness={0.9} /></mesh>
-    <mesh position={[0, -2.08, -4.05]}><boxGeometry args={[9.4, 0.18, 0.12]} /><meshStandardMaterial color={theme.edge} roughness={0.7} /></mesh>
-    <mesh position={[1.85, 0.95, -4.12]}><planeGeometry args={[1.6, 1.9]} /><meshStandardMaterial color={theme.light} emissive={theme.light} emissiveIntensity={0.22} roughness={0.4} /></mesh>
+    <mesh position={[0, env.floorTop - floorH / 2, floorZ]}><boxGeometry args={[env.floorX * 2, floorH, floorDepth]} /><meshStandardMaterial color={theme.floor} roughness={0.82} /></mesh>
+    <mesh position={[0, env.ceilingY + 0.12, ceilZ]}><boxGeometry args={[env.ceilingX * 2, 0.24, ceilDepth]} /><meshStandardMaterial color={theme.wallAccent} roughness={0.88} /></mesh>
+    <mesh position={[0, 0.72, env.backZ]} onClick={(event) => { event.stopPropagation(); onSelectZone?.("wall"); }}><boxGeometry args={[env.wallX * 2 + 0.4, 6.9, 0.28]} /><meshStandardMaterial color={theme.wall} roughness={0.9} /></mesh>
+    <mesh position={[-env.wallX, (env.wallTop + env.wallBottom) / 2, wallZ]}><boxGeometry args={[0.28, wallH, wallDepth]} /><meshStandardMaterial color={theme.sideWall} roughness={0.88} /></mesh>
+    <mesh position={[env.wallX, (env.wallTop + env.wallBottom) / 2, wallZ]}><boxGeometry args={[0.28, wallH, wallDepth]} /><meshStandardMaterial color={theme.sideWall} roughness={0.88} /></mesh>
+    <mesh position={[0, env.floorTop + 0.08, env.backZ + 0.18]}><boxGeometry args={[env.wallX * 2 - 0.2, 0.2, 0.14]} /><meshStandardMaterial color={theme.edge} roughness={0.62} /></mesh>
+    <mesh position={[-env.wallX + 0.18, env.floorTop + 0.08, wallZ]}><boxGeometry args={[0.12, 0.2, wallDepth - 0.3]} /><meshStandardMaterial color={theme.edge} roughness={0.64} /></mesh>
+    <mesh position={[env.wallX - 0.18, env.floorTop + 0.08, wallZ]}><boxGeometry args={[0.12, 0.2, wallDepth - 0.3]} /><meshStandardMaterial color={theme.edge} roughness={0.64} /></mesh>
+    <group position={[-5.28, 0.55, -1.35]} rotation={[0, Math.PI / 2, 0]}>
+      <mesh><boxGeometry args={[1.72, 2.35, 0.08]} /><meshStandardMaterial color={theme.edge} roughness={0.48} /></mesh>
+      <mesh position={[0, 0, 0.03]}><boxGeometry args={[1.42, 2.05, 0.04]} /><meshStandardMaterial color={theme.light} emissive={theme.light} emissiveIntensity={0.35 * theme.brightness} roughness={0.35} /></mesh>
+    </group>
+    <mesh position={[1.85, 0.95, env.backZ + 0.16]}><boxGeometry args={[1.55, 1.85, 0.04]} /><meshStandardMaterial color={theme.wallAccent} roughness={0.7} /></mesh>
   </>;
 }
 
@@ -220,36 +238,54 @@ function RoomFurniture({
   onOpenStorage,
   onSelectZone,
 }: {
-  theme: ReturnType<typeof roomPalette>;
+  theme: RoomLook;
   hideClosedBinder: boolean;
   onOpenBinder?: () => void;
   onOpenStorage?: () => void;
   onSelectZone?: (zone: CanonicalZoneKind) => void;
 }) {
   return <>
-    <mesh position={[-3.15, -0.55, -3.78]} onClick={(event) => { event.stopPropagation(); onSelectZone?.("shelf"); }}><boxGeometry args={[2.28, 3.15, 0.42]} /><meshStandardMaterial color={theme.furniture} roughness={0.78} /></mesh>
-    {[-1.45, -0.55, 0.35].map((y) => <mesh key={y} position={[-3.15, y, -3.48]}><boxGeometry args={[2.12, 0.08, 0.64]} /><meshStandardMaterial color={theme.edge} roughness={0.62} /></mesh>)}
-    <mesh position={[1.45, -0.82, -2.85]} onClick={(event) => { event.stopPropagation(); onSelectZone?.("desk"); }}><boxGeometry args={[3.28, 0.16, 1.68]} /><meshStandardMaterial color={theme.edge} roughness={0.68} /></mesh>
-    <mesh position={[0.05, -1.42, -2.85]}><boxGeometry args={[0.12, 1.05, 1.5]} /><meshStandardMaterial color={theme.furniture} roughness={0.8} /></mesh>
-    <mesh position={[2.85, -1.42, -2.85]}><boxGeometry args={[0.12, 1.05, 1.5]} /><meshStandardMaterial color={theme.furniture} roughness={0.8} /></mesh>
+    <group position={[-3.15, -0.55, -3.78]} onClick={(event) => { event.stopPropagation(); onSelectZone?.("shelf"); }}>
+      <mesh position={[0, 0, -0.18]}><boxGeometry args={[2.32, 3.22, 0.1]} /><meshStandardMaterial color={theme.furniture} roughness={0.72} /></mesh>
+      <mesh position={[-1.12, 0, 0.12]}><boxGeometry args={[0.1, 3.22, 0.72]} /><meshStandardMaterial color={theme.furniture} roughness={0.7} /></mesh>
+      <mesh position={[1.12, 0, 0.12]}><boxGeometry args={[0.1, 3.22, 0.72]} /><meshStandardMaterial color={theme.furniture} roughness={0.7} /></mesh>
+      {[-1.45, -0.55, 0.35, 1.18].map((y) => <mesh key={y} position={[0, y + 0.55, 0.16]}><boxGeometry args={[2.16, 0.07, 0.7]} /><meshStandardMaterial color={theme.edge} roughness={0.55} /></mesh>)}
+      <mesh position={[0, -1.58, 0.08]}><boxGeometry args={[2.2, 0.12, 0.58]} /><meshStandardMaterial color={theme.edge} roughness={0.6} /></mesh>
+      <mesh position={[0, -2.02, 0.16]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[1.9, 0.55]} /><meshBasicMaterial color="#1a1214" transparent opacity={0.18} depthWrite={false} /></mesh>
+    </group>
+    <group position={[1.45, -0.82, -2.85]} onClick={(event) => { event.stopPropagation(); onSelectZone?.("desk"); }}>
+      <mesh position={[0, 0.04, 0]}><boxGeometry args={[3.32, 0.1, 1.72]} /><meshStandardMaterial color={theme.edge} roughness={0.58} /></mesh>
+      <mesh position={[0, -0.02, 0]}><boxGeometry args={[3.18, 0.06, 1.58]} /><meshStandardMaterial color={theme.furniture} roughness={0.68} /></mesh>
+      {([[-1.48, -0.58, -0.68], [1.48, -0.58, -0.68], [-1.48, -0.58, 0.68], [1.48, -0.58, 0.68]] as [number, number, number][]).map((pos) => (
+        <mesh key={pos.join()} position={pos}><boxGeometry args={[0.12, 1.08, 0.12]} /><meshStandardMaterial color={theme.furniture} roughness={0.74} /></mesh>
+      ))}
+      <mesh position={[0, -0.42, 0.78]}><boxGeometry args={[3.05, 0.08, 0.08]} /><meshStandardMaterial color={theme.edge} roughness={0.5} /></mesh>
+    </group>
     {!hideClosedBinder ? <group position={[DESK_BINDER_AT.x, DESK_BINDER_AT.y, DESK_BINDER_AT.z]} rotation={[-0.18, -0.22, 0]} onClick={(event) => { event.stopPropagation(); onOpenBinder?.(); }}>
       <mesh position={[0, 0.02, 0.02]}><boxGeometry args={[1.15, 1.02, 0.82]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>
-      <mesh position={[-0.36, 0, 0]}><boxGeometry args={[0.08, 0.74, 0.52]} /><meshStandardMaterial color={theme.binder} roughness={0.5} /></mesh>
-      <mesh position={[0.04, 0, 0]}><boxGeometry args={[0.72, 0.7, 0.5]} /><meshStandardMaterial color={theme.binder} roughness={0.62} /></mesh>
-      <mesh position={[0.4, 0, 0]}><boxGeometry args={[0.04, 0.66, 0.46]} /><meshStandardMaterial color={theme.paper} roughness={0.85} /></mesh>
+      <mesh position={[-0.38, 0, 0]}><boxGeometry args={[0.1, 0.78, 0.56]} /><meshStandardMaterial color={theme.binder} roughness={0.42} /></mesh>
+      <mesh position={[0.02, 0.01, -0.02]}><boxGeometry args={[0.7, 0.74, 0.52]} /><meshStandardMaterial color={theme.binder} roughness={0.55} /></mesh>
+      <mesh position={[0.38, 0, 0.02]}><boxGeometry args={[0.08, 0.7, 0.48]} /><meshStandardMaterial color={theme.paper} roughness={0.82} /></mesh>
+      <mesh position={[0.08, 0.02, 0.22]}><boxGeometry args={[0.52, 0.62, 0.08]} /><meshStandardMaterial color={theme.paper} roughness={0.88} /></mesh>
     </group> : null}
-    <mesh position={[3.65, -0.55, -3.78]} onClick={(event) => { event.stopPropagation(); onSelectZone?.("case"); }}><boxGeometry args={[1.6, 3.18, 0.34]} /><meshStandardMaterial color={theme.furniture} roughness={0.76} /></mesh>
-    {[-0.55, 0.43].map((y) => <mesh key={`case-${y}`} position={[3.65, y, -3.5]}><boxGeometry args={[1.46, 0.07, 0.66]} /><meshStandardMaterial color={theme.edge} roughness={0.55} /></mesh>)}
-    <mesh position={[3.65, 0, -3.42]}><boxGeometry args={[1.42, 2.85, 0.04]} /><meshStandardMaterial color="#d8ecec" roughness={0.12} metalness={0.15} transparent opacity={0.22} /></mesh>
+    <group position={[3.65, -0.55, -3.78]} onClick={(event) => { event.stopPropagation(); onSelectZone?.("case"); }}>
+      <mesh position={[0, 0, -0.12]}><boxGeometry args={[1.62, 3.2, 0.1]} /><meshStandardMaterial color={theme.furniture} roughness={0.7} /></mesh>
+      <mesh position={[-0.76, 0, 0.18]}><boxGeometry args={[0.1, 3.2, 0.68]} /><meshStandardMaterial color={theme.furniture} roughness={0.68} /></mesh>
+      <mesh position={[0.76, 0, 0.18]}><boxGeometry args={[0.1, 3.2, 0.68]} /><meshStandardMaterial color={theme.furniture} roughness={0.68} /></mesh>
+      {[-1.48, -0.55, 0.43, 1.28].map((y) => <mesh key={`case-${y}`} position={[0, y + 0.55, 0.2]}><boxGeometry args={[1.48, 0.06, 0.64]} /><meshStandardMaterial color={theme.edge} roughness={0.48} /></mesh>)}
+      <mesh position={[0, 0.05, 0.36]}><boxGeometry args={[1.42, 2.85, 0.03]} /><meshStandardMaterial color="#d8ecec" roughness={0.12} metalness={0.18} transparent opacity={0.18} /></mesh>
+    </group>
     <group position={[-1.2, -1.86, -0.65]} onClick={(event) => { event.stopPropagation(); if (onOpenStorage) onOpenStorage(); else onSelectZone?.("archive"); }}>
       <mesh position={[0, 0.22, 0]}><boxGeometry args={[2.15, 1.15, 1.55]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>
-      <mesh><boxGeometry args={[1.84, 0.58, 1.18]} /><meshStandardMaterial color={theme.furniture} roughness={0.88} /></mesh>
-      <mesh position={[0, 0.34, 0]}><boxGeometry args={[1.72, 0.1, 1.08]} /><meshStandardMaterial color={theme.edge} roughness={0.7} /></mesh>
-      <mesh position={[0, 0.06, 0.6]}><boxGeometry args={[0.72, 0.18, 0.04]} /><meshStandardMaterial color={theme.paper} roughness={0.82} /></mesh>
+      <mesh><boxGeometry args={[1.84, 0.58, 1.18]} /><meshStandardMaterial color={theme.furniture} roughness={0.84} /></mesh>
+      {[-0.88, 0.88].map((x) => <mesh key={`crate-${x}`} position={[x, 0, 0]}><boxGeometry args={[0.08, 0.62, 1.2]} /><meshStandardMaterial color={theme.edge} roughness={0.55} /></mesh>)}
+      <mesh position={[0, 0.36, 0.04]} rotation={[-0.12, 0, 0]}><boxGeometry args={[1.76, 0.08, 1.12]} /><meshStandardMaterial color={theme.edge} roughness={0.62} /></mesh>
+      <mesh position={[0, 0.08, 0.6]}><boxGeometry args={[0.78, 0.2, 0.04]} /><meshStandardMaterial color={theme.paper} roughness={0.8} /></mesh>
     </group>
-    <mesh position={[0.2, -1.28, -1.15]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[1.38, 48]} /><meshStandardMaterial color={theme.accent} roughness={1} /></mesh>
-    <mesh position={[-3.95, -0.85, -1.15]}><cylinderGeometry args={[0.08, 0.12, 2.4, 10]} /><meshStandardMaterial color={theme.edge} roughness={0.45} metalness={0.25} /></mesh>
-    <mesh position={[-3.95, 0.42, -1.15]}><sphereGeometry args={[0.22, 16, 12]} /><meshStandardMaterial color={theme.light} emissive={theme.light} emissiveIntensity={0.4} roughness={0.3} /></mesh>
+    <mesh position={[0.18, -2.055, -1.05]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[1.42, 48]} /><meshStandardMaterial color={theme.accent} roughness={0.95} /></mesh>
+    <mesh position={[0.18, -2.048, -1.05]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[1.18, 40]} /><meshStandardMaterial color={theme.wallAccent} roughness={0.92} /></mesh>
+    <mesh position={[-3.95, -0.85, -1.15]}><cylinderGeometry args={[0.07, 0.1, 2.4, 10]} /><meshStandardMaterial color={theme.edge} roughness={0.4} metalness={0.28} /></mesh>
+    <mesh position={[-3.95, 0.42, -1.15]}><sphereGeometry args={[0.2, 16, 12]} /><meshStandardMaterial color={theme.light} emissive={theme.light} emissiveIntensity={0.45 * theme.brightness} roughness={0.28} /></mesh>
   </>;
 }
 
@@ -356,13 +392,13 @@ function CollectibleForm({ item, selected, loadTexture }: { item: RoomRenderable
   const color = selected ? "#bd4268" : item.color;
   switch (item.geometry) {
     case "photocard":
-      return <Cardstock width={size.x} height={size.y} depth={size.z} color={color} edge={item.accent} imageUrl={loadTexture ? item.imageUrl : undefined} cacheKey={item.holding.id} glossy />;
+      return <Cardstock width={size.x} height={size.y} depth={Math.max(size.z, 0.022)} color={color} edge={item.accent} imageUrl={loadTexture ? item.imageUrl : undefined} cacheKey={item.holding.id} glossy />;
     case "poster":
-      return <Cardstock width={size.x} height={size.y} depth={size.z} color={color} edge={item.accent} imageUrl={loadTexture ? item.imageUrl : undefined} cacheKey={item.holding.id} />;
+      return <PosterForm width={size.x} height={size.y} color={color} edge={item.accent} imageUrl={loadTexture ? item.imageUrl : undefined} cacheKey={item.holding.id} />;
     case "album":
       return <AlbumForm width={size.x} height={size.y} depth={size.z} color={color} accent={item.accent} imageUrl={loadTexture ? item.imageUrl : undefined} cacheKey={item.holding.id} />;
     case "book":
-      return <AlbumForm width={size.x} height={size.y} depth={size.z} color={color} accent={item.accent} imageUrl={loadTexture ? item.imageUrl : undefined} cacheKey={item.holding.id} />;
+      return <AlbumForm width={size.x} height={size.y} depth={size.z} color={color} accent={item.accent} imageUrl={loadTexture ? item.imageUrl : undefined} cacheKey={item.holding.id} bound />;
     case "vinyl":
       return <VinylForm size={size.x} color={color} accent={item.accent} imageUrl={loadTexture ? item.imageUrl : undefined} cacheKey={item.holding.id} />;
     case "lightstick":
@@ -374,9 +410,11 @@ function CollectibleForm({ item, selected, loadTexture }: { item: RoomRenderable
     case "apparel":
       return <mesh><boxGeometry args={[size.x, size.y, size.z]} /><meshStandardMaterial color={color} roughness={0.92} /></mesh>;
     case "ticket":
-      return <Cardstock width={size.x} height={size.y} depth={size.z} color={color} edge={item.accent} imageUrl={loadTexture ? item.imageUrl : undefined} cacheKey={item.holding.id} />;
+      return <Cardstock width={size.x} height={size.y} depth={Math.max(size.z, 0.014)} color={color} edge={item.accent} imageUrl={loadTexture ? item.imageUrl : undefined} cacheKey={item.holding.id} />;
     case "disc-case":
-      return <AlbumForm width={size.x} height={size.y} depth={size.z} color={color} accent={item.accent} imageUrl={loadTexture ? item.imageUrl : undefined} cacheKey={item.holding.id} />;
+      return <AlbumForm width={Math.max(size.x, 0.06)} height={size.y} depth={size.z} color={color} accent={item.accent} imageUrl={loadTexture ? item.imageUrl : undefined} cacheKey={item.holding.id} slim />;
+    case "memorabilia":
+      return <Cardstock width={size.x} height={size.y} depth={0.03} color={color} edge={item.accent} imageUrl={loadTexture ? item.imageUrl : undefined} cacheKey={item.holding.id} />;
     default:
       return <mesh><boxGeometry args={[size.x, size.y, size.z]} /><meshStandardMaterial color={color} roughness={0.62} /></mesh>;
   }
@@ -390,10 +428,20 @@ function Cardstock({ width, height, depth, color, edge, imageUrl, cacheKey, glos
   </>;
 }
 
-function AlbumForm({ width, height, depth, color, accent, imageUrl, cacheKey }: { width: number; height: number; depth: number; color: string; accent: string; imageUrl?: string; cacheKey: string }) {
+function PosterForm({ width, height, color, edge, imageUrl, cacheKey }: { width: number; height: number; color: string; edge: string; imageUrl?: string; cacheKey: string }) {
   return <>
-    <mesh><boxGeometry args={[width, height, depth]} /><meshStandardMaterial color={color} roughness={0.58} /></mesh>
-    <mesh position={[0, 0, depth / 2 + 0.002]}><planeGeometry args={[width * 0.92, height * 0.92]} /><meshStandardMaterial color={accent} roughness={0.5} /></mesh>
+    <mesh position={[0, 0, -0.012]}><boxGeometry args={[width + 0.05, height + 0.05, 0.018]} /><meshStandardMaterial color={edge} roughness={0.55} /></mesh>
+    <mesh position={[0, 0, 0.002]}><boxGeometry args={[width, height, 0.012]} /><meshStandardMaterial color={color} roughness={0.62} /></mesh>
+    {imageUrl ? <CachedPersonalMediaFace cacheKey={cacheKey} url={imageUrl} width={width * 0.96} height={height * 0.96} depth={0.014} /> : null}
+  </>;
+}
+
+function AlbumForm({ width, height, depth, color, accent, imageUrl, cacheKey, bound, slim }: { width: number; height: number; depth: number; color: string; accent: string; imageUrl?: string; cacheKey: string; bound?: boolean; slim?: boolean }) {
+  return <>
+    <mesh><boxGeometry args={[width, height, depth]} /><meshStandardMaterial color={color} roughness={slim ? 0.4 : 0.58} /></mesh>
+    <mesh position={[-width / 2 + 0.008, 0, 0]}><boxGeometry args={[0.012, height * 0.96, depth * 0.96]} /><meshStandardMaterial color={accent} roughness={0.45} /></mesh>
+    {bound ? <mesh position={[0, 0, depth / 2 + 0.004]}><boxGeometry args={[width * 0.7, height * 0.08, 0.01]} /><meshStandardMaterial color={accent} roughness={0.5} /></mesh> : null}
+    <mesh position={[0, 0, depth / 2 + 0.002]}><planeGeometry args={[width * 0.86, height * 0.88]} /><meshStandardMaterial color={accent} roughness={0.5} /></mesh>
     {imageUrl ? <CachedCoverMedia cacheKey={cacheKey} url={imageUrl} width={depth * 0.9} height={height * 0.9} offset={width / 2} /> : null}
   </>;
 }

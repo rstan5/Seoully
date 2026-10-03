@@ -24,7 +24,7 @@ export interface PublicRoomPlacement {
 
 export interface PublicRoomDTO {
   owner: { userId: string; handle: string; displayName: string };
-  room: { id: string; placements: PublicRoomPlacement[] } | null;
+  room: { id: string; style?: Record<string, unknown>; placements: PublicRoomPlacement[] } | null;
   private: boolean;
   viewerUserId?: string;
 }
@@ -80,7 +80,11 @@ export async function getPublicRoomByHandle(input: unknown, client?: SupabaseCli
   }
   return {
     owner: { userId: owner.userId, handle: owner.handle, displayName: String(owner.displayName ?? owner.handle) },
-    room: { id: String(roomRaw.id), placements },
+    room: {
+      id: String(roomRaw.id),
+      placements,
+      ...(isRecord(roomRaw.style) ? { style: roomRaw.style } : {}),
+    },
     private: false,
     ...(viewerUserId ? { viewerUserId } : {}),
   };

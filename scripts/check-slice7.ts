@@ -80,7 +80,7 @@ assertContains(read("src/server/dal/public-room.ts"), "get_public_room_by_handle
 
 // G. Personal card art wins
 const representation = read("apps/mobile/src/room/representation.ts");
-assertContains(representation, 'source: imageUrl ? "personal-media"', "personal media source");
+assertContains(representation, 'source: holding.personalMediaUrl ? "personal-media"', "personal media source");
 assertContains(representation, "holding.personalMediaUrl", "personal url");
 
 // H. Representation fallback
@@ -160,7 +160,8 @@ assertContains(read("apps/mobile/src/room/threeFiberCompat.ts"), "extractUrlBase
 
 // V. Migration safety
 assertContains(read("supabase/migrations/20261002000000_native_room_theme.sql"), "theme_id", "migration file exists");
-assertContains(read("src/server/dal/room-schema.ts"), 'ROOM_OWNER_SELECT = "id,owner_user_id,created_at,updated_at"', "no theme_id select");
+assertContains(read("src/server/dal/room-schema.ts"), 'ROOM_OWNER_SELECT = "id,owner_user_id,created_at,updated_at,style"', "style selected without theme_id");
+assertNotContains(read("src/server/dal/room-schema.ts"), 'ROOM_OWNER_SELECT = "id,owner_user_id,theme_id', "20261002 theme_id stays unselected");
 assertContains(read("src/server/dal/rooms.ts"), "room_theme_unavailable", "theme write blocked");
 assertNotContains(read("apps/mobile/app/room.tsx"), "saveNativeRoomTheme", "room does not write theme");
 

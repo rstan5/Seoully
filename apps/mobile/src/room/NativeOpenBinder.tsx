@@ -161,9 +161,13 @@ function PagePockets({
       const py = (0.5 - row) * 0.46;
       const held = Boolean(pocket.holding && pocket.holding.id === heldHoldingId);
       return <group key={`${page.setId}-${pocket.index}`} position={[px, py, held ? 0.42 : 0.02]} scale={held ? 1.85 : 1}>
+        <mesh position={[0, 0, -0.006]}>
+          <boxGeometry args={[CARD_W + 0.03, CARD_H + 0.03, 0.01]} />
+          <meshStandardMaterial color="#c8b8a8" roughness={0.62} />
+        </mesh>
         <mesh>
           <planeGeometry args={[CARD_W + 0.02, CARD_H + 0.02]} />
-          <meshStandardMaterial color="#d8cfc0" roughness={0.5} transparent opacity={0.55} />
+          <meshStandardMaterial color="#d8cfc0" roughness={0.5} transparent opacity={0.42} />
         </mesh>
         {pocket.holding && !held ? <PocketCard holding={pocket.holding} paper={paper} onHold={onHold} /> : null}
         {pocket.holding && held ? <PocketCard holding={pocket.holding} paper={paper} lifted onHold={onHold} /> : null}

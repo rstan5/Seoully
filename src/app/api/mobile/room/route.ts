@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { listMyHoldings } from "@/server/dal/holdings";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { ensureMyRoom, listMyRoomPlacements, removeMyRoomPlacement, updateMyRoomTheme, upsertMyRoomPlacement } from "@/server/dal/rooms";
+import { ensureMyRoom, listMyRoomPlacements, removeMyRoomPlacement, updateMyRoomStyle, updateMyRoomTheme, upsertMyRoomPlacement } from "@/server/dal/rooms";
 import { createSupabaseBearerClient } from "@/server/supabase/bearer";
 
 export async function GET(request: Request) {
@@ -36,7 +36,10 @@ export async function PATCH(request: Request) {
   const client = createSupabaseBearerClient(request);
   if (!client) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   try {
-    const room = await updateMyRoomTheme(await request.json(), client);
+    const body = await request.json() as { style?: unknown; themeId?: unknown };
+    const room = body.style
+      ? await updateMyRoomStyle(body, client)
+      : await updateMyRoomTheme(body, client);
     return NextResponse.json({ room }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "room_theme_write_failed";

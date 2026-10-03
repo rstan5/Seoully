@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "seoully-domain/*": ["src/domain/*"]
+    },
+    "outDir": ".tmp/build",
+    "skipLibCheck": true,
+    "strict": false,
+    "esModuleInterop": true
+  },
+  "include": [
+    "scripts/check-slice7d.ts",
+    "apps/mobile/src/room/envelope.ts",
+    "apps/mobile/src/room/roomStyle.ts",
+    "apps/mobile/src/room/representation.ts",
+    "apps/mobile/src/room/camera.ts",
+    "apps/mobile/src/room/worldView.ts",
+    "apps/mobile/src/room/theme.ts",
+    "apps/mobile/src/theme.ts",
+    "apps/mobile/src/ui/profileContrast.ts"
+  ]
+}

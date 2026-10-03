@@ -3,7 +3,7 @@ import "server-only";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/profile";
-import { nativeRoomThemeFromRow, ROOM_OWNER_SELECT } from "@/server/dal/room-schema";
+import { nativeRoomStyleFromRow, nativeRoomThemeFromRow, ROOM_OWNER_SELECT, type NativeRoomStyle } from "@/server/dal/room-schema";
 import { createSupabaseServerClient } from "@/server/supabase/server";
 
 const uuid = z.string().uuid();
@@ -28,8 +28,19 @@ const roomThemeSchema = z.object({
   roomId: uuid,
   themeId: z.enum(["hearth", "blossom", "midnight"]),
 }).strict();
+const roomStyleSchema = z.object({
+  roomId: uuid,
+  style: z.object({
+    wall: z.enum(["plum", "cream", "ink", "blush", "sage"]),
+    floor: z.enum(["walnut", "oak", "charcoal", "blush-wood"]),
+    furniture: z.enum(["walnut", "oak", "ink", "blush"]),
+    rug: z.enum(["rose", "cream", "ink", "sage"]),
+    light: z.enum(["warm", "day", "soft", "night"]),
+    brightness: z.enum(["dim", "normal", "bright"]),
+  }).strict(),
+}).strict();
 
-export interface RoomDTO { id: string; ownerUserId: string; themeId: "hearth" | "blossom" | "midnight"; createdAt: string; updatedAt: string; }
+export interface RoomDTO { id: string; ownerUserId: string; themeId: "hearth" | "blossom" | "midnight"; style: NativeRoomStyle; createdAt: string; updatedAt: string; }
 export interface RoomPlacementDTO {
   id: string; roomId: string; holdingId: string; zoneId: string; slot: number;
   offset: Record<string, number> | null;
@@ -37,27 +48,26 @@ export interface RoomPlacementDTO {
   surfaceId: string | null; createdAt: string; updatedAt: string;
 }
 
+const ROOM_OWNER_SELECT_FALLBACK = "id,owner_user_id,created_at,updated_at" as const;
+
+async function selectOwnerRoom(supabase: SupabaseClient, ownerUserId: string) {
+  const styled = await supabase.from("rooms").select(ROOM_OWNER_SELECT).eq("owner_user_id", ownerUserId).maybeSingle();
+  if (!styled.error) return styled;
+  return supabase.from("rooms").select(ROOM_OWNER_SELECT_FALLBACK).eq("owner_user_id", ownerUserId).maybeSingle();
+}
+
 export async function ensureMyRoom(client?: SupabaseClient): Promise<RoomDTO> {
   const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
   const supabase = client ?? await createSupabaseServerClient();
-  const { data: existing, error: readError } = await supabase.from("rooms")
-    .select(ROOM_OWNER_SELECT).eq("owner_user_id", identity.user.id).maybeSingle();
+  const { data: existing, error: readError } = await selectOwnerRoom(supabase, identity.user.id);
   if (readError) throw new Error("room_read_failed");
   if (existing) return mapRoom(existing);
-  const { data, error } = await supabase.from("rooms")
-    .insert({ owner_user_id: identity.user.id })
-    .select(ROOM_OWNER_SELECT).single();
-  if (error) {
-    if (error.code === "23505") {
-      const { data: raced } = await supabase.from("rooms")
-        .select(ROOM_OWNER_SELECT).eq("owner_user_id", identity.user.id).maybeSingle();
-      if (raced) return mapRoom(raced);
-    }
-    throw new Error("room_create_failed");
-  }
-  if (!data) throw new Error("room_create_failed");
-  return mapRoom(data);
+  const { error } = await supabase.from("rooms").insert({ owner_user_id: identity.user.id });
+  if (error && error.code !== "23505") throw new Error("room_create_failed");
+  const created = await selectOwnerRoom(supabase, identity.user.id);
+  if (created.error || !created.data) throw new Error("room_create_failed");
+  return mapRoom(created.data);
 }
 
 export async function getMyRoom(client?: SupabaseClient): Promise<RoomDTO> { return ensureMyRoom(client); }
@@ -68,6 +78,21 @@ export async function updateMyRoomTheme(input: unknown, client?: SupabaseClient)
   if (room.id !== payload.roomId) throw new Error("room_not_found");
   void client;
   throw new Error("room_theme_unavailable");
+}
+
+export async function updateMyRoomStyle(input: unknown, client?: SupabaseClient): Promise<RoomDTO> {
+  const payload = roomStyleSchema.parse(input);
+  const room = await ensureMyRoom(client);
+  if (room.id !== payload.roomId) throw new Error("room_not_found");
+  const supabase = client ?? await createSupabaseServerClient();
+  const { data, error } = await supabase.from("rooms")
+    .update({ style: payload.style })
+    .eq("id", room.id)
+    .eq("owner_user_id", room.ownerUserId)
+    .select(ROOM_OWNER_SELECT)
+    .single();
+  if (error || !data) throw new Error(error?.code === "42501" ? "room_style_forbidden" : "room_style_write_failed");
+  return mapRoom(data);
 }
 
 export async function listMyRoomPlacements(input: unknown, client?: SupabaseClient): Promise<{ room: RoomDTO; placements: RoomPlacementDTO[] }> {
@@ -112,6 +137,7 @@ function mapRoom(row: Record<string, unknown>): RoomDTO {
     id: String(row.id),
     ownerUserId: String(row.owner_user_id),
     themeId: nativeRoomThemeFromRow(row),
+    style: nativeRoomStyleFromRow(row),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   };

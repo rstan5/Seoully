@@ -12,11 +12,13 @@ import {
   USERS,
 } from "seoully-domain/fixtures/collectors";
 import type { CollectibleTemplate, Placement } from "seoully-domain/types";
-import type { NativeCatalogTemplate, NativeHolding, NativeRoomPlacement, NativeRoomSnapshot } from "../api";
+import type { NativeCatalogTemplate, NativeHolding, NativeRoomPlacement, NativeRoomSnapshot, NativeRoomStyle } from "../api";
+import { defaultStyleForTheme, parseRoomStyle } from "./roomStyle";
 import { demoAssetUri } from "../data/demo/assets";
 import { createInitialRoomRenderable, nativeHomeForHolding, toPersistedTransform, zoneIdForNativeSurface } from "./model";
 
 const session = new Map<string, NativeRoomPlacement[]>();
+const styleSession = new Map<string, NativeRoomStyle>();
 
 function nativeTemplate(template: CollectibleTemplate): NativeCatalogTemplate {
   return {
@@ -82,7 +84,12 @@ export function buildFixtureRoomSnapshot(ownerId: string = String(SOO)): NativeR
   const roomId = room?.id ?? `room-${ownerId}`;
   const holdings = nativeHoldingsFor(ownerId);
   return {
-    room: { id: roomId, ownerUserId: ownerId, themeId: ownerId === String(SOO) ? "hearth" : "blossom" },
+    room: {
+      id: roomId,
+      ownerUserId: ownerId,
+      themeId: ownerId === String(SOO) ? "hearth" : "blossom",
+      style: styleSession.get(ownerId) ?? defaultStyleForTheme(ownerId === String(SOO) ? "hearth" : "blossom"),
+    },
     holdings,
     placements: fixturePlacements(ownerId, roomId, holdings),
   };
@@ -120,8 +127,15 @@ export function removeDemoPlacement(roomId: string, holdingId: string) {
   session.set(ownerKey, current.filter((item) => item.holdingId !== holdingId));
 }
 
+export function saveDemoRoomStyle(ownerId: string, style: NativeRoomStyle) {
+  const next = parseRoomStyle(style);
+  styleSession.set(ownerId, next);
+  return next;
+}
+
 export function resetDemoRoomSession() {
   session.clear();
+  styleSession.clear();
 }
 
 export function demoRoomOwnerId() {

@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Stack, useFocusEffect } from "expo-router";
 import { AccessibilityInfo, Animated, AppState, Easing, PanResponder, Pressable, StyleSheet, View, type GestureResponderEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { loadCollectorRoom, loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomPlacement, type NativeHolding, type NativeRoomSnapshot } from "../api";
+import { loadCollectorRoom, loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomPlacement, saveNativeRoomStyle, type NativeHolding, type NativeRoomSnapshot } from "../api";
 import { binderSpreads, buildNativeBinderPages, spreadIndexForHolding } from "../binder/model";
 import { collectibleKindLabel, type MobileCopy } from "../i18n";
 import { colors, spacing } from "../theme";
@@ -42,8 +42,10 @@ import {
   type HeldEdit,
 } from "./touchEdit";
 import { StoredCollectionSheet } from "./StoredCollectionSheet";
+import { RoomStyleSheet } from "./RoomStyleSheet";
+import { DEFAULT_ROOM_STYLE, defaultStyleForTheme, parseRoomStyle, resolveRoomLook, type NativeRoomStyle } from "./roomStyle";
 import { entranceForeground, roomEntranceCopy } from "./entrance";
-import { roomOverlayChrome, roomPalette } from "./theme";
+import { roomOverlayChrome } from "./theme";
 import { inspectView, openBinderView, stepBack, zoneFromSurfaceId, type CanonicalZoneKind, type NativeWorldView } from "./worldView";
 
 const NativeRoomRenderer = lazy(async () => {
@@ -92,6 +94,8 @@ export function RoomWorldScreen({
   const [placingItem, setPlacingItem] = useState<RoomRenderable | null>(null);
   const [storageOpen, setStorageOpen] = useState(false);
   const [storageQuery, setStorageQuery] = useState("");
+  const [roomStyle, setRoomStyle] = useState<NativeRoomStyle>(DEFAULT_ROOM_STYLE);
+  const [styleOpen, setStyleOpen] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const insets = useSafeAreaInsets();
@@ -113,6 +117,7 @@ export function RoomWorldScreen({
   const suppressTapRef = useRef(false);
   const undoStack = useRef<PlacementHistoryEntry<RoomRenderable>[]>([]);
   const redoStack = useRef<PlacementHistoryEntry<RoomRenderable>[]>([]);
+  const styleBaseline = useRef<NativeRoomStyle>(DEFAULT_ROOM_STYLE);
   const binderReturnRef = useRef<{ view: NativeWorldView; explore: ExploreOffset } | null>(null);
   const layoutRef = useRef({ width: 1, height: 1, x: 0, y: 0 });
   const stageRef = useRef<View>(null);
@@ -142,6 +147,7 @@ export function RoomWorldScreen({
           setSnapshot(next);
           setHoldings(next.holdings);
           setItems(buildRoomRenderables(next.holdings, next.placements));
+          setRoomStyle(parseRoomStyle(next.room.style, defaultStyleForTheme(next.room.themeId)));
           setOwnerName(demoRoom.demoCollectorDisplayName(userId));
           setPrivateRoom(false);
         } else {
@@ -149,6 +155,7 @@ export function RoomWorldScreen({
           setSnapshot(next);
           setHoldings(next.holdings);
           setItems(buildRoomRenderables(next.holdings, next.placements));
+          setRoomStyle(parseRoomStyle(next.room.style, defaultStyleForTheme(next.room.themeId)));
           setPrivateRoom(false);
         }
       } else if (mode === "public" && userId) {
@@ -162,8 +169,9 @@ export function RoomWorldScreen({
         const nextItems = publicRoom.room ? buildPublicRoomRenderables(publicRoom.room.id, publicRoom.room.placements) : [];
         setItems(nextItems);
         setHoldings(nextItems.map((item) => item.holding));
+        setRoomStyle(parseRoomStyle(publicRoom.room?.style, DEFAULT_ROOM_STYLE));
         setSnapshot(publicRoom.room ? {
-          room: { id: publicRoom.room.id, ownerUserId: publicRoom.owner.userId, themeId: "hearth" },
+          room: { id: publicRoom.room.id, ownerUserId: publicRoom.owner.userId, themeId: "hearth", style: parseRoomStyle(publicRoom.room.style) },
           placements: [],
           holdings: nextItems.map((item) => item.holding),
         } : null);
@@ -172,6 +180,7 @@ export function RoomWorldScreen({
         setSnapshot(next);
         setHoldings(next.holdings);
         setItems(buildRoomRenderables(next.holdings, next.placements));
+        setRoomStyle(parseRoomStyle(next.room.style, defaultStyleForTheme(next.room.themeId)));
         setPrivateRoom(false);
       } else {
         setError(copy.demoRoomUnavailable);
@@ -335,7 +344,6 @@ export function RoomWorldScreen({
       if (heldRef.current) void releaseHeld();
     },
   });
-  /* eslint-enable react-hooks/refs */
 
   const placedIds = new Set(items.map((item) => item.holding.id));
   const unplaced = holdings.filter((holding) => !placedIds.has(holding.id));
@@ -343,6 +351,7 @@ export function RoomWorldScreen({
   const editing = view.kind === "edit";
   const readOnly = mode === "public";
   const themeId = snapshot?.room.themeId ?? "hearth";
+  const roomTheme = resolveRoomLook(roomStyle);
   const entranceLabel = roomEntranceCopy({
     mode,
     displayName: ownerName,
@@ -350,7 +359,6 @@ export function RoomWorldScreen({
     ownLabel: copy.enteringYourRoom,
     visitorLabel: copy.enteringCollectorRoom,
   });
-  const roomTheme = roomPalette(themeId);
   const entranceTone = entranceForeground(roomTheme.void);
   const overlayTheme = roomOverlayChrome(roomTheme);
 
@@ -493,6 +501,7 @@ export function RoomWorldScreen({
     setCanRedo(false);
     clearPendingPress();
     clearHeldVisual();
+    styleBaseline.current = roomStyle;
     setView({ kind: "edit" });
     setSelectedId(null);
   }
@@ -518,8 +527,28 @@ export function RoomWorldScreen({
       }
     }
     exploreRef.current = { ...homeExploreRef.current };
+    setRoomStyle(styleBaseline.current);
+    await persistRoomStyle(styleBaseline.current);
     setView({ kind: "home" });
     setSelectedId(null);
+    setStyleOpen(false);
+  }
+
+  async function persistRoomStyle(next: NativeRoomStyle) {
+    const room = snapshotRef.current?.room;
+    if (!room || readOnly) return;
+    try {
+      if (demo) loadDemoRoom().saveDemoRoomStyle(room.ownerUserId, next);
+      else await saveNativeRoomStyle(room.id, next);
+      setSnapshot((current) => current ? { ...current, room: { ...current.room, style: next } } : current);
+    } catch {
+      setError(copy.roomSaveFailed);
+    }
+  }
+
+  async function applyRoomStyle(next: NativeRoomStyle) {
+    setRoomStyle(next);
+    await persistRoomStyle(next);
   }
 
   async function persistPlacement(next: RoomRenderable, options?: { silent?: boolean }) {
@@ -696,7 +725,7 @@ export function RoomWorldScreen({
 
   return <View style={[styles.world, immersiveRoomFill(roomTheme.void)]}>
     <Stack.Screen options={{ contentStyle: immersiveRoomFill(roomTheme.void) }} />
-    {!loading && snapshot ? <View
+    {!privateRoom ? <View
       ref={stageRef}
       style={styles.stage}
       onLayout={(event) => {
@@ -718,6 +747,7 @@ export function RoomWorldScreen({
           focusedId={editing ? null : selectedId}
           heldId={heldId}
           themeId={themeId}
+          style={roomStyle}
           view={view}
           binderSpread={currentSpread}
           turningSpread={turningSpread}
@@ -799,14 +829,24 @@ export function RoomWorldScreen({
         <SeoullyText variant="handle" style={styles.inspectionTitle}>{holdings.find((item) => item.id === view.heldHoldingId)?.template.name ?? copy.binder}</SeoullyText>
         <Pressable onPress={() => setView({ kind: "binder", spread: view.spread })} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.returnToBinder}</SeoullyText></Pressable>
       </View> : null}
-      {editing && !heldId && selectedItem ? <View style={[styles.editTray, trayPad]}>
-        <View style={styles.selectionRow}><SeoullyText numberOfLines={1} variant="handle" color={colors.plum} style={styles.selection}>{selectedItem.holding.template.name}</SeoullyText><Pressable onPress={() => void storeSelected()}><SeoullyText variant="caption" color={colors.muted}>{copy.removeFromRoom}</SeoullyText></Pressable></View>
+      {editing && !heldId && !placingItem ? <View style={[styles.editTray, trayPad]}>
+        {selectedItem ? <View style={styles.selectionRow}><SeoullyText numberOfLines={1} variant="handle" color={colors.plum} style={styles.selection}>{selectedItem.holding.template.name}</SeoullyText><Pressable onPress={() => void storeSelected()}><SeoullyText variant="caption" color={colors.muted}>{copy.removeFromRoom}</SeoullyText></Pressable></View> : null}
+        <Pressable onPress={() => setStyleOpen(true)} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.roomStyle}</SeoullyText></Pressable>
       </View> : null}
       {placingItem ? <View style={[styles.editTray, trayPad]}>
         <Pressable onPress={() => { clearPendingPress(); clearHeldVisual(); }} style={styles.inspectAction}>
           <SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.cancelPlacement}</SeoullyText>
         </Pressable>
       </View> : null}
+      {!readOnly && editing ? <RoomStyleSheet
+        visible={styleOpen}
+        style={roomStyle}
+        reducedMotion={reducedMotion}
+        copy={copy}
+        bottomInset={insets.bottom}
+        onChange={(next) => void applyRoomStyle(next)}
+        onClose={() => setStyleOpen(false)}
+      /> : null}
       {!readOnly ? <StoredCollectionSheet
         visible={storageOpen}
         holdings={unplaced}

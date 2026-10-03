@@ -35,6 +35,7 @@ export type NativeCatalogTemplate = {
   name: string;
   descriptor: string;
   status: string;
+  imageUrl?: string;
   groupName: string;
   memberName: string | null;
   releaseName: string | null;
@@ -721,6 +722,7 @@ export type NativePublicRoom = {
   viewerUserId?: string;
   room: {
     id: string;
+    style?: NativeRoomStyle;
     placements: {
       id: string;
       zoneId: string;
@@ -782,7 +784,15 @@ export async function loadCollectorPosts(userId: string, cursor?: string): Promi
 }
 
 export type NativeRoomThemeId = "hearth" | "blossom" | "midnight";
-export type NativeRoom = { id: string; ownerUserId: string; themeId: NativeRoomThemeId };
+export type NativeRoomStyle = {
+  wall: "plum" | "cream" | "ink" | "blush" | "sage";
+  floor: "walnut" | "oak" | "charcoal" | "blush-wood";
+  furniture: "walnut" | "oak" | "ink" | "blush";
+  rug: "rose" | "cream" | "ink" | "sage";
+  light: "warm" | "day" | "soft" | "night";
+  brightness: "dim" | "normal" | "bright";
+};
+export type NativeRoom = { id: string; ownerUserId: string; themeId: NativeRoomThemeId; style?: NativeRoomStyle };
 export type NativeRoomPlacement = {
   id: string;
   roomId: string;
@@ -825,6 +835,18 @@ export async function saveNativeRoomPlacement(input: {
   if (!response.ok) throw new Error("room_placement_write_failed");
   const payload = await response.json() as { placement: NativeRoomPlacement };
   return payload.placement;
+}
+
+export async function saveNativeRoomStyle(roomId: string, style: NativeRoomStyle) {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/room`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ roomId, style }),
+  });
+  if (!response.ok) throw new Error("room_style_write_failed");
+  const payload = await response.json() as { room: NativeRoom };
+  return payload.room;
 }
 
 export async function saveNativeRoomTheme(roomId: string, themeId: NativeRoomThemeId) {

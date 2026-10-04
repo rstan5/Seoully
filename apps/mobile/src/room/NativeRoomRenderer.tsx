@@ -3,15 +3,16 @@ import "./threeFiberCompat";
 import { Suspense, useMemo, useRef, type MutableRefObject } from "react";
 import { StyleSheet } from "react-native";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber/native";
-import { Color, Group, MeshBasicMaterial, TextureLoader, Vector3 } from "three";
+import { Color, Euler, Group, MeshBasicMaterial, Quaternion, TextureLoader, Vector3 } from "three";
 import type { NativeBinderSpread } from "../binder/model";
 import type { NativeHolding } from "../api";
 import { useCachedSignedMedia } from "../media/cachedMedia";
-import { applyExploreOffset, cameraLerpAlpha, DESK_BINDER_AT, exploreAllowedForView, IDENTITY_EXPLORE, poseForView, type ExploreOffset } from "./camera";
+import { applyExploreOffset, cameraLerpAlpha, exploreAllowedForView, IDENTITY_EXPLORE, poseForView, type ExploreOffset } from "./camera";
+import { binderCameraForViewport, inspectionPresentation } from "./composition";
 import { NativeOpenBinder } from "./NativeOpenBinder";
 import { extentsForGeometry } from "./representation";
-import { WORLD_ENVELOPE } from "./envelope";
-import { defaultStyleForTheme, resolveRoomLook, type NativeRoomStyle, type RoomLook } from "./roomStyle";
+import { RoomFurniture, RoomShell } from "./roomEnvironment";
+import { defaultStyleForTheme, resolveRoomLook, type NativeRoomStyle } from "./roomStyle";
 import { HELD_SCALE } from "./touchEdit";
 import { roomTextureIds, type NativeRoomSurface, type RoomRenderable } from "./model";
 import { CANONICAL_ZONE_KINDS, zoneInteractive, type CanonicalZoneKind, type NativeWorldView } from "./worldView";
@@ -89,7 +90,6 @@ export function NativeRoomRenderer({
   const textured = roomTextureIds(items, selectedId, focusedId);
   if (placingItem?.imageUrl) textured.add(placingItem.holding.id);
   const binderOpen = view.kind === "binder";
-  const examining = Boolean(view.kind === "binder" && view.heldHoldingId);
   const placedItems = binderOpen ? items.filter((item) => item.geometry !== "photocard") : items;
   const worldItems = placingItem && !placedItems.some((item) => item.holding.id === placingItem.holding.id)
     ? [...placedItems, placingItem]
@@ -97,17 +97,18 @@ export function NativeRoomRenderer({
   return <Canvas
     frameloop={paused ? "never" : "always"}
     style={StyleSheet.absoluteFill}
-    camera={{ position: [0.55, 1.92, 5.25], fov: 46 }}
+    camera={{ position: [1.22, 2.16, 15.55], fov: 46 }}
     onPointerMissed={onClearSelection}
     onCreated={({ camera, scene }) => {
-      camera.lookAt(0.18, -0.12, -2.35);
+      camera.lookAt(-0.42, -0.46, -1.52);
       scene.background = new Color(theme.void);
     }}
   >
     <color attach="background" args={[theme.void]} />
-    <ambientLight intensity={0.55 * theme.brightness} color={theme.fill} />
-    <directionalLight color={theme.light} intensity={1.55 * theme.brightness} position={[-3.4, 4.8, 2.8]} castShadow={false} />
-    <pointLight color={theme.light} intensity={(reducedMotion ? 0.12 : 0.28) * theme.brightness} position={[1.4, 1.2, -1.8]} />
+    <ambientLight intensity={0.82 * theme.brightness} color={theme.fill} />
+    <directionalLight color={theme.light} intensity={1.18 * theme.brightness} position={[-3.8, 3.4, 1.2]} castShadow={false} />
+    <pointLight color={theme.light} intensity={(reducedMotion ? 0.2 : 0.36) * theme.brightness} position={[-4.2, 0.86, -0.82]} />
+    <pointLight color={theme.fill} intensity={0.28 * theme.brightness} position={[2.4, 1.55, 0.55]} />
     <AuthoredCamera view={view} focused={focused} reducedMotion={reducedMotion} paused={paused} exploreRef={exploreRef} />
     <RoomShell theme={theme} onSelectZone={view.kind === "home" || view.kind === "zone" ? onSelectZone : undefined} />
     <RoomFurniture
@@ -137,6 +138,8 @@ export function NativeRoomRenderer({
         loadTexture={textured.has(item.holding.id)}
         interactive={live}
         previewRef={previewRef}
+        reducedMotion={reducedMotion}
+        paused={paused}
         onSelect={onSelect}
         onPressStart={view.kind === "edit" && !readOnly ? onPressStart : undefined}
         onPressEnd={view.kind === "edit" && !readOnly ? onPressEnd : undefined}
@@ -155,7 +158,6 @@ export function NativeRoomRenderer({
       onTurnComplete={() => onTurnComplete?.()}
       onTurnEdge={(dir) => onTurnEdge?.(dir)}
     /> : null}
-    {examining ? <mesh position={[0.42, 0.28, -1.1]}><planeGeometry args={[0.01, 0.01]} /><meshBasicMaterial transparent opacity={0} /></mesh> : null}
   </Canvas>;
 }
 
@@ -172,13 +174,18 @@ function AuthoredCamera({
   paused: boolean;
   exploreRef?: MutableRefObject<ExploreOffset>;
 }) {
-  const { camera } = useThree();
+  const { camera, size } = useThree();
   const targetPosition = useMemo(() => new Vector3(), []);
   const lookAt = useMemo(() => new Vector3(0.18, -0.12, -2.35), []);
   const desiredLook = useMemo(() => new Vector3(), []);
   useFrame((_, delta) => {
     if (paused) return;
-    const authored = poseForView(view, focused);
+    const aspect = size.width / Math.max(1, size.height);
+    const authored = view.kind === "inspect" && focused
+      ? inspectionPresentation(focused, aspect).camera
+      : view.kind === "binder"
+        ? binderCameraForViewport(aspect)
+        : poseForView(view, focused);
     const offset = exploreRef?.current ?? IDENTITY_EXPLORE;
     const pose = exploreAllowedForView(view)
       ? applyExploreOffset(authored, offset, view.kind === "zone" ? "zone" : "home")
@@ -202,91 +209,6 @@ function ZoneHotspot({ zone, onSelect }: { zone: CanonicalZoneKind; onSelect: (z
     <boxGeometry args={spot.size} />
     <meshBasicMaterial transparent opacity={0} depthWrite={false} />
   </mesh>;
-}
-
-function RoomShell({ theme, onSelectZone }: { theme: RoomLook; onSelectZone?: (zone: CanonicalZoneKind) => void }) {
-  const env = WORLD_ENVELOPE;
-  const floorH = env.floorTop - env.floorBottom;
-  const floorZ = (env.floorNearZ + env.floorFarZ) / 2;
-  const floorDepth = env.floorNearZ - env.floorFarZ;
-  const wallH = env.wallTop - env.wallBottom;
-  const wallZ = (env.wallNearZ + env.wallFarZ) / 2;
-  const wallDepth = env.wallNearZ - env.wallFarZ;
-  const ceilZ = (env.ceilingNearZ + env.ceilingFarZ) / 2;
-  const ceilDepth = env.ceilingNearZ - env.ceilingFarZ;
-  return <>
-    <mesh position={[0, env.floorTop - floorH / 2, floorZ]}><boxGeometry args={[env.floorX * 2, floorH, floorDepth]} /><meshStandardMaterial color={theme.floor} roughness={0.82} /></mesh>
-    <mesh position={[0, env.ceilingY + 0.12, ceilZ]}><boxGeometry args={[env.ceilingX * 2, 0.24, ceilDepth]} /><meshStandardMaterial color={theme.wallAccent} roughness={0.88} /></mesh>
-    <mesh position={[0, 0.72, env.backZ]} onClick={(event) => { event.stopPropagation(); onSelectZone?.("wall"); }}><boxGeometry args={[env.wallX * 2 + 0.4, 6.9, 0.28]} /><meshStandardMaterial color={theme.wall} roughness={0.9} /></mesh>
-    <mesh position={[-env.wallX, (env.wallTop + env.wallBottom) / 2, wallZ]}><boxGeometry args={[0.28, wallH, wallDepth]} /><meshStandardMaterial color={theme.sideWall} roughness={0.88} /></mesh>
-    <mesh position={[env.wallX, (env.wallTop + env.wallBottom) / 2, wallZ]}><boxGeometry args={[0.28, wallH, wallDepth]} /><meshStandardMaterial color={theme.sideWall} roughness={0.88} /></mesh>
-    <mesh position={[0, env.floorTop + 0.08, env.backZ + 0.18]}><boxGeometry args={[env.wallX * 2 - 0.2, 0.2, 0.14]} /><meshStandardMaterial color={theme.edge} roughness={0.62} /></mesh>
-    <mesh position={[-env.wallX + 0.18, env.floorTop + 0.08, wallZ]}><boxGeometry args={[0.12, 0.2, wallDepth - 0.3]} /><meshStandardMaterial color={theme.edge} roughness={0.64} /></mesh>
-    <mesh position={[env.wallX - 0.18, env.floorTop + 0.08, wallZ]}><boxGeometry args={[0.12, 0.2, wallDepth - 0.3]} /><meshStandardMaterial color={theme.edge} roughness={0.64} /></mesh>
-    <group position={[-5.28, 0.55, -1.35]} rotation={[0, Math.PI / 2, 0]}>
-      <mesh><boxGeometry args={[1.72, 2.35, 0.08]} /><meshStandardMaterial color={theme.edge} roughness={0.48} /></mesh>
-      <mesh position={[0, 0, 0.03]}><boxGeometry args={[1.42, 2.05, 0.04]} /><meshStandardMaterial color={theme.light} emissive={theme.light} emissiveIntensity={0.35 * theme.brightness} roughness={0.35} /></mesh>
-    </group>
-    <mesh position={[1.85, 0.95, env.backZ + 0.16]}><boxGeometry args={[1.55, 1.85, 0.04]} /><meshStandardMaterial color={theme.wallAccent} roughness={0.7} /></mesh>
-  </>;
-}
-
-function RoomFurniture({
-  theme,
-  hideClosedBinder,
-  onOpenBinder,
-  onOpenStorage,
-  onSelectZone,
-}: {
-  theme: RoomLook;
-  hideClosedBinder: boolean;
-  onOpenBinder?: () => void;
-  onOpenStorage?: () => void;
-  onSelectZone?: (zone: CanonicalZoneKind) => void;
-}) {
-  return <>
-    <group position={[-3.15, -0.55, -3.78]} onClick={(event) => { event.stopPropagation(); onSelectZone?.("shelf"); }}>
-      <mesh position={[0, 0, -0.18]}><boxGeometry args={[2.32, 3.22, 0.1]} /><meshStandardMaterial color={theme.furniture} roughness={0.72} /></mesh>
-      <mesh position={[-1.12, 0, 0.12]}><boxGeometry args={[0.1, 3.22, 0.72]} /><meshStandardMaterial color={theme.furniture} roughness={0.7} /></mesh>
-      <mesh position={[1.12, 0, 0.12]}><boxGeometry args={[0.1, 3.22, 0.72]} /><meshStandardMaterial color={theme.furniture} roughness={0.7} /></mesh>
-      {[-1.45, -0.55, 0.35, 1.18].map((y) => <mesh key={y} position={[0, y + 0.55, 0.16]}><boxGeometry args={[2.16, 0.07, 0.7]} /><meshStandardMaterial color={theme.edge} roughness={0.55} /></mesh>)}
-      <mesh position={[0, -1.58, 0.08]}><boxGeometry args={[2.2, 0.12, 0.58]} /><meshStandardMaterial color={theme.edge} roughness={0.6} /></mesh>
-      <mesh position={[0, -2.02, 0.16]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[1.9, 0.55]} /><meshBasicMaterial color="#1a1214" transparent opacity={0.18} depthWrite={false} /></mesh>
-    </group>
-    <group position={[1.45, -0.82, -2.85]} onClick={(event) => { event.stopPropagation(); onSelectZone?.("desk"); }}>
-      <mesh position={[0, 0.04, 0]}><boxGeometry args={[3.32, 0.1, 1.72]} /><meshStandardMaterial color={theme.edge} roughness={0.58} /></mesh>
-      <mesh position={[0, -0.02, 0]}><boxGeometry args={[3.18, 0.06, 1.58]} /><meshStandardMaterial color={theme.furniture} roughness={0.68} /></mesh>
-      {([[-1.48, -0.58, -0.68], [1.48, -0.58, -0.68], [-1.48, -0.58, 0.68], [1.48, -0.58, 0.68]] as [number, number, number][]).map((pos) => (
-        <mesh key={pos.join()} position={pos}><boxGeometry args={[0.12, 1.08, 0.12]} /><meshStandardMaterial color={theme.furniture} roughness={0.74} /></mesh>
-      ))}
-      <mesh position={[0, -0.42, 0.78]}><boxGeometry args={[3.05, 0.08, 0.08]} /><meshStandardMaterial color={theme.edge} roughness={0.5} /></mesh>
-    </group>
-    {!hideClosedBinder ? <group position={[DESK_BINDER_AT.x, DESK_BINDER_AT.y, DESK_BINDER_AT.z]} rotation={[-0.18, -0.22, 0]} onClick={(event) => { event.stopPropagation(); onOpenBinder?.(); }}>
-      <mesh position={[0, 0.02, 0.02]}><boxGeometry args={[1.15, 1.02, 0.82]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>
-      <mesh position={[-0.38, 0, 0]}><boxGeometry args={[0.1, 0.78, 0.56]} /><meshStandardMaterial color={theme.binder} roughness={0.42} /></mesh>
-      <mesh position={[0.02, 0.01, -0.02]}><boxGeometry args={[0.7, 0.74, 0.52]} /><meshStandardMaterial color={theme.binder} roughness={0.55} /></mesh>
-      <mesh position={[0.38, 0, 0.02]}><boxGeometry args={[0.08, 0.7, 0.48]} /><meshStandardMaterial color={theme.paper} roughness={0.82} /></mesh>
-      <mesh position={[0.08, 0.02, 0.22]}><boxGeometry args={[0.52, 0.62, 0.08]} /><meshStandardMaterial color={theme.paper} roughness={0.88} /></mesh>
-    </group> : null}
-    <group position={[3.65, -0.55, -3.78]} onClick={(event) => { event.stopPropagation(); onSelectZone?.("case"); }}>
-      <mesh position={[0, 0, -0.12]}><boxGeometry args={[1.62, 3.2, 0.1]} /><meshStandardMaterial color={theme.furniture} roughness={0.7} /></mesh>
-      <mesh position={[-0.76, 0, 0.18]}><boxGeometry args={[0.1, 3.2, 0.68]} /><meshStandardMaterial color={theme.furniture} roughness={0.68} /></mesh>
-      <mesh position={[0.76, 0, 0.18]}><boxGeometry args={[0.1, 3.2, 0.68]} /><meshStandardMaterial color={theme.furniture} roughness={0.68} /></mesh>
-      {[-1.48, -0.55, 0.43, 1.28].map((y) => <mesh key={`case-${y}`} position={[0, y + 0.55, 0.2]}><boxGeometry args={[1.48, 0.06, 0.64]} /><meshStandardMaterial color={theme.edge} roughness={0.48} /></mesh>)}
-      <mesh position={[0, 0.05, 0.36]}><boxGeometry args={[1.42, 2.85, 0.03]} /><meshStandardMaterial color="#d8ecec" roughness={0.12} metalness={0.18} transparent opacity={0.18} /></mesh>
-    </group>
-    <group position={[-1.2, -1.86, -0.65]} onClick={(event) => { event.stopPropagation(); if (onOpenStorage) onOpenStorage(); else onSelectZone?.("archive"); }}>
-      <mesh position={[0, 0.22, 0]}><boxGeometry args={[2.15, 1.15, 1.55]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>
-      <mesh><boxGeometry args={[1.84, 0.58, 1.18]} /><meshStandardMaterial color={theme.furniture} roughness={0.84} /></mesh>
-      {[-0.88, 0.88].map((x) => <mesh key={`crate-${x}`} position={[x, 0, 0]}><boxGeometry args={[0.08, 0.62, 1.2]} /><meshStandardMaterial color={theme.edge} roughness={0.55} /></mesh>)}
-      <mesh position={[0, 0.36, 0.04]} rotation={[-0.12, 0, 0]}><boxGeometry args={[1.76, 0.08, 1.12]} /><meshStandardMaterial color={theme.edge} roughness={0.62} /></mesh>
-      <mesh position={[0, 0.08, 0.6]}><boxGeometry args={[0.78, 0.2, 0.04]} /><meshStandardMaterial color={theme.paper} roughness={0.8} /></mesh>
-    </group>
-    <mesh position={[0.18, -2.055, -1.05]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[1.42, 48]} /><meshStandardMaterial color={theme.accent} roughness={0.95} /></mesh>
-    <mesh position={[0.18, -2.048, -1.05]} rotation={[-Math.PI / 2, 0, 0]}><circleGeometry args={[1.18, 40]} /><meshStandardMaterial color={theme.wallAccent} roughness={0.92} /></mesh>
-    <mesh position={[-3.95, -0.85, -1.15]}><cylinderGeometry args={[0.07, 0.1, 2.4, 10]} /><meshStandardMaterial color={theme.edge} roughness={0.4} metalness={0.28} /></mesh>
-    <mesh position={[-3.95, 0.42, -1.15]}><sphereGeometry args={[0.2, 16, 12]} /><meshStandardMaterial color={theme.light} emissive={theme.light} emissiveIntensity={0.45 * theme.brightness} roughness={0.28} /></mesh>
-  </>;
 }
 
 function LandingHighlights({
@@ -335,6 +257,8 @@ function RoomObject({
   loadTexture,
   interactive,
   previewRef,
+  reducedMotion,
+  paused,
   onSelect,
   onPressStart,
   onPressEnd,
@@ -346,27 +270,51 @@ function RoomObject({
   loadTexture: boolean;
   interactive: boolean;
   previewRef?: MutableRefObject<RoomRenderable | null>;
+  reducedMotion: boolean;
+  paused: boolean;
   onSelect: (id: string) => void;
   onPressStart?: (id: string) => void;
   onPressEnd?: (id: string) => void;
 }) {
   const group = useRef<Group>(null);
-  const wall = item.placement?.surfaceId?.endsWith("-wall") || item.position.z < -3.9;
-  const restY = item.position.y + (focused && !wall ? 0.16 : 0) + (held && !wall ? 0.22 : 0);
-  const restZ = item.position.z + (focused && !wall ? 0.14 : 0) + (held && wall ? 0.12 : 0);
-  useFrame(() => {
+  const { size } = useThree();
+  const targetPos = useMemo(() => new Vector3(), []);
+  const targetQuat = useMemo(() => new Quaternion(), []);
+  const targetEuler = useMemo(() => new Euler(), []);
+  useFrame((_, delta) => {
     const mesh = group.current;
+    if (!mesh || paused) return;
     const preview = previewRef?.current;
-    if (!mesh || !held || !preview || preview.holding.id !== item.holding.id) return;
-    mesh.position.set(preview.position.x, preview.position.y, preview.position.z);
-    mesh.rotation.set(preview.rotation.x, preview.rotation.y, preview.rotation.z);
-    mesh.scale.setScalar(preview.scale * HELD_SCALE);
+    if (held && preview && preview.holding.id === item.holding.id) {
+      mesh.position.set(preview.position.x, preview.position.y, preview.position.z);
+      mesh.rotation.set(preview.rotation.x, preview.rotation.y, preview.rotation.z);
+      mesh.scale.setScalar(preview.scale * HELD_SCALE);
+      return;
+    }
+    const aspect = size.width / Math.max(1, size.height);
+    const presented = focused ? inspectionPresentation(item, aspect) : null;
+    const restScale = item.scale * (held ? HELD_SCALE : selected && !focused ? 1.08 : 1);
+    targetPos.set(
+      presented?.position.x ?? item.position.x,
+      presented?.position.y ?? item.position.y,
+      presented?.position.z ?? item.position.z,
+    );
+    targetEuler.set(
+      presented?.rotation.x ?? item.rotation.x,
+      presented?.rotation.y ?? item.rotation.y,
+      presented?.rotation.z ?? item.rotation.z,
+    );
+    targetQuat.setFromEuler(targetEuler);
+    const alpha = cameraLerpAlpha(delta, reducedMotion);
+    mesh.position.lerp(targetPos, alpha);
+    mesh.quaternion.slerp(targetQuat, alpha);
+    mesh.scale.setScalar(mesh.scale.x + (restScale - mesh.scale.x) * alpha);
   });
   return <group
     ref={group}
-    position={[item.position.x, restY, restZ]}
-    rotation={[item.rotation.x + (focused && wall ? -0.18 : 0), item.rotation.y, item.rotation.z]}
-    scale={item.scale * (held ? HELD_SCALE : selected ? 1.08 : 1) * (focused ? 1.04 : 1)}
+    position={[item.position.x, item.position.y, item.position.z]}
+    rotation={[item.rotation.x, item.rotation.y, item.rotation.z]}
+    scale={item.scale}
     onPointerDown={(event) => {
       if (!interactive) return;
       event.stopPropagation();

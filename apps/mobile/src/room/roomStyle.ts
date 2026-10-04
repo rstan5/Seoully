@@ -39,25 +39,25 @@ export const STYLE_BY_THEME = {
 } as const satisfies Record<string, NativeRoomStyle>;
 
 const WALLS: Record<RoomWallId, { wall: string; wallAccent: string; sideWall: string; void: string }> = {
-  plum: { wall: "#4a3a42", wallAccent: "#6a5460", sideWall: "#3c3038", void: "#1a1418" },
-  cream: { wall: "#efe4d6", wallAccent: "#f7efe4", sideWall: "#e4d6c6", void: "#d8c8b6" },
-  ink: { wall: "#2c2838", wallAccent: "#3e384c", sideWall: "#22202c", void: "#0c0b12" },
-  blush: { wall: "#8a5460", wallAccent: "#b87888", sideWall: "#6e4250", void: "#2a1a20" },
-  sage: { wall: "#5a6a5e", wallAccent: "#7a8c7e", sideWall: "#4a584e", void: "#1a201c" },
+  plum: { wall: "#5a4650", wallAccent: "#7a6270", sideWall: "#463840", void: "#1c161a" },
+  cream: { wall: "#f3e8da", wallAccent: "#fff6ec", sideWall: "#e0d0be", void: "#d4c4b2" },
+  ink: { wall: "#3a3548", wallAccent: "#524a62", sideWall: "#2a2636", void: "#121018" },
+  blush: { wall: "#9a6270", wallAccent: "#c48896", sideWall: "#7a4c5a", void: "#2c1c22" },
+  sage: { wall: "#66786a", wallAccent: "#88a090", sideWall: "#526258", void: "#1c2420" },
 };
 
-const FLOORS: Record<RoomFloorId, string> = {
-  walnut: "#3a2a22",
-  oak: "#8a6a48",
-  charcoal: "#2a262c",
-  "blush-wood": "#6a4440",
+const FLOORS: Record<RoomFloorId, { floor: string; plank: string }> = {
+  walnut: { floor: "#4a3428", plank: "#6a4a36" },
+  oak: { floor: "#9a784e", plank: "#c4a06a" },
+  charcoal: { floor: "#3a363c", plank: "#524e56" },
+  "blush-wood": { floor: "#7a524c", plank: "#9a6a62" },
 };
 
-const FURNITURE: Record<RoomFurnitureId, { furniture: string; edge: string }> = {
-  walnut: { furniture: "#3a2c26", edge: "#8a6e58" },
-  oak: { furniture: "#7a5a3a", edge: "#c4a078" },
-  ink: { furniture: "#2a2432", edge: "#6a5c78" },
-  blush: { furniture: "#5a3840", edge: "#c48b9a" },
+const FURNITURE: Record<RoomFurnitureId, { furniture: string; edge: string; metal: string }> = {
+  walnut: { furniture: "#2e221c", edge: "#a88868", metal: "#8a7a6a" },
+  oak: { furniture: "#6a4a2e", edge: "#d4b088", metal: "#9a8a78" },
+  ink: { furniture: "#1e1a28", edge: "#8a7a96", metal: "#7a7288" },
+  blush: { furniture: "#4a2c34", edge: "#d4a0ae", metal: "#b08a92" },
 };
 
 const RUGS: Record<RoomRugId, string> = {
@@ -68,14 +68,14 @@ const RUGS: Record<RoomRugId, string> = {
 };
 
 const LIGHTS: Record<RoomLightId, { light: string; fill: string }> = {
-  warm: { light: "#ffc48a", fill: "#c9b6dc" },
-  day: { light: "#fff1e5", fill: "#f3d4e2" },
-  soft: { light: "#f4d8c4", fill: "#d8c4d0" },
-  night: { light: "#d6c9ff", fill: "#6a5a88" },
+  warm: { light: "#ffc48a", fill: "#d4c4e4" },
+  day: { light: "#fff4ea", fill: "#f6dce8" },
+  soft: { light: "#f6ddcc", fill: "#e0d0da" },
+  night: { light: "#e8dcff", fill: "#a898c4" },
 };
 
 const BRIGHTNESS: Record<RoomBrightnessId, number> = {
-  dim: 0.62,
+  dim: 0.78,
   normal: 1,
   bright: 1.28,
 };
@@ -86,8 +86,10 @@ export type RoomLook = {
   wallAccent: string;
   sideWall: string;
   floor: string;
+  plank: string;
   furniture: string;
   edge: string;
+  metal: string;
   accent: string;
   light: string;
   fill: string;
@@ -118,6 +120,7 @@ export function parseRoomStyle(value: unknown, fallback: NativeRoomStyle = DEFAU
 export function resolveRoomLook(style: NativeRoomStyle): RoomLook {
   const wall = WALLS[style.wall];
   const furniture = FURNITURE[style.furniture];
+  const boards = FLOORS[style.floor];
   const lamp = LIGHTS[style.light];
   const cream = style.wall === "cream";
   return {
@@ -125,9 +128,11 @@ export function resolveRoomLook(style: NativeRoomStyle): RoomLook {
     wall: wall.wall,
     wallAccent: wall.wallAccent,
     sideWall: wall.sideWall,
-    floor: FLOORS[style.floor],
+    floor: boards.floor,
+    plank: boards.plank,
     furniture: furniture.furniture,
     edge: furniture.edge,
+    metal: furniture.metal,
     accent: RUGS[style.rug],
     light: lamp.light,
     fill: lamp.fill,
@@ -140,7 +145,7 @@ export function resolveRoomLook(style: NativeRoomStyle): RoomLook {
 
 export function styleSwatch(kind: keyof NativeRoomStyle, id: string) {
   if (kind === "wall") return WALLS[id as RoomWallId]?.wall ?? "#888";
-  if (kind === "floor") return FLOORS[id as RoomFloorId] ?? "#888";
+  if (kind === "floor") return FLOORS[id as RoomFloorId]?.floor ?? "#888";
   if (kind === "furniture") return FURNITURE[id as RoomFurnitureId]?.furniture ?? "#888";
   if (kind === "rug") return RUGS[id as RoomRugId] ?? "#888";
   if (kind === "light") return LIGHTS[id as RoomLightId]?.light ?? "#888";

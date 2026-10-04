@@ -63,6 +63,8 @@ export function RoomWorldScreen({
   copy,
   onLeave,
   onInspectCollectible,
+  onWishlistCollectible,
+  onMessageCollectible,
   onOwnRoom,
   initialHoldingId,
 }: {
@@ -73,6 +75,8 @@ export function RoomWorldScreen({
   copy: MobileCopy;
   onLeave: () => void;
   onInspectCollectible?: (holdingId: string) => void;
+  onWishlistCollectible?: (holding: NativeHolding) => void | Promise<void>;
+  onMessageCollectible?: (holding: NativeHolding) => void;
   onOwnRoom?: () => void;
   initialHoldingId?: string;
 }) {
@@ -96,6 +100,8 @@ export function RoomWorldScreen({
   const [storageQuery, setStorageQuery] = useState("");
   const [roomStyle, setRoomStyle] = useState<NativeRoomStyle>(DEFAULT_ROOM_STYLE);
   const [styleOpen, setStyleOpen] = useState(false);
+  const [inspectNotice, setInspectNotice] = useState<string | null>(null);
+  const [binderHintSeen, setBinderHintSeen] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const insets = useSafeAreaInsets();
@@ -370,6 +376,7 @@ export function RoomWorldScreen({
       return;
     }
     if (current.kind === "binder" && current.heldHoldingId) {
+      setInspectNotice(null);
       setView({ kind: "binder", spread: current.spread });
       return;
     }
@@ -475,6 +482,16 @@ export function RoomWorldScreen({
     setSelectedId(null);
     setStorageOpen(false);
     setView(openBinderView(Math.max(0, index)));
+  }
+
+  async function wishlistHolding(holding: NativeHolding) {
+    if (!onWishlistCollectible) return;
+    try {
+      await onWishlistCollectible(holding);
+      setInspectNotice(copy.savedToWishlist);
+    } catch {
+      setInspectNotice(copy.wishlistUnavailable);
+    }
   }
 
   function closeBinder() {
@@ -692,11 +709,14 @@ export function RoomWorldScreen({
   const landingSurfaces = editing && heldId && snapshot && heldItem
     ? compatibleSurfaces(snapshot.room.id, heldItem.geometry)
     : [];
+  const binderHeld = view.kind === "binder" && view.heldHoldingId
+    ? holdings.find((item) => item.id === view.heldHoldingId) ?? null
+    : null;
   const hint = placingItem
     ? copy.roomPlaceHint
     : editing
       ? copy.roomDragHint
-      : view.kind === "binder"
+      : view.kind === "binder" && !view.heldHoldingId && !binderHintSeen
         ? copy.binderLead
         : null;
   const overlayPad = {
@@ -776,9 +796,12 @@ export function RoomWorldScreen({
           placingItem={placingItem}
           onHoldCard={(holding) => {
             if (view.kind !== "binder") return;
+            setBinderHintSeen(true);
+            setInspectNotice(null);
             setView({ kind: "binder", spread: view.spread, ...(holding ? { heldHoldingId: holding.id } : {}) });
           }}
           onTurnEdge={(dir) => {
+            setBinderHintSeen(true);
             const to = binderSpreadIndex + dir;
             if (to < 0 || to >= spreads.length || turnDir !== 0) return;
             if (reducedMotion) {
@@ -816,19 +839,29 @@ export function RoomWorldScreen({
       {!loading ? <RoomEntranceTitle key={entranceLabel} label={entranceLabel} color={entranceTone.color} shadow={entranceTone.shadow} reducedMotion={reducedMotion} /> : null}
       {error ? <Pressable onPress={() => void refresh()} style={styles.error}><SeoullyText variant="secondary" color={colors.plum}>{error} · {copy.retry}</SeoullyText></Pressable> : null}
       {hint ? <View pointerEvents="none" style={[styles.hint, { bottom: insets.bottom + chrome.companionSize + chrome.gutter }]}><SeoullyText variant="caption" color={colors.ink} style={styles.hintText}>{hint}</SeoullyText></View> : null}
-      {selectedItem && !editing && view.kind !== "binder" ? <View style={[styles.inspection, trayPad]}>
-        <View style={styles.inspectionCopy}>
-          <SeoullyText numberOfLines={1} variant="handle" style={styles.inspectionTitle}>{selectedItem.holding.template.name}</SeoullyText>
-          <SeoullyText numberOfLines={1} variant="caption" style={styles.inspectionMeta}>{[selectedItem.holding.template.groupName, selectedItem.holding.template.memberName, collectibleKindLabel(selectedItem.holding.template.kind, copy)].filter(Boolean).join(" · ")}</SeoullyText>
-        </View>
-        {onInspectCollectible && !readOnly ? <Pressable onPress={() => onInspectCollectible(selectedItem.holding.id)} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.viewCollectible}</SeoullyText></Pressable> : null}
-        {selectedItem.holding.template.kind === "photocard" ? <Pressable onPress={() => openBinderFromWorld(selectedItem.holding.id)} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.openBinder}</SeoullyText></Pressable> : null}
-        <Pressable onPress={goBack} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.close}</SeoullyText></Pressable>
-      </View> : null}
-      {view.kind === "binder" && view.heldHoldingId ? <View style={[styles.inspection, trayPad]}>
-        <SeoullyText variant="handle" style={styles.inspectionTitle}>{holdings.find((item) => item.id === view.heldHoldingId)?.template.name ?? copy.binder}</SeoullyText>
-        <Pressable onPress={() => setView({ kind: "binder", spread: view.spread })} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.returnToBinder}</SeoullyText></Pressable>
-      </View> : null}
+      {selectedItem && !editing && view.kind !== "binder" ? <InspectionTray
+        holding={selectedItem.holding}
+        copy={copy}
+        notice={inspectNotice}
+        style={trayPad}
+        onView={onInspectCollectible ? () => onInspectCollectible(selectedItem.holding.id) : undefined}
+        onOpenBinder={selectedItem.holding.template.kind === "photocard" ? () => openBinderFromWorld(selectedItem.holding.id) : undefined}
+        onWishlist={readOnly && onWishlistCollectible ? () => { void wishlistHolding(selectedItem.holding); } : undefined}
+        onMessage={readOnly && onMessageCollectible ? () => onMessageCollectible(selectedItem.holding) : undefined}
+        onClose={goBack}
+        closeLabel={copy.close}
+      /> : null}
+      {binderHeld ? <InspectionTray
+        holding={binderHeld}
+        copy={copy}
+        notice={inspectNotice}
+        style={trayPad}
+        onView={onInspectCollectible ? () => onInspectCollectible(binderHeld.id) : undefined}
+        onWishlist={readOnly && onWishlistCollectible ? () => { void wishlistHolding(binderHeld); } : undefined}
+        onMessage={readOnly && onMessageCollectible ? () => onMessageCollectible(binderHeld) : undefined}
+        onClose={() => setView({ kind: "binder", spread: view.kind === "binder" ? view.spread : 0 })}
+        closeLabel={copy.returnToBinder}
+      /> : null}
       {editing && !heldId && !placingItem ? <View style={[styles.editTray, trayPad]}>
         {selectedItem ? <View style={styles.selectionRow}><SeoullyText numberOfLines={1} variant="handle" color={colors.plum} style={styles.selection}>{selectedItem.holding.template.name}</SeoullyText><Pressable onPress={() => void storeSelected()}><SeoullyText variant="caption" color={colors.muted}>{copy.removeFromRoom}</SeoullyText></Pressable></View> : null}
         <Pressable onPress={() => setStyleOpen(true)} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.roomStyle}</SeoullyText></Pressable>
@@ -862,6 +895,47 @@ export function RoomWorldScreen({
         onEditToPlace={() => { beginEditing(); }}
       /> : null}
     </View>
+  </View>;
+}
+
+function InspectionTray({
+  holding,
+  copy,
+  notice,
+  style,
+  onView,
+  onOpenBinder,
+  onWishlist,
+  onMessage,
+  onClose,
+  closeLabel,
+}: {
+  holding: NativeHolding;
+  copy: MobileCopy;
+  notice?: string | null;
+  style?: object;
+  onView?: () => void;
+  onOpenBinder?: () => void;
+  onWishlist?: () => void;
+  onMessage?: () => void;
+  onClose: () => void;
+  closeLabel: string;
+}) {
+  return <View style={[styles.inspection, style]}>
+    <View style={styles.inspectionCopy}>
+      <SeoullyText numberOfLines={1} variant="handle" style={styles.inspectionTitle}>{holding.template.name}</SeoullyText>
+      <SeoullyText numberOfLines={1} variant="caption" style={styles.inspectionMeta}>
+        {[holding.template.groupName, holding.template.memberName, collectibleKindLabel(holding.template.kind, copy)].filter(Boolean).join(" · ")}
+      </SeoullyText>
+    </View>
+    <View style={styles.inspectionActions}>
+      {onView ? <Pressable onPress={onView} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.viewCollectible}</SeoullyText></Pressable> : null}
+      {onOpenBinder ? <Pressable onPress={onOpenBinder} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.openBinder}</SeoullyText></Pressable> : null}
+      {onWishlist ? <Pressable onPress={onWishlist} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.saveToWishlist}</SeoullyText></Pressable> : null}
+      {onMessage ? <Pressable onPress={onMessage} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.messageAboutCollectible}</SeoullyText></Pressable> : null}
+      <Pressable onPress={onClose} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{closeLabel}</SeoullyText></Pressable>
+    </View>
+    {notice ? <SeoullyText variant="caption" color={colors.plum} style={styles.inspectionNotice}>{notice}</SeoullyText> : null}
   </View>;
 }
 
@@ -971,18 +1045,20 @@ const styles = StyleSheet.create({
   error: { paddingHorizontal: chrome.gutter, paddingTop: spacing.xs },
   empty: { padding: chrome.gutter },
   stage: StyleSheet.absoluteFill,
-  hint: { alignSelf: "center", backgroundColor: "rgba(247,241,244,0.88)", borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, position: "absolute" },
-  hintText: { color: colors.ink, fontSize: 13, fontWeight: "600" },
+  hint: { alignSelf: "center", backgroundColor: "rgba(247,241,244,0.82)", borderRadius: 999, paddingHorizontal: spacing.sm, paddingVertical: 5, position: "absolute" },
+  hintText: { color: colors.ink, fontSize: 11, fontWeight: "600" },
   editTray: { backgroundColor: "rgba(247,241,244,0.94)", borderTopColor: colors.border, borderTopWidth: 1, bottom: 0, gap: spacing.xs, left: 0, paddingHorizontal: spacing.sm, paddingTop: spacing.sm, position: "absolute", right: 0 },
   selectionColumn: { gap: spacing.xs },
   selectionRow: { alignItems: "center", flexDirection: "row", gap: spacing.sm, justifyContent: "center" },
   selection: { color: colors.plum, flexShrink: 1, fontWeight: "700" },
   transformRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, justifyContent: "center" },
   transformButton: { borderColor: colors.border, borderRadius: 999, borderWidth: 1, justifyContent: "center", minHeight: 34, paddingHorizontal: spacing.sm },
-  inspection: { alignItems: "center", backgroundColor: "rgba(247,241,244,0.94)", borderTopColor: colors.border, borderTopWidth: 1, bottom: 0, flexDirection: "row", gap: spacing.sm, left: 0, paddingHorizontal: spacing.sm, paddingTop: spacing.sm, position: "absolute", right: 0 },
-  inspectionCopy: { flex: 1 },
-  inspectionTitle: { color: colors.ink, fontSize: 15, fontWeight: "700" },
-  inspectionMeta: { color: colors.muted, fontSize: 12, marginTop: 2 },
-  inspectAction: { borderColor: colors.plum, borderRadius: 10, borderWidth: 1, justifyContent: "center", minHeight: 38, paddingHorizontal: spacing.sm },
-  inspectActionText: { color: colors.plum, fontSize: 12, fontWeight: "700" },
+  inspection: { backgroundColor: "rgba(247,241,244,0.94)", borderTopColor: colors.border, borderTopWidth: 1, bottom: 0, gap: 6, left: 0, paddingHorizontal: spacing.sm, paddingTop: 8, position: "absolute", right: 0 },
+  inspectionCopy: { minWidth: 0 },
+  inspectionTitle: { color: colors.ink, fontSize: 14, fontWeight: "700" },
+  inspectionMeta: { color: colors.muted, fontSize: 11, marginTop: 1 },
+  inspectionActions: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  inspectionNotice: { marginTop: 2 },
+  inspectAction: { borderColor: colors.plum, borderRadius: 8, borderWidth: 1, justifyContent: "center", minHeight: 30, paddingHorizontal: 8 },
+  inspectActionText: { color: colors.plum, fontSize: 11, fontWeight: "700" },
 });

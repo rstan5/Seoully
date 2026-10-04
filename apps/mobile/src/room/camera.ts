@@ -14,31 +14,30 @@ type FocusedItem = {
   placement?: { surfaceId?: string | null };
 };
 
-/** Portrait window into the Room — not a fit-the-whole-set framing. */
+/** Authored wide bedroom framing — far dolly reveals side walls + window. */
 export const HOME_POSE: CameraPose = {
-  position: { x: 0.55, y: 1.92, z: 5.25 },
-  lookAt: { x: 0.18, y: -0.12, z: -2.35 },
+  position: { x: 1.22, y: 2.16, z: 15.55 },
+  lookAt: { x: -0.42, y: -0.46, z: -1.52 },
 };
 
 export const EDIT_POSE: CameraPose = {
-  position: { x: 0.42, y: 2.45, z: 5.95 },
-  lookAt: { x: 0.12, y: -0.28, z: -2.05 },
+  position: { x: 1.08, y: 2.48, z: 16.15 },
+  lookAt: { x: -0.28, y: -0.38, z: -1.38 },
 };
 
 export const PROFILE_GLIMPSE_POSE: CameraPose = {
-  position: { x: 0.62, y: 2.55, z: 6.55 },
-  lookAt: { x: 0.18, y: 0.08, z: -2.2 },
+  position: { x: 1.28, y: 2.58, z: 16.85 },
+  lookAt: { x: -0.32, y: -0.22, z: -1.48 },
 };
 
+/** Fallback only — live Binder framing uses `binderCameraForViewport`. */
 export const BINDER_OPEN_POSE: CameraPose = {
-  position: { x: 0.42, y: 1.08, z: 1.72 },
-  lookAt: { x: 0.42, y: 0.18, z: -1.48 },
+  position: { x: 0.45, y: 0.58, z: 5.71 },
+  lookAt: { x: 0.45, y: 0, z: -1.5 },
 };
 
-export const BINDER_EXAMINE_POSE: CameraPose = {
-  position: { x: 0.48, y: 1.02, z: 1.28 },
-  lookAt: { x: 0.42, y: 0.28, z: -1.35 },
-};
+/** Card inspection keeps the Binder frame; the card lifts toward the camera. */
+export const BINDER_EXAMINE_POSE: CameraPose = BINDER_OPEN_POSE;
 
 export const ZONE_DOCKS: Record<CanonicalZoneKind, CameraPose> = {
   shelf: { position: { x: -2.18, y: 0.78, z: -0.92 }, lookAt: { x: -3.15, y: -0.12, z: -3.52 } },
@@ -66,7 +65,7 @@ export function poseForView(
     case "inspect":
       return focused ? inspectPose(focused) : ZONE_DOCKS[view.zone];
     case "binder":
-      return view.heldHoldingId ? BINDER_EXAMINE_POSE : BINDER_OPEN_POSE;
+      return BINDER_OPEN_POSE;
     default:
       return HOME_POSE;
   }
@@ -127,7 +126,7 @@ export const PORTRAIT_ASPECT = 9 / 19.5;
 export const EXPLORE_LIMITS = {
   homePanY: 0.72,
   homeDollyMin: 0.78,
-  homeDollyMax: 1.22,
+  homeDollyMax: 1.48,
   zonePanX: 0.55,
   zonePanY: 0.28,
   zoneDollyMin: 0.88,

@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { CANONICAL_ZONE_KINDS } from "../apps/mobile/src/room/worldView";
-import { envelopeCoversPose, permittedExploreSamples, WORLD_ENVELOPE } from "../apps/mobile/src/room/envelope";
+import { applyExploreOffset, CAMERA_FOV_DEG, EXPLORE_LIMITS, HOME_POSE, IDENTITY_EXPLORE, ROOM_INTERIOR } from "../apps/mobile/src/room/camera";
+import { envelopeCoversPose, permittedExploreSamples, wholeRoomCompositionHolds, WORLD_ENVELOPE } from "../apps/mobile/src/room/envelope";
 import { parseRoomStyle, resolveRoomLook, STYLE_BY_THEME } from "../apps/mobile/src/room/roomStyle";
 import { representationForHolding } from "../apps/mobile/src/room/representation";
-import { CAMERA_FOV_DEG, ROOM_INTERIOR } from "../apps/mobile/src/room/camera";
 
 const repoRoot = process.cwd();
 function read(rel: string) {
@@ -20,13 +20,32 @@ function assertNotContains(haystack: string, needle: string, label: string) {
 
 const worldScreen = read("apps/mobile/src/room/RoomWorldScreen.tsx");
 const renderer = read("apps/mobile/src/room/NativeRoomRenderer.tsx");
+const environment = read("apps/mobile/src/room/roomEnvironment.tsx");
 const binder = read("apps/mobile/src/room/NativeOpenBinder.tsx");
 
 assert.deepEqual([...CANONICAL_ZONE_KINDS], ["shelf", "wall", "case", "desk", "binder", "archive"]);
 assert.equal((CANONICAL_ZONE_KINDS as readonly string[]).includes("closet"), false);
-assertContains(renderer, "WORLD_ENVELOPE", "envelope constants drive the shell");
-assertContains(renderer, "boxGeometry args={[2.15, 1.15, 1.55]}", "7C storage hit remains");
-assertContains(renderer, "boxGeometry args={[1.15, 1.02, 0.82]}", "7C Binder hit remains");
+assertContains(environment, "WORLD_ENVELOPE", "envelope constants drive the shell");
+assertContains(environment, "boxGeometry args={[2.15, 1.15, 1.55]}", "7C storage hit remains");
+assertContains(environment, "boxGeometry args={[1.15, 1.02, 0.82]}", "7C Binder hit remains");
+assertContains(environment, "RoomWindow", "authored window exists");
+assertContains(environment, "FloorLamp", "floor lamp dressing exists");
+assertContains(environment, "Plant", "plant dressing exists");
+assertContains(environment, "StorageBoxes", "storage boxes exist");
+assertContains(environment, "0.22, 0.03, 0.03", "desk drawer handles exist");
+assertContains(renderer, "inspectionPresentation", "inspection repair remains");
+assertContains(binder, "InspectedBinderCard", "binder card lift remains");
+assertContains(read("apps/mobile/src/room/camera.ts"), "homeDollyMax: 1.48", "wide home dolly");
+for (const prop of ["FloorLamp", "Plant", "StorageBoxes", "Rug", "RoomWindow"]) {
+  const start = environment.indexOf(`function ${prop}`);
+  const from = environment.slice(start);
+  const next = from.slice(1).search(/\n(?:export )?function /);
+  const body = next === -1 ? from : from.slice(0, next + 1);
+  assert.ok(!body.includes("onClick"), `${prop} must stay non-interactive`);
+}
+assertContains(read("apps/mobile/src/room/model.ts"), "x: -3.15, y: -1.4, z: -3.48", "shelf landing plane unchanged");
+assertContains(read("apps/mobile/src/room/model.ts"), "x: 1.45, y: -0.72, z: -2.85", "desk landing plane unchanged");
+assertContains(read("apps/mobile/src/room/composition.ts"), "inspectionPresentation", "inspection repair file remains");
 assertContains(renderer, "PosterForm", "posters have framed geometry");
 assertContains(renderer, "bound", "books have bound treatment");
 assertContains(renderer, "slim", "disc cases stay thin");
@@ -51,6 +70,10 @@ assert.ok(WORLD_ENVELOPE.ceilingY > ROOM_INTERIOR.ceiling, "ceiling sits above a
 for (const pose of permittedExploreSamples()) {
   assert.equal(envelopeCoversPose(pose), true, `envelope must cover ${JSON.stringify(pose)}`);
 }
+
+const wideHome = applyExploreOffset(HOME_POSE, { ...IDENTITY_EXPLORE, dolly: EXPLORE_LIMITS.homeDollyMax }, "home");
+assert.equal(envelopeCoversPose(wideHome), true, "widest home pose stays envelope-covered");
+assert.equal(wholeRoomCompositionHolds(wideHome), true, "max dolly shows side wall, window, and furniture span");
 
 const cream = resolveRoomLook(parseRoomStyle({ wall: "cream", floor: "oak", furniture: "oak", rug: "cream", light: "day", brightness: "bright" }));
 assert.notEqual(cream.wall, resolveRoomLook(STYLE_BY_THEME.hearth).wall);

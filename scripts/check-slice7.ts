@@ -9,21 +9,38 @@ import { acquireHeld, acquirePlaceFromStorage, compatibleSurfaces, LONG_PRESS_MS
 import { filterStoredHoldings } from "../apps/mobile/src/room/storedHoldings";
 import {
   applyExploreOffset,
+  BINDER_EXAMINE_POSE,
+  BINDER_OPEN_POSE,
+  CAMERA_FOV_DEG,
   clampExplore,
   exploreAllowedForView,
   explorePanLimits,
+  EXPLORE_LIMITS,
   HOME_POSE,
   IDENTITY_EXPLORE,
   nudgeExploreFromDrag,
   nudgeExploreFromPinch,
+  PORTRAIT_ASPECT,
   ROOM_INTERIOR,
-  visibleFrustumY,
+  visibleHalfWidth,
 } from "../apps/mobile/src/room/camera";
+import { envelopeCoversPose } from "../apps/mobile/src/room/envelope";
 import { entranceForeground, isInternalCollectorId, roomEntranceCopy } from "../apps/mobile/src/room/entrance";
 import { roomOverlayChrome, roomPalette } from "../apps/mobile/src/room/theme";
 import { BUTTON_LABEL_OPTICAL_Y } from "../apps/mobile/src/theme";
 import { contrastRatio, relativeLuminance } from "../apps/mobile/src/ui/profileContrast";
 import { CANONICAL_ZONE_KINDS, stepBack } from "../apps/mobile/src/room/worldView";
+import {
+  binderCameraForViewport,
+  binderCardInspectionWorld,
+  binderFitsPortrait,
+  binderSpreadSize,
+  frontFaceAxis,
+  inspectionOrientationDelta,
+  inspectionPresentation,
+  openBinderWorldAt,
+  presentedFaceSize,
+} from "../apps/mobile/src/room/composition";
 
 const repoRoot = process.cwd();
 function read(rel: string) {
@@ -184,7 +201,7 @@ assertContains(worldScreen, "Math.hypot(gesture.dx, gesture.dy) > 10", "drag thr
 assertContains(worldScreen, "exploreRef={exploreRef}", "camera reads explore ref");
 assertContains(worldScreen, "onOpenBinder={() => openBinderFromWorld()}", "desk Binder tap");
 assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "ZONE_HOTSPOTS", "world zone taps");
-assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), 'onSelectZone?.("shelf")', "shelf furniture tap");
+assertContains(read("apps/mobile/src/room/roomEnvironment.tsx"), 'onSelectZone?.("shelf")', "shelf furniture tap");
 assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "onOpenBinder", "desk Binder tap");
 assertContains(read("apps/mobile/app/room.tsx"), "immersiveRoomFill", "own Room fills the physical viewport");
 assertContains(read("apps/mobile/app/collector-room.tsx"), "immersiveRoomFill", "collector Room fills the physical viewport");
@@ -220,7 +237,7 @@ const extreme = clampExplore({ panX: 99, panY: -99, dolly: 0.05 }, "home");
 const limits = explorePanLimits(extreme.dolly, "home");
 assert.ok(extreme.panX >= limits.panXMin && extreme.panX <= limits.panXMax);
 assert.ok(extreme.panY >= limits.panYMin && extreme.panY <= limits.panYMax);
-assert.ok(extreme.dolly >= 0.78 && extreme.dolly <= 1.22);
+assert.ok(extreme.dolly >= EXPLORE_LIMITS.homeDollyMin && extreme.dolly <= EXPLORE_LIMITS.homeDollyMax);
 assert.ok((limits.panXMax - limits.panXMin) > (limits.panYMax - limits.panYMin) * 2, "horizontal pan larger than vertical");
 const panned = applyExploreOffset(HOME_POSE, { panX: 1.4, panY: 0.2, dolly: 1 }, "home");
 assert.ok(Math.abs(panned.lookAt.x - HOME_POSE.lookAt.x) > 0.5, "pan moves look target");
@@ -239,22 +256,19 @@ const vertical = nudgeExploreFromDrag(IDENTITY_EXPLORE, 0, 80, "home");
 assert.ok(Math.abs(vertical.panY) < Math.abs(dragged.panX), "vertical travel is smaller");
 const pinched = nudgeExploreFromPinch(IDENTITY_EXPLORE, 1, 100, 140, "home");
 assert.ok(pinched.dolly < 1);
-assert.ok(pinched.dolly >= 0.78);
+assert.ok(pinched.dolly >= EXPLORE_LIMITS.homeDollyMin);
 assert.equal(pinched.panX, 0);
 
 function assertWorldEnvelope(dolly: number, panY: number) {
   const pose = applyExploreOffset(HOME_POSE, { panX: 0, panY, dolly }, "home");
-  const ceiling = visibleFrustumY(pose, ROOM_INTERIOR.backZ);
-  const floor = visibleFrustumY(pose, ROOM_INTERIOR.floorNearZ);
-  assert.ok(ceiling.top <= ROOM_INTERIOR.ceiling + 0.02, `dolly ${dolly} panY ${panY} top ${ceiling.top}`);
-  assert.ok(floor.bottom >= ROOM_INTERIOR.floor - 0.02, `dolly ${dolly} panY ${panY} bottom ${floor.bottom}`);
+  assert.ok(envelopeCoversPose(pose), `dolly ${dolly} panY ${panY} must stay inside the world envelope`);
 }
 
 const identityLimits = explorePanLimits(1, "home");
-assert.ok(Math.abs(identityLimits.panXMin + 3.241072952372463) < 1e-9, "horizontal min bound unchanged");
-assert.ok(Math.abs(identityLimits.panXMax - 2.8810729523724627) < 1e-9, "horizontal max bound unchanged");
+assert.ok(identityLimits.panXMin <= -0.85 && identityLimits.panXMax >= 0.85, "home still has horizontal travel");
+assert.ok((identityLimits.panXMax - identityLimits.panXMin) > (identityLimits.panYMax - identityLimits.panYMin) * 2, "horizontal pan larger than vertical");
 
-for (const dolly of [1, 0.78, 1.22]) {
+for (const dolly of [1, EXPLORE_LIMITS.homeDollyMin, EXPLORE_LIMITS.homeDollyMax]) {
   const up = clampExplore({ panX: 0, panY: 9, dolly }, "home");
   assertWorldEnvelope(up.dolly, up.panY);
   const down = clampExplore({ panX: 0, panY: -9, dolly }, "home");
@@ -485,8 +499,8 @@ assertContains(worldScreen, "openBinderFromWorld", "Binder opens from the world"
 assertContains(worldScreen, "closeBinder", "Binder close restores framing");
 assertContains(worldScreen, "explore: { ...exploreRef.current }", "Binder captures explore");
 assertContains(renderer, "onOpenStorage", "Archive crate is the storage hit target");
-assertContains(renderer, "boxGeometry args={[2.15, 1.15, 1.55]}", "storage hit geometry is world-attached");
-assertContains(renderer, "boxGeometry args={[1.15, 1.02, 0.82]}", "Binder has a forgiving world hit");
+assertContains(read("apps/mobile/src/room/roomEnvironment.tsx"), "boxGeometry args={[2.15, 1.15, 1.55]}", "storage hit geometry is world-attached");
+assertContains(read("apps/mobile/src/room/roomEnvironment.tsx"), "boxGeometry args={[1.15, 1.02, 0.82]}", "Binder has a forgiving world hit");
 assertContains(renderer, "placingItem", "new placement preview is in-world");
 assertContains(renderer, "style={StyleSheet.absoluteFill}", "Canvas still fills without an opacity gate");
 assertNotContains(renderer, "surfaceReady", "failed entrance repair is not reintroduced");
@@ -507,5 +521,53 @@ assertContains(read("docs/native-road-to-ship.md"), "failed entrance repair", "r
 assertContains(read("docs/native-road-to-ship.md"), "0.5s", "own-Room initialization blank is deferred");
 assertContains(read("docs/web-native-parity-contract.md"), "SLICE 7C — ROOM WORLD INTEGRATION", "parity contract records 7C");
 assertContains(read("docs/web-native-parity-contract.md"), "public storage", "public storage privacy is documented");
+
+// Inspection front-face + Binder portrait composition
+assert.equal(frontFaceAxis("album"), "+x");
+assert.equal(frontFaceAxis("book"), "+x");
+assert.equal(frontFaceAxis("disc-case"), "+x");
+assert.equal(frontFaceAxis("photocard"), "+z");
+assert.equal(frontFaceAxis("poster"), "+z");
+assert.equal(frontFaceAxis("vinyl"), "+z");
+assert.ok(Math.abs(inspectionOrientationDelta("album").y + Math.PI / 2) < 1e-6, "album inspect turns cover toward camera");
+const albumFace = presentedFaceSize("album");
+assert.ok(albumFace.width > 0.7 && albumFace.height > 0.7, "album cover face is the broad side, not the spine");
+assert.ok(albumFace.width > albumFace.depth, "cover is wider than spine thickness");
+const albumInspect = inspectionPresentation({
+  geometry: "album",
+  position: { x: -3.1, y: 0.1, z: -3.4 },
+  rotation: { x: 0, y: 0, z: 0 },
+  scale: 1,
+  placement: { surfaceId: "room-shelf-0" },
+});
+assert.ok(Math.abs(albumInspect.rotation.y + Math.PI / 2) < 0.2, "shelf album inspect yaw presents +X cover");
+assert.ok(albumInspect.position.z > -3.4, "album pulls forward off the shelf");
+assert.ok(albumInspect.camera.position.z - albumInspect.position.z > 1.4, "inspect camera stays far enough to fit the cover");
+const binderFit = binderFitsPortrait(PORTRAIT_ASPECT);
+assert.equal(binderFit.fitsWidth, true);
+assert.equal(binderFit.fitsHeight, true);
+const binderPose = binderCameraForViewport(PORTRAIT_ASPECT);
+const binderAt = openBinderWorldAt();
+const binderDepth = Math.hypot(binderPose.position.x - binderAt.x, binderPose.position.y - binderAt.y, binderPose.position.z - binderAt.z);
+assert.ok(visibleHalfWidth(binderDepth, PORTRAIT_ASPECT) * 2 > binderSpreadSize().width * 0.9, "portrait Binder framing includes the spread width");
+assert.ok(binderPose.position.z > 4.5, "Binder camera is not inside the spread");
+assert.deepEqual(BINDER_EXAMINE_POSE, BINDER_OPEN_POSE);
+const cardInspect = binderCardInspectionWorld(PORTRAIT_ASPECT);
+assert.ok(cardInspect.position.z > binderAt.z + 1.2, "photocard lifts toward the camera, out of the pocket");
+assert.ok(cardInspect.distance < binderDepth - 1, "inspected card sits in front of the Binder");
+assert.equal(CAMERA_FOV_DEG, 46);
+assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "inspectionPresentation", "room inspect uses front-face presentation");
+assertContains(read("apps/mobile/src/room/NativeOpenBinder.tsx"), "InspectedBinderCard", "binder card lifts out of pocket");
+assertContains(read("apps/mobile/src/room/NativeOpenBinder.tsx"), "holding.personalMediaUrl ?? holding.template.imageUrl", "binder card image priority");
+assertContains(worldScreen, "InspectionTray", "shared compact inspect chrome");
+assertContains(worldScreen, "copy.viewCollectible", "View collectible on inspect");
+assertContains(worldScreen, "copy.returnToBinder", "return to binder");
+assertContains(worldScreen, "onWishlistCollectible", "visitor wishlist hook");
+assertContains(worldScreen, "onMessageCollectible", "visitor message hook");
+assertContains(read("apps/mobile/app/collector-room.tsx"), "onInspectCollectible", "public room reuses collectible detail");
+assertContains(read("apps/mobile/app/collector-room.tsx"), "/public-collectible", "visitor View collectible is public detail");
+assertContains(read("apps/mobile/app/room.tsx"), "/collectible", "own View collectible is canonical detail");
+assertNotContains(read("apps/mobile/src/room/NativeOpenBinder.tsx"), "held ? 1.85", "no in-pocket zoom inspect");
+assertNotContains(worldScreen, "onInspectCollectible && !readOnly", "public inspect can view collectible");
 
 console.log("check:slice7 passed");

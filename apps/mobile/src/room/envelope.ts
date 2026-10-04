@@ -16,20 +16,28 @@ import {
  */
 export const WORLD_ENVELOPE = {
   floorTop: -2.08,
-  floorBottom: -2.62,
-  floorX: 6.4,
-  floorNearZ: 6.8,
-  floorFarZ: -6.4,
-  wallX: 5.45,
-  wallBottom: -2.55,
-  wallTop: 4.05,
-  wallNearZ: 6.5,
-  wallFarZ: -6.2,
-  backZ: -4.55,
-  ceilingY: 3.88,
-  ceilingX: 6.4,
-  ceilingNearZ: 6.5,
-  ceilingFarZ: -6.2,
+  floorBottom: -2.72,
+  floorX: 7.35,
+  floorNearZ: 26.4,
+  floorFarZ: -6.8,
+  wallX: 6.25,
+  wallBottom: -2.65,
+  wallTop: 4.35,
+  wallNearZ: 25.8,
+  wallFarZ: -6.6,
+  backZ: -4.72,
+  ceilingY: 4.25,
+  ceilingX: 7.35,
+  ceilingNearZ: 25.8,
+  ceilingFarZ: -6.6,
+} as const;
+
+/** Visible bedroom box — tighter than the coverage envelope so walls enter the portrait frame. */
+export const ROOM_BOX = {
+  wallX: 4.52,
+  backZ: -4.48,
+  windowZ: -0.82,
+  furnitureZ: -3.58,
 } as const;
 
 type Vec = { x: number; y: number; z: number };
@@ -122,6 +130,25 @@ export function envelopeCoversPose(pose: CameraPose) {
   return true;
 }
 
+export function visibleXAtZ(pose: CameraPose, planeZ: number) {
+  const oz = pose.lookAt.z - pose.position.z;
+  const t = Math.abs(oz) < 1e-6 ? 1 : (planeZ - pose.position.z) / oz;
+  const center = pose.position.x + t * (pose.lookAt.x - pose.position.x);
+  const lookY = pose.position.y + t * (pose.lookAt.y - pose.position.y);
+  const dist = Math.hypot(center - pose.position.x, lookY - pose.position.y, planeZ - pose.position.z) || 1;
+  const halfW = Math.tan((CAMERA_FOV_DEG * Math.PI) / 360) * dist * PORTRAIT_ASPECT;
+  return { center, min: center - halfW, max: center + halfW };
+}
+
+/** Far HOME dolly must read as a bedroom, not a cropped back-wall slab. */
+export function wholeRoomCompositionHolds(pose: CameraPose) {
+  const windowSpan = visibleXAtZ(pose, ROOM_BOX.windowZ);
+  const furnitureSpan = visibleXAtZ(pose, ROOM_BOX.furnitureZ);
+  return windowSpan.min <= -ROOM_BOX.wallX + 0.2
+    && furnitureSpan.min <= -3.05
+    && furnitureSpan.max >= 3.45;
+}
+
 export function permittedExploreSamples(): CameraPose[] {
   const offsets: ExploreOffset[] = [
     { ...IDENTITY_EXPLORE },
@@ -129,6 +156,9 @@ export function permittedExploreSamples(): CameraPose[] {
     { panX: 0.85, panY: EXPLORE_LIMITS.homePanY, dolly: EXPLORE_LIMITS.homeDollyMax },
     { panX: -0.85, panY: EXPLORE_LIMITS.homePanY, dolly: EXPLORE_LIMITS.homeDollyMin },
     { panX: 0.85, panY: -EXPLORE_LIMITS.homePanY, dolly: EXPLORE_LIMITS.homeDollyMax },
+    { panX: 0, panY: 0, dolly: EXPLORE_LIMITS.homeDollyMax },
+    { panX: -0.85, panY: 0, dolly: EXPLORE_LIMITS.homeDollyMax },
+    { panX: 0.85, panY: 0, dolly: EXPLORE_LIMITS.homeDollyMax },
   ];
   return [
     ...offsets.map((offset) => applyExploreOffset(HOME_POSE, offset, "home")),

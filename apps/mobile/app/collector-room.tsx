@@ -28,6 +28,15 @@ export default function CollectorRoomScreen() {
       copy={copy}
       onLeave={() => { if (router.canGoBack()) router.back(); else router.replace("/(tabs)/search"); }}
       onOwnRoom={() => router.replace("/room")}
+      onInspectCollectible={(holdingId) => router.push({ pathname: "/public-collectible", params: { userId, holdingId } })}
+      onWishlistCollectible={(holding) => social.setWishlist(holding.templateId, true)}
+      onMessageCollectible={(holding) => {
+        if (!social.capabilities.persistMessages) return;
+        router.push({
+          pathname: "/thread",
+          params: { userId, templateIds: holding.templateId, trade: "1" },
+        });
+      }}
     />
   </View>
   </>;

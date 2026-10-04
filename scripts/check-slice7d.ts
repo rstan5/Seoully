@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { CANONICAL_ZONE_KINDS } from "../apps/mobile/src/room/worldView";
-import { applyExploreOffset, CAMERA_FOV_DEG, EXPLORE_LIMITS, HOME_POSE, IDENTITY_EXPLORE, ROOM_INTERIOR } from "../apps/mobile/src/room/camera";
-import { envelopeCoversPose, permittedExploreSamples, wholeRoomCompositionHolds, WORLD_ENVELOPE } from "../apps/mobile/src/room/envelope";
+import { applyExploreOffset, CAMERA_FOV_DEG, EXPLORE_LIMITS, HOME_POSE, IDENTITY_EXPLORE, IMMERSIVE_HOME, ROOM_INTERIOR } from "../apps/mobile/src/room/camera";
+import { envelopeCoversPose, immersiveRoomHolds, permittedExploreSamples, ROOM_BOX, WORLD_ENVELOPE } from "../apps/mobile/src/room/envelope";
 import { parseRoomStyle, resolveRoomLook, STYLE_BY_THEME } from "../apps/mobile/src/room/roomStyle";
 import { representationForHolding } from "../apps/mobile/src/room/representation";
 
@@ -35,7 +35,11 @@ assertContains(environment, "StorageBoxes", "storage boxes exist");
 assertContains(environment, "0.22, 0.03, 0.03", "desk drawer handles exist");
 assertContains(renderer, "inspectionPresentation", "inspection repair remains");
 assertContains(binder, "InspectedBinderCard", "binder card lift remains");
-assertContains(read("apps/mobile/src/room/camera.ts"), "homeDollyMax: 1.48", "wide home dolly");
+assertContains(read("apps/mobile/src/room/camera.ts"), "homeDollyMax: 1.16", "immersive home dolly");
+assert.ok(EXPLORE_LIMITS.homeDollyMax <= 1.22, "max dolly stays a modest step-back");
+assert.ok(HOME_POSE.position.z < 8, "HOME stands inside the bedroom, not outside a dollhouse");
+assert.ok(!read("apps/mobile/src/room/camera.ts").includes("15.55"), "rejected dollhouse HOME z is gone");
+assert.ok(!read("apps/mobile/src/room/envelope.ts").includes("wholeRoomCompositionHolds"), "whole-room fit is not an acceptance check");
 for (const prop of ["FloorLamp", "Plant", "StorageBoxes", "Rug", "RoomWindow"]) {
   const start = environment.indexOf(`function ${prop}`);
   const from = environment.slice(start);
@@ -73,7 +77,13 @@ for (const pose of permittedExploreSamples()) {
 
 const wideHome = applyExploreOffset(HOME_POSE, { ...IDENTITY_EXPLORE, dolly: EXPLORE_LIMITS.homeDollyMax }, "home");
 assert.equal(envelopeCoversPose(wideHome), true, "widest home pose stays envelope-covered");
-assert.equal(wholeRoomCompositionHolds(wideHome), true, "max dolly shows side wall, window, and furniture span");
+assert.equal(immersiveRoomHolds(wideHome), true, "max dolly stays inside the bedroom");
+assert.ok(wideHome.position.z <= IMMERSIVE_HOME.maxZ, "immersive Z guard holds at max dolly");
+assert.ok(ROOM_BOX.wallNearZ > IMMERSIVE_HOME.maxZ, "inner side walls continue past the camera");
+assert.ok(Math.abs(wideHome.position.x) < ROOM_BOX.wallX - 0.2, "camera does not stand outside the side walls");
+for (const pose of permittedExploreSamples()) {
+  assert.equal(immersiveRoomHolds(pose), true, `immersive home must hold ${JSON.stringify(pose.position)}`);
+}
 
 const cream = resolveRoomLook(parseRoomStyle({ wall: "cream", floor: "oak", furniture: "oak", rug: "cream", light: "day", brightness: "bright" }));
 assert.notEqual(cream.wall, resolveRoomLook(STYLE_BY_THEME.hearth).wall);

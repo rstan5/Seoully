@@ -97,10 +97,10 @@ export function NativeRoomRenderer({
   return <Canvas
     frameloop={paused ? "never" : "always"}
     style={StyleSheet.absoluteFill}
-    camera={{ position: [1.22, 2.16, 15.55], fov: 46 }}
+    camera={{ position: [0.68, 1.58, 5.72], fov: 46 }}
     onPointerMissed={onClearSelection}
     onCreated={({ camera, scene }) => {
-      camera.lookAt(-0.42, -0.46, -1.52);
+      camera.lookAt(-0.18, 0.06, -2.38);
       scene.background = new Color(theme.void);
     }}
   >

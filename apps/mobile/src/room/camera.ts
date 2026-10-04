@@ -14,20 +14,20 @@ type FocusedItem = {
   placement?: { surfaceId?: string | null };
 };
 
-/** Authored wide bedroom framing — far dolly reveals side walls + window. */
+/** Standing inside the bedroom — not a dollhouse overview. */
 export const HOME_POSE: CameraPose = {
-  position: { x: 1.22, y: 2.16, z: 15.55 },
-  lookAt: { x: -0.42, y: -0.46, z: -1.52 },
+  position: { x: 0.68, y: 1.58, z: 5.72 },
+  lookAt: { x: -0.18, y: 0.06, z: -2.38 },
 };
 
 export const EDIT_POSE: CameraPose = {
-  position: { x: 1.08, y: 2.48, z: 16.15 },
-  lookAt: { x: -0.28, y: -0.38, z: -1.38 },
+  position: { x: 0.52, y: 2.08, z: 6.22 },
+  lookAt: { x: -0.08, y: -0.08, z: -2.12 },
 };
 
 export const PROFILE_GLIMPSE_POSE: CameraPose = {
-  position: { x: 1.28, y: 2.58, z: 16.85 },
-  lookAt: { x: -0.32, y: -0.22, z: -1.48 },
+  position: { x: 0.72, y: 2.18, z: 6.72 },
+  lookAt: { x: -0.05, y: 0.16, z: -2.22 },
 };
 
 /** Fallback only — live Binder framing uses `binderCameraForViewport`. */
@@ -123,10 +123,15 @@ export const CAMERA_FOV_DEG = 46;
 /** Typical portrait phone, not one device. */
 export const PORTRAIT_ASPECT = 9 / 19.5;
 
+/** Hard stop so HOME pinch-out cannot leave the bedroom. */
+export const IMMERSIVE_HOME = {
+  maxZ: 7.85,
+} as const;
+
 export const EXPLORE_LIMITS = {
   homePanY: 0.72,
   homeDollyMin: 0.78,
-  homeDollyMax: 1.48,
+  homeDollyMax: 1.16,
   zonePanX: 0.55,
   zonePanY: 0.28,
   zoneDollyMin: 0.88,
@@ -323,7 +328,8 @@ export function applyExploreOffset(
   position.y = Math.max(lookAt.y + 0.22, position.y);
   if (space === "home") {
     position.y = Math.max(ROOM_INTERIOR.floorGuard + 1.15, position.y);
-    position.z = Math.max(ROOM_INTERIOR.cameraMinZ, position.z);
+    position.z = Math.min(IMMERSIVE_HOME.maxZ, Math.max(ROOM_INTERIOR.cameraMinZ, position.z));
+    position.x = clampNumber(position.x, ROOM_INTERIOR.xMin + 0.45, ROOM_INTERIOR.xMax - 0.45);
     lookAt.x = clampNumber(lookAt.x, ROOM_INTERIOR.xMin, ROOM_INTERIOR.xMax);
     lookAt.y = clampNumber(lookAt.y, ROOM_INTERIOR.yMin, ROOM_INTERIOR.ceiling);
   }

@@ -5,7 +5,9 @@ import {
   EXPLORE_LIMITS,
   HOME_POSE,
   IDENTITY_EXPLORE,
+  IMMERSIVE_HOME,
   PORTRAIT_ASPECT,
+  ROOM_INTERIOR,
   type CameraPose,
   type ExploreOffset,
 } from "./camera";
@@ -32,12 +34,13 @@ export const WORLD_ENVELOPE = {
   ceilingFarZ: -6.6,
 } as const;
 
-/** Visible bedroom box — tighter than the coverage envelope so walls enter the portrait frame. */
+/** Visible bedroom box. Coverage envelope may extend farther; this is what the viewer stands in. */
 export const ROOM_BOX = {
   wallX: 4.52,
   backZ: -4.48,
   windowZ: -0.82,
   furnitureZ: -3.58,
+  wallNearZ: 8.6,
 } as const;
 
 type Vec = { x: number; y: number; z: number };
@@ -140,13 +143,12 @@ export function visibleXAtZ(pose: CameraPose, planeZ: number) {
   return { center, min: center - halfW, max: center + halfW };
 }
 
-/** Far HOME dolly must read as a bedroom, not a cropped back-wall slab. */
-export function wholeRoomCompositionHolds(pose: CameraPose) {
-  const windowSpan = visibleXAtZ(pose, ROOM_BOX.windowZ);
-  const furnitureSpan = visibleXAtZ(pose, ROOM_BOX.furnitureZ);
-  return windowSpan.min <= -ROOM_BOX.wallX + 0.2
-    && furnitureSpan.min <= -3.05
-    && furnitureSpan.max >= 3.45;
+/** Safety: viewer stays inside the bedroom. Does not require the whole Room to fit. */
+export function immersiveRoomHolds(pose: CameraPose) {
+  return pose.position.z <= IMMERSIVE_HOME.maxZ + 0.02
+    && pose.position.z >= ROOM_INTERIOR.cameraMinZ - 0.02
+    && pose.position.z < ROOM_BOX.wallNearZ
+    && Math.abs(pose.position.x) < ROOM_BOX.wallX - 0.2;
 }
 
 export function permittedExploreSamples(): CameraPose[] {

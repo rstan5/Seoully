@@ -15,8 +15,8 @@ export function RoomShell({ theme, onSelectZone }: { theme: RoomLook; onSelectZo
   const wallDepth = env.wallNearZ - env.wallFarZ;
   const ceilZ = (env.ceilingNearZ + env.ceilingFarZ) / 2;
   const ceilDepth = env.ceilingNearZ - env.ceilingFarZ;
-  const roomWallZ = (box.backZ + 3.15) / 2;
-  const roomWallDepth = 3.15 - box.backZ + 0.4;
+  const roomWallZ = (box.backZ + box.wallNearZ) / 2;
+  const roomWallDepth = box.wallNearZ - box.backZ;
   return <>
     <mesh position={[0, env.floorTop - floorH / 2, floorZ]}><boxGeometry args={[env.floorX * 2, floorH, floorDepth]} /><meshStandardMaterial color={theme.floor} roughness={0.86} /></mesh>
     {[-2.6, -1.3, 0, 1.3, 2.6].map((x) => (
@@ -42,12 +42,12 @@ export function RoomShell({ theme, onSelectZone }: { theme: RoomLook; onSelectZo
       <boxGeometry args={[0.2, wallH, wallDepth]} />
       <meshStandardMaterial color={theme.sideWall} roughness={0.92} />
     </mesh>
-    <mesh position={[-box.wallX, 0.55, roomWallZ]} rotation={[0, 0.035, 0]}>
-      <boxGeometry args={[0.1, 5.55, roomWallDepth]} />
+    <mesh position={[-box.wallX, 0.55, roomWallZ]} rotation={[0, 0.012, 0]}>
+      <boxGeometry args={[0.12, 5.55, roomWallDepth]} />
       <meshStandardMaterial color={theme.sideWall} roughness={0.88} />
     </mesh>
-    <mesh position={[box.wallX, 0.55, roomWallZ]} rotation={[0, -0.035, 0]}>
-      <boxGeometry args={[0.1, 5.55, roomWallDepth]} />
+    <mesh position={[box.wallX, 0.55, roomWallZ]} rotation={[0, -0.012, 0]}>
+      <boxGeometry args={[0.12, 5.55, roomWallDepth]} />
       <meshStandardMaterial color={theme.sideWall} roughness={0.88} />
     </mesh>
     <mesh position={[0, env.floorTop + 0.055, box.backZ + 0.14]}><boxGeometry args={[box.wallX * 2 - 0.12, 0.11, 0.06]} /><meshStandardMaterial color={theme.edge} roughness={0.56} /></mesh>

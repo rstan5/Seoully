@@ -13,10 +13,10 @@ import {
 } from "seoully-domain/fixtures/collectors";
 import type { CollectibleTemplate, Placement } from "seoully-domain/types";
 import type { NativeCatalogTemplate, NativeHolding, NativeRoomPlacement, NativeRoomSnapshot, NativeRoomStyle } from "../api";
-import { parseRoomLayout, serializeRoomLayout, type RoomLayoutState } from "./roomObjects";
+import { parseRoomLayout, serializeRoomLayout, starterRoomLayout, type RoomLayoutState } from "./roomObjects";
 import { defaultStyleForTheme, parseRoomStyle } from "./roomStyle";
 import { demoAssetUri } from "../data/demo/assets";
-import { createInitialRoomRenderable, nativeHomeForHolding, toPersistedTransform, zoneIdForNativeSurface } from "./model";
+import { buildRoomRenderables, nativeHomeForHolding, toPersistedTransform, zoneIdForNativeSurface } from "./model";
 
 const session = new Map<string, NativeRoomPlacement[]>();
 const styleSession = new Map<string, NativeRoomStyle>();
@@ -54,9 +54,13 @@ function nativeHoldingsFor(ownerId: string): NativeHolding[] {
   });
 }
 
-function fixturePlacements(ownerId: string, roomId: string, holdings: NativeHolding[]): NativeRoomPlacement[] {
+function fixturePlacements(ownerId: string, roomId: string, holdings: NativeHolding[], ownStarter: boolean): NativeRoomPlacement[] {
   const existing = session.get(ownerId);
   if (existing) return existing.map((placement) => ({ ...placement }));
+  if (ownStarter) {
+    session.set(ownerId, []);
+    return [];
+  }
   const byId = new Map(holdings.map((holding) => [holding.id, holding]));
   const source = PLACEMENTS_FIXTURE.get(roomId) ?? [];
   const mapped: NativeRoomPlacement[] = [];
@@ -65,23 +69,28 @@ function fixturePlacements(ownerId: string, roomId: string, holdings: NativeHold
     if (!holding) return;
     if (holding.template.kind === "photocard") return;
     const home = nativeHomeForHolding(holding, roomId, placement.slot ?? index);
-    const initial = createInitialRoomRenderable(holding, placement.slot ?? index, roomId);
+    const slot = mapped.filter((item) => item.surfaceId === home.surfaceId).length;
     mapped.push({
       id: `demo-place-${holding.id}`,
       roomId,
       holdingId: holding.id,
-      zoneId: home.zoneId,
-      slot: placement.slot ?? index,
+      zoneId: zoneIdForNativeSurface(roomId, home.surfaceId),
+      slot,
       offset: null,
-      transform: toPersistedTransform({ ...initial, position: home.position }),
+      transform: null,
       surfaceId: home.surfaceId,
     });
   });
-  session.set(ownerId, mapped);
-  return mapped.map((placement) => ({ ...placement }));
+  const settled = buildRoomRenderables(holdings, mapped).map((item) => ({ ...item.placement!, transform: toPersistedTransform(item) }));
+  session.set(ownerId, settled);
+  return settled.map((placement) => ({ ...placement }));
 }
 
-export function buildFixtureRoomSnapshot(ownerId: string = String(SOO)): NativeRoomSnapshot {
+export function buildFixtureRoomSnapshot(
+  ownerId: string = String(SOO),
+  options?: { ownStarter?: boolean },
+): NativeRoomSnapshot {
+  const ownStarter = options?.ownStarter === true;
   const room = ROOMS.find((item) => String(item.ownerId) === ownerId);
   const roomId = room?.id ?? `room-${ownerId}`;
   const holdings = nativeHoldingsFor(ownerId);
@@ -91,10 +100,10 @@ export function buildFixtureRoomSnapshot(ownerId: string = String(SOO)): NativeR
       ownerUserId: ownerId,
       themeId: ownerId === String(SOO) ? "hearth" : "blossom",
       style: styleSession.get(ownerId) ?? defaultStyleForTheme(ownerId === String(SOO) ? "hearth" : "blossom"),
-      layout: serializeRoomLayout(demoRoomLayout(ownerId)),
+      layout: serializeRoomLayout(demoRoomLayout(ownerId, ownStarter)),
     },
     holdings,
-    placements: fixturePlacements(ownerId, roomId, holdings),
+    placements: fixturePlacements(ownerId, roomId, holdings, ownStarter),
   };
 }
 
@@ -136,8 +145,14 @@ export function saveDemoRoomStyle(ownerId: string, style: NativeRoomStyle) {
   return next;
 }
 
-export function demoRoomLayout(ownerId: string): RoomLayoutState {
-  return layoutSession.get(ownerId) ?? parseRoomLayout({});
+export function demoRoomLayout(ownerId: string, ownStarter = false): RoomLayoutState {
+  return layoutSession.get(ownerId) ?? (ownStarter ? starterRoomLayout() : parseRoomLayout({}));
+}
+
+/** Demo/dev QA only. Does not delete holdings, Binder data, wishlist, or social state. */
+export function resetDemoRoomToStarter(ownerId: string) {
+  session.set(ownerId, []);
+  layoutSession.set(ownerId, starterRoomLayout());
 }
 
 export function saveDemoRoomLayout(ownerId: string, layout: RoomLayoutState) {

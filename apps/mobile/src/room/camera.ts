@@ -49,7 +49,7 @@ export const ZONE_DOCKS: Record<CanonicalZoneKind, CameraPose> = {
   archive: { position: { x: layoutX(-0.52), y: 0.28, z: layoutZ(1.62) }, lookAt: { x: layoutX(-1.2), y: -1.52, z: layoutZ(-0.62) } },
 };
 
-export const DESK_BINDER_AT = { x: layoutX(0.45), y: -0.52, z: layoutZ(-2.62) };
+export const DESK_BINDER_AT = { x: layoutX(0.45), y: -0.68, z: layoutZ(-2.62) };
 export const OPEN_BINDER_LIFT = { y: 0.52, z: 1.12 };
 
 export function poseForView(

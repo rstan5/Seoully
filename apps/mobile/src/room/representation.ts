@@ -78,9 +78,9 @@ export function extentsForGeometry(geometry: NativeRepresentationKind) {
     case "plushie": return { x: 0.52, y: 0.62, z: 0.42 };
     case "figure": return { x: 0.32, y: 0.78, z: 0.16 };
     case "apparel": return { x: 0.72, y: 0.12, z: 0.52 };
-    case "ticket": return { x: 0.78, y: 0.28, z: 0.012 };
+    case "ticket": return { x: 0.78, y: 0.016, z: 0.32 };
     case "disc-case": return { x: 0.1, y: 0.68, z: 0.58 };
-    case "memorabilia": return { x: 0.4, y: 0.46, z: 0.4 };
+    case "memorabilia": return { x: 0.48, y: 0.016, z: 0.34 };
     default: return { x: 0.48, y: 0.48, z: 0.48 };
   }
 }

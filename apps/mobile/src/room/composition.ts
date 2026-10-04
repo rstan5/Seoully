@@ -9,7 +9,7 @@ import { extentsForGeometry, type NativeRepresentationKind } from "./representat
 
 export type RoomVec = { x: number; y: number; z: number };
 
-export type FrontFaceAxis = "+x" | "+z";
+export type FrontFaceAxis = "+x" | "+y" | "+z";
 
 /** Portrait overlay reservations as fractions of the full viewport. */
 export type ViewportReservations = {
@@ -50,6 +50,9 @@ export const BINDER_V_ANGLE = 0.12;
 
 export function frontFaceAxis(geometry: NativeRepresentationKind): FrontFaceAxis {
   switch (geometry) {
+    case "ticket":
+    case "memorabilia":
+      return "+y";
     case "album":
     case "book":
     case "disc-case":
@@ -64,6 +67,7 @@ export function frontFaceAxis(geometry: NativeRepresentationKind): FrontFaceAxis
  * Album/book/disc covers live on +X; cards/posters/vinyl already face +Z.
  */
 export function inspectionOrientationDelta(geometry: NativeRepresentationKind): RoomVec {
+  if (frontFaceAxis(geometry) === "+y") return { x: Math.PI / 2, y: 0, z: 0 };
   if (frontFaceAxis(geometry) === "+x") {
     return { x: -0.1, y: -Math.PI / 2, z: 0 };
   }
@@ -79,6 +83,7 @@ export function inspectionOrientationDelta(geometry: NativeRepresentationKind): 
 /** Face size after the cover/image is turned toward the camera. */
 export function presentedFaceSize(geometry: NativeRepresentationKind, scale = 1) {
   const extents = extentsForGeometry(geometry);
+  if (frontFaceAxis(geometry) === "+y") return { width: extents.x * scale, height: extents.z * scale, depth: extents.y * scale };
   if (frontFaceAxis(geometry) === "+x") {
     return { width: extents.z * scale, height: extents.y * scale, depth: extents.x * scale };
   }

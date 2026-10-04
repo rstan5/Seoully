@@ -119,7 +119,7 @@ export function defaultRoomObject(kind: RoomObjectKind, id: string = kind): Room
 }
 
 export function legacyRoomObjects(): RoomObjectInstance[] {
-  return ROOM_OBJECT_KINDS.map((kind) => defaultRoomObject(kind));
+  return ROOM_OBJECT_KINDS.map((kind) => kind === "archive" ? spawnRoomObject([], kind) : defaultRoomObject(kind));
 }
 
 export function starterRoomObjects(): RoomObjectInstance[] {
@@ -242,7 +242,11 @@ export function nextRoomObjectId(objects: RoomObjectInstance[], kind: RoomObject
 
 export function spawnRoomObject(objects: RoomObjectInstance[], kind: RoomObjectKind): RoomObjectInstance {
   const id = nextRoomObjectId(objects, kind);
-  const draft = clampRoomObject(defaultRoomObject(kind, id));
+  const drafted = defaultRoomObject(kind, id);
+  const separated = kind === "archive"
+    ? { ...drafted, x: layoutX(-2.95), z: layoutZ(1.05) }
+    : drafted;
+  const draft = clampRoomObject(separated);
   const clash = objects.some((item) => item.kind === kind && distanceXZ(item, draft) < 0.35);
   if (!clash) return draft;
   return clampRoomObject({ ...draft, x: draft.x + 0.48, z: Math.min(draft.z + 0.4, 1.2) });
@@ -296,6 +300,23 @@ export function deskBinderWorld(objects: RoomObjectInstance[]): NativeRoomVector
   if (!desk) return null;
   const delta = furnitureDelta(desk);
   return { x: DESK_BINDER_AT.x + delta.x, y: DESK_BINDER_AT.y + delta.y, z: DESK_BINDER_AT.z + delta.z };
+}
+
+/** Live Desk drag preview — same rest as `deskBinderWorld` once the preview matches the stored Desk. */
+export function liveDeskBinderWorld(
+  objects: RoomObjectInstance[],
+  preview?: RoomObjectInstance | null,
+): NativeRoomVector | null {
+  const rest = deskBinderWorld(objects);
+  if (!rest) return null;
+  if (preview?.kind !== "desk") return rest;
+  const origin = objectByKind(objects, "desk");
+  if (!origin) return rest;
+  return {
+    x: rest.x + preview.x - origin.x,
+    y: rest.y + preview.y - origin.y,
+    z: rest.z + preview.z - origin.z,
+  };
 }
 
 export function storageTakeoutFor(objects: RoomObjectInstance[]): NativeRoomVector {

@@ -1,13 +1,14 @@
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
-import { Suspense, useMemo, useRef, useState } from "react";
+import { Suspense, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { useFrame, useLoader, useThree } from "@react-three/fiber/native";
 import { DoubleSide, Euler, Group, Quaternion, TextureLoader, Vector3 } from "three";
 import type { NativeHolding } from "../api";
 import { useCachedSignedMedia } from "../media/cachedMedia";
 import type { NativeBinderPage, NativeBinderSpread } from "../binder/model";
 import { BINDER_POCKETS_PER_PAGE } from "../binder/model";
-import { cameraLerpAlpha, DESK_BINDER_AT, OPEN_BINDER_LIFT } from "./camera";
+import { cameraLerpAlpha, DESK_BINDER_AT } from "./camera";
 import { prepCollectibleTexture } from "./roomMaterials";
+import { liveDeskBinderWorld, type RoomObjectInstance } from "./roomObjects";
 import {
   BINDER_CARD_H,
   BINDER_CARD_W,
@@ -16,6 +17,7 @@ import {
   BINDER_SPINE_W as COMP_SPINE_W,
   BINDER_V_ANGLE,
   binderCardInspectionWorld,
+  openBinderWorldAt,
   pageLocalX,
   pocketLocalPosition,
   pocketWorldPosition,
@@ -28,7 +30,11 @@ const V_ANGLE = BINDER_V_ANGLE;
 const CARD_W = BINDER_CARD_W;
 const CARD_H = BINDER_CARD_H;
 
+export const BINDER_TRAVEL_RATE = 5.6;
+export const BINDER_TRAVEL_RATE_REDUCED = 14;
+
 export function NativeOpenBinder({
+  open,
   spread,
   turningTo,
   turnDir,
@@ -38,10 +44,14 @@ export function NativeOpenBinder({
   cover,
   paper,
   binderAt = DESK_BINDER_AT,
+  objects = [],
+  objectPreviewRef,
+  onOpen,
   onHold,
   onTurnComplete,
   onTurnEdge,
 }: {
+  open: boolean;
   spread: NativeBinderSpread | undefined;
   turningTo: NativeBinderSpread | undefined;
   turnDir: 1 | -1 | 0;
@@ -51,15 +61,22 @@ export function NativeOpenBinder({
   cover: string;
   paper: string;
   binderAt?: { x: number; y: number; z: number };
+  objects?: RoomObjectInstance[];
+  objectPreviewRef?: MutableRefObject<RoomObjectInstance | null>;
+  onOpen?: () => void;
   onHold: (holding: NativeHolding | null) => void;
   onTurnComplete: () => void;
   onTurnEdge: (dir: 1 | -1) => void;
 }) {
-  const x = binderAt.x;
-  const y = binderAt.y + OPEN_BINDER_LIFT.y;
-  const z = binderAt.z + OPEN_BINDER_LIFT.z;
-  const left = turnDir === -1 && turningTo ? turningTo.left : spread?.left;
-  const right = turnDir === 1 && turningTo ? turningTo.right : spread?.right;
+  const group = useRef<Group>(null);
+  const leftRef = useRef<Group>(null);
+  const rightRef = useRef<Group>(null);
+  const progress = useRef(0);
+  const [lastSpread, setLastSpread] = useState(spread);
+  if (open && spread !== lastSpread) setLastSpread(spread);
+  const visibleSpread = open ? spread : lastSpread;
+  const left = turnDir === -1 && turningTo ? turningTo.left : visibleSpread?.left;
+  const right = turnDir === 1 && turningTo ? turningTo.right : visibleSpread?.right;
   const leaf = turnDir === 1 ? spread?.right : turnDir === -1 ? spread?.left : undefined;
   const leafBack = turnDir === 1 ? turningTo?.left : turningTo?.right;
   const liveHeld = findHeldCard(spread, turningTo, heldHoldingId, binderAt);
@@ -69,14 +86,47 @@ export function NativeOpenBinder({
   if (heldHoldingId && !keepFlight) setKeepFlight(true);
   const shown = liveHeld ?? (keepFlight ? flight : null);
 
+  useFrame((_, delta) => {
+    if (paused) return;
+    const rate = reducedMotion ? BINDER_TRAVEL_RATE_REDUCED : BINDER_TRAVEL_RATE;
+    progress.current = Math.max(0, Math.min(1, progress.current + (open ? 1 : -1) * delta * rate / 3));
+    const ease = progress.current * progress.current * (3 - 2 * progress.current);
+    const rest = liveDeskBinderWorld(objects, objectPreviewRef?.current) ?? binderAt;
+    const lifted = openBinderWorldAt(rest);
+    if (group.current) {
+      group.current.position.set(
+        rest.x + (lifted.x - rest.x) * ease,
+        rest.y + (lifted.y - rest.y) * ease,
+        rest.z + (lifted.z - rest.z) * ease,
+      );
+      group.current.rotation.set(-Math.PI / 2 + (Math.PI / 2 - 0.08) * ease, -0.22 * (1 - ease), 0);
+      group.current.scale.setScalar(0.62 + 0.38 * ease);
+    }
+    const spreadAmount = Math.max(0, Math.min(1, (ease - 0.28) / 0.72));
+    if (leftRef.current) leftRef.current.rotation.y = Math.PI * (1 - spreadAmount) + V_ANGLE * spreadAmount;
+    if (rightRef.current) rightRef.current.rotation.y = -V_ANGLE * spreadAmount;
+  });
+
+  const rest = binderAt;
   return <>
-    <group position={[x, y, z]} rotation={[-0.08, 0, 0]}>
-      <mesh position={[0, 0, -0.06]}><boxGeometry args={[BINDER_SPINE_W, BINDER_PAGE_H + 0.08, 0.08]} /><meshStandardMaterial color={cover} roughness={0.55} /></mesh>
-      {left ? <BinderLeaf page={left} side="left" heldHoldingId={heldHoldingId} paper={paper} cover={cover} onHold={onHold} onTurnEdge={() => onTurnEdge(-1)} /> : null}
-      {right ? <BinderLeaf page={right} side="right" heldHoldingId={heldHoldingId} paper={paper} cover={cover} onHold={onHold} onTurnEdge={() => onTurnEdge(1)} /> : null}
-      {leaf && turnDir !== 0 ? <TurningLeaf page={leaf} back={leafBack} dir={turnDir} reducedMotion={reducedMotion} paused={paused} paper={paper} cover={cover} heldHoldingId={heldHoldingId} onHold={onHold} onComplete={onTurnComplete} /> : null}
+    <group
+      ref={group}
+      position={[rest.x, rest.y, rest.z]}
+      rotation={[-Math.PI / 2, -0.22, 0]}
+      scale={0.62}
+      onClick={(event) => {
+        event.stopPropagation();
+        if (!open) onOpen?.();
+      }}
+    >
+      <group>
+        <mesh position={[0, 0, -0.06]}><boxGeometry args={[BINDER_SPINE_W, BINDER_PAGE_H + 0.08, 0.08]} /><meshStandardMaterial color={cover} roughness={0.55} /></mesh>
+        {left ? <BinderLeaf page={left} side="left" leafRef={leftRef} heldHoldingId={heldHoldingId} paper={paper} cover={cover} interactive={open} onHold={open ? onHold : () => onOpen?.()} onTurnEdge={() => onTurnEdge(-1)} /> : null}
+        {right ? <BinderLeaf page={right} side="right" leafRef={rightRef} heldHoldingId={heldHoldingId} paper={paper} cover={cover} interactive={open} onHold={open ? onHold : () => onOpen?.()} onTurnEdge={() => onTurnEdge(1)} /> : null}
+        {open && leaf && turnDir !== 0 ? <TurningLeaf page={leaf} back={leafBack} dir={turnDir} reducedMotion={reducedMotion} paused={paused} paper={paper} cover={cover} heldHoldingId={heldHoldingId} onHold={onHold} onComplete={onTurnComplete} /> : null}
+      </group>
     </group>
-    {shown ? <InspectedBinderCard
+    {open && shown ? <InspectedBinderCard
       holding={shown.holding}
       rest={shown.rest}
       binderAt={binderAt}
@@ -93,24 +143,29 @@ export function NativeOpenBinder({
 function BinderLeaf({
   page,
   side,
+  leafRef,
   heldHoldingId,
   paper,
   cover,
+  interactive,
   onHold,
   onTurnEdge,
 }: {
   page: NativeBinderPage;
   side: "left" | "right";
+  leafRef: MutableRefObject<Group | null>;
   heldHoldingId?: string;
   paper: string;
   cover: string;
+  interactive: boolean;
   onHold: (holding: NativeHolding | null) => void;
   onTurnEdge: () => void;
 }) {
   const x = pageLocalX(side);
   const angle = side === "left" ? V_ANGLE : -V_ANGLE;
-  return <group position={[x, 0, 0]} rotation={[0, angle, 0]}>
-    <mesh position={[side === "left" ? -0.04 : 0.04, 0, -0.025]} onClick={(event) => { event.stopPropagation(); onTurnEdge(); }}>
+  return <group ref={leafRef} position={[side === "left" ? -BINDER_SPINE_W / 2 : BINDER_SPINE_W / 2, 0, 0]} rotation={[0, angle, 0]}>
+    <group position={[x - (side === "left" ? -BINDER_SPINE_W / 2 : BINDER_SPINE_W / 2), 0, 0]}>
+    <mesh position={[side === "left" ? -0.04 : 0.04, 0, -0.025]} onClick={(event) => { if (interactive) { event.stopPropagation(); onTurnEdge(); } }}>
       <boxGeometry args={[BINDER_PAGE_W + 0.08, BINDER_PAGE_H + 0.1, 0.03]} />
       <meshStandardMaterial color={cover} roughness={0.6} />
     </mesh>
@@ -119,6 +174,7 @@ function BinderLeaf({
       <meshStandardMaterial color={paper} roughness={0.82} side={DoubleSide} />
     </mesh>
     <PagePockets page={page} heldHoldingId={heldHoldingId} paper={paper} onHold={onHold} />
+    </group>
   </group>;
 }
 
@@ -150,7 +206,7 @@ function TurningLeaf({
   const originX = dir === 1 ? BINDER_SPINE_W / 2 : -BINDER_SPINE_W / 2;
   const start = dir === 1 ? -V_ANGLE : V_ANGLE;
   const end = dir === 1 ? -Math.PI + V_ANGLE : Math.PI - V_ANGLE;
-  const [y, setY] = useState(start);
+  const y = useRef(start);
   useFrame((_, delta) => {
     if (paused || done.current) return;
     if (reducedMotion) {
@@ -158,15 +214,16 @@ function TurningLeaf({
       onComplete();
       return;
     }
-    const next = y + (end - start) * Math.min(1, delta * 1.7);
+    const next = y.current + (end - start) * Math.min(1, delta * 1.7);
     const clamped = dir === 1 ? Math.max(end, next) : Math.min(end, next);
-    setY(clamped);
+    y.current = clamped;
+    if (group.current) group.current.rotation.y = clamped;
     if (Math.abs(clamped - end) < 0.02) {
       done.current = true;
       onComplete();
     }
   });
-  return <group ref={group} position={[originX, 0, 0.04]} rotation={[0, y, 0]}>
+  return <group ref={group} position={[originX, 0, 0.04]} rotation={[0, start, 0]}>
     <group position={[dir === 1 ? BINDER_PAGE_W / 2 : -BINDER_PAGE_W / 2, 0, 0]}>
       <mesh position={[0, 0, -0.02]}><boxGeometry args={[BINDER_PAGE_W, BINDER_PAGE_H, 0.02]} /><meshStandardMaterial color={cover} roughness={0.62} /></mesh>
       <mesh position={[0, 0, 0.012]}><planeGeometry args={[BINDER_PAGE_W, BINDER_PAGE_H]} /><meshStandardMaterial color={paper} roughness={0.82} side={DoubleSide} /></mesh>

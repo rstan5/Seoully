@@ -225,7 +225,7 @@ export function RoomWorldScreen({
           setOwnerName(demoRoom.demoCollectorDisplayName(userId));
           setPrivateRoom(false);
         } else {
-          const next = demoRoom.buildFixtureRoomSnapshot();
+          const next = demoRoom.buildFixtureRoomSnapshot(undefined, { ownStarter: true });
           setSnapshot(next);
           setHoldings(next.holdings);
           setItems(buildRoomRenderables(next.holdings, next.placements));
@@ -285,7 +285,7 @@ export function RoomWorldScreen({
   const turningSpread = turningSpreadIndex != null ? spreads[turningSpreadIndex] : undefined;
 
   useEffect(() => {
-    if (!initialHoldingId || !spreads.length) return;
+    if (!initialHoldingId || !spreads.length || !objectHasKind(roomLayout.objects, "desk")) return;
     const index = spreadIndexForHolding(spreads, initialHoldingId);
     if (index < 0) return;
     const task = setTimeout(() => {
@@ -293,7 +293,7 @@ export function RoomWorldScreen({
       setView(openBinderView(index));
     }, 0);
     return () => clearTimeout(task);
-  }, [initialHoldingId, spreads]);
+  }, [initialHoldingId, spreads, roomLayout.objects]);
 
   function clearPendingPress() {
     if (pendingPressRef.current) clearTimeout(pendingPressRef.current.timer);
@@ -594,6 +594,7 @@ export function RoomWorldScreen({
   }
 
   function openBinderFromWorld(holdingId?: string) {
+    if (!objectHasKind(latestObjects.current, "desk")) return;
     captureBinderReturn();
     const index = holdingId ? spreadIndexForHolding(spreads, holdingId) : 0;
     setSelectedId(null);
@@ -1076,7 +1077,7 @@ export function RoomWorldScreen({
           objects={roomLayout.objects}
           selectedObjectId={selectedObjectId}
           heldObjectId={heldObjectId}
-          showLegacyBoxes={roomLayout.source === "legacy"}
+          showLegacyBoxes={false}
           themeId={themeId}
           style={roomStyle}
           view={view}
@@ -1157,6 +1158,15 @@ export function RoomWorldScreen({
         showStorage={!readOnly && !archivePresent}
         onStorage={() => setStorageOpen(true)}
       />
+      {__DEV__ && demo && !readOnly && editing ? <Pressable
+        accessibilityLabel="Reset Demo to Starter Room"
+        style={{ position: "absolute", right: 16, top: insets.top + 100 }}
+        onPress={() => {
+          if (!__DEV__ || !demo || mode !== "own" || !snapshot) return;
+          loadDemoRoom().resetDemoRoomToStarter(snapshot.room.ownerUserId);
+          onLeave();
+        }}
+      ><SeoullyText variant="caption" color={overlayTheme.color}>Reset Demo to Starter Room</SeoullyText></Pressable> : null}
       {helperKind ? <View pointerEvents="none" style={[styles.helper, { top: insets.top + 52 }]}>
         <SeoullyText variant="handle" color={colors.ink} style={styles.helperTitle}>
           {helperKind === "first" ? copy.roomFirstTitle : copy.roomEditHoldHint}
@@ -1173,7 +1183,7 @@ export function RoomWorldScreen({
         notice={inspectNotice}
         style={trayPad}
         onView={onInspectCollectible ? () => onInspectCollectible(selectedItem.holding.id) : undefined}
-        onOpenBinder={selectedItem.holding.template.kind === "photocard" ? () => openBinderFromWorld(selectedItem.holding.id) : undefined}
+        onOpenBinder={deskPresent && selectedItem.holding.template.kind === "photocard" ? () => openBinderFromWorld(selectedItem.holding.id) : undefined}
         onWishlist={readOnly && onWishlistCollectible ? () => { void wishlistHolding(selectedItem.holding); } : undefined}
         onMessage={readOnly && onMessageCollectible ? () => onMessageCollectible(selectedItem.holding) : undefined}
         onClose={goBack}

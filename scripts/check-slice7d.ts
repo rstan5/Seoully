@@ -6,6 +6,9 @@ import { applyExploreOffset, CAMERA_FOV_DEG, EXPLORE_LIMITS, HOME_POSE, IDENTITY
 import { envelopeCoversPose, immersiveRoomHolds, permittedExploreSamples, ROOM_BOX, WORLD_ENVELOPE } from "../apps/mobile/src/room/envelope";
 import { REPAIR02_BACK_Z, REPAIR02_WALL_X, ROOM_DEPTH_SCALE, ROOM_WIDTH_SCALE } from "../apps/mobile/src/room/roomLayout";
 import {
+  deskBinderWorld,
+  liveDeskBinderWorld,
+  spawnRoomObject,
   parseRoomLayout,
   shouldAutoEnterFirstRoomEdit,
   shopHasNoCommerce,
@@ -22,6 +25,11 @@ import {
   ROOM_TEXTURE_MAX_EDGE,
 } from "../apps/mobile/src/room/roomRendererQuality";
 import { representationForHolding } from "../apps/mobile/src/room/representation";
+
+import { buildRoomRenderables, createInitialRoomRenderable, nativeRoomSurfaces } from "../apps/mobile/src/room/model";
+import { openBinderWorldAt } from "../apps/mobile/src/room/composition";
+import { extentsForGeometry } from "../apps/mobile/src/room/representation";
+import type { NativeHolding } from "../apps/mobile/src/api";
 
 const repoRoot = process.cwd();
 function read(rel: string) {
@@ -213,3 +221,57 @@ assertContains(read("src/server/dal/public-room.ts"), "layout", "public Room may
 assertContains(read("supabase/migrations/20261004000000_native_room_layout.sql"), "rooms_update_own", "layout stays on owner-write rooms");
 
 console.log("check:slice7d passed");
+
+// Repair 07: placement truth, a clean starter, and persistent spatial Binder.
+const clean = starterRoomLayout();
+assert.deepEqual(clean.objects.map((object) => object.kind), ["shelf", "lamp"]);
+assert.equal(clean.firstRoomEditCompleted, false);
+assert.equal(deskBinderWorld(clean.objects), null);
+const desk07 = spawnRoomObject(clean.objects, "desk");
+const withDesk07 = [...clean.objects, desk07];
+const anchor07 = deskBinderWorld(withDesk07)!;
+const moved07 = { ...desk07, x: desk07.x + 0.7, z: desk07.z + 0.4 };
+const movedAnchor07 = liveDeskBinderWorld(withDesk07, moved07)!;
+assert.ok(Math.abs(movedAnchor07.x - anchor07.x - 0.7) < 1e-9);
+assert.ok(Math.abs(movedAnchor07.z - anchor07.z - 0.4) < 1e-9);
+assert.ok(Math.abs(movedAnchor07.x - deskBinderWorld([...clean.objects, moved07])!.x) < 1e-9);
+assert.equal(openBinderWorldAt(movedAnchor07).x, movedAnchor07.x);
+const archive07 = spawnRoomObject(withDesk07, "archive");
+assert.ok(Math.hypot(archive07.x - anchor07.x, archive07.z - anchor07.z) > 2);
+const holding07 = { id: "repair07-owned", templateId: "template07", template: { id: "template07", kind: "album", name: "Album" } } as NativeHolding;
+assert.deepEqual(buildRoomRenderables([holding07], []), [], "ownership never creates placement");
+const placement07 = { id: "p07", roomId: "r07", holdingId: holding07.id, zoneId: "r07-shelf", slot: 0, offset: null, transform: null, surfaceId: "r07-shelf-bay-0" };
+assert.equal(buildRoomRenderables([holding07], [placement07]).length, 1);
+const album07 = createInitialRoomRenderable(holding07, 0, "r07");
+const shelf07 = nativeRoomSurfaces("r07").find((surface) => surface.id === "r07-shelf-bay-0")!;
+assert.equal(album07.position.y - extentsForGeometry("album").y / 2, shelf07.y);
+assertContains(worldScreen, "__DEV__ && demo && !readOnly && editing", "reset UI is Demo owner edit only");
+assertContains(worldScreen, 'if (!__DEV__ || !demo || mode !== "own" || !snapshot) return;', "reset handler guard");
+assertContains(worldScreen, "showLegacyBoxes={false}", "no decorative storage clutter");
+assertContains(worldScreen, "{ ownStarter: true }", "own Demo starts clean");
+const demo07 = read("apps/mobile/src/room/demoRoom.ts");
+const reset07 = demo07.slice(demo07.indexOf("export function resetDemoRoomToStarter"), demo07.indexOf("export function saveDemoRoomLayout"));
+assertContains(reset07, "session.set(ownerId, [])", "reset clears session placements only");
+assertContains(reset07, "starterRoomLayout()", "reset clears first-edit flag");
+assertNotContains(reset07, "await", "no server reset");
+assertNotContains(reset07, "delete", "no data deletion");
+assertContains(renderer, "{binderAt ? <NativeOpenBinder", "Binder lifecycle follows Desk, not open view");
+assertContains(binder, "liveDeskBinderWorld(objects, objectPreviewRef?.current)", "open and close use live Desk");
+assertContains(binder, "open ? 1 : -1", "reverse the same spatial motion on close");
+assertNotContains(binder, "setY(", "page turn uses refs");
+assertNotContains(binder, "<Canvas", "no second Canvas");
+assertNotContains(worldScreen, "Vision", "no Vision");
+assert.ok(extentsForGeometry("ticket").y < 0.02);
+assert.ok(extentsForGeometry("memorabilia").y < 0.02);
+console.log("Repair 07 focused checks passed");
+
+const twin07 = { ...holding07, id: "repair07-twin" };
+const defaults07 = buildRoomRenderables([holding07, twin07], [placement07, { ...placement07, id: "p08", holdingId: twin07.id }]);
+assert.notDeepEqual(defaults07[0].position, defaults07[1].position, "duplicate fallback slots are distinct");
+const saved07 = { x: 33, y: 44, z: 55, rotateX: 0, rotateY: 0, rotateZ: 0, scale: 1 };
+const overlaps07 = buildRoomRenderables([holding07, twin07], [
+  { ...placement07, transform: saved07 },
+  { ...placement07, id: "p08", holdingId: twin07.id, transform: saved07 },
+]);
+assert.deepEqual(overlaps07[0].position, overlaps07[1].position, "intentional overlap remains authoritative");
+assertContains(worldScreen, 'if (!objectHasKind(latestObjects.current, "desk")) return;', "no Binder entry without Desk");

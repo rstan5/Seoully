@@ -167,9 +167,9 @@ export function NativeRoomRenderer({
       <RoomFurniture
       theme={theme}
       objects={layoutObjects}
-      hideClosedBinder={binderOpen}
+      hideClosedBinder
       binderAt={binderAt}
-      showLegacyBoxes={showLegacyBoxes}
+      showLegacyBoxes={false}
       selectedObjectId={selectedObjectId}
       heldObjectId={heldObjectId}
       objectPreviewRef={objectPreviewRef}
@@ -214,7 +214,8 @@ export function NativeRoomRenderer({
         onPressEnd={view.kind === "edit" && !readOnly ? onPressEnd : undefined}
       />;
     })}
-    {binderOpen ? <NativeOpenBinder
+    {binderAt ? <NativeOpenBinder
+      open={binderOpen}
       spread={binderSpread}
       turningTo={turningSpread}
       turnDir={turnDir ?? 0}
@@ -223,7 +224,10 @@ export function NativeRoomRenderer({
       paused={paused}
       cover={theme.binder}
       paper={theme.paper}
-      binderAt={binderAt ?? DESK_BINDER_AT}
+      binderAt={binderAt}
+      objects={layoutObjects}
+      objectPreviewRef={objectPreviewRef}
+      onOpen={view.kind === "binder" || view.kind === "edit" || Boolean(heldId) || Boolean(heldObjectId) ? undefined : onOpenBinder}
       onHold={(holding) => onHoldCard?.(holding)}
       onTurnComplete={() => onTurnComplete?.()}
       onTurnEdge={(dir) => onTurnEdge?.(dir)}
@@ -457,14 +461,20 @@ function CollectibleForm({ item, selected, loadTexture }: { item: RoomRenderable
     case "apparel":
       return <mesh><boxGeometry args={[size.x, size.y, size.z]} /><meshStandardMaterial color={color} roughness={0.92} /></mesh>;
     case "ticket":
-      return <Cardstock width={size.x} height={size.y} depth={Math.max(size.z, 0.014)} color={color} edge={item.accent} imageUrl={loadTexture ? item.imageUrl : undefined} cacheKey={item.holding.id} />;
+      return <FlatPaperForm width={size.x} depth={size.z} thickness={Math.max(size.y, 0.016)} color={color} edge={item.accent} imageUrl={loadTexture ? item.imageUrl : undefined} cacheKey={item.holding.id} />;
     case "disc-case":
       return <AlbumForm width={Math.max(size.x, 0.06)} height={size.y} depth={size.z} color={color} accent={item.accent} imageUrl={loadTexture ? item.imageUrl : undefined} cacheKey={item.holding.id} slim />;
     case "memorabilia":
-      return <Cardstock width={size.x} height={size.y} depth={0.03} color={color} edge={item.accent} imageUrl={loadTexture ? item.imageUrl : undefined} cacheKey={item.holding.id} />;
+      return <FlatPaperForm width={size.x} depth={size.z} thickness={Math.max(size.y, 0.016)} color={color} edge={item.accent} imageUrl={loadTexture ? item.imageUrl : undefined} cacheKey={item.holding.id} />;
     default:
       return <mesh><boxGeometry args={[size.x, size.y, size.z]} /><meshStandardMaterial color={color} roughness={0.62} /></mesh>;
   }
+}
+
+function FlatPaperForm({ width, depth, thickness, color, edge, imageUrl, cacheKey }: { width: number; depth: number; thickness: number; color: string; edge: string; imageUrl?: string; cacheKey: string }) {
+  return <group rotation={[-Math.PI / 2, 0, 0]}>
+    <Cardstock width={width} height={depth} depth={thickness} color={color} edge={edge} imageUrl={imageUrl} cacheKey={cacheKey} />
+  </group>;
 }
 
 function Cardstock({ width, height, depth, color, edge, imageUrl, cacheKey, glossy }: { width: number; height: number; depth: number; color: string; edge: string; imageUrl?: string; cacheKey: string; glossy?: boolean }) {

@@ -1,3 +1,4 @@
+import { layoutX, layoutZ, ROOM_LAYOUT } from "./roomLayout";
 import type { CanonicalZoneKind, NativeWorldView } from "./worldView";
 
 type RoomVector = { x: number; y: number; z: number };
@@ -40,15 +41,15 @@ export const BINDER_OPEN_POSE: CameraPose = {
 export const BINDER_EXAMINE_POSE: CameraPose = BINDER_OPEN_POSE;
 
 export const ZONE_DOCKS: Record<CanonicalZoneKind, CameraPose> = {
-  shelf: { position: { x: -2.18, y: 0.78, z: -0.92 }, lookAt: { x: -3.15, y: -0.12, z: -3.52 } },
-  wall: { position: { x: 1.08, y: 1.08, z: -1.28 }, lookAt: { x: 1.1, y: 0.72, z: -4.12 } },
-  case: { position: { x: 2.52, y: 0.58, z: -1.08 }, lookAt: { x: 3.65, y: 0.06, z: -3.52 } },
-  desk: { position: { x: 1.18, y: 0.88, z: -0.28 }, lookAt: { x: 1.45, y: -0.42, z: -2.82 } },
-  binder: { position: { x: 0.52, y: 0.48, z: -0.42 }, lookAt: { x: 0.45, y: -0.32, z: -2.58 } },
-  archive: { position: { x: -0.52, y: 0.28, z: 1.62 }, lookAt: { x: -1.2, y: -1.52, z: -0.62 } },
+  shelf: { position: { x: layoutX(-2.18), y: 0.78, z: layoutZ(-0.92) }, lookAt: { x: layoutX(-3.15), y: -0.12, z: layoutZ(-3.52) } },
+  wall: { position: { x: layoutX(1.08), y: 1.08, z: layoutZ(-1.28) }, lookAt: { x: layoutX(1.1), y: 0.72, z: layoutZ(-4.12) } },
+  case: { position: { x: layoutX(2.52), y: 0.58, z: layoutZ(-1.08) }, lookAt: { x: layoutX(3.65), y: 0.06, z: layoutZ(-3.52) } },
+  desk: { position: { x: layoutX(1.18), y: 0.88, z: layoutZ(-0.28) }, lookAt: { x: layoutX(1.45), y: -0.42, z: layoutZ(-2.82) } },
+  binder: { position: { x: layoutX(0.52), y: 0.48, z: layoutZ(-0.42) }, lookAt: { x: layoutX(0.45), y: -0.32, z: layoutZ(-2.58) } },
+  archive: { position: { x: layoutX(-0.52), y: 0.28, z: layoutZ(1.62) }, lookAt: { x: layoutX(-1.2), y: -1.52, z: layoutZ(-0.62) } },
 };
 
-export const DESK_BINDER_AT = { x: 0.45, y: -0.52, z: -2.62 };
+export const DESK_BINDER_AT = { x: layoutX(0.45), y: -0.52, z: layoutZ(-2.62) };
 export const OPEN_BINDER_LIFT = { y: 0.52, z: 1.12 };
 
 export function poseForView(
@@ -329,7 +330,7 @@ export function applyExploreOffset(
   if (space === "home") {
     position.y = Math.max(ROOM_INTERIOR.floorGuard + 1.15, position.y);
     position.z = Math.min(IMMERSIVE_HOME.maxZ, Math.max(ROOM_INTERIOR.cameraMinZ, position.z));
-    position.x = clampNumber(position.x, ROOM_INTERIOR.xMin + 0.45, ROOM_INTERIOR.xMax - 0.45);
+    position.x = clampNumber(position.x, -ROOM_LAYOUT.wallX + 0.4, ROOM_LAYOUT.wallX - 0.4);
     lookAt.x = clampNumber(lookAt.x, ROOM_INTERIOR.xMin, ROOM_INTERIOR.xMax);
     lookAt.y = clampNumber(lookAt.y, ROOM_INTERIOR.yMin, ROOM_INTERIOR.ceiling);
   }

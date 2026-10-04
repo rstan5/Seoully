@@ -25,6 +25,7 @@ import {
   visibleHalfWidth,
 } from "../apps/mobile/src/room/camera";
 import { envelopeCoversPose } from "../apps/mobile/src/room/envelope";
+import { layoutX, layoutZ } from "../apps/mobile/src/room/roomLayout";
 import { entranceForeground, isInternalCollectorId, roomEntranceCopy } from "../apps/mobile/src/room/entrance";
 import { roomOverlayChrome, roomPalette } from "../apps/mobile/src/room/theme";
 import { BUTTON_LABEL_OPTICAL_Y } from "../apps/mobile/src/theme";
@@ -423,7 +424,7 @@ assert.equal(compatibleSurfaces("room-qa", "poster").every((surface) => surface.
 
 const originAlbum = {
   holding: { id: "h-album" },
-  position: { x: -3.15, y: 0, z: -3.48 },
+  position: { x: layoutX(-3.15), y: 0, z: layoutZ(-3.48) },
   rotation: { x: 0, y: 0, z: 0 },
   scale: 1,
   geometry: "album" as const,

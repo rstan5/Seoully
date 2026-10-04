@@ -11,6 +11,7 @@ import {
   type CameraPose,
   type ExploreOffset,
 } from "./camera";
+import { ROOM_LAYOUT } from "./roomLayout";
 
 /**
  * Authored world box that must cover every permitted camera frustum.
@@ -36,11 +37,11 @@ export const WORLD_ENVELOPE = {
 
 /** Visible bedroom box. Coverage envelope may extend farther; this is what the viewer stands in. */
 export const ROOM_BOX = {
-  wallX: 4.52,
-  backZ: -4.48,
-  windowZ: -0.82,
-  furnitureZ: -3.58,
-  wallNearZ: 8.6,
+  wallX: ROOM_LAYOUT.wallX,
+  backZ: ROOM_LAYOUT.backZ,
+  windowZ: ROOM_LAYOUT.windowZ,
+  furnitureZ: ROOM_LAYOUT.furnitureZ,
+  wallNearZ: ROOM_LAYOUT.wallNearZ,
 } as const;
 
 type Vec = { x: number; y: number; z: number };

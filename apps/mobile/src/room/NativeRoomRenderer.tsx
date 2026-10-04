@@ -3,7 +3,7 @@ import "./threeFiberCompat";
 import { Suspense, useMemo, useRef, type MutableRefObject } from "react";
 import { StyleSheet } from "react-native";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber/native";
-import { Color, Euler, Group, MeshBasicMaterial, Quaternion, TextureLoader, Vector3 } from "three";
+import { Color, Euler, Group, MeshBasicMaterial, PCFShadowMap, Quaternion, TextureLoader, Vector3 } from "three";
 import type { NativeBinderSpread } from "../binder/model";
 import type { NativeHolding } from "../api";
 import { useCachedSignedMedia } from "../media/cachedMedia";
@@ -11,6 +11,8 @@ import { applyExploreOffset, cameraLerpAlpha, exploreAllowedForView, IDENTITY_EX
 import { binderCameraForViewport, inspectionPresentation } from "./composition";
 import { NativeOpenBinder } from "./NativeOpenBinder";
 import { extentsForGeometry } from "./representation";
+import { layoutX, layoutZ, ROOM_LAYOUT } from "./roomLayout";
+import { ContactShadow } from "./roomMaterials";
 import { RoomFurniture, RoomShell } from "./roomEnvironment";
 import { defaultStyleForTheme, resolveRoomLook, type NativeRoomStyle } from "./roomStyle";
 import { HELD_SCALE } from "./touchEdit";
@@ -18,12 +20,12 @@ import { roomTextureIds, type NativeRoomSurface, type RoomRenderable } from "./m
 import { CANONICAL_ZONE_KINDS, zoneInteractive, type CanonicalZoneKind, type NativeWorldView } from "./worldView";
 
 const ZONE_HOTSPOTS: Record<CanonicalZoneKind, { position: [number, number, number]; size: [number, number, number] }> = {
-  shelf: { position: [-3.15, -0.2, -3.55], size: [2.4, 3.2, 0.9] },
-  wall: { position: [1.1, 0.75, -4.12], size: [3.6, 2.6, 0.2] },
-  case: { position: [3.65, -0.2, -3.52], size: [1.7, 3.2, 0.8] },
-  desk: { position: [1.55, -0.55, -2.85], size: [3.3, 1.1, 1.7] },
-  binder: { position: [0.45, -0.35, -2.58], size: [1.05, 0.9, 0.7] },
-  archive: { position: [-1.2, -1.55, -0.65], size: [1.9, 0.8, 1.2] },
+  shelf: { position: [layoutX(-3.15), -0.2, layoutZ(-3.55)], size: [2.4, 3.2, 0.9] },
+  wall: { position: [layoutX(1.1), 0.75, ROOM_LAYOUT.backZ + 0.36], size: [3.2, 2.6, 0.2] },
+  case: { position: [layoutX(3.65), -0.2, layoutZ(-3.52)], size: [1.7, 3.2, 0.8] },
+  desk: { position: [layoutX(1.55), -0.55, layoutZ(-2.85)], size: [3.3, 1.1, 1.7] },
+  binder: { position: [layoutX(0.45), -0.35, layoutZ(-2.58)], size: [1.05, 0.9, 0.7] },
+  archive: { position: [layoutX(-1.2), -1.55, layoutZ(-0.65)], size: [1.9, 0.8, 1.2] },
 };
 
 export function NativeRoomRenderer({
@@ -96,28 +98,46 @@ export function NativeRoomRenderer({
     : placedItems;
   return <Canvas
     frameloop={paused ? "never" : "always"}
+    shadows
     style={StyleSheet.absoluteFill}
     camera={{ position: [0.68, 1.58, 5.72], fov: 46 }}
     onPointerMissed={onClearSelection}
-    onCreated={({ camera, scene }) => {
+    onCreated={({ camera, scene, gl }) => {
       camera.lookAt(-0.18, 0.06, -2.38);
       scene.background = new Color(theme.void);
+      gl.shadowMap.enabled = true;
+      gl.shadowMap.type = PCFShadowMap;
     }}
   >
     <color attach="background" args={[theme.void]} />
-    <ambientLight intensity={0.82 * theme.brightness} color={theme.fill} />
-    <directionalLight color={theme.light} intensity={1.18 * theme.brightness} position={[-3.8, 3.4, 1.2]} castShadow={false} />
-    <pointLight color={theme.light} intensity={(reducedMotion ? 0.2 : 0.36) * theme.brightness} position={[-4.2, 0.86, -0.82]} />
-    <pointLight color={theme.fill} intensity={0.28 * theme.brightness} position={[2.4, 1.55, 0.55]} />
+    <ambientLight intensity={0.64 * theme.brightness} color={theme.fill} />
+    <directionalLight
+      color={theme.light}
+      intensity={1.22 * theme.brightness}
+      position={[layoutX(-3.8), 3.4, layoutZ(1.2)]}
+      castShadow
+      shadow-mapSize={[512, 512]}
+      shadow-bias={-0.0008}
+      shadow-camera-near={0.6}
+      shadow-camera-far={16}
+      shadow-camera-left={-6}
+      shadow-camera-right={6}
+      shadow-camera-top={5}
+      shadow-camera-bottom={-5}
+    />
+    <pointLight color={theme.light} intensity={(reducedMotion ? 0.16 : 0.28) * theme.brightness} position={[-ROOM_LAYOUT.wallX + 0.28, 0.86, ROOM_LAYOUT.windowZ]} />
+    <pointLight color={theme.fill} intensity={0.32 * theme.brightness} position={[layoutX(2.4), 1.55, layoutZ(0.55)]} />
     <AuthoredCamera view={view} focused={focused} reducedMotion={reducedMotion} paused={paused} exploreRef={exploreRef} />
-    <RoomShell theme={theme} onSelectZone={view.kind === "home" || view.kind === "zone" ? onSelectZone : undefined} />
-    <RoomFurniture
+    <Suspense fallback={null}>
+      <RoomShell theme={theme} onSelectZone={view.kind === "home" || view.kind === "zone" ? onSelectZone : undefined} />
+      <RoomFurniture
       theme={theme}
       hideClosedBinder={binderOpen}
       onOpenBinder={view.kind === "binder" || view.kind === "edit" || Boolean(heldId) ? undefined : onOpenBinder}
       onOpenStorage={readOnly || view.kind === "binder" || Boolean(heldId) ? undefined : onOpenStorage}
       onSelectZone={view.kind === "home" || view.kind === "zone" ? onSelectZone : undefined}
     />
+    </Suspense>
     {view.kind === "home" ? CANONICAL_ZONE_KINDS.filter((zone) => zone !== "archive").map((zone) => (
       <ZoneHotspot key={zone} zone={zone} onSelect={onSelectZone} />
     )) : null}
@@ -332,6 +352,11 @@ function RoomObject({
     }}
   >
     <CollectibleForm item={item} selected={selected || held} loadTexture={loadTexture} />
+    {!focused && !held && !item.placement?.surfaceId?.endsWith("-wall") ? (
+      <group position={[0, -extentsForGeometry(item.geometry).y / 2 - 0.012, 0]}>
+        <ContactShadow width={0.26} depth={0.2} opacity={0.1} />
+      </group>
+    ) : null}
   </group>;
 }
 

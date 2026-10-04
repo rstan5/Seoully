@@ -1,4 +1,5 @@
 import { CAMERA_FOV_DEG, type CameraPose } from "./camera";
+import { layoutX, layoutZ } from "./roomLayout";
 import {
   nativeRoomSurfaces,
   settleRoomRenderable,
@@ -28,7 +29,7 @@ export type HeldEdit = {
 };
 
 /** Lifted takeout pose above the Archive crate — not a fake persisted origin. */
-export const STORAGE_TAKEOUT = { x: -1.2, y: -1.12, z: -0.65 };
+export const STORAGE_TAKEOUT = { x: layoutX(-1.2), y: -1.12, z: layoutZ(-0.65) };
 
 export type PlacementCandidate = {
   surface: NativeRoomSurface;

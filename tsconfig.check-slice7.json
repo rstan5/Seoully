@@ -24,6 +24,7 @@
     "apps/mobile/src/room/representation.ts",
     "apps/mobile/src/room/worldView.ts",
     "apps/mobile/src/room/camera.ts",
+    "apps/mobile/src/room/roomLayout.ts",
     "apps/mobile/src/room/envelope.ts",
     "apps/mobile/src/room/composition.ts",
     "apps/mobile/src/room/entrance.ts",

@@ -16,6 +16,7 @@
   "include": [
     "scripts/check-slice7d.ts",
     "apps/mobile/src/room/envelope.ts",
+    "apps/mobile/src/room/roomLayout.ts",
     "apps/mobile/src/room/roomStyle.ts",
     "apps/mobile/src/room/representation.ts",
     "apps/mobile/src/room/camera.ts",

@@ -302,6 +302,8 @@ Repair 01 report additions: **42** album front-face inspection; **43** viewport-
 
 **Repair 02 — immersive Room framing (code verified / device QA required).** Physical QA rejected the environment-repair HOME (`z: 15.55`, `homeDollyMax: 1.48`) as a dollhouse: camera outside the bedroom, empty floor/ceiling, side walls as stage flats. Environment reconstruction is kept. HOME is pulled back inside the room (`z: 5.72`, look slightly left/up). Max dolly is a modest step-back (`1.16`) with an `IMMERSIVE_HOME.maxZ` guard. Inner side walls continue past the camera. Checks require envelope coverage and immersive-inside-room safety — not “the entire Room must fit.” Pan discovers off-frame window/wall. Slice 8 not started.
 
+**Repair 03 — Room proportions + material/lighting fidelity (code verified / device QA required).** Physical QA accepted Repair 02 framing but asked for a more intimate bedroom and less clay. Authored width is 90% and depth is 80% of Repair 02 (layout helpers, not a camera pull-back). HOME stays at `z: 5.72`. Bundled grayscale grain maps tint with existing style colors. One window-key directional light may cast a 512px shadow; contact planes sit under furniture. Thin edge lips replace razor-box silhouettes. Inspection/7B/7C unchanged. `20261003000000_native_room_style.sql` stays unapplied. Slice 8 not started.
+
 Locked gesture model:
 
 - **NORMAL ROOM:** tap object = inspect; empty drag = camera pan; pinch = camera dolly; tap storage crate = stored sheet; tap Binder = spatial Binder

@@ -4,6 +4,7 @@ import path from "node:path";
 import { CANONICAL_ZONE_KINDS } from "../apps/mobile/src/room/worldView";
 import { applyExploreOffset, CAMERA_FOV_DEG, EXPLORE_LIMITS, HOME_POSE, IDENTITY_EXPLORE, IMMERSIVE_HOME, ROOM_INTERIOR } from "../apps/mobile/src/room/camera";
 import { envelopeCoversPose, immersiveRoomHolds, permittedExploreSamples, ROOM_BOX, WORLD_ENVELOPE } from "../apps/mobile/src/room/envelope";
+import { REPAIR02_BACK_Z, REPAIR02_WALL_X, ROOM_DEPTH_SCALE, ROOM_WIDTH_SCALE } from "../apps/mobile/src/room/roomLayout";
 import { parseRoomStyle, resolveRoomLook, STYLE_BY_THEME } from "../apps/mobile/src/room/roomStyle";
 import { representationForHolding } from "../apps/mobile/src/room/representation";
 
@@ -47,8 +48,31 @@ for (const prop of ["FloorLamp", "Plant", "StorageBoxes", "Rug", "RoomWindow"]) 
   const body = next === -1 ? from : from.slice(0, next + 1);
   assert.ok(!body.includes("onClick"), `${prop} must stay non-interactive`);
 }
-assertContains(read("apps/mobile/src/room/model.ts"), "x: -3.15, y: -1.4, z: -3.48", "shelf landing plane unchanged");
-assertContains(read("apps/mobile/src/room/model.ts"), "x: 1.45, y: -0.72, z: -2.85", "desk landing plane unchanged");
+assertContains(read("apps/mobile/src/room/model.ts"), "layoutX(-3.15)", "shelf landing follows layout X");
+assertContains(read("apps/mobile/src/room/model.ts"), "layoutZ(-2.85)", "desk landing follows layout Z");
+assertContains(read("apps/mobile/src/room/touchEdit.ts"), "layoutX(-1.2)", "storage takeout follows archive");
+assert.ok(Math.abs(ROOM_WIDTH_SCALE - 0.9) < 1e-9, "width scale is 10% narrower");
+assert.ok(Math.abs(ROOM_DEPTH_SCALE - 0.8) < 1e-9, "depth scale is 20% shallower");
+assert.ok(Math.abs(ROOM_BOX.wallX / REPAIR02_WALL_X - 0.9) < 1e-9, "visible wall half-width is 90% of Repair 02");
+assert.ok(Math.abs(ROOM_BOX.backZ / REPAIR02_BACK_Z - 0.8) < 1e-9, "visible back wall is 80% of Repair 02 depth");
+assert.equal(HOME_POSE.position.z, 5.72, "HOME was not pulled backward");
+assert.equal(HOME_POSE.position.y, 1.58, "HOME height remains Repair 02");
+assertContains(read("apps/mobile/src/room/roomMaterials.tsx"), "assets/room/plaster.png", "plaster texture is bundled");
+assertContains(read("apps/mobile/src/room/roomMaterials.tsx"), "assets/room/wood-floor.png", "floor texture is bundled");
+assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "castShadow", "one key light may cast shadows");
+assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "shadow-mapSize={[512, 512]}", "shadow map stays mobile-sized");
+assertContains(read("apps/mobile/src/room/roomEnvironment.tsx"), "ContactShadow", "authored contact cues exist");
+assertNotContains(read("apps/mobile/src/room/roomMaterials.tsx"), "http", "no remote texture fetch");
+assertNotContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "EffectComposer", "no post-processing");
+assertNotContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "PMREM", "no HDR environment");
+const textureDir = path.join(repoRoot, "apps/mobile/assets/room");
+const textureFiles = fs.readdirSync(textureDir).filter((name) => name.endsWith(".png"));
+assert.ok(textureFiles.length <= 8, "texture count stays bounded");
+for (const name of textureFiles) {
+  const bytes = fs.readFileSync(path.join(textureDir, name));
+  const edge = bytes.readUInt32BE(16);
+  assert.ok(edge <= 256, `${name} stays at or under 256px`);
+}
 assertContains(read("apps/mobile/src/room/composition.ts"), "inspectionPresentation", "inspection repair file remains");
 assertContains(renderer, "PosterForm", "posters have framed geometry");
 assertContains(renderer, "bound", "books have bound treatment");

@@ -1,5 +1,6 @@
 import type { NativeHolding, NativeRoomPlacement } from "../api";
 import { extentsForGeometry, representationForHolding, representationKindForHolding, type NativeRepresentationKind } from "./representation";
+import { layoutX, layoutZ, ROOM_LAYOUT } from "./roomLayout";
 
 export type NativeRoomVector = { x: number; y: number; z: number };
 export type NativeRoomSurface = { id: string; kind: "horizontal" | "wall"; x: number; y: number; z: number; width: number; depth: number };
@@ -183,16 +184,16 @@ export function settleRoomRenderable(renderable: RoomRenderable, roomId: string,
 
 export function nativeRoomSurfaces(roomId: string): NativeRoomSurface[] {
   return [
-    { id: `${roomId}-shelf-bay-0`, kind: "horizontal", x: -3.15, y: -1.4, z: -3.48, width: 2.1, depth: 0.8 },
-    { id: `${roomId}-shelf-bay-1`, kind: "horizontal", x: -3.15, y: -0.5, z: -3.48, width: 2.1, depth: 0.8 },
-    { id: `${roomId}-shelf-bay-2`, kind: "horizontal", x: -3.15, y: 0.4, z: -3.48, width: 2.1, depth: 0.8 },
-    { id: `${roomId}-desk`, kind: "horizontal", x: 1.45, y: -0.72, z: -2.85, width: 3.25, depth: 1.65 },
-    { id: `${roomId}-binder`, kind: "horizontal", x: 0.45, y: -0.68, z: -2.7, width: 0.95, depth: 0.72 },
-    { id: `${roomId}-display-case-shelf`, kind: "horizontal", x: 3.65, y: -0.5, z: -3.52, width: 1.45, depth: 0.72 },
-    { id: `${roomId}-display-case-top`, kind: "horizontal", x: 3.65, y: 0.48, z: -3.52, width: 1.45, depth: 0.72 },
-    { id: `${roomId}-archive`, kind: "horizontal", x: -1.2, y: -1.68, z: -0.65, width: 1.7, depth: 1.05 },
-    { id: `${roomId}-wall`, kind: "wall", x: 1.1, y: 0.75, z: -4.2, width: 3.5, depth: 2.5 },
-    { id: `${roomId}-floor`, kind: "horizontal", x: 0, y: -2.15, z: -1.2, width: 9.2, depth: 5.8 },
+    { id: `${roomId}-shelf-bay-0`, kind: "horizontal", x: layoutX(-3.15), y: -1.4, z: layoutZ(-3.48), width: 2.1, depth: 0.8 },
+    { id: `${roomId}-shelf-bay-1`, kind: "horizontal", x: layoutX(-3.15), y: -0.5, z: layoutZ(-3.48), width: 2.1, depth: 0.8 },
+    { id: `${roomId}-shelf-bay-2`, kind: "horizontal", x: layoutX(-3.15), y: 0.4, z: layoutZ(-3.48), width: 2.1, depth: 0.8 },
+    { id: `${roomId}-desk`, kind: "horizontal", x: layoutX(1.45), y: -0.72, z: layoutZ(-2.85), width: 3.25, depth: 1.65 },
+    { id: `${roomId}-binder`, kind: "horizontal", x: layoutX(0.45), y: -0.68, z: layoutZ(-2.7), width: 0.95, depth: 0.72 },
+    { id: `${roomId}-display-case-shelf`, kind: "horizontal", x: layoutX(3.65), y: -0.5, z: layoutZ(-3.52), width: 1.45, depth: 0.72 },
+    { id: `${roomId}-display-case-top`, kind: "horizontal", x: layoutX(3.65), y: 0.48, z: layoutZ(-3.52), width: 1.45, depth: 0.72 },
+    { id: `${roomId}-archive`, kind: "horizontal", x: layoutX(-1.2), y: -1.68, z: layoutZ(-0.65), width: 1.7, depth: 1.05 },
+    { id: `${roomId}-wall`, kind: "wall", x: layoutX(1.1), y: 0.75, z: ROOM_LAYOUT.backZ + 0.28, width: 3.15, depth: 2.5 },
+    { id: `${roomId}-floor`, kind: "horizontal", x: 0, y: -2.15, z: layoutZ(-1.2), width: 9.2, depth: 5.8 },
   ];
 }
 
@@ -201,33 +202,33 @@ export function nativeHomeForHolding(holding: NativeHolding, roomId: string, slo
   if (kind === "photocard") {
     const col = slot % 3;
     const row = Math.floor(slot / 3) % 2;
-    return { zoneId: `${roomId}-binder`, surfaceId: `${roomId}-binder`, position: { x: 0.12 + col * 0.28, y: -0.1, z: -2.48 - row * 0.24 } };
+    return { zoneId: `${roomId}-binder`, surfaceId: `${roomId}-binder`, position: { x: layoutX(0.12) + col * 0.28, y: -0.1, z: layoutZ(-2.48) - row * 0.24 } };
   }
   if (kind === "album" || kind === "vinyl" || kind === "book") {
     const bay = slot % 3;
     const along = Math.floor(slot / 3) % 4;
-    return { zoneId: `${roomId}-shelf`, surfaceId: `${roomId}-shelf-bay-${bay}`, position: { x: -3.85 + along * 0.48, y: 0, z: -3.48 } };
+    return { zoneId: `${roomId}-shelf`, surfaceId: `${roomId}-shelf-bay-${bay}`, position: { x: layoutX(-3.15) - 0.7 + along * 0.48, y: 0, z: layoutZ(-3.48) } };
   }
   if (kind === "poster") {
-    return { zoneId: `${roomId}-wall`, surfaceId: `${roomId}-wall`, position: { x: 0.2 + (slot % 3) * 0.9, y: 0.4 + (Math.floor(slot / 3) % 2) * 0.8, z: -4.14 } };
+    return { zoneId: `${roomId}-wall`, surfaceId: `${roomId}-wall`, position: { x: layoutX(0.2) + (slot % 3) * 0.9, y: 0.4 + (Math.floor(slot / 3) % 2) * 0.8, z: ROOM_LAYOUT.backZ + 0.34 } };
   }
   if (kind === "lightstick" || kind === "figure" || kind === "plushie") {
     const upper = slot % 2 === 1;
     const along = Math.floor(slot / 2) % 3;
-    return { zoneId: `${roomId}-display-case`, surfaceId: `${roomId}-display-case-${upper ? "top" : "shelf"}`, position: { x: 3.25 + along * 0.32, y: 0, z: -3.52 } };
+    return { zoneId: `${roomId}-display-case`, surfaceId: `${roomId}-display-case-${upper ? "top" : "shelf"}`, position: { x: layoutX(3.25) + along * 0.32, y: 0, z: layoutZ(-3.52) } };
   }
   if (kind === "apparel" || (kind === "memorabilia" && /kit/i.test(holding.template.name))) {
-    return { zoneId: `${roomId}-archive`, surfaceId: `${roomId}-archive`, position: { x: -1.7 + (slot % 3) * 0.45, y: 0, z: -0.4 - (Math.floor(slot / 3) % 2) * 0.35 } };
+    return { zoneId: `${roomId}-archive`, surfaceId: `${roomId}-archive`, position: { x: layoutX(-1.7) + (slot % 3) * 0.45, y: 0, z: layoutZ(-0.4) - (Math.floor(slot / 3) % 2) * 0.35 } };
   }
   if (kind === "memorabilia") {
     const form = representationKindForHolding(holding);
     if (form === "disc-case" || form === "book") {
       const bay = slot % 3;
       const along = Math.floor(slot / 3) % 4;
-      return { zoneId: `${roomId}-shelf`, surfaceId: `${roomId}-shelf-bay-${bay}`, position: { x: -3.85 + along * 0.48, y: 0, z: -3.48 } };
+      return { zoneId: `${roomId}-shelf`, surfaceId: `${roomId}-shelf-bay-${bay}`, position: { x: layoutX(-3.15) - 0.7 + along * 0.48, y: 0, z: layoutZ(-3.48) } };
     }
   }
-  return { zoneId: `${roomId}-desk`, surfaceId: `${roomId}-desk`, position: { x: 0.5 + (slot % 4) * 0.55, y: 0, z: -2.4 - (Math.floor(slot / 4) % 2) * 0.45 } };
+  return { zoneId: `${roomId}-desk`, surfaceId: `${roomId}-desk`, position: { x: layoutX(0.5) + (slot % 4) * 0.55, y: 0, z: layoutZ(-2.4) - (Math.floor(slot / 4) % 2) * 0.45 } };
 }
 
 export function zoneIdForNativeSurface(roomId: string, surfaceId: string) {
@@ -242,7 +243,7 @@ export function zoneIdForNativeSurface(roomId: string, surfaceId: string) {
 function fallbackPosition(slot: number): NativeRoomVector {
   const column = slot % 4;
   const row = Math.floor(slot / 4);
-  return { x: 0.45 + column * 0.68, y: -0.15, z: -2.9 + row * 0.45 };
+  return { x: layoutX(0.45) + column * 0.68, y: -0.15, z: layoutZ(-2.9) + row * 0.45 };
 }
 
 function roomRenderable(holding: NativeHolding, placement: NativeRoomPlacement | undefined, index: number): RoomRenderable {

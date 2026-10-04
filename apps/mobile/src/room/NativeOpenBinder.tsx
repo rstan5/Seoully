@@ -7,6 +7,7 @@ import { useCachedSignedMedia } from "../media/cachedMedia";
 import type { NativeBinderPage, NativeBinderSpread } from "../binder/model";
 import { BINDER_POCKETS_PER_PAGE } from "../binder/model";
 import { cameraLerpAlpha, DESK_BINDER_AT, OPEN_BINDER_LIFT } from "./camera";
+import { prepCollectibleTexture } from "./roomMaterials";
 import {
   BINDER_CARD_H,
   BINDER_CARD_W,
@@ -296,10 +297,11 @@ function CachedCardFace({ cacheKey, url, onError }: { cacheKey: string; url: str
 
 function CardFace({ uri, onError }: { uri: string; onError: () => void }) {
   const texture = useLoader(TextureLoader, uri);
+  const map = useMemo(() => prepCollectibleTexture(texture), [texture]);
   void onError;
   return <mesh position={[0, 0, 0.008]}>
     <planeGeometry args={[CARD_W * 0.92, CARD_H * 0.92]} />
-    <meshBasicMaterial map={texture} toneMapped={false} />
+    <meshBasicMaterial map={map} toneMapped={false} />
   </mesh>;
 }
 

@@ -13,6 +13,14 @@ import {
   UNIQUE_ROOM_OBJECT_KINDS,
 } from "../apps/mobile/src/room/roomObjects";
 import { parseRoomStyle, resolveRoomLook, STYLE_BY_THEME } from "../apps/mobile/src/room/roomStyle";
+import {
+  ROOM_ANISOTROPY_LARGE_CAP,
+  ROOM_ANISOTROPY_SMALL_CAP,
+  ROOM_PIXEL_RATIO_CAP,
+  ROOM_SHADOW_CAMERA,
+  ROOM_SHADOW_MAP_SIZE,
+  ROOM_TEXTURE_MAX_EDGE,
+} from "../apps/mobile/src/room/roomRendererQuality";
 import { representationForHolding } from "../apps/mobile/src/room/representation";
 
 const repoRoot = process.cwd();
@@ -67,18 +75,44 @@ assert.equal(HOME_POSE.position.y, 1.58, "HOME height remains Repair 02");
 assertContains(read("apps/mobile/src/room/roomMaterials.tsx"), "assets/room/plaster.png", "plaster texture is bundled");
 assertContains(read("apps/mobile/src/room/roomMaterials.tsx"), "assets/room/wood-floor.png", "floor texture is bundled");
 assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "castShadow", "one key light may cast shadows");
-assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "shadow-mapSize={[512, 512]}", "shadow map stays mobile-sized");
+assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "ROOM_SHADOW_MAP_SIZE", "shadow map uses the Repair 05 constant");
+assert.equal(ROOM_SHADOW_MAP_SIZE, 1024, "single directional shadow map is 1024");
+assert.ok(ROOM_SHADOW_MAP_SIZE <= 1024, "shadow map never exceeds 1024");
+assert.ok(ROOM_SHADOW_CAMERA.left >= -5.3 && ROOM_SHADOW_CAMERA.right <= 5.3, "shadow camera is fitted to the Room");
+assert.ok(ROOM_SHADOW_CAMERA.far <= 13, "shadow camera far plane stays around the bedroom");
+assert.equal((renderer.match(/castShadow/g) || []).length, 1, "only the key light casts realtime shadows in the renderer");
+assert.ok(!/function (CollectibleForm|PersonalMediaFace|Cardstock|AlbumForm)[\s\S]{0,800}castShadow/.test(renderer), "collectibles stay non-casters");
 assertContains(read("apps/mobile/src/room/roomEnvironment.tsx"), "ContactShadow", "authored contact cues exist");
+assertContains(read("apps/mobile/src/room/roomMaterials.tsx"), "getMaxAnisotropy", "anisotropy queries renderer capabilities");
+assertContains(read("apps/mobile/src/room/roomMaterials.tsx"), "LinearMipmapLinearFilter", "world textures keep mipmaps");
+assertContains(read("apps/mobile/src/room/roomMaterials.tsx"), "prepCollectibleTexture", "collectible images use their own filter path");
+assert.equal(ROOM_ANISOTROPY_LARGE_CAP, 4, "large-surface anisotropy stays conservative");
+assert.equal(ROOM_ANISOTROPY_SMALL_CAP, 2, "small-surface anisotropy stays conservative");
+assert.equal(ROOM_PIXEL_RATIO_CAP, 2, "documented pixel-ratio cap stays conservative");
+assertNotContains(renderer, "dpr=", "Canvas does not override R3F native PixelRatio.get()");
+assertNotContains(renderer, "surfaceReady", "renderer has no surfaceReady");
 assertNotContains(read("apps/mobile/src/room/roomMaterials.tsx"), "http", "no remote texture fetch");
 assertNotContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "EffectComposer", "no post-processing");
 assertNotContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "PMREM", "no HDR environment");
+assert.equal((renderer.match(/<Canvas/g) || []).length, 1, "one Room Canvas");
+assertNotContains(worldScreen, "<Canvas", "world screen does not mount a second Canvas");
 const textureDir = path.join(repoRoot, "apps/mobile/assets/room");
 const textureFiles = fs.readdirSync(textureDir).filter((name) => name.endsWith(".png"));
 assert.ok(textureFiles.length <= 8, "texture count stays bounded");
+const textureEdges: Record<string, number> = {
+  "plaster.png": 512,
+  "wood-floor.png": 512,
+  "wood-fine.png": 512,
+  "fabric.png": 256,
+  "cardboard.png": 128,
+  "vinyl.png": 128,
+  "paper.png": 128,
+};
 for (const name of textureFiles) {
   const bytes = fs.readFileSync(path.join(textureDir, name));
   const edge = bytes.readUInt32BE(16);
-  assert.ok(edge <= 256, `${name} stays at or under 256px`);
+  assert.ok(edge <= ROOM_TEXTURE_MAX_EDGE, `${name} stays at or under ${ROOM_TEXTURE_MAX_EDGE}px`);
+  if (textureEdges[name]) assert.equal(edge, textureEdges[name], `${name} keeps its Repair 05 size`);
 }
 assertContains(read("apps/mobile/src/room/composition.ts"), "inspectionPresentation", "inspection repair file remains");
 assertContains(renderer, "PosterForm", "posters have framed geometry");
@@ -150,6 +184,7 @@ assertContains(read("supabase/migrations/20261003000000_native_room_style.sql"),
 assertContains(read("supabase/migrations/20261002000000_native_room_theme.sql"), "theme_id", "obsolete preset migration still exists");
 assertContains(read("docs/native-road-to-ship.md"), "SLICE 7D — ROOM VISUAL RECONSTRUCTION", "7D documented");
 assertContains(read("docs/native-road-to-ship.md"), "Repair 04 — true Edit Room", "Repair 04 documented");
+assertContains(read("docs/native-road-to-ship.md"), "Repair 05 — mobile render fidelity", "Repair 05 documented");
 const starter = starterRoomLayout();
 assert.equal(starter.objects.length, 2);
 assert.equal(starter.objects.some((item) => item.kind === "desk"), false);

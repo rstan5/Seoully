@@ -5,7 +5,7 @@ import { Group } from "three";
 import { ROOM_BOX, WORLD_ENVELOPE } from "./envelope";
 import type { RoomObjectInstance } from "./roomObjects";
 import { layoutX, layoutZ } from "./roomLayout";
-import { ContactShadow, EdgeLip, useRoomMaps, type RoomMaps } from "./roomMaterials";
+import { ContactShadow, EdgeLip, RoomTextureQuality, useRoomMaps, type RoomMaps } from "./roomMaterials";
 import type { RoomLook } from "./roomStyle";
 import type { CanonicalZoneKind } from "./worldView";
 
@@ -24,9 +24,10 @@ export function RoomShell({ theme, onSelectZone }: { theme: RoomLook; onSelectZo
   const roomWallZ = (box.backZ + box.wallNearZ) / 2;
   const roomWallDepth = box.wallNearZ - box.backZ;
   return <>
+    <RoomTextureQuality maps={maps} />
     <mesh position={[0, env.floorTop - floorH / 2, floorZ]} receiveShadow>
       <boxGeometry args={[env.floorX * 2, floorH, floorDepth]} />
-      <meshStandardMaterial color={theme.floor} map={maps.woodFloor} roughness={0.88} roughnessMap={maps.woodFloor} />
+      <meshStandardMaterial color={theme.floor} map={maps.woodFloor} roughness={0.84} />
     </mesh>
     {[-2.6, -1.3, 0, 1.3, 2.6].map((x) => (
       <mesh key={`plank-${x}`} position={[layoutX(x), env.floorTop + 0.004, floorZ]}>

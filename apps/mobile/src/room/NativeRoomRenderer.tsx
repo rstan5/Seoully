@@ -12,7 +12,8 @@ import { binderCameraForViewport, inspectionPresentation } from "./composition";
 import { NativeOpenBinder } from "./NativeOpenBinder";
 import { extentsForGeometry } from "./representation";
 import { layoutX, layoutZ, ROOM_LAYOUT } from "./roomLayout";
-import { ContactShadow } from "./roomMaterials";
+import { ContactShadow, prepCollectibleTexture } from "./roomMaterials";
+import { ROOM_SHADOW_CAMERA, ROOM_SHADOW_MAP_SIZE } from "./roomRendererQuality";
 import { RoomFurniture, RoomShell } from "./roomEnvironment";
 import { deskBinderWorld, objectOwnsSurface, zoneHotspotFor, type RoomObjectInstance } from "./roomObjects";
 import { defaultStyleForTheme, resolveRoomLook, type NativeRoomStyle } from "./roomStyle";
@@ -139,14 +140,14 @@ export function NativeRoomRenderer({
       intensity={1.22 * theme.brightness}
       position={[layoutX(-3.8), 3.4, layoutZ(1.2)]}
       castShadow
-      shadow-mapSize={[512, 512]}
+      shadow-mapSize={[ROOM_SHADOW_MAP_SIZE, ROOM_SHADOW_MAP_SIZE]}
       shadow-bias={-0.0008}
-      shadow-camera-near={0.6}
-      shadow-camera-far={16}
-      shadow-camera-left={-6}
-      shadow-camera-right={6}
-      shadow-camera-top={5}
-      shadow-camera-bottom={-5}
+      shadow-camera-near={ROOM_SHADOW_CAMERA.near}
+      shadow-camera-far={ROOM_SHADOW_CAMERA.far}
+      shadow-camera-left={ROOM_SHADOW_CAMERA.left}
+      shadow-camera-right={ROOM_SHADOW_CAMERA.right}
+      shadow-camera-top={ROOM_SHADOW_CAMERA.top}
+      shadow-camera-bottom={ROOM_SHADOW_CAMERA.bottom}
     />
     <pointLight color={theme.light} intensity={(reducedMotion ? 0.16 : 0.28) * theme.brightness} position={[-ROOM_LAYOUT.wallX + 0.28, 0.86, ROOM_LAYOUT.windowZ]} />
     <pointLight color={theme.fill} intensity={0.32 * theme.brightness} position={[layoutX(2.4), 1.55, layoutZ(0.55)]} />
@@ -522,9 +523,10 @@ function CachedCoverMedia({ cacheKey, url, width, height, offset }: { cacheKey: 
 
 function PersonalMediaFace({ uri, width, height, position, rotation = [0, 0, 0] }: { uri: string; width: number; height: number; position: [number, number, number]; rotation?: [number, number, number] }) {
   const texture = useLoader(TextureLoader, uri);
+  const map = useMemo(() => prepCollectibleTexture(texture), [texture]);
   return <mesh position={position} rotation={rotation}>
     <planeGeometry args={[width, height]} />
-    <meshBasicMaterial map={texture} toneMapped={false} />
+    <meshBasicMaterial map={map} toneMapped={false} />
   </mesh>;
 }
 

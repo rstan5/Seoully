@@ -13,12 +13,14 @@ import {
 } from "seoully-domain/fixtures/collectors";
 import type { CollectibleTemplate, Placement } from "seoully-domain/types";
 import type { NativeCatalogTemplate, NativeHolding, NativeRoomPlacement, NativeRoomSnapshot, NativeRoomStyle } from "../api";
+import { parseRoomLayout, serializeRoomLayout, type RoomLayoutState } from "./roomObjects";
 import { defaultStyleForTheme, parseRoomStyle } from "./roomStyle";
 import { demoAssetUri } from "../data/demo/assets";
 import { createInitialRoomRenderable, nativeHomeForHolding, toPersistedTransform, zoneIdForNativeSurface } from "./model";
 
 const session = new Map<string, NativeRoomPlacement[]>();
 const styleSession = new Map<string, NativeRoomStyle>();
+const layoutSession = new Map<string, RoomLayoutState>();
 
 function nativeTemplate(template: CollectibleTemplate): NativeCatalogTemplate {
   return {
@@ -89,6 +91,7 @@ export function buildFixtureRoomSnapshot(ownerId: string = String(SOO)): NativeR
       ownerUserId: ownerId,
       themeId: ownerId === String(SOO) ? "hearth" : "blossom",
       style: styleSession.get(ownerId) ?? defaultStyleForTheme(ownerId === String(SOO) ? "hearth" : "blossom"),
+      layout: serializeRoomLayout(demoRoomLayout(ownerId)),
     },
     holdings,
     placements: fixturePlacements(ownerId, roomId, holdings),
@@ -133,9 +136,24 @@ export function saveDemoRoomStyle(ownerId: string, style: NativeRoomStyle) {
   return next;
 }
 
+export function demoRoomLayout(ownerId: string): RoomLayoutState {
+  return layoutSession.get(ownerId) ?? parseRoomLayout({});
+}
+
+export function saveDemoRoomLayout(ownerId: string, layout: RoomLayoutState) {
+  const next = {
+    source: "authored" as const,
+    objects: layout.objects.map((item) => ({ ...item })),
+    firstRoomEditCompleted: layout.firstRoomEditCompleted,
+  };
+  layoutSession.set(ownerId, next);
+  return next;
+}
+
 export function resetDemoRoomSession() {
   session.clear();
   styleSession.clear();
+  layoutSession.clear();
 }
 
 export function demoRoomOwnerId() {

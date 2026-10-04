@@ -29,10 +29,18 @@ export function cloneRenderables<T extends { position: object; rotation: object 
 }
 
 /** One committed placement change. Canceled / invalid drags must not push. */
-export type PlacementHistoryEntry<T> = {
+export type PlacementHistoryEntry<T, TObject = unknown> = {
   before: T | { storedHoldingId: string };
   after: T | { storedHoldingId: string };
+  objectsBefore?: TObject[];
+  objectsAfter?: TObject[];
+  childrenBefore?: T[];
+  childrenAfter?: T[];
 };
+
+export function isObjectHistory<T, TObject>(entry: PlacementHistoryEntry<T, TObject>) {
+  return Array.isArray(entry.objectsBefore) && Array.isArray(entry.objectsAfter);
+}
 
 export function isStoredHistoryMarker(value: object): value is { storedHoldingId: string } {
   return "storedHoldingId" in value;

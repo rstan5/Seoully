@@ -8,6 +8,7 @@ import {
   type NativeRoomVector,
   type RoomRenderable,
 } from "./model";
+import type { RoomObjectInstance } from "./roomObjects";
 import { extentsForGeometry } from "./representation";
 
 /** Long enough that a normal tap does not acquire; short enough to feel immediate. */
@@ -50,8 +51,8 @@ export function cloneRenderable(item: RoomRenderable): RoomRenderable {
   };
 }
 
-export function compatibleSurfaces(roomId: string, geometry: RoomRenderable["geometry"]) {
-  return nativeRoomSurfaces(roomId).filter((surface) => surfaceAcceptsGeometry(surface, geometry));
+export function compatibleSurfaces(roomId: string, geometry: RoomRenderable["geometry"], objects?: RoomObjectInstance[]) {
+  return nativeRoomSurfaces(roomId, objects).filter((surface) => surfaceAcceptsGeometry(surface, geometry));
 }
 
 export function orientationForSurface(origin: RoomRenderable, surface: NativeRoomSurface): NativeRoomVector {
@@ -167,9 +168,10 @@ export function projectTouchOntoSurfaces(
   roomId: string,
   origin: RoomRenderable,
   reducedMotion = false,
+  objects?: RoomObjectInstance[],
 ): PlacementCandidate | null {
   const ray = screenRay(locX, locY, width, height, pose);
-  const surfaces = nativeRoomSurfaces(roomId);
+  const surfaces = nativeRoomSurfaces(roomId, objects);
   let bestValid: { surface: NativeRoomSurface; point: NativeRoomVector; t: number } | null = null;
   let bestAny: { surface: NativeRoomSurface; point: NativeRoomVector; t: number } | null = null;
   for (const surface of surfaces) {
@@ -182,7 +184,7 @@ export function projectTouchOntoSurfaces(
   }
   if (bestValid) {
     const rest = previewOnSurface(origin, bestValid.surface, bestValid.point);
-    const settled = settleRoomRenderable(rest, roomId, bestValid.surface.id);
+    const settled = settleRoomRenderable(rest, roomId, bestValid.surface.id, objects);
     return {
       surface: bestValid.surface,
       point: bestValid.point,
@@ -221,10 +223,10 @@ export function acquireHeld(origin: RoomRenderable, reducedMotion = false): Held
   };
 }
 
-export function acquirePlaceFromStorage(draft: RoomRenderable, reducedMotion = false): HeldEdit {
+export function acquirePlaceFromStorage(draft: RoomRenderable, reducedMotion = false, takeout: NativeRoomVector = STORAGE_TAKEOUT): HeldEdit {
   const rest = cloneRenderable({
     ...draft,
-    position: { ...STORAGE_TAKEOUT },
+    position: { ...takeout },
   });
   return {
     holdingId: draft.holding.id,

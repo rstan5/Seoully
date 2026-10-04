@@ -92,11 +92,11 @@ export function binderSpreadSize() {
   };
 }
 
-export function openBinderWorldAt(): RoomVec {
+export function openBinderWorldAt(binderAt: RoomVec = DESK_BINDER_AT): RoomVec {
   return {
-    x: DESK_BINDER_AT.x,
-    y: DESK_BINDER_AT.y + OPEN_BINDER_LIFT.y,
-    z: DESK_BINDER_AT.z + OPEN_BINDER_LIFT.z,
+    x: binderAt.x,
+    y: binderAt.y + OPEN_BINDER_LIFT.y,
+    z: binderAt.z + OPEN_BINDER_LIFT.z,
   };
 }
 
@@ -175,8 +175,8 @@ export function inspectionPresentation(item: InspectableItem, aspect = PORTRAIT_
   return { position, rotation, scale: item.scale, camera, distance, face, wall };
 }
 
-export function binderCameraForViewport(aspect = PORTRAIT_ASPECT): CameraPose {
-  const at = openBinderWorldAt();
+export function binderCameraForViewport(aspect = PORTRAIT_ASPECT, binderAt: RoomVec = DESK_BINDER_AT): CameraPose {
+  const at = openBinderWorldAt(binderAt);
   const face = binderSpreadSize();
   const distance = distanceToFitFace(face, aspect, BINDER_RESERVATIONS, BINDER_FILL);
   const bias = lookBiasY(distance, BINDER_RESERVATIONS);
@@ -186,8 +186,8 @@ export function binderCameraForViewport(aspect = PORTRAIT_ASPECT): CameraPose {
   };
 }
 
-export function binderCardInspectionWorld(aspect = PORTRAIT_ASPECT) {
-  const camera = binderCameraForViewport(aspect);
+export function binderCardInspectionWorld(aspect = PORTRAIT_ASPECT, binderAt: RoomVec = DESK_BINDER_AT) {
+  const camera = binderCameraForViewport(aspect, binderAt);
   const face = { width: BINDER_CARD_W, height: BINDER_CARD_H };
   const distance = distanceToFitFace(face, aspect, BINDER_CARD_RESERVATIONS, BINDER_CARD_FILL);
   const dx = camera.lookAt.x - camera.position.x;
@@ -223,8 +223,8 @@ export function pageLocalX(side: "left" | "right") {
 }
 
 /** Resting pocket position in world space — used to lift a card out and put it back. */
-export function pocketWorldPosition(side: "left" | "right", index: number): RoomVec {
-  const binder = openBinderWorldAt();
+export function pocketWorldPosition(side: "left" | "right", index: number, binderAt: RoomVec = DESK_BINDER_AT): RoomVec {
+  const binder = openBinderWorldAt(binderAt);
   const pageX = pageLocalX(side);
   const angle = side === "left" ? BINDER_V_ANGLE : -BINDER_V_ANGLE;
   const pocket = pocketLocalPosition(index);
@@ -243,9 +243,9 @@ export function pocketWorldPosition(side: "left" | "right", index: number): Room
   };
 }
 
-export function binderFitsPortrait(aspect = PORTRAIT_ASPECT) {
-  const pose = binderCameraForViewport(aspect);
-  const at = openBinderWorldAt();
+export function binderFitsPortrait(aspect = PORTRAIT_ASPECT, binderAt: RoomVec = DESK_BINDER_AT) {
+  const pose = binderCameraForViewport(aspect, binderAt);
+  const at = openBinderWorldAt(binderAt);
   const depth = Math.hypot(pose.position.x - at.x, pose.position.y - at.y, pose.position.z - at.z);
   const halfW = Math.tan((CAMERA_FOV_DEG * Math.PI) / 360) * depth * aspect;
   const halfH = Math.tan((CAMERA_FOV_DEG * Math.PI) / 360) * depth;

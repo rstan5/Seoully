@@ -304,6 +304,8 @@ Repair 01 report additions: **42** album front-face inspection; **43** viewport-
 
 **Repair 03 — Room proportions + material/lighting fidelity (code verified / device QA required).** Physical QA accepted Repair 02 framing but asked for a more intimate bedroom and less clay. Authored width is 90% and depth is 80% of Repair 02 (layout helpers, not a camera pull-back). HOME stays at `z: 5.72`. Bundled grayscale grain maps tint with existing style colors. One window-key directional light may cast a 512px shadow; contact planes sit under furniture. Thin edge lips replace razor-box silhouettes. Inspection/7B/7C unchanged. `20261003000000_native_room_style.sql` stays unapplied. Slice 8 not started.
 
+**Repair 04 — true Edit Room + basic Room Shop + first-room experience (code verified / device QA required).** The Room is the collector's bedroom; Edit Room arranges and customizes it. New rooms bootstrap Shelf + Lamp only and auto-enter Edit Room once with a short "Make this room yours" helper. Existing rooms stay furnished (`rooms.layout` empty `{}` = legacy + first edit complete). One Edit mode moves collectibles, furniture, and decor; furniture carries children via surface-relative deltas; Binder follows the live Desk and survives Desk absence. Basic Shop (no commerce) adds one canonical version of each Room object. Compact floating toolbar replaces the giant edit tray. Transient toasts replace persistent placement errors. `20261004000000_native_room_layout.sql` is written and reviewed, **not applied**. Style/camera/7B/7C/Repair 03 visuals unchanged. Slice 8 not started.
+
 Locked gesture model:
 
 - **NORMAL ROOM:** tap object = inspect; empty drag = camera pan; pinch = camera dolly; tap storage crate = stored sheet; tap Binder = spatial Binder
@@ -316,7 +318,7 @@ Locked gesture model:
 | **7A** | Immersive Room shell + direct-touch constrained camera | Physically accepted (REPAIR 04 `7dbc60d`); slanted floor sliver **DEFERRED TO 7D** |
 | **7B** | Touch-first editing (long-press, world-space drag, settle/rollback) | **Physically verified** (`1916f58`) — freeze the touch model |
 | **7C** | Storage + Binder as physical Room world objects | **Physically verified** — freeze storage/Binder world integration |
-| **7D** | Visual reconstruction + unified Edit Room customization | CODE VERIFIED / DEVICE QA REQUIRED — `20261002` unapplied; `20261003` style JSONB written, not applied |
+| **7D** | Visual reconstruction + unified Edit Room customization | CODE VERIFIED / DEVICE QA REQUIRED — `20261002`/`20261003`/`20261004` written, not applied |
 | **7E** | Physical integration QA of the reconstructed world | Not started — required after 7A device proof |
 
 #### Slice 7 visual / interaction QA map

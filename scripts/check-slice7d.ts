@@ -5,6 +5,13 @@ import { CANONICAL_ZONE_KINDS } from "../apps/mobile/src/room/worldView";
 import { applyExploreOffset, CAMERA_FOV_DEG, EXPLORE_LIMITS, HOME_POSE, IDENTITY_EXPLORE, IMMERSIVE_HOME, ROOM_INTERIOR } from "../apps/mobile/src/room/camera";
 import { envelopeCoversPose, immersiveRoomHolds, permittedExploreSamples, ROOM_BOX, WORLD_ENVELOPE } from "../apps/mobile/src/room/envelope";
 import { REPAIR02_BACK_Z, REPAIR02_WALL_X, ROOM_DEPTH_SCALE, ROOM_WIDTH_SCALE } from "../apps/mobile/src/room/roomLayout";
+import {
+  parseRoomLayout,
+  shouldAutoEnterFirstRoomEdit,
+  shopHasNoCommerce,
+  starterRoomLayout,
+  UNIQUE_ROOM_OBJECT_KINDS,
+} from "../apps/mobile/src/room/roomObjects";
 import { parseRoomStyle, resolveRoomLook, STYLE_BY_THEME } from "../apps/mobile/src/room/roomStyle";
 import { representationForHolding } from "../apps/mobile/src/room/representation";
 
@@ -142,5 +149,24 @@ assertContains(read("src/server/dal/rooms.ts"), "room_theme_unavailable", "old t
 assertContains(read("supabase/migrations/20261003000000_native_room_style.sql"), "room_style_is_valid", "style migration validates curated ids");
 assertContains(read("supabase/migrations/20261002000000_native_room_theme.sql"), "theme_id", "obsolete preset migration still exists");
 assertContains(read("docs/native-road-to-ship.md"), "SLICE 7D — ROOM VISUAL RECONSTRUCTION", "7D documented");
+assertContains(read("docs/native-road-to-ship.md"), "Repair 04 — true Edit Room", "Repair 04 documented");
+const starter = starterRoomLayout();
+assert.equal(starter.objects.length, 2);
+assert.equal(starter.objects.some((item) => item.kind === "desk"), false);
+assert.equal(shouldAutoEnterFirstRoomEdit(parseRoomLayout({}), false), false);
+assert.equal(shopHasNoCommerce(), true);
+assert.equal(UNIQUE_ROOM_OBJECT_KINDS.has("rug"), true);
+assertContains(worldScreen, "RoomShopSheet", "Shop sheet");
+assertContains(worldScreen, "styles.editBar", "compact floating toolbar");
+assertNotContains(worldScreen, "styles.editTray", "giant white edit block removed");
+assertContains(worldScreen, "roomFirstTitle", "first-room copy");
+assertContains(worldScreen, "showToast", "transient placement errors");
+assertNotContains(read("apps/mobile/src/room/RoomShopSheet.tsx"), "Stripe", "no Stripe");
+assertNotContains(read("apps/mobile/src/room/RoomShopSheet.tsx"), "coin", "no coins");
+assertContains(environment, "FurniturePose", "furniture uses instance transforms");
+assertContains(environment, "WallFrame", "wall decor is a Room object");
+assertContains(read("apps/mobile/src/room/roomEnvironment.tsx"), "RoomWindow", "window stays architectural");
+assertContains(read("src/server/dal/public-room.ts"), "layout", "public Room may expose visual layout");
+assertContains(read("supabase/migrations/20261004000000_native_room_layout.sql"), "rooms_update_own", "layout stays on owner-write rooms");
 
 console.log("check:slice7d passed");

@@ -723,6 +723,7 @@ export type NativePublicRoom = {
   room: {
     id: string;
     style?: NativeRoomStyle;
+    layout?: Record<string, unknown>;
     placements: {
       id: string;
       zoneId: string;
@@ -792,7 +793,7 @@ export type NativeRoomStyle = {
   light: "warm" | "day" | "soft" | "night";
   brightness: "dim" | "normal" | "bright";
 };
-export type NativeRoom = { id: string; ownerUserId: string; themeId: NativeRoomThemeId; style?: NativeRoomStyle };
+export type NativeRoom = { id: string; ownerUserId: string; themeId: NativeRoomThemeId; style?: NativeRoomStyle; layout?: Record<string, unknown> };
 export type NativeRoomPlacement = {
   id: string;
   roomId: string;
@@ -835,6 +836,18 @@ export async function saveNativeRoomPlacement(input: {
   if (!response.ok) throw new Error("room_placement_write_failed");
   const payload = await response.json() as { placement: NativeRoomPlacement };
   return payload.placement;
+}
+
+export async function saveNativeRoomLayout(roomId: string, layout: Record<string, unknown>) {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/room`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ roomId, layout }),
+  });
+  if (!response.ok) throw new Error("room_layout_write_failed");
+  const payload = await response.json() as { room: NativeRoom };
+  return payload.room;
 }
 
 export async function saveNativeRoomStyle(roomId: string, style: NativeRoomStyle) {

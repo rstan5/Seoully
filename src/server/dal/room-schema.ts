@@ -1,6 +1,17 @@
 /** Applied rooms columns plus 7D `style`. Do not select theme_id — 20261002 stays unapplied. */
 
-export const ROOM_OWNER_SELECT = "id,owner_user_id,created_at,updated_at,style" as const;
+export const ROOM_OWNER_SELECT = "id,owner_user_id,created_at,updated_at,style,layout" as const;
+export const ROOM_OWNER_SELECT_STYLE = "id,owner_user_id,created_at,updated_at,style" as const;
+
+/** Authored new-room bootstrap. Coordinates match mobile layoutX/layoutZ of Repair 03 defaults. */
+export const STARTER_ROOM_LAYOUT = {
+  version: 1,
+  firstRoomEditCompleted: false,
+  objects: [
+    { id: "shelf", kind: "shelf", x: -2.835, y: -0.55, z: -3.024, rotateY: 0 },
+    { id: "lamp", kind: "lamp", x: -3.348, y: -2.08, z: -0.464, rotateY: 0 },
+  ],
+} as const;
 export const DEFAULT_NATIVE_ROOM_THEME = "hearth" as const;
 export const DEFAULT_NATIVE_ROOM_STYLE = {
   wall: "plum",

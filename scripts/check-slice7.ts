@@ -5,6 +5,20 @@ import { buildPages } from "../src/world/objects/binderGeometry";
 import { isBinderEligible } from "../apps/mobile/src/data/ownership";
 import { holdingRemainsAfterStore, pushPlacementHistory, restoreEditBaseline, revertDrop, storeRenderable } from "../apps/mobile/src/room/editSession";
 import { nativeRoomSurfaces, surfaceAcceptsGeometry } from "../apps/mobile/src/room/model";
+import {
+  canAddRoomObject,
+  childrenOnObject,
+  deskBinderWorld,
+  emptyLayoutMeansLegacy,
+  legacyRoomLayout,
+  parseRoomLayout,
+  serializeRoomLayout,
+  shouldAutoEnterFirstRoomEdit,
+  shopHasNoCommerce,
+  starterRoomLayout,
+  translateChildren,
+  UNIQUE_ROOM_OBJECT_KINDS,
+} from "../apps/mobile/src/room/roomObjects";
 import { acquireHeld, acquirePlaceFromStorage, compatibleSurfaces, LONG_PRESS_MS, placementsMatch, projectTouchOntoSurfaces, screenRay } from "../apps/mobile/src/room/touchEdit";
 import { filterStoredHoldings } from "../apps/mobile/src/room/storedHoldings";
 import {
@@ -155,7 +169,7 @@ assert.deepEqual(stepBack({ kind: "zone", zone: "desk" }), { kind: "home" });
 assert.equal(stepBack({ kind: "home" }), "leave");
 
 // R. Public binder
-assertContains(worldScreen, "onOpenBinder={() => openBinderFromWorld()}", "Binder opens from the world object");
+assertContains(worldScreen, "onOpenBinder={deskPresent ? () => openBinderFromWorld() : undefined}", "Binder opens from the world object");
 assertContains(worldScreen, "if (!snapshot || readOnly || viewRef.current.kind !== \"edit\") return;", "public cannot place from storage");
 
 // S. Demo/Live isolation
@@ -178,7 +192,7 @@ assertContains(read("apps/mobile/src/room/threeFiberCompat.ts"), "extractUrlBase
 
 // V. Migration safety
 assertContains(read("supabase/migrations/20261002000000_native_room_theme.sql"), "theme_id", "migration file exists");
-assertContains(read("src/server/dal/room-schema.ts"), 'ROOM_OWNER_SELECT = "id,owner_user_id,created_at,updated_at,style"', "style selected without theme_id");
+assertContains(read("src/server/dal/room-schema.ts"), 'ROOM_OWNER_SELECT = "id,owner_user_id,created_at,updated_at,style,layout"', "style and layout selected without theme_id");
 assertNotContains(read("src/server/dal/room-schema.ts"), 'ROOM_OWNER_SELECT = "id,owner_user_id,theme_id', "20261002 theme_id stays unselected");
 assertContains(read("src/server/dal/rooms.ts"), "room_theme_unavailable", "theme write blocked");
 assertNotContains(read("apps/mobile/app/room.tsx"), "saveNativeRoomTheme", "room does not write theme");
@@ -200,7 +214,7 @@ assertContains(worldScreen, "nudgeExploreFromDrag", "one-finger explore");
 assertContains(worldScreen, "nudgeExploreFromPinch", "pinch zoom");
 assertContains(worldScreen, "Math.hypot(gesture.dx, gesture.dy) > 10", "drag threshold");
 assertContains(worldScreen, "exploreRef={exploreRef}", "camera reads explore ref");
-assertContains(worldScreen, "onOpenBinder={() => openBinderFromWorld()}", "desk Binder tap");
+assertContains(worldScreen, "openBinderFromWorld()", "desk Binder tap");
 assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "ZONE_HOTSPOTS", "world zone taps");
 assertContains(read("apps/mobile/src/room/roomEnvironment.tsx"), 'onSelectZone?.("shelf")', "shelf furniture tap");
 assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "onOpenBinder", "desk Binder tap");
@@ -570,5 +584,50 @@ assertContains(read("apps/mobile/app/collector-room.tsx"), "/public-collectible"
 assertContains(read("apps/mobile/app/room.tsx"), "/collectible", "own View collectible is canonical detail");
 assertNotContains(read("apps/mobile/src/room/NativeOpenBinder.tsx"), "held ? 1.85", "no in-pocket zoom inspect");
 assertNotContains(worldScreen, "onInspectCollectible && !readOnly", "public inspect can view collectible");
+
+const starter = starterRoomLayout();
+assert.deepEqual(starter.objects.map((item) => item.kind).sort(), ["lamp", "shelf"]);
+assert.equal(starter.firstRoomEditCompleted, false);
+assert.equal(shouldAutoEnterFirstRoomEdit(starter, false), true);
+assert.equal(shouldAutoEnterFirstRoomEdit(starter, true), false);
+const legacy = parseRoomLayout({});
+assert.equal(emptyLayoutMeansLegacy({}), true);
+assert.equal(legacy.source, "legacy");
+assert.equal(legacy.firstRoomEditCompleted, true);
+assert.equal(shouldAutoEnterFirstRoomEdit(legacy, false), false);
+assert.equal(JSON.stringify(serializeRoomLayout(legacy)), "{}");
+assert.equal(canAddRoomObject(starter.objects, "desk"), true);
+assert.equal(canAddRoomObject(legacy.objects, "desk"), false);
+assert.equal(UNIQUE_ROOM_OBJECT_KINDS.has("desk"), true);
+assert.equal(shopHasNoCommerce(), true);
+const starterShelf = starter.objects.find((item) => item.kind === "shelf")!;
+const carried = translateChildren([{
+  holding: { id: "h1" },
+  position: { x: layoutX(-3.15), y: 0, z: layoutZ(-3.48) },
+  placement: { surfaceId: "room-1-shelf-bay-0" },
+}], "room-1", starterShelf, { x: 0.5, y: 0, z: 0 });
+assert.ok(Math.abs(carried[0]!.position.x - (layoutX(-3.15) + 0.5)) < 1e-6, "shelf children follow parent delta");
+assert.equal(childrenOnObject(carried, "room-1", { ...starterShelf, x: starterShelf.x + 0.5 }).length, 1);
+assert.equal(deskBinderWorld(starter.objects), null);
+assert.ok(deskBinderWorld(legacy.objects));
+const movedSurfaces = nativeRoomSurfaces("room-1", [{ ...starterShelf, x: starterShelf.x + 1 }]);
+const defaultBay = nativeRoomSurfaces("room-1").find((surface) => surface.id.endsWith("shelf-bay-0"))!;
+const movedBay = movedSurfaces.find((surface) => surface.id.endsWith("shelf-bay-0"))!;
+assert.ok(Math.abs(movedBay.x - defaultBay.x - 1) < 1e-6, "landing surfaces move with shelf");
+assertContains(worldScreen, "RoomShopSheet", "basic Room Shop exists");
+assertContains(worldScreen, "beginPlaceFromShop", "Shop can enter placement");
+assertContains(worldScreen, "saveNativeRoomLayout", "live layout persist");
+assertContains(worldScreen, "saveDemoRoomLayout", "demo layout persist");
+assertContains(worldScreen, "roomFirstTitle", "first-room helper");
+assertContains(worldScreen, "styles.editBar", "compact Edit toolbar");
+assertNotContains(worldScreen, "styles.editTray", "giant edit tray is gone");
+assertNotContains(worldScreen, "stripe", "no commerce in Room screen");
+assertNotContains(read("apps/mobile/src/room/RoomShopSheet.tsx"), "price", "Shop has no prices");
+assertNotContains(read("apps/mobile/src/room/roomObjects.ts"), "CannonJS", "no physics engine");
+assertContains(read("src/server/dal/rooms.ts"), "updateMyRoomLayout", "owner layout writes");
+assertContains(read("src/server/dal/rooms.ts"), "room_layout_unavailable", "unapplied layout column is honest");
+assertContains(read("src/server/dal/rooms.ts"), "STARTER_ROOM_LAYOUT", "new rooms bootstrap Shelf + Lamp");
+assertContains(read("supabase/migrations/20261004000000_native_room_layout.sql"), "room_layout_is_valid", "layout migration validates objects");
+assertContains(read("supabase/migrations/20261004000000_native_room_layout.sql"), "firstRoomEditCompleted", "first-room completion lives on layout");
 
 console.log("check:slice7 passed");

@@ -7,13 +7,14 @@ import { Color, Euler, Group, MeshBasicMaterial, PCFShadowMap, Quaternion, Textu
 import type { NativeBinderSpread } from "../binder/model";
 import type { NativeHolding } from "../api";
 import { useCachedSignedMedia } from "../media/cachedMedia";
-import { applyExploreOffset, cameraLerpAlpha, exploreAllowedForView, IDENTITY_EXPLORE, poseForView, type ExploreOffset } from "./camera";
+import { applyExploreOffset, cameraLerpAlpha, DESK_BINDER_AT, exploreAllowedForView, IDENTITY_EXPLORE, poseForView, type ExploreOffset } from "./camera";
 import { binderCameraForViewport, inspectionPresentation } from "./composition";
 import { NativeOpenBinder } from "./NativeOpenBinder";
 import { extentsForGeometry } from "./representation";
 import { layoutX, layoutZ, ROOM_LAYOUT } from "./roomLayout";
 import { ContactShadow } from "./roomMaterials";
 import { RoomFurniture, RoomShell } from "./roomEnvironment";
+import { deskBinderWorld, objectOwnsSurface, zoneHotspotFor, type RoomObjectInstance } from "./roomObjects";
 import { defaultStyleForTheme, resolveRoomLook, type NativeRoomStyle } from "./roomStyle";
 import { HELD_SCALE } from "./touchEdit";
 import { roomTextureIds, type NativeRoomSurface, type RoomRenderable } from "./model";
@@ -33,6 +34,11 @@ export function NativeRoomRenderer({
   selectedId,
   focusedId,
   heldId = null,
+  roomId,
+  objects = [],
+  selectedObjectId = null,
+  heldObjectId = null,
+  showLegacyBoxes = false,
   themeId,
   style,
   view,
@@ -44,6 +50,7 @@ export function NativeRoomRenderer({
   readOnly = false,
   onSelectZone,
   onSelect,
+  onSelectObject,
   onClearSelection,
   onOpenBinder,
   onHoldCard,
@@ -51,10 +58,14 @@ export function NativeRoomRenderer({
   onTurnComplete,
   exploreRef,
   previewRef,
+  objectPreviewRef,
+  furnitureCarryRef,
   highlightSurfaceIdRef,
   compatibleSurfaces = [],
   onPressStart,
   onPressEnd,
+  onObjectPressStart,
+  onObjectPressEnd,
   onOpenStorage,
   placingItem = null,
 }: {
@@ -62,6 +73,11 @@ export function NativeRoomRenderer({
   selectedId: string | null;
   focusedId: string | null;
   heldId?: string | null;
+  roomId?: string;
+  objects?: RoomObjectInstance[];
+  selectedObjectId?: string | null;
+  heldObjectId?: string | null;
+  showLegacyBoxes?: boolean;
   themeId: import("../api").NativeRoomThemeId;
   style?: NativeRoomStyle;
   view: NativeWorldView;
@@ -73,6 +89,7 @@ export function NativeRoomRenderer({
   readOnly?: boolean;
   onSelectZone: (zone: CanonicalZoneKind) => void;
   onSelect: (holdingId: string) => void;
+  onSelectObject?: (objectId: string) => void;
   onClearSelection: () => void;
   onOpenBinder?: () => void;
   onHoldCard?: (holding: NativeHolding | null) => void;
@@ -80,15 +97,21 @@ export function NativeRoomRenderer({
   onTurnComplete?: () => void;
   exploreRef?: MutableRefObject<ExploreOffset>;
   previewRef?: MutableRefObject<RoomRenderable | null>;
+  objectPreviewRef?: MutableRefObject<RoomObjectInstance | null>;
+  furnitureCarryRef?: MutableRefObject<{ roomId: string; origin: RoomObjectInstance; current: RoomObjectInstance } | null>;
   highlightSurfaceIdRef?: MutableRefObject<string | null>;
   compatibleSurfaces?: NativeRoomSurface[];
   onPressStart?: (holdingId: string) => void;
   onPressEnd?: (holdingId: string) => void;
+  onObjectPressStart?: (objectId: string) => void;
+  onObjectPressEnd?: (objectId: string) => void;
   onOpenStorage?: () => void;
   placingItem?: RoomRenderable | null;
 }) {
   const focused = items.find((item) => item.holding.id === focusedId) ?? null;
   const theme = resolveRoomLook(style ?? defaultStyleForTheme(themeId));
+  const layoutObjects = objects;
+  const binderAt = deskBinderWorld(layoutObjects);
   const textured = roomTextureIds(items, selectedId, focusedId);
   if (placingItem?.imageUrl) textured.add(placingItem.holding.id);
   const binderOpen = view.kind === "binder";
@@ -127,21 +150,33 @@ export function NativeRoomRenderer({
     />
     <pointLight color={theme.light} intensity={(reducedMotion ? 0.16 : 0.28) * theme.brightness} position={[-ROOM_LAYOUT.wallX + 0.28, 0.86, ROOM_LAYOUT.windowZ]} />
     <pointLight color={theme.fill} intensity={0.32 * theme.brightness} position={[layoutX(2.4), 1.55, layoutZ(0.55)]} />
-    <AuthoredCamera view={view} focused={focused} reducedMotion={reducedMotion} paused={paused} exploreRef={exploreRef} />
+    <AuthoredCamera view={view} focused={focused} reducedMotion={reducedMotion} paused={paused} exploreRef={exploreRef} binderAt={binderAt ?? DESK_BINDER_AT} />
     <Suspense fallback={null}>
       <RoomShell theme={theme} onSelectZone={view.kind === "home" || view.kind === "zone" ? onSelectZone : undefined} />
       <RoomFurniture
       theme={theme}
+      objects={layoutObjects}
       hideClosedBinder={binderOpen}
-      onOpenBinder={view.kind === "binder" || view.kind === "edit" || Boolean(heldId) ? undefined : onOpenBinder}
-      onOpenStorage={readOnly || view.kind === "binder" || Boolean(heldId) ? undefined : onOpenStorage}
+      binderAt={binderAt}
+      showLegacyBoxes={showLegacyBoxes}
+      selectedObjectId={selectedObjectId}
+      heldObjectId={heldObjectId}
+      objectPreviewRef={objectPreviewRef}
+      editing={view.kind === "edit" && !readOnly}
+      onOpenBinder={view.kind === "binder" || view.kind === "edit" || Boolean(heldId) || Boolean(heldObjectId) ? undefined : onOpenBinder}
+      onOpenStorage={readOnly || view.kind === "binder" || Boolean(heldId) || Boolean(heldObjectId) ? undefined : onOpenStorage}
       onSelectZone={view.kind === "home" || view.kind === "zone" ? onSelectZone : undefined}
+      onSelectObject={view.kind === "edit" && !readOnly ? onSelectObject : undefined}
+      onObjectPressStart={view.kind === "edit" && !readOnly ? onObjectPressStart : undefined}
+      onObjectPressEnd={view.kind === "edit" && !readOnly ? onObjectPressEnd : undefined}
     />
     </Suspense>
-    {view.kind === "home" ? CANONICAL_ZONE_KINDS.filter((zone) => zone !== "archive").map((zone) => (
-      <ZoneHotspot key={zone} zone={zone} onSelect={onSelectZone} />
-    )) : null}
-    {heldId && compatibleSurfaces.length ? <LandingHighlights
+    {view.kind === "home" ? CANONICAL_ZONE_KINDS.filter((zone) => zone !== "archive").map((zone) => {
+      if (zone === "wall") return <ZoneHotspot key={zone} zone={zone} onSelect={onSelectZone} />;
+      const spot = zoneHotspotFor(zone, layoutObjects);
+      return spot ? <ZoneHotspot key={zone} zone={zone} onSelect={onSelectZone} spot={spot} /> : null;
+    }) : null}
+    {(heldId || heldObjectId) && compatibleSurfaces.length ? <LandingHighlights
       surfaces={compatibleSurfaces}
       activeIdRef={highlightSurfaceIdRef}
       color={theme.light}
@@ -158,6 +193,7 @@ export function NativeRoomRenderer({
         loadTexture={textured.has(item.holding.id)}
         interactive={live}
         previewRef={previewRef}
+        furnitureCarryRef={furnitureCarryRef}
         reducedMotion={reducedMotion}
         paused={paused}
         onSelect={onSelect}
@@ -174,6 +210,7 @@ export function NativeRoomRenderer({
       paused={paused}
       cover={theme.binder}
       paper={theme.paper}
+      binderAt={binderAt ?? DESK_BINDER_AT}
       onHold={(holding) => onHoldCard?.(holding)}
       onTurnComplete={() => onTurnComplete?.()}
       onTurnEdge={(dir) => onTurnEdge?.(dir)}
@@ -187,12 +224,14 @@ function AuthoredCamera({
   reducedMotion,
   paused,
   exploreRef,
+  binderAt,
 }: {
   view: NativeWorldView;
   focused: RoomRenderable | null;
   reducedMotion: boolean;
   paused: boolean;
   exploreRef?: MutableRefObject<ExploreOffset>;
+  binderAt: { x: number; y: number; z: number };
 }) {
   const { camera, size } = useThree();
   const targetPosition = useMemo(() => new Vector3(), []);
@@ -204,7 +243,7 @@ function AuthoredCamera({
     const authored = view.kind === "inspect" && focused
       ? inspectionPresentation(focused, aspect).camera
       : view.kind === "binder"
-        ? binderCameraForViewport(aspect)
+        ? binderCameraForViewport(aspect, binderAt)
         : poseForView(view, focused);
     const offset = exploreRef?.current ?? IDENTITY_EXPLORE;
     const pose = exploreAllowedForView(view)
@@ -220,8 +259,15 @@ function AuthoredCamera({
   return null;
 }
 
-function ZoneHotspot({ zone, onSelect }: { zone: CanonicalZoneKind; onSelect: (zone: CanonicalZoneKind) => void }) {
-  const spot = ZONE_HOTSPOTS[zone];
+function ZoneHotspot({
+  zone,
+  onSelect,
+  spot = ZONE_HOTSPOTS[zone],
+}: {
+  zone: CanonicalZoneKind;
+  onSelect: (zone: CanonicalZoneKind) => void;
+  spot?: { position: [number, number, number]; size: [number, number, number] };
+}) {
   return <mesh
     position={spot.position}
     onClick={(event) => { event.stopPropagation(); onSelect(zone); }}
@@ -277,6 +323,7 @@ function RoomObject({
   loadTexture,
   interactive,
   previewRef,
+  furnitureCarryRef,
   reducedMotion,
   paused,
   onSelect,
@@ -290,6 +337,7 @@ function RoomObject({
   loadTexture: boolean;
   interactive: boolean;
   previewRef?: MutableRefObject<RoomRenderable | null>;
+  furnitureCarryRef?: MutableRefObject<{ roomId: string; origin: RoomObjectInstance; current: RoomObjectInstance } | null>;
   reducedMotion: boolean;
   paused: boolean;
   onSelect: (id: string) => void;
@@ -309,6 +357,15 @@ function RoomObject({
       mesh.position.set(preview.position.x, preview.position.y, preview.position.z);
       mesh.rotation.set(preview.rotation.x, preview.rotation.y, preview.rotation.z);
       mesh.scale.setScalar(preview.scale * HELD_SCALE);
+      return;
+    }
+    const carry = furnitureCarryRef?.current;
+    if (carry && objectOwnsSurface(carry.roomId, carry.origin, item.placement?.surfaceId)) {
+      mesh.position.set(
+        item.position.x + (carry.current.x - carry.origin.x),
+        item.position.y + (carry.current.y - carry.origin.y),
+        item.position.z + (carry.current.z - carry.origin.z),
+      );
       return;
     }
     const aspect = size.width / Math.max(1, size.height);

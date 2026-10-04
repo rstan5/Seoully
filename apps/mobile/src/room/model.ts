@@ -1,5 +1,6 @@
 import type { NativeHolding, NativeRoomPlacement } from "../api";
 import { extentsForGeometry, representationForHolding, representationKindForHolding, type NativeRepresentationKind } from "./representation";
+import { applyObjectSurfaces, type RoomObjectInstance } from "./roomObjects";
 import { layoutX, layoutZ, ROOM_LAYOUT } from "./roomLayout";
 
 export type NativeRoomVector = { x: number; y: number; z: number };
@@ -158,18 +159,19 @@ export function surfaceAcceptsGeometry(surface: NativeRoomSurface, geometry: Roo
   return surface.id.includes("shelf") || surface.id.includes("desk") || surface.id.includes("display-case");
 }
 
-export function isSupportedRoomPlacement(renderable: RoomRenderable, roomId: string) {
-  return nativeRoomSurfaces(roomId).some((surface) =>
+export function isSupportedRoomPlacement(renderable: RoomRenderable, roomId: string, objects?: RoomObjectInstance[]) {
+  return nativeRoomSurfaces(roomId, objects).some((surface) =>
     surfaceAcceptsGeometry(surface, renderable.geometry) && footprintDistance(renderable.position, surface) < 1.45,
   );
 }
 
-export function settleRoomRenderable(renderable: RoomRenderable, roomId: string, preferredSurfaceId?: string) {
-  const surfaces = nativeRoomSurfaces(roomId).filter((surface) => surfaceAcceptsGeometry(surface, renderable.geometry));
+export function settleRoomRenderable(renderable: RoomRenderable, roomId: string, preferredSurfaceId?: string, objects?: RoomObjectInstance[]) {
+  const all = nativeRoomSurfaces(roomId, objects);
+  const surfaces = all.filter((surface) => surfaceAcceptsGeometry(surface, renderable.geometry));
   const preferred = surfaces.find((candidate) => candidate.id === preferredSurfaceId);
   const surface = preferred ?? surfaces
     .map((candidate) => ({ candidate, distance: footprintDistance(renderable.position, candidate) }))
-    .sort((a, b) => a.distance - b.distance)[0]?.candidate ?? nativeRoomSurfaces(roomId).find((item) => item.id.endsWith("-desk"))!;
+    .sort((a, b) => a.distance - b.distance)[0]?.candidate ?? all.find((item) => item.id.endsWith("-floor")) ?? all[0];
   const halfHeight = extentsForGeometry(renderable.geometry).y / 2;
   return {
     renderable: {
@@ -182,8 +184,8 @@ export function settleRoomRenderable(renderable: RoomRenderable, roomId: string,
   };
 }
 
-export function nativeRoomSurfaces(roomId: string): NativeRoomSurface[] {
-  return [
+export function nativeRoomSurfaces(roomId: string, objects?: RoomObjectInstance[]): NativeRoomSurface[] {
+  const defaults: NativeRoomSurface[] = [
     { id: `${roomId}-shelf-bay-0`, kind: "horizontal", x: layoutX(-3.15), y: -1.4, z: layoutZ(-3.48), width: 2.1, depth: 0.8 },
     { id: `${roomId}-shelf-bay-1`, kind: "horizontal", x: layoutX(-3.15), y: -0.5, z: layoutZ(-3.48), width: 2.1, depth: 0.8 },
     { id: `${roomId}-shelf-bay-2`, kind: "horizontal", x: layoutX(-3.15), y: 0.4, z: layoutZ(-3.48), width: 2.1, depth: 0.8 },
@@ -195,6 +197,7 @@ export function nativeRoomSurfaces(roomId: string): NativeRoomSurface[] {
     { id: `${roomId}-wall`, kind: "wall", x: layoutX(1.1), y: 0.75, z: ROOM_LAYOUT.backZ + 0.28, width: 3.15, depth: 2.5 },
     { id: `${roomId}-floor`, kind: "horizontal", x: 0, y: -2.15, z: layoutZ(-1.2), width: 9.2, depth: 5.8 },
   ];
+  return objects ? applyObjectSurfaces(roomId, defaults, objects) : defaults;
 }
 
 export function nativeHomeForHolding(holding: NativeHolding, roomId: string, slot: number) {
@@ -232,7 +235,7 @@ export function nativeHomeForHolding(holding: NativeHolding, roomId: string, slo
 }
 
 export function zoneIdForNativeSurface(roomId: string, surfaceId: string) {
-  if (surfaceId.startsWith(`${roomId}-shelf-bay-`)) return `${roomId}-shelf`;
+  if (surfaceId.startsWith(`${roomId}-shelf-bay-`) || surfaceId.startsWith(`${roomId}-shelf:`)) return `${roomId}-shelf`;
   if (surfaceId.startsWith(`${roomId}-display-case-`)) return `${roomId}-display-case`;
   for (const zone of ["binder", "desk", "archive", "wall", "floor"]) {
     if (surfaceId === `${roomId}-${zone}`) return `${roomId}-${zone}`;

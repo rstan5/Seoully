@@ -36,6 +36,7 @@ export function NativeOpenBinder({
   paused,
   cover,
   paper,
+  binderAt = DESK_BINDER_AT,
   onHold,
   onTurnComplete,
   onTurnEdge,
@@ -48,18 +49,19 @@ export function NativeOpenBinder({
   paused: boolean;
   cover: string;
   paper: string;
+  binderAt?: { x: number; y: number; z: number };
   onHold: (holding: NativeHolding | null) => void;
   onTurnComplete: () => void;
   onTurnEdge: (dir: 1 | -1) => void;
 }) {
-  const x = DESK_BINDER_AT.x;
-  const y = DESK_BINDER_AT.y + OPEN_BINDER_LIFT.y;
-  const z = DESK_BINDER_AT.z + OPEN_BINDER_LIFT.z;
+  const x = binderAt.x;
+  const y = binderAt.y + OPEN_BINDER_LIFT.y;
+  const z = binderAt.z + OPEN_BINDER_LIFT.z;
   const left = turnDir === -1 && turningTo ? turningTo.left : spread?.left;
   const right = turnDir === 1 && turningTo ? turningTo.right : spread?.right;
   const leaf = turnDir === 1 ? spread?.right : turnDir === -1 ? spread?.left : undefined;
   const leafBack = turnDir === 1 ? turningTo?.left : turningTo?.right;
-  const liveHeld = findHeldCard(spread, turningTo, heldHoldingId);
+  const liveHeld = findHeldCard(spread, turningTo, heldHoldingId, binderAt);
   const [flight, setFlight] = useState<typeof liveHeld>(null);
   const [keepFlight, setKeepFlight] = useState(false);
   if (liveHeld && flight?.holding.id !== liveHeld.holding.id) setFlight(liveHeld);
@@ -76,6 +78,7 @@ export function NativeOpenBinder({
     {shown ? <InspectedBinderCard
       holding={shown.holding}
       rest={shown.rest}
+      binderAt={binderAt}
       active={Boolean(heldHoldingId)}
       reducedMotion={reducedMotion}
       paused={paused}
@@ -205,6 +208,7 @@ function PagePockets({
 function InspectedBinderCard({
   holding,
   rest,
+  binderAt,
   active,
   reducedMotion,
   paused,
@@ -214,6 +218,7 @@ function InspectedBinderCard({
 }: {
   holding: NativeHolding;
   rest: { x: number; y: number; z: number };
+  binderAt: { x: number; y: number; z: number };
   active: boolean;
   reducedMotion: boolean;
   paused: boolean;
@@ -235,7 +240,7 @@ function InspectedBinderCard({
       seeded.current = true;
     }
     const aspect = size.width / Math.max(1, size.height);
-    const presented = binderCardInspectionWorld(aspect);
+    const presented = binderCardInspectionWorld(aspect, binderAt);
     const dest = active ? presented.position : rest;
     const destRot = active ? presented.rotation : { x: 0, y: 0, z: 0 };
     const destScale = active ? presented.scale : 1;
@@ -302,6 +307,7 @@ function findHeldCard(
   spread: NativeBinderSpread | undefined,
   turningTo: NativeBinderSpread | undefined,
   heldHoldingId?: string,
+  binderAt: { x: number; y: number; z: number } = DESK_BINDER_AT,
 ) {
   if (!heldHoldingId) return null;
   for (const page of [spread?.left, spread?.right, turningTo?.left, turningTo?.right]) {
@@ -309,7 +315,7 @@ function findHeldCard(
     const pocket = page.pockets.find((entry) => entry.holding?.id === heldHoldingId);
     if (!pocket?.holding) continue;
     const side = page === spread?.left || page === turningTo?.left ? "left" : "right";
-    return { holding: pocket.holding, rest: pocketWorldPosition(side, pocket.index % BINDER_POCKETS_PER_PAGE) };
+    return { holding: pocket.holding, rest: pocketWorldPosition(side, pocket.index % BINDER_POCKETS_PER_PAGE, binderAt) };
   }
   return null;
 }

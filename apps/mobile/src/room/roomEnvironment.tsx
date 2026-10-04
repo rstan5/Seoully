@@ -1,6 +1,9 @@
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
-import { DESK_BINDER_AT } from "./camera";
+import { useRef, type MutableRefObject, type ReactNode } from "react";
+import { useFrame } from "@react-three/fiber/native";
+import { Group } from "three";
 import { ROOM_BOX, WORLD_ENVELOPE } from "./envelope";
+import type { RoomObjectInstance } from "./roomObjects";
 import { layoutX, layoutZ } from "./roomLayout";
 import { ContactShadow, EdgeLip, useRoomMaps, type RoomMaps } from "./roomMaterials";
 import type { RoomLook } from "./roomStyle";
@@ -63,8 +66,6 @@ export function RoomShell({ theme, onSelectZone }: { theme: RoomLook; onSelectZo
     <mesh position={[-box.wallX + 0.08, env.floorTop + 0.055, roomWallZ]}><boxGeometry args={[0.055, 0.11, roomWallDepth - 0.2]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.58} /></mesh>
     <mesh position={[box.wallX - 0.08, env.floorTop + 0.055, roomWallZ]}><boxGeometry args={[0.055, 0.11, roomWallDepth - 0.2]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.58} /></mesh>
     <RoomWindow theme={theme} maps={maps} />
-    <mesh position={[layoutX(1.55), 0.88, box.backZ + 0.12]}><boxGeometry args={[1.28, 1.48, 0.03]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.5} /></mesh>
-    <mesh position={[layoutX(1.55), 0.88, box.backZ + 0.15]}><boxGeometry args={[1.1, 1.3, 0.02]} /><meshStandardMaterial color={theme.wallAccent} map={maps.paper} roughness={0.78} /></mesh>
   </>;
 }
 
@@ -81,34 +82,136 @@ function RoomWindow({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
 
 export function RoomFurniture({
   theme,
+  objects,
   hideClosedBinder,
+  binderAt,
+  showLegacyBoxes,
+  selectedObjectId,
+  heldObjectId,
+  objectPreviewRef,
+  editing = false,
   onOpenBinder,
   onOpenStorage,
   onSelectZone,
+  onSelectObject,
+  onObjectPressStart,
+  onObjectPressEnd,
 }: {
   theme: RoomLook;
+  objects: import("./roomObjects").RoomObjectInstance[];
   hideClosedBinder: boolean;
+  binderAt?: { x: number; y: number; z: number } | null;
+  showLegacyBoxes?: boolean;
+  selectedObjectId?: string | null;
+  heldObjectId?: string | null;
+  objectPreviewRef?: MutableRefObject<RoomObjectInstance | null>;
+  editing?: boolean;
   onOpenBinder?: () => void;
   onOpenStorage?: () => void;
   onSelectZone?: (zone: CanonicalZoneKind) => void;
+  onSelectObject?: (objectId: string) => void;
+  onObjectPressStart?: (objectId: string) => void;
+  onObjectPressEnd?: (objectId: string) => void;
 }) {
   const maps = useRoomMaps();
+  const deskPresent = objects.some((item) => item.kind === "desk");
   return <>
-    <ShelfUnit theme={theme} maps={maps} onSelect={() => onSelectZone?.("shelf")} />
-    <DeskUnit theme={theme} maps={maps} onSelect={() => onSelectZone?.("desk")} />
-    {!hideClosedBinder ? <ClosedBinder theme={theme} maps={maps} onOpen={onOpenBinder} /> : null}
-    <CaseUnit theme={theme} maps={maps} onSelect={() => onSelectZone?.("case")} />
-    <ArchiveCrate theme={theme} maps={maps} onOpen={onOpenStorage} onSelect={() => onSelectZone?.("archive")} />
-    <Rug theme={theme} maps={maps} />
-    <FloorLamp theme={theme} />
-    <Plant theme={theme} maps={maps} />
-    <StorageBoxes theme={theme} maps={maps} />
+    {objects.map((object) => (
+      <FurniturePose
+        key={object.id}
+        object={object}
+        held={heldObjectId === object.id}
+        previewRef={objectPreviewRef}
+        editing={editing}
+        onSelectZone={onSelectZone}
+        onSelectObject={onSelectObject}
+        onObjectPressStart={onObjectPressStart}
+        onObjectPressEnd={onObjectPressEnd}
+        onOpenStorage={onOpenStorage}
+      >
+        {object.kind === "shelf" ? <ShelfUnit theme={theme} maps={maps} /> : null}
+        {object.kind === "desk" ? <DeskUnit theme={theme} maps={maps} /> : null}
+        {object.kind === "case" ? <CaseUnit theme={theme} maps={maps} /> : null}
+        {object.kind === "archive" ? <ArchiveCrate theme={theme} maps={maps} /> : null}
+        {object.kind === "rug" ? <Rug theme={theme} maps={maps} /> : null}
+        {object.kind === "lamp" ? <FloorLamp theme={theme} /> : null}
+        {object.kind === "plant" ? <Plant theme={theme} maps={maps} /> : null}
+        {object.kind === "wall-frame" ? <WallFrame theme={theme} maps={maps} /> : null}
+      </FurniturePose>
+    ))}
+    {!hideClosedBinder && deskPresent && binderAt ? <ClosedBinder theme={theme} maps={maps} at={binderAt} objects={objects} previewRef={objectPreviewRef} onOpen={onOpenBinder} /> : null}
+    {showLegacyBoxes ? <StorageBoxes theme={theme} maps={maps} /> : null}
   </>;
 }
 
-function ShelfUnit({ theme, maps, onSelect }: { theme: RoomLook; maps: RoomMaps; onSelect: () => void }) {
+function FurniturePose({
+  object,
+  held,
+  previewRef,
+  editing,
+  onSelectZone,
+  onSelectObject,
+  onObjectPressStart,
+  onObjectPressEnd,
+  onOpenStorage,
+  children,
+}: {
+  object: RoomObjectInstance;
+  held: boolean;
+  previewRef?: MutableRefObject<RoomObjectInstance | null>;
+  editing: boolean;
+  onSelectZone?: (zone: CanonicalZoneKind) => void;
+  onSelectObject?: (objectId: string) => void;
+  onObjectPressStart?: (objectId: string) => void;
+  onObjectPressEnd?: (objectId: string) => void;
+  onOpenStorage?: () => void;
+  children: ReactNode;
+}) {
+  const group = useRef<Group>(null);
+  useFrame(() => {
+    const mesh = group.current;
+    if (!mesh) return;
+    const live = held && previewRef?.current?.id === object.id ? previewRef.current : object;
+    mesh.position.set(live.x, live.y, live.z);
+    mesh.rotation.set(0, (live.rotateY * Math.PI) / 180, 0);
+  });
+  return <group
+    ref={group}
+    position={[object.x, object.y, object.z]}
+    rotation={[0, (object.rotateY * Math.PI) / 180, 0]}
+    onPointerDown={(event) => {
+      if (!editing) return;
+      event.stopPropagation();
+      onObjectPressStart?.(object.id);
+    }}
+    onPointerUp={(event) => {
+      if (!editing) return;
+      event.stopPropagation();
+      onObjectPressEnd?.(object.id);
+    }}
+    onClick={(event) => {
+      event.stopPropagation();
+      if (editing) {
+        onSelectObject?.(object.id);
+        return;
+      }
+      if (object.kind === "archive") {
+        if (onOpenStorage) onOpenStorage();
+        else onSelectZone?.("archive");
+        return;
+      }
+      if (object.kind === "shelf") onSelectZone?.("shelf");
+      if (object.kind === "desk") onSelectZone?.("desk");
+      if (object.kind === "case") onSelectZone?.("case");
+    }}
+  >
+    {children}
+  </group>;
+}
+
+function ShelfUnit({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
   const boards = [-1.45, -0.55, 0.35, 1.18];
-  return <group position={[layoutX(-3.15), -0.55, layoutZ(-3.78)]} onClick={(event) => { event.stopPropagation(); onSelect(); }}>
+  return <group>
     <mesh position={[0, 0, -0.28]} castShadow receiveShadow><boxGeometry args={[2.18, 3.08, 0.05]} /><meshStandardMaterial color={theme.furniture} map={maps.woodFine} roughness={0.78} /></mesh>
     <mesh position={[-1.06, 0, 0.08]} castShadow><boxGeometry args={[0.055, 3.12, 0.68]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.56} /></mesh>
     <mesh position={[1.06, 0, 0.08]} castShadow><boxGeometry args={[0.055, 3.12, 0.68]} /><meshStandardMaterial color={theme.furniture} map={maps.woodFine} roughness={0.68} /></mesh>
@@ -125,8 +228,8 @@ function ShelfUnit({ theme, maps, onSelect }: { theme: RoomLook; maps: RoomMaps;
   </group>;
 }
 
-function DeskUnit({ theme, maps, onSelect }: { theme: RoomLook; maps: RoomMaps; onSelect: () => void }) {
-  return <group position={[layoutX(1.45), -0.82, layoutZ(-2.85)]} onClick={(event) => { event.stopPropagation(); onSelect(); }}>
+function DeskUnit({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
+  return <group>
     <mesh position={[0, 0.055, 0]} castShadow receiveShadow><boxGeometry args={[3.28, 0.055, 1.68]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.46} /></mesh>
     <EdgeLip width={3.22} color={theme.metal} depth={0.83} />
     <mesh position={[0, 0.018, 0]} receiveShadow><boxGeometry args={[3.12, 0.04, 1.52]} /><meshStandardMaterial color={theme.furniture} map={maps.woodFine} roughness={0.64} /></mesh>
@@ -146,8 +249,35 @@ function DeskUnit({ theme, maps, onSelect }: { theme: RoomLook; maps: RoomMaps; 
   </group>;
 }
 
-function ClosedBinder({ theme, maps, onOpen }: { theme: RoomLook; maps: RoomMaps; onOpen?: () => void }) {
-  return <group position={[DESK_BINDER_AT.x, DESK_BINDER_AT.y, DESK_BINDER_AT.z]} rotation={[-0.18, -0.22, 0]} onClick={(event) => { event.stopPropagation(); onOpen?.(); }}>
+function ClosedBinder({
+  theme,
+  maps,
+  at,
+  objects,
+  previewRef,
+  onOpen,
+}: {
+  theme: RoomLook;
+  maps: RoomMaps;
+  at: { x: number; y: number; z: number };
+  objects: RoomObjectInstance[];
+  previewRef?: MutableRefObject<RoomObjectInstance | null>;
+  onOpen?: () => void;
+}) {
+  const group = useRef<Group>(null);
+  useFrame(() => {
+    const mesh = group.current;
+    if (!mesh) return;
+    const preview = previewRef?.current;
+    const desk = preview?.kind === "desk" ? preview : objects.find((item) => item.kind === "desk");
+    if (!desk) return;
+    const origin = objects.find((item) => item.kind === "desk");
+    const dx = origin ? desk.x - origin.x : 0;
+    const dy = origin ? desk.y - origin.y : 0;
+    const dz = origin ? desk.z - origin.z : 0;
+    mesh.position.set(at.x + dx, at.y + dy, at.z + dz);
+  });
+  return <group ref={group} position={[at.x, at.y, at.z]} rotation={[-0.18, -0.22, 0]} onClick={(event) => { event.stopPropagation(); onOpen?.(); }}>
     <mesh position={[0, 0.02, 0.02]}><boxGeometry args={[1.15, 1.02, 0.82]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>
     <mesh position={[-0.36, 0, 0]}><boxGeometry args={[0.07, 0.74, 0.52]} /><meshStandardMaterial color={theme.binder} map={maps.vinyl} roughness={0.38} /></mesh>
     <mesh position={[0.02, 0.01, -0.02]}><boxGeometry args={[0.64, 0.7, 0.48]} /><meshStandardMaterial color={theme.binder} map={maps.vinyl} roughness={0.48} /></mesh>
@@ -157,8 +287,8 @@ function ClosedBinder({ theme, maps, onOpen }: { theme: RoomLook; maps: RoomMaps
   </group>;
 }
 
-function CaseUnit({ theme, maps, onSelect }: { theme: RoomLook; maps: RoomMaps; onSelect: () => void }) {
-  return <group position={[layoutX(3.65), -0.55, layoutZ(-3.78)]} onClick={(event) => { event.stopPropagation(); onSelect(); }}>
+function CaseUnit({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
+  return <group>
     <mesh position={[0, 0, -0.18]} castShadow receiveShadow><boxGeometry args={[1.48, 3.08, 0.05]} /><meshStandardMaterial color={theme.furniture} map={maps.woodFine} roughness={0.74} /></mesh>
     <mesh position={[-0.72, 0, 0.14]} castShadow><boxGeometry args={[0.055, 3.12, 0.62]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.52} /></mesh>
     <mesh position={[0.72, 0, 0.14]} castShadow><boxGeometry args={[0.055, 3.12, 0.62]} /><meshStandardMaterial color={theme.furniture} map={maps.woodFine} roughness={0.66} /></mesh>
@@ -175,8 +305,8 @@ function CaseUnit({ theme, maps, onSelect }: { theme: RoomLook; maps: RoomMaps; 
   </group>;
 }
 
-function ArchiveCrate({ theme, maps, onOpen, onSelect }: { theme: RoomLook; maps: RoomMaps; onOpen?: () => void; onSelect: () => void }) {
-  return <group position={[layoutX(-1.2), -1.86, layoutZ(-0.65)]} onClick={(event) => { event.stopPropagation(); if (onOpen) onOpen(); else onSelect(); }}>
+function ArchiveCrate({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
+  return <group>
     <mesh position={[0, 0.22, 0]}><boxGeometry args={[2.15, 1.15, 1.55]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>
     <mesh castShadow receiveShadow><boxGeometry args={[1.72, 0.5, 1.08]} /><meshStandardMaterial color={theme.paper} map={maps.cardboard} roughness={0.9} /></mesh>
     {[-0.52, 0, 0.52].map((z) => (
@@ -191,14 +321,14 @@ function ArchiveCrate({ theme, maps, onOpen, onSelect }: { theme: RoomLook; maps
 }
 
 function Rug({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
-  return <group position={[layoutX(0.22), -2.05, layoutZ(-1.15)]}>
+  return <group>
     <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow><boxGeometry args={[2.3, 1.48, 0.02]} /><meshStandardMaterial color={theme.accent} map={maps.fabric} roughness={0.97} /></mesh>
     <mesh position={[0, 0.008, 0]} rotation={[-Math.PI / 2, 0, 0]}><boxGeometry args={[1.96, 1.18, 0.012]} /><meshStandardMaterial color={theme.wallAccent} map={maps.fabric} roughness={0.95} /></mesh>
   </group>;
 }
 
 function FloorLamp({ theme }: { theme: RoomLook }) {
-  return <group position={[layoutX(-3.72), -2.08, layoutZ(-0.58)]}>
+  return <group>
     <mesh position={[0, 0.04, 0]}><cylinderGeometry args={[0.16, 0.2, 0.06, 12]} /><meshStandardMaterial color={theme.metal} roughness={0.32} metalness={0.46} /></mesh>
     <mesh position={[0, 1.05, 0]} castShadow><cylinderGeometry args={[0.03, 0.04, 2.02, 8]} /><meshStandardMaterial color={theme.metal} roughness={0.36} metalness={0.38} /></mesh>
     <mesh position={[0, 2.12, 0]}><cylinderGeometry args={[0.22, 0.28, 0.28, 12]} /><meshStandardMaterial color={theme.paper} roughness={0.74} /></mesh>
@@ -207,8 +337,15 @@ function FloorLamp({ theme }: { theme: RoomLook }) {
   </group>;
 }
 
+function WallFrame({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
+  return <group>
+    <mesh position={[0, 0, 0]}><boxGeometry args={[1.28, 1.48, 0.03]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.5} /></mesh>
+    <mesh position={[0, 0, 0.03]}><boxGeometry args={[1.1, 1.3, 0.02]} /><meshStandardMaterial color={theme.wallAccent} map={maps.paper} roughness={0.78} /></mesh>
+  </group>;
+}
+
 function Plant({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
-  return <group position={[layoutX(3.42), -1.95, layoutZ(-1.62)]}>
+  return <group>
     <mesh position={[0, 0.12, 0]} castShadow><cylinderGeometry args={[0.14, 0.12, 0.24, 10]} /><meshStandardMaterial color={theme.furniture} map={maps.woodFine} roughness={0.72} /></mesh>
     <mesh position={[0, 0.38, 0]}><sphereGeometry args={[0.22, 12, 10]} /><meshStandardMaterial color="#4a6a52" roughness={0.9} /></mesh>
     <mesh position={[0.12, 0.52, 0.04]}><sphereGeometry args={[0.14, 10, 8]} /><meshStandardMaterial color="#5a7a60" roughness={0.88} /></mesh>

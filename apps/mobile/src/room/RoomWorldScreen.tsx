@@ -47,7 +47,6 @@ import { RoomShopSheet } from "./RoomShopSheet";
 import { RoomStyleSheet } from "./RoomStyleSheet";
 import {
   canAddRoomObject,
-  childrenOnObject,
   cloneRoomObjects,
   legacyRoomLayout,
   markFirstRoomEditComplete,
@@ -59,7 +58,6 @@ import {
   shouldAutoEnterFirstRoomEdit,
   spawnRoomObject,
   storageTakeoutFor,
-  translateChildren,
   TURNABLE_ROOM_OBJECT_KINDS,
   turnRoomObject,
   type RoomLayoutState,
@@ -70,6 +68,7 @@ import { acquireRoomObject, liftRoomObject, objectsMatch, projectRoomObjectOntoW
 import { DEFAULT_ROOM_STYLE, defaultStyleForTheme, parseRoomStyle, resolveRoomLook, type NativeRoomStyle } from "./roomStyle";
 import { entranceForeground, roomEntranceCopy } from "./entrance";
 import { roomOverlayChrome } from "./theme";
+import { asAuthoredRenderable, withResolvedWorld } from "./roomWorldTransform";
 import { inspectView, openBinderView, stepBack, zoneFromSurfaceId, type CanonicalZoneKind, type NativeWorldView } from "./worldView";
 
 const NativeRoomRenderer = lazy(async () => {
@@ -565,7 +564,10 @@ export function RoomWorldScreen({
         pendingPressRef.current = null;
         const item = latestItems.current.find((entry) => entry.holding.id === holdingId);
         if (!item || viewRef.current.kind !== "edit") return;
-        const held = acquireHeld(item, reducedMotionRef.current);
+        const room = snapshotRef.current?.room;
+        const world = withResolvedWorld(item, room?.id, latestObjects.current);
+        const held = acquireHeld(world, reducedMotionRef.current);
+        held.origin = cloneRenderable(item);
         heldRef.current = held;
         previewRef.current = held.preview;
         highlightSurfaceIdRef.current = held.surfaceId;
@@ -697,23 +699,34 @@ export function RoomWorldScreen({
   async function persistPlacement(next: RoomRenderable, options?: { silent?: boolean }) {
     const room = snapshotRef.current?.room ?? snapshot?.room;
     if (!room) return;
-    const settled = settleRoomRenderable(next, room.id, next.placement?.surfaceId ?? undefined, latestObjects.current);
+    const objects = latestObjects.current;
+    const world = withResolvedWorld(next, room.id, objects);
+    const settled = settleRoomRenderable(world, room.id, next.placement?.surfaceId ?? undefined, objects);
+    const authored = asAuthoredRenderable({
+      ...settled.renderable,
+      placement: next.placement
+        ? { ...next.placement, surfaceId: settled.surfaceId }
+        : settled.renderable.placement,
+    }, room.id, objects);
     const payload = {
       roomId: room.id,
       holdingId: next.holding.id,
       zoneId: zoneIdForNativeSurface(room.id, settled.surfaceId),
       slot: next.placement?.slot ?? latestItems.current.findIndex((item) => item.holding.id === next.holding.id),
-      transform: toPersistedTransform(settled.renderable),
+      transform: toPersistedTransform(authored),
       surfaceId: settled.surfaceId,
     };
     try {
       const placement = demo ? loadDemoRoom().saveDemoPlacement(payload) : await saveNativeRoomPlacement(payload);
+      const stored = { ...authored, placement };
       setItems((all) => {
-        const mapped = all.map((item) => item.holding.id === next.holding.id ? { ...settled.renderable, placement } : item);
-        return mapped.some((item) => item.holding.id === next.holding.id) ? mapped : [...mapped, { ...settled.renderable, placement }];
+        const mapped = all.map((item) => item.holding.id === next.holding.id ? stored : item);
+        return mapped.some((item) => item.holding.id === next.holding.id) ? mapped : [...mapped, stored];
       });
+      return stored;
     } catch {
       if (!options?.silent) setError(copy.roomSaveFailed);
+      return undefined;
     }
   }
 
@@ -730,9 +743,10 @@ export function RoomWorldScreen({
         if (held.valid === false) showToast(copy.roomPlaceOnSurface);
         return;
       }
-      if (held.origin && placementsMatch(held.origin, held.rest)) return;
-      await persistPlacement(held.rest);
-      rememberPlacement(held.origin ?? { storedHoldingId: held.holdingId }, held.rest);
+      const authoredRest = asAuthoredRenderable(held.rest, room.id, latestObjects.current);
+      if (held.origin && placementsMatch(held.origin, authoredRest)) return;
+      const stored = await persistPlacement(held.rest);
+      rememberPlacement(held.origin ?? { storedHoldingId: held.holdingId }, stored ?? authoredRest);
     } finally {
       clearHeldVisual();
       gestureRef.current.releasing = false;
@@ -754,18 +768,13 @@ export function RoomWorldScreen({
     }
   }
 
-  async function applyRoomObjects(nextObjects: RoomObjectInstance[], children?: RoomRenderable[]) {
+  async function applyRoomObjects(nextObjects: RoomObjectInstance[]) {
     const next = { ...layoutStateRef.current, source: "authored" as const, objects: cloneRoomObjects(nextObjects) };
-    if (children) {
-      setItems(children);
-      await Promise.all(children.map((item) => persistPlacement(item, { silent: true })));
-    }
     await persistLayout(next);
   }
 
   async function releaseHeldObject() {
     const held = heldObjectRef.current;
-    const room = snapshotRef.current?.room;
     if (!held || gestureRef.current.releasing) return;
     gestureRef.current.releasing = true;
     suppressTapRef.current = true;
@@ -784,26 +793,13 @@ export function RoomWorldScreen({
       const afterObjects = held.placing
         ? [...removeRoomObject(beforeObjects, held.objectId), held.current]
         : replaceRoomObject(beforeObjects, held.current);
-      const dx = held.current.x - held.origin.x;
-      const dy = held.current.y - held.origin.y;
-      const dz = held.current.z - held.origin.z;
-      const childrenBefore = childrenOnObject(latestItems.current, room?.id ?? "", held.origin);
-      const childrenAfter = room
-        ? translateChildren(latestItems.current, room.id, held.origin, { x: dx, y: dy, z: dz })
-        : latestItems.current;
       setRoomLayout((current) => ({ ...current, source: "authored", objects: afterObjects }));
-      if (room && (dx || dy || dz)) setItems(childrenAfter);
       await persistLayout({ ...layoutStateRef.current, source: "authored", objects: afterObjects });
-      if (room) {
-        await Promise.all(childrenOnObject(childrenAfter, room.id, held.current).map((item) => persistPlacement(item, { silent: true })));
-      }
       pushPlacementHistory(undoStack.current, redoStack.current, {
         before: { storedHoldingId: held.objectId },
         after: { storedHoldingId: held.objectId },
         objectsBefore: beforeObjects,
         objectsAfter: cloneRoomObjects(afterObjects),
-        childrenBefore: childrenBefore.map(cloneRenderable),
-        childrenAfter: childrenOnObject(childrenAfter, room?.id ?? "", held.current).map(cloneRenderable),
       });
       syncHistory();
       setSelectedObjectId(held.objectId);
@@ -820,7 +816,7 @@ export function RoomWorldScreen({
     redoStack.current.push(entry);
     syncHistory();
     if (isObjectHistory(entry) && entry.objectsBefore) {
-      await applyRoomObjects(entry.objectsBefore, restoreObjectChildren(entry.childrenBefore));
+      await applyRoomObjects(entry.objectsBefore);
       return;
     }
     const before = entry.before;
@@ -841,7 +837,7 @@ export function RoomWorldScreen({
     undoStack.current.push(entry);
     syncHistory();
     if (isObjectHistory(entry) && entry.objectsAfter) {
-      await applyRoomObjects(entry.objectsAfter, restoreObjectChildren(entry.childrenAfter));
+      await applyRoomObjects(entry.objectsAfter);
       return;
     }
     const after = entry.after;
@@ -854,12 +850,6 @@ export function RoomWorldScreen({
       return;
     }
     await persistPlacement(after);
-  }
-
-  function restoreObjectChildren(children?: RoomRenderable[]) {
-    if (!children) return latestItems.current;
-    const byId = new Map(children.map((item) => [item.holding.id, item]));
-    return latestItems.current.map((item) => byId.get(item.holding.id) ?? item);
   }
 
   async function saveEditing() {

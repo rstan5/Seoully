@@ -18,7 +18,15 @@ import {
   starterRoomLayout,
   translateChildren,
   UNIQUE_ROOM_OBJECT_KINDS,
+  defaultRoomObject,
+  furnitureDelta,
+  ROOM_OBJECT_DEFAULTS,
 } from "../apps/mobile/src/room/roomObjects";
+import {
+  authoredPlacementFromWorld,
+  liveZoneDock,
+  resolveRoomWorldTransform,
+} from "../apps/mobile/src/room/roomWorldTransform";
 import { acquireHeld, acquirePlaceFromStorage, compatibleSurfaces, LONG_PRESS_MS, placementsMatch, projectTouchOntoSurfaces, screenRay } from "../apps/mobile/src/room/touchEdit";
 import { filterStoredHoldings } from "../apps/mobile/src/room/storedHoldings";
 import {
@@ -406,7 +414,7 @@ assertContains(worldScreen, "previewRef", "drag preview is ref-driven");
 assertContains(worldScreen, "heldRef.current", "acquired object owns the drag");
 assertContains(worldScreen, "if (heldRef.current) {", "held drag does not pan the camera");
 assertContains(worldScreen, "async function releaseHeld", "release commits or rolls back");
-assertContains(worldScreen, "rememberPlacement(held.origin ?? { storedHoldingId: held.holdingId }, held.rest)", "committed move or place is undoable");
+assertContains(worldScreen, "rememberPlacement(held.origin ?? { storedHoldingId: held.holdingId }, stored ?? authoredRest)", "committed move or place is undoable");
 assertContains(worldScreen, "revertDrop(all, origin)", "invalid release restores origin");
 assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "onPressStart", "collectibles receive long-press");
 assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "LandingHighlights", "compatible surfaces highlight while held");
@@ -629,5 +637,67 @@ assertContains(read("src/server/dal/rooms.ts"), "room_layout_unavailable", "unap
 assertContains(read("src/server/dal/rooms.ts"), "STARTER_ROOM_LAYOUT", "new rooms bootstrap Shelf + Lamp");
 assertContains(read("supabase/migrations/20261004000000_native_room_layout.sql"), "room_layout_is_valid", "layout migration validates objects");
 assertContains(read("supabase/migrations/20261004000000_native_room_layout.sql"), "firstRoomEditCompleted", "first-room completion lives on layout");
+
+const roomId = "room-1";
+const albumAuthored = {
+  geometry: "album" as const,
+  position: { x: layoutX(-3.15), y: -0.35, z: layoutZ(-3.48) },
+  rotation: { x: 0, y: 0, z: 0 },
+  scale: 1,
+  placement: { surfaceId: `${roomId}-shelf-bay-0` },
+};
+const shelfA = defaultRoomObject("shelf");
+const shelfB = { ...shelfA, x: shelfA.x + 1, z: shelfA.z + 0.4 };
+const atA = resolveRoomWorldTransform(albumAuthored, roomId, [shelfA]);
+const atB = resolveRoomWorldTransform(albumAuthored, roomId, [shelfB]);
+assert.ok(Math.abs(atA.position.x - albumAuthored.position.x) < 1e-6, "A: authored album stays on default shelf");
+assert.ok(Math.abs(atB.position.x - (albumAuthored.position.x + 1)) < 1e-6, "A: moved shelf carries album world X");
+assert.ok(Math.abs(atB.position.z - (albumAuthored.position.z + 0.4)) < 1e-6, "A: moved shelf carries album world Z");
+const inspectB = inspectionPresentation({ ...albumAuthored, position: atB.position, rotation: atB.rotation });
+assert.ok(Math.abs(inspectB.camera.lookAt.x - atB.position.x) < 1e-6, "A: inspection target equals resolved album X");
+assert.ok(Math.abs((atB.position.x - atA.position.x) - 1) < 1e-6, "B: shelf +1 moves album +1");
+assert.ok(Math.abs(atB.position.x - albumAuthored.position.x - 2) > 0.5, "B: album is not double-delta +2");
+assert.deepEqual(authoredPlacementFromWorld(atB.position, roomId, albumAuthored.placement.surfaceId, [shelfB]), albumAuthored.position, "B: authored placement is unchanged after parent move");
+const undone = resolveRoomWorldTransform(albumAuthored, roomId, [shelfA]);
+assert.ok(Math.abs(undone.position.x - atA.position.x) < 1e-6, "C: undo returns album to A");
+const redone = resolveRoomWorldTransform(albumAuthored, roomId, [shelfB]);
+assert.ok(Math.abs(redone.position.x - atB.position.x) < 1e-6, "D: redo returns album to B");
+const deskA = defaultRoomObject("desk");
+const deskB = { ...deskA, x: deskA.x + 0.8 };
+const binderA = deskBinderWorld([deskA])!;
+const binderB = deskBinderWorld([deskB])!;
+assert.ok(Math.abs(binderB.x - binderA.x - 0.8) < 1e-6, "E: Binder rest follows current Desk");
+assert.ok(Math.abs(binderCameraForViewport(9 / 19.5, binderB).lookAt.x - openBinderWorldAt(binderB).x) < 1e-6, "E: Binder camera follows current Desk");
+const caseItem = {
+  geometry: "figure" as const,
+  position: { x: layoutX(3.65), y: 0.1, z: layoutZ(-3.52) },
+  rotation: { x: 0, y: 0, z: 0 },
+  scale: 1,
+  placement: { surfaceId: `${roomId}-display-case-shelf` },
+};
+const caseA = defaultRoomObject("case");
+const caseB = { ...caseA, x: caseA.x - 0.7 };
+const caseWorld = resolveRoomWorldTransform(caseItem, roomId, [caseB]);
+assert.ok(Math.abs(caseWorld.position.x - (caseItem.position.x - 0.7)) < 1e-6, "F: Case child follows Case");
+const wallItem = {
+  position: { x: layoutX(1.1), y: 0.75, z: layoutZ(-4.12) },
+  placement: { surfaceId: `${roomId}-wall` },
+};
+const wallWorld = resolveRoomWorldTransform(wallItem, roomId, [shelfB, caseB, deskB]);
+assert.ok(Math.abs(wallWorld.position.x - wallItem.position.x) < 1e-6, "G: wall collectible ignores furniture displacement");
+const publicAlbum = resolveRoomWorldTransform(albumAuthored, roomId, [shelfB]);
+assert.ok(Math.abs(publicAlbum.position.x - atB.position.x) < 1e-6, "H: public layout uses the same resolver");
+assert.ok(Math.abs(resolveRoomWorldTransform(albumAuthored, roomId, [shelfA]).position.x - albumAuthored.position.x) < 1e-6, "I: legacy absolute placement remains resolvable");
+const shopShelf = defaultRoomObject("shelf", "shelf-2");
+shopShelf.x += 1.2;
+const shopAlbum = {
+  position: { x: layoutX(-3.15) + 0.2, y: -0.35, z: layoutZ(-3.48) },
+  placement: { surfaceId: `${roomId}-shelf:shelf-2-bay-0` },
+};
+const shopWorld = resolveRoomWorldTransform(shopAlbum, roomId, [shopShelf]);
+assert.ok(Math.abs(shopWorld.position.x - (shopAlbum.position.x + 1.2)) < 1e-6, "J: shop-added shelf anchors its child");
+assert.ok(Math.abs(liveZoneDock("shelf", [shelfB]).lookAt.x - (liveZoneDock("shelf", [shelfA]).lookAt.x + 1)) < 1e-6, "zone return follows moved shelf");
+assert.ok(Math.abs(furnitureDelta(shelfB).x - 1) < 1e-6, "furnitureDelta is current minus kind default");
+assert.ok(Math.abs(ROOM_OBJECT_DEFAULTS.shelf.x - shelfA.x) < 1e-6, "default shelf is the authored reference");
 
 console.log("check:slice7 passed");

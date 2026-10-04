@@ -185,6 +185,14 @@ assertContains(read("supabase/migrations/20261002000000_native_room_theme.sql"),
 assertContains(read("docs/native-road-to-ship.md"), "SLICE 7D — ROOM VISUAL RECONSTRUCTION", "7D documented");
 assertContains(read("docs/native-road-to-ship.md"), "Repair 04 — true Edit Room", "Repair 04 documented");
 assertContains(read("docs/native-road-to-ship.md"), "Repair 05 — mobile render fidelity", "Repair 05 documented");
+assertContains(read("apps/mobile/src/room/roomWorldTransform.ts"), "resolveRoomWorldTransform", "live world resolver exists");
+assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "resolveRoomWorldTransform", "renderer consumes the resolver");
+assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "inspectionPresentation(liveFocused, aspect)", "inspect camera uses resolved focus");
+assertNotContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "carry.current.x - carry.origin.x", "no ad hoc furniture delta in the renderer");
+assertNotContains(read("apps/mobile/src/room/RoomWorldScreen.tsx"), "translateChildren(", "furniture move does not rewrite child placements");
+assertContains(read("apps/mobile/src/room/roomRendererQuality.ts"), "ROOM_SHADOW_MAP_SIZE", "Repair 05 shadow constant remains");
+assert.equal(ROOM_SHADOW_MAP_SIZE, 1024, "Repair 05 1024 shadow remains");
+assert.equal(ROOM_TEXTURE_MAX_EDGE, 512, "Repair 05 texture ceiling remains");
 const starter = starterRoomLayout();
 assert.equal(starter.objects.length, 2);
 assert.equal(starter.objects.some((item) => item.kind === "desk"), false);

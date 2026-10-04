@@ -19,6 +19,7 @@
     "apps/mobile/src/room/roomLayout.ts",
     "apps/mobile/src/room/roomStyle.ts",
     "apps/mobile/src/room/roomRendererQuality.ts",
+    "apps/mobile/src/room/roomWorldTransform.ts",
     "apps/mobile/src/room/roomObjects.ts",
     "apps/mobile/src/room/model.ts",
     "apps/mobile/src/room/representation.ts",

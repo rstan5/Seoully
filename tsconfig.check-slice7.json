@@ -22,6 +22,7 @@
     "apps/mobile/src/room/storedHoldings.ts",
     "apps/mobile/src/room/model.ts",
     "apps/mobile/src/room/roomObjects.ts",
+    "apps/mobile/src/room/roomWorldTransform.ts",
     "apps/mobile/src/room/roomObjectEdit.ts",
     "apps/mobile/src/room/representation.ts",
     "apps/mobile/src/room/worldView.ts",

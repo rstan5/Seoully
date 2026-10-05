@@ -1,16 +1,16 @@
-import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { roomChromeSurface, type RoomChrome } from "./theme";
+import { Modal, TextInput, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeHolding } from "../api";
 import { collectibleKindLabel, type MobileCopy } from "../i18n";
 import { filterStoredHoldings } from "./storedHoldings";
 import { representationForHolding } from "./representation";
 import { CachedSignedImage } from "../media/cachedMedia";
-import { colors, spacing } from "../theme";
+import { spacing } from "../theme";
 import { chrome } from "../ui/shellLayout";
-import { SeoullyEmptyState } from "../ui/SeoullyEmptyState";
-import { SeoullySearchField } from "../ui/SeoullySearch";
 import { SeoullyText } from "../ui/SeoullyText";
 
 export function StoredCollectionSheet({
+  roomChrome,
   visible,
   holdings,
   query,
@@ -24,6 +24,7 @@ export function StoredCollectionSheet({
   onPlace,
   onEditToPlace,
 }: {
+  roomChrome: RoomChrome;
   visible: boolean;
   holdings: NativeHolding[];
   query: string;
@@ -46,41 +47,36 @@ export function StoredCollectionSheet({
   >
     <View style={styles.frame}>
       <Pressable accessibilityRole="button" onPress={onClose} style={styles.dismiss} />
-      <View style={[styles.sheet, { paddingBottom: bottomInset + chrome.companionSize + chrome.companionClearance }]}>
+      <View style={[styles.sheet, roomChromeSurface(roomChrome), { paddingBottom: bottomInset + chrome.companionSize + chrome.companionClearance }]}>
         <View style={styles.header}>
-          <SeoullyText variant="handle" style={styles.title}>{copy.storedCollection}</SeoullyText>
-          <Pressable accessibilityRole="button" onPress={onClose} hitSlop={8}>
-            <SeoullyText variant="button" color={colors.plum}>{copy.close}</SeoullyText>
+          <SeoullyText color={roomChrome.color} variant="handle" style={styles.title}>{copy.storedCollection}</SeoullyText>
+          <Pressable accessibilityRole="button" onPress={onClose} style={styles.close} hitSlop={8}>
+            <SeoullyText variant="button" color={roomChrome.color}>{copy.close}</SeoullyText>
           </Pressable>
         </View>
         <View style={styles.search}>
-          <SeoullySearchField
-            value={query}
-            placeholder={copy.storedSearchPlaceholder}
-            label={copy.storedSearch}
-            clearLabel={copy.searchClear}
-            onChange={onChangeQuery}
-            onSubmit={() => undefined}
-            onClear={() => onChangeQuery("")}
-          />
+          <View style={styles.searchRow}>
+            <TextInput accessibilityLabel={copy.storedSearch} value={query} placeholder={copy.storedSearchPlaceholder}
+              placeholderTextColor={roomChrome.color} selectionColor={roomChrome.color}
+              autoCorrect={false} autoCapitalize="none" returnKeyType="search" onChangeText={onChangeQuery}
+              style={[styles.searchInput, roomChromeSurface(roomChrome), { color: roomChrome.color }]} />
+            {query.trim() ? <Pressable style={styles.close} onPress={() => onChangeQuery("")}><SeoullyText color={roomChrome.color} variant="button">{copy.searchClear}</SeoullyText></Pressable> : null}
+          </View>
         </View>
-        {matches.length === 0 ? <SeoullyEmptyState
-          align="start"
-          body={holdings.length === 0 ? copy.storedEmpty : copy.storedEmptySearch}
-        /> : <ScrollView keyboardShouldPersistTaps="handled" style={styles.list}>
+        {matches.length === 0 ? <SeoullyText color={roomChrome.color} variant="secondary">{holdings.length === 0 ? copy.storedEmpty : copy.storedEmptySearch}</SeoullyText> : <ScrollView keyboardShouldPersistTaps="handled" style={styles.list}>
           {matches.map((holding) => {
             const look = representationForHolding(holding);
-            return <View key={holding.id} style={styles.row}>
+            return <View key={holding.id} style={[styles.row, roomChromeSurface(roomChrome)]}>
             {look.imageUrl ? <CachedSignedImage cacheKey={holding.id} url={look.imageUrl} style={styles.thumb} /> : <View style={[styles.thumb, styles.thumbFallback, { backgroundColor: look.color }]} />}
             <View style={styles.meta}>
-              <SeoullyText numberOfLines={1} variant="handle" style={styles.name}>{holding.template.name}</SeoullyText>
-              <SeoullyText numberOfLines={1} variant="caption" color={colors.muted}>
+              <SeoullyText color={roomChrome.color} numberOfLines={1} variant="handle" style={styles.name}>{holding.template.name}</SeoullyText>
+              <SeoullyText numberOfLines={1} variant="caption" color={roomChrome.color}>
                 {[holding.template.groupName, holding.template.memberName, collectibleKindLabel(holding.template.kind, copy)].filter(Boolean).join(" · ")}
               </SeoullyText>
               <View style={styles.actions}>
-                {onInspect ? <Pressable onPress={() => onInspect(holding.id)}><SeoullyText variant="caption" color={colors.plum}>{copy.viewCollectible}</SeoullyText></Pressable> : null}
-                {editing && onPlace ? <Pressable onPress={() => onPlace(holding)}><SeoullyText variant="caption" color={colors.plum}>{copy.placeInRoom}</SeoullyText></Pressable> : null}
-                {!editing && onEditToPlace ? <Pressable onPress={onEditToPlace}><SeoullyText variant="caption" color={colors.plum}>{copy.editRoomToPlace}</SeoullyText></Pressable> : null}
+                {onInspect ? <Pressable style={styles.close} onPress={() => onInspect(holding.id)}><SeoullyText variant="caption" color={roomChrome.color}>{copy.viewCollectible}</SeoullyText></Pressable> : null}
+                {editing && onPlace ? <Pressable style={styles.close} onPress={() => onPlace(holding)}><SeoullyText variant="caption" color={roomChrome.color}>{copy.placeInRoom}</SeoullyText></Pressable> : null}
+                {!editing && onEditToPlace ? <Pressable style={styles.close} onPress={onEditToPlace}><SeoullyText variant="caption" color={roomChrome.color}>{copy.editRoomToPlace}</SeoullyText></Pressable> : null}
               </View>
             </View>
           </View>;
@@ -92,17 +88,20 @@ export function StoredCollectionSheet({
 }
 
 const styles = StyleSheet.create({
+  close: { minHeight: 44, minWidth: 44, justifyContent: "center", alignItems: "center" },
+  searchRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  searchInput: { flex: 1, borderWidth: 1, borderRadius: 12, minHeight: 48, fontSize: 16, paddingHorizontal: 12 },
   frame: { flex: 1, justifyContent: "flex-end" },
   dismiss: { flex: 1, backgroundColor: "rgba(18, 14, 18, 0.28)" },
-  sheet: { backgroundColor: colors.canvas, borderTopColor: colors.border, borderTopLeftRadius: 20, borderTopRightRadius: 20, borderTopWidth: 1, maxHeight: "72%", paddingHorizontal: chrome.gutter, paddingTop: spacing.sm },
+  sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderTopWidth: 1, maxHeight: "72%", paddingHorizontal: chrome.gutter, paddingTop: spacing.sm },
   header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: spacing.sm },
-  title: { color: colors.ink, flex: 1, fontWeight: "700" },
+  title: { flex: 1, fontWeight: "700" },
   search: { marginBottom: spacing.sm, zIndex: 2 },
   list: { zIndex: 1 },
-  row: { alignItems: "center", borderBottomColor: colors.border, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: "row", gap: spacing.sm, paddingVertical: spacing.sm },
+  row: { alignItems: "center", borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: "row", gap: spacing.sm, paddingVertical: spacing.sm },
   thumb: { borderRadius: 8, height: 72, width: 52 },
-  thumbFallback: { backgroundColor: colors.blush },
+  thumbFallback: { },
   meta: { flex: 1, gap: 4 },
-  name: { color: colors.ink },
+  name: { },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
 });

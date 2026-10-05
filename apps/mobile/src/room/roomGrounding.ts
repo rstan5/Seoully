@@ -3,7 +3,7 @@ import type { RoomObjectKind } from "seoully-domain/room-object-schema";
 export const FLOOR_Y = -2.08;
 export const CONTACT_EPSILON = 0.002;
 export const FURNITURE_LOWER_BOUND: Record<Exclude<RoomObjectKind, "wall-frame" | "photo-string">, number> = {
-  shelf: -1.575, desk: -1.09, case: -1.575, chair: -0.9,
+  shelf: -1.575, desk: -1.09, case: -1.575, chair: -0.61,
   lamp: 0.01, plant: 0, archive: -0.28, rug: -0.01,
 };
 export const DESK_TABLETOP_TOP = 0.0825;
@@ -15,3 +15,6 @@ export function furnitureGroundY(kind: RoomObjectKind) {
   if (kind === "wall-frame" || kind === "photo-string") throw new Error("wall_object_has_no_floor_origin");
   return groundedOrigin(FLOOR_Y, FURNITURE_LOWER_BOUND[kind], kind === "rug" ? CONTACT_EPSILON : 0);
 }
+
+/** Flat top of the lounge cushion; rounded edges/arms/back are not landing surfaces. */
+export const CHAIR_SEAT_TOP = 0.15;

@@ -1,9 +1,12 @@
+import { roomOverlayChrome, roomChromeSurface } from "../apps/mobile/src/room/theme";
+import { ROOM_WALL_IDS, ROOM_FURNITURE_IDS, ROOM_LIGHT_IDS, ROOM_BRIGHTNESS_IDS, parseRoomStyle, resolveRoomLook } from "../apps/mobile/src/room/roomStyle";
+import { contrastRatio, mixHex } from "../apps/mobile/src/ui/profileContrast";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { ROOM_OBJECT_KINDS, validPhotoStringConfig, eligiblePhotoStringHolding } from "../src/domain/room-object-schema";
 import { publicPhotoStringVisuals, publicVisualRoomLayout } from "../src/domain/public-room-layout";
 import { defaultRoomObject, spawnRoomObject, starterRoomLayout, parseRoomLayout, serializeRoomLayout, cloneRoomObjects, clampRoomObject, SHOP_CATALOG, isWallObject } from "../apps/mobile/src/room/roomObjects";
-import { FLOOR_Y, furnitureGroundY, FURNITURE_LOWER_BOUND, DESK_DRAWER_CENTERS, DESK_TABLETOP_TOP } from "../apps/mobile/src/room/roomGrounding";
+import { FLOOR_Y, furnitureGroundY, FURNITURE_LOWER_BOUND, DESK_DRAWER_CENTERS, DESK_TABLETOP_TOP, CHAIR_SEAT_TOP } from "../apps/mobile/src/room/roomGrounding";
 import { nativeRoomSurfaces, surfaceAcceptsGeometry, settleRoomRenderable, type RoomRenderable } from "../apps/mobile/src/room/model";
 import { visibleLowerBound } from "../apps/mobile/src/room/representation";
 import { configuredPhotoString, eligiblePhotocards, photoStringAttachmentWorld, photoStringSlot, publicPhotoStringHolding, PHOTO_STRING_CAPACITY } from "../apps/mobile/src/room/photoString";
@@ -65,7 +68,7 @@ for (const kind of ["wall-frame", "photo-string"] as const) {
 }
 const chair = objects.find((o) => o.kind === "chair")!;
 const seat = surfaces.find((s) => s.id.endsWith("chair-seat"))!;
-assert.equal(seat.y, chair.y + 0.06);
+assert.equal(seat.y, chair.y + CHAIR_SEAT_TOP);
 const heldPlush = { geometry: "plushie", scale: 1, position: { x: chair.x, y: seat.y + 0.262, z: chair.z }, rotation: { x: 0, y: 0, z: 0 }, placement: { surfaceId: seat.id } } as RoomRenderable;
 const movedChair = { ...chair, x: chair.x + 1, z: chair.z + 0.4 };
 const world = resolveRoomWorldTransform(heldPlush, roomId, objects.map((o) => o.id === chair.id ? movedChair : o));
@@ -144,3 +147,31 @@ saveDemoRoomLayout(demoOwner, starter);
 assert.equal(JSON.stringify(buildFixtureRoomSnapshot(undefined, { ownStarter: true }).holdings), ownedSnapshot, "removing Photo String retains all Holdings");
 resetDemoRoomSession();
 console.log("Repair 08 Demo Chair/String attachment round-trip and ownership checks passed");
+
+// Room chrome uses the top-control palette for all immersive surfaces.
+for (const name of ["RoomShopSheet", "RoomStyleSheet", "PhotoStringSheet", "StoredCollectionSheet"]) {
+  const source = read(`apps/mobile/src/room/${name}.tsx`);
+  assert.ok(source.includes("roomChromeSurface(roomChrome)"), `${name} shares chrome`);
+  assert.ok(!source.includes("colors."), `${name} has no independent social palette`);
+}
+const screenChrome = read("apps/mobile/src/room/RoomWorldScreen.tsx");
+assert.ok(screenChrome.includes("const controlSurface = roomChromeSurface(overlayTheme)"));
+assert.ok(screenChrome.includes("roomChromeSurface(chrome)"), "top uses same surface helper");
+assert.ok(screenChrome.includes("[styles.toolButton, controlSurface]"));
+assert.ok(screenChrome.includes("[styles.toolChip, controlSurface]"));
+assert.ok(!screenChrome.includes("colors.") && !screenChrome.includes("rgba(247,241,244"));
+assert.ok(read("apps/mobile/src/room/ShopMiniature.tsx").includes('chair: "upholstered-armchair"'));
+console.log("Micro-polish shared Room chrome and armchair miniature checks passed");
+
+const chromeBackgrounds = new Set<string>();
+for (const wall of ROOM_WALL_IDS) for (const furniture of ROOM_FURNITURE_IDS) for (const light of ROOM_LIGHT_IDS) for (const brightness of ROOM_BRIGHTNESS_IDS) {
+  const palette = roomOverlayChrome(resolveRoomLook(parseRoomStyle({ wall, furniture, light, brightness })));
+  assert.ok(contrastRatio(palette.color, palette.background) >= 4.5, `${wall}/${furniture}/${light}/${brightness} Room text contrast`);
+  const surface = roomChromeSurface(palette);
+  assert.equal(surface.backgroundColor, palette.background);
+  assert.equal(surface.borderColor, palette.border);
+  assert.ok(contrastRatio(mixHex(palette.color, palette.background, 0.85), palette.background) >= 3, "disabled Photo String labels remain readable");
+  chromeBackgrounds.add(palette.background);
+}
+assert.ok(chromeBackgrounds.size > 5, "Room chrome changes with Room appearance");
+console.log("Micro-polish all supported Room palette contrast checks passed");

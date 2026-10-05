@@ -1,8 +1,10 @@
 import { DESK_DRAWER_CENTERS } from "./roomGrounding";
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
-import { useRef, type MutableRefObject, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type MutableRefObject, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber/native";
 import { Group } from "three";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { mixHex } from "../ui/profileContrast";
 import { ROOM_BOX, WORLD_ENVELOPE } from "./envelope";
 import type { RoomObjectInstance } from "./roomObjects";
 import { layoutX, layoutZ } from "./roomLayout";
@@ -377,9 +379,27 @@ function StorageBoxes({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
 }
 
 function ChairUnit({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
+  const upholstery = mixHex(theme.furniture, theme.edge, 0.62);
   return <group>
-    <mesh castShadow receiveShadow><boxGeometry args={[0.86, 0.12, 0.82]} /><meshStandardMaterial color={theme.furniture} map={maps.woodFine} roughness={0.68} /></mesh>
-    <mesh position={[0, 0.46, -0.35]} castShadow><boxGeometry args={[0.84, 0.76, 0.08]} /><meshStandardMaterial color={theme.furniture} map={maps.woodFine} roughness={0.68} /></mesh>
-    {[-0.34, 0.34].flatMap((x) => [-0.32, 0.32].map((z) => <mesh key={`${x}:${z}`} position={[x, -0.48, z]} castShadow><boxGeometry args={[0.075, 0.84, 0.075]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.7} /></mesh>))}
+    <ChairCushion position={[0, -0.2, 0]} size={[1.32, 0.3, 1.12]} color={upholstery} fabric={maps.fabric} />
+    <ChairCushion position={[0, 0.04, 0.06]} size={[0.98, 0.22, 0.92]} color={upholstery} fabric={maps.fabric} />
+    <group position={[0, 0.53, -0.46]} rotation={[-0.14, 0, 0]}>
+      <ChairCushion size={[1.22, 0.98, 0.26]} color={upholstery} fabric={maps.fabric} />
+    </group>
+    {[-0.6, 0.6].map((x) => <ChairCushion key={x} position={[x, 0.18, 0.02]} size={[0.24, 0.5, 1.12]} color={upholstery} fabric={maps.fabric} />)}
+    {[-0.51, 0.51].flatMap((x) => [-0.42, 0.42].map((z) => <mesh key={`${x}:${z}`} position={[x, -0.48, z]} castShadow><cylinderGeometry args={[0.065, 0.075, 0.26, 8]} /><meshStandardMaterial color={theme.furniture} map={maps.woodFine} roughness={0.8} /></mesh>))}
   </group>;
+}
+
+/** Small beveled cushions, static geometry with a flat usable seat center. */
+function ChairCushion({ size, position = [0, 0, 0], color, fabric }: {
+  size: [number, number, number]; position?: [number, number, number]; color: string; fabric: RoomMaps["fabric"];
+}) {
+  const [width, height, depth] = size;
+  const geometry = useMemo(() => new RoundedBoxGeometry(width, height, depth, 2, 0.065), [width, height, depth]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  return <mesh position={position} castShadow receiveShadow>
+    <primitive attach="geometry" object={geometry} />
+    <meshStandardMaterial color={color} map={fabric} roughness={0.96} />
+  </mesh>;
 }

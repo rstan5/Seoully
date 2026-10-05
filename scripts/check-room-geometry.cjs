@@ -5,15 +5,16 @@ const assert = require("node:assert/strict");
 const ts = require("typescript");
 let THREE;
 require("./register-build-alias.cjs");
-const { FLOOR_Y, FURNITURE_LOWER_BOUND, furnitureGroundY, DESK_TABLETOP_TOP, DESK_DRAWER_CENTERS } = require("../.tmp/build/apps/mobile/src/room/roomGrounding.js");
+const { FLOOR_Y, FURNITURE_LOWER_BOUND, furnitureGroundY, DESK_TABLETOP_TOP, DESK_DRAWER_CENTERS, CHAIR_SEAT_TOP } = require("../.tmp/build/apps/mobile/src/room/roomGrounding.js");
 async function main() {
+const { RoundedBoxGeometry } = await import("../apps/mobile/node_modules/three/examples/jsm/geometries/RoundedBoxGeometry.js");
 THREE = await import("../apps/mobile/node_modules/three/build/three.module.js");
 const source = fs.readFileSync("apps/mobile/src/room/roomEnvironment.tsx", "utf8");
 const names = { shelf: "ShelfUnit", desk: "DeskUnit", case: "CaseUnit", chair: "ChairUnit", archive: "ArchiveCrate", rug: "Rug", lamp: "FloorLamp", plant: "Plant" };
 const file = ts.createSourceFile("geometry.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-const functions = file.statements.filter((node) => ts.isFunctionDeclaration(node) && Object.values(names).includes(node.name?.text)).map((node) => node.getText(file)).join("\n");
+const functions = file.statements.filter((node) => ts.isFunctionDeclaration(node) && [...Object.values(names), "ChairCushion"].includes(node.name?.text)).map((node) => node.getText(file)).join("\n");
 const jsx = (type, props) => ({ type, props: props ?? {} });
-const sandbox = { exports: {}, require: () => ({ jsx, jsxs: jsx, Fragment: "group" }), ContactShadow: () => null, EdgeLip: () => null, DESK_DRAWER_CENTERS };
+const sandbox = { exports: {}, require: () => ({ jsx, jsxs: jsx, Fragment: "group" }), ContactShadow: () => null, EdgeLip: () => null, DESK_DRAWER_CENTERS, CHAIR_SEAT_TOP, RoundedBoxGeometry, useMemo: (fn) => fn(), useEffect: () => {}, mixHex: () => "#ffffff" };
 vm.createContext(sandbox);
 vm.runInContext(ts.transpileModule(functions, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText, sandbox);
 const theme = new Proxy({}, { get: () => "#ffffff" });
@@ -27,11 +28,11 @@ function bounds(node, parent = new THREE.Matrix4(), result = new THREE.Box3()) {
   if (node.type === "mesh") {
     const parts = children(node);
     if (parts.some((part) => part.type?.endsWith("Material") && part.props.opacity === 0)) return result;
-    const part = parts.find((part) => part.type?.endsWith("Geometry"));
+    const part = parts.find((part) => part.type?.endsWith("Geometry") || part.type === "primitive" && part.props.attach === "geometry");
     const args = part?.props.args ?? [];
     const Geometry = { boxGeometry: THREE.BoxGeometry, cylinderGeometry: THREE.CylinderGeometry, sphereGeometry: THREE.SphereGeometry }[part?.type];
-    if (Geometry) {
-      const geometry = new Geometry(...args);
+    if (Geometry || part?.props.object) {
+      const geometry = part.props.object ?? new Geometry(...args);
       geometry.computeBoundingBox();
       result.union(geometry.boundingBox.clone().applyMatrix4(world));
       geometry.dispose();
@@ -47,6 +48,37 @@ for (const [kind, name] of Object.entries(names)) {
   assert.ok(Math.abs(contact - FLOOR_Y - (kind === "rug" ? 0.002 : 0)) < 1e-6, `${kind} floor contact`);
   console.log(`${kind}: visible bottom ${contact.toFixed(3)} / floor ${FLOOR_Y}`);
 }
+const lounge = sandbox.ChairUnit({ theme, maps: {} });
+const cushions = children(lounge).filter((node) => node.type === sandbox.ChairCushion);
+assert.equal(cushions.length, 4, "upholstered base, seat and two arms");
+const seat = cushions.find((node) => node.props.position[1] === 0.04);
+const seatBounds = bounds(seat);
+assert.ok(Math.abs(seatBounds.max.y - CHAIR_SEAT_TOP) < 1e-6, "actual cushion top matches landing height");
+assert.ok(seatBounds.max.x - seatBounds.min.x > 0.97, "wider lounge cushion");
+const arms = cushions.filter((node) => Math.abs(node.props.position[0]) === 0.6);
+assert.equal(arms.length, 2);
+assert.ok(arms.every((node) => bounds(node).max.y > seatBounds.max.y), "padded arms above seat");
+const back = children(lounge).find((node) => node.type === "group" && node.props.rotation?.[0] < 0);
+assert.ok(back && bounds(back).max.y > 1, "substantial relaxed back cushion");
+const { defaultRoomObject } = require("../.tmp/build/apps/mobile/src/room/roomObjects.js");
+const { nativeRoomSurfaces } = require("../.tmp/build/apps/mobile/src/room/model.js");
+const chair = defaultRoomObject("chair");
+const landing = nativeRoomSurfaces("geometry", [chair]).find((surface) => surface.id.endsWith("chair-seat"));
+assert.equal(chair.kind, "chair");
+assert.ok(Math.abs(landing.y - chair.y - seatBounds.max.y) < 1e-6, "landing meets measured cushion");
+assert.ok(landing.width <= seat.props.size[0] - 0.13 && landing.depth <= seat.props.size[2] - 0.13, "seat landing excludes rounded edges and arms");
+console.log("Micro-polish lounge geometry, feet and measured cushion landing checks passed");
+const miniatureSource = fs.readFileSync("apps/mobile/src/room/ShopMiniature.tsx", "utf8");
+const miniatureFile = ts.createSourceFile("miniature.tsx", miniatureSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const miniatureFunction = miniatureFile.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === "ShopMiniature");
+Object.assign(sandbox, { Svg: "svg", Rect: "rect", Path: "path", Circle: "circle", Ellipse: "ellipse", SHOP_MINIATURES: { chair: "upholstered-armchair" } });
+const miniatureCode = ts.transpileModule(miniatureFunction.getText(miniatureFile), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
+vm.runInContext(`(function () { ${miniatureCode} }).call(globalThis);`, sandbox);
+const miniatureParts = children(sandbox.exports.ShopMiniature({ kind: "chair" })).flatMap(children);
+const paddedMiniArms = miniatureParts.filter((node) => node.type === "rect" && node.props.width === 8 && node.props.height >= 20 && node.props.rx >= 4);
+assert.equal(paddedMiniArms.length, 2, "Shop miniature has two rounded padded arms");
+assert.ok(miniatureParts.some((node) => node.type === "rect" && node.props.width >= 30 && node.props.height >= 25 && node.props.rx >= 7), "Shop miniature has broad cushioned back");
+console.log("Micro-polish actual native Shop lounge silhouette checks passed");
 const desk = sandbox.DeskUnit({ theme, maps: {} });
 for (const drawer of children(desk).filter((node) => node.type === "group" && node.props.position?.[0] === 0.82)) {
   assert.ok(bounds(drawer).max.y < DESK_TABLETOP_TOP, "actual drawer front/handle stays below tabletop");

@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { loadCollectorRoom, loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomLayout, saveNativeRoomPlacement, saveNativeRoomStyle, type NativeHolding, type NativeRoomSnapshot } from "../api";
 import { binderSpreads, buildNativeBinderPages, spreadIndexForHolding } from "../binder/model";
 import { collectibleKindLabel, type MobileCopy } from "../i18n";
-import { colors, spacing } from "../theme";
+import { spacing } from "../theme";
 import { chrome, immersiveRoomFill } from "../ui/shellLayout";
 import { SeoullyText } from "../ui/SeoullyText";
 import { cloneRenderables, holdingRemainsAfterStore, isObjectHistory, isStoredHistoryMarker, pushPlacementHistory, restoreEditBaseline, revertDrop, storeRenderable, type PlacementHistoryEntry } from "./editSession";
@@ -70,7 +70,7 @@ import {
 import { acquireRoomObject, liftRoomObject, objectsMatch, projectRoomObjectOntoWorld, type HeldRoomObject } from "./roomObjectEdit";
 import { DEFAULT_ROOM_STYLE, defaultStyleForTheme, parseRoomStyle, resolveRoomLook, type NativeRoomStyle } from "./roomStyle";
 import { entranceForeground, roomEntranceCopy } from "./entrance";
-import { roomOverlayChrome } from "./theme";
+import { roomChromeSurface, roomOverlayChrome } from "./theme";
 import { asAuthoredRenderable, withResolvedWorld } from "./roomWorldTransform";
 import { inspectView, openBinderView, stepBack, zoneFromSurfaceId, type CanonicalZoneKind, type NativeWorldView } from "./worldView";
 
@@ -502,6 +502,7 @@ export function RoomWorldScreen({
   });
   const entranceTone = entranceForeground(roomTheme.void);
   const overlayTheme = roomOverlayChrome(roomTheme);
+  const controlSurface = roomChromeSurface(overlayTheme);
 
   function goBack() {
     const current = viewRef.current;
@@ -1234,17 +1235,18 @@ export function RoomWorldScreen({
           onLeave();
         }}
       ><SeoullyText variant="caption" color={overlayTheme.color}>Reset Demo to Starter Room</SeoullyText></Pressable> : null}
-      {helperKind ? <Animated.View pointerEvents="none" style={[styles.helper, { top: insets.top + 52, opacity: helperOpacity }]}>
-        <SeoullyText variant="handle" color={colors.ink} style={styles.helperTitle}>
+      {helperKind ? <Animated.View pointerEvents="none" style={[styles.helper, controlSurface, { top: insets.top + 52, opacity: helperOpacity }]}>
+        <SeoullyText variant="handle" color={overlayTheme.color} style={styles.helperTitle}>
           {helperKind === "first" ? copy.roomFirstTitle : copy.roomEditHoldHint}
         </SeoullyText>
-        {helperKind === "first" ? <SeoullyText variant="caption" color={colors.muted} style={styles.helperLead}>{copy.roomFirstLead}</SeoullyText> : null}
-        {helperKind === "edit" ? <SeoullyText variant="caption" color={colors.muted} style={styles.helperLead}>{copy.roomEditLookHint}</SeoullyText> : null}
+        {helperKind === "first" ? <SeoullyText variant="caption" color={overlayTheme.color} style={styles.helperLead}>{copy.roomFirstLead}</SeoullyText> : null}
+        {helperKind === "edit" ? <SeoullyText variant="caption" color={overlayTheme.color} style={styles.helperLead}>{copy.roomEditLookHint}</SeoullyText> : null}
       </Animated.View> : null}
       {!loading ? <RoomEntranceTitle key={entranceLabel} label={entranceLabel} color={entranceTone.color} shadow={entranceTone.shadow} reducedMotion={reducedMotion} /> : null}
-      {error ? <Pressable onPress={() => void refresh()} style={styles.error}><SeoullyText variant="secondary" color={colors.plum}>{error} · {copy.retry}</SeoullyText></Pressable> : null}
-      {hint ? <View pointerEvents="none" style={[styles.hint, { bottom: insets.bottom + chrome.companionSize + chrome.gutter }]}><SeoullyText variant="caption" color={colors.ink} style={styles.hintText}>{hint}</SeoullyText></View> : null}
+      {error ? <Pressable onPress={() => void refresh()} style={[styles.error, controlSurface]}><SeoullyText variant="secondary" color={overlayTheme.color}>{error} · {copy.retry}</SeoullyText></Pressable> : null}
+      {hint ? <View pointerEvents="none" style={[styles.hint, controlSurface, { bottom: insets.bottom + chrome.companionSize + chrome.gutter }]}><SeoullyText variant="caption" color={overlayTheme.color} style={styles.hintText}>{hint}</SeoullyText></View> : null}
       {selectedItem && !editing && view.kind !== "binder" ? <InspectionTray
+        roomChrome={overlayTheme}
         holding={selectedItem.holding}
         copy={copy}
         notice={inspectNotice}
@@ -1257,6 +1259,7 @@ export function RoomWorldScreen({
         closeLabel={copy.close}
       /> : null}
       {binderHeld ? <InspectionTray
+        roomChrome={overlayTheme}
         holding={binderHeld}
         copy={copy}
         notice={inspectNotice}
@@ -1268,35 +1271,37 @@ export function RoomWorldScreen({
         closeLabel={copy.returnToBinder}
       /> : null}
       {editing ? <View pointerEvents="box-none" style={[styles.editBar, trayPad]}>
-        {selectedItem && !heldId && !placingItem ? <View style={styles.contextRow}>
-          <SeoullyText numberOfLines={1} variant="caption" color={colors.ink} style={styles.selection}>{selectedItem.holding.template.name}</SeoullyText>
-          <Pressable onPress={() => void storeSelected()} style={styles.toolChip}><SeoullyText variant="caption" color={colors.plum}>{copy.removeFromRoom}</SeoullyText></Pressable>
+        {selectedItem && !heldId && !placingItem ? <View style={[styles.contextRow, controlSurface]}>
+          <SeoullyText numberOfLines={1} variant="caption" color={overlayTheme.color} style={styles.selection}>{selectedItem.holding.template.name}</SeoullyText>
+          <Pressable onPress={() => void storeSelected()} style={[styles.toolChip, controlSurface]}><SeoullyText variant="caption" color={overlayTheme.color}>{copy.removeFromRoom}</SeoullyText></Pressable>
         </View> : null}
-        {selectedRoomObject && !heldObjectId && !placingItem ? <View style={styles.contextRow}>
-          {selectedRoomObject.kind === "photo-string" ? <Pressable onPress={() => setPhotoStringId(selectedRoomObject.id)} style={styles.toolChip}><SeoullyText variant="caption" color={colors.plum}>{copy.roomChoosePhotocards}</SeoullyText></Pressable> : null}
-          {TURNABLE_ROOM_OBJECT_KINDS.has(selectedRoomObject.kind) ? <Pressable onPress={() => void turnSelectedObject()} style={styles.toolChip}><SeoullyText variant="caption" color={colors.plum}>{copy.roomTurn}</SeoullyText></Pressable> : null}
-          <Pressable onPress={() => void removeSelectedObject()} style={styles.toolChip}><SeoullyText variant="caption" color={colors.plum}>{copy.roomRemoveObject}</SeoullyText></Pressable>
+        {selectedRoomObject && !heldObjectId && !placingItem ? <View style={[styles.contextRow, controlSurface]}>
+          {selectedRoomObject.kind === "photo-string" ? <Pressable onPress={() => setPhotoStringId(selectedRoomObject.id)} style={[styles.toolChip, controlSurface]}><SeoullyText variant="caption" color={overlayTheme.color}>{copy.roomChoosePhotocards}</SeoullyText></Pressable> : null}
+          {TURNABLE_ROOM_OBJECT_KINDS.has(selectedRoomObject.kind) ? <Pressable onPress={() => void turnSelectedObject()} style={[styles.toolChip, controlSurface]}><SeoullyText variant="caption" color={overlayTheme.color}>{copy.roomTurn}</SeoullyText></Pressable> : null}
+          <Pressable onPress={() => void removeSelectedObject()} style={[styles.toolChip, controlSurface]}><SeoullyText variant="caption" color={overlayTheme.color}>{copy.roomRemoveObject}</SeoullyText></Pressable>
         </View> : null}
-        {placingItem ? <Pressable onPress={() => { clearPendingPress(); clearHeldVisual(); }} style={styles.toolChip}>
-          <SeoullyText variant="caption" color={colors.plum}>{copy.cancelPlacement}</SeoullyText>
+        {placingItem ? <Pressable onPress={() => { clearPendingPress(); clearHeldVisual(); }} style={[styles.toolChip, controlSurface]}>
+          <SeoullyText variant="caption" color={overlayTheme.color}>{copy.cancelPlacement}</SeoullyText>
         </Pressable> : null}
         <View style={styles.toolRow}>
-          <Pressable onPress={() => setShopOpen(true)} style={styles.toolButton}><SeoullyText variant="button" color={colors.plum}>{copy.roomShop}</SeoullyText></Pressable>
-          <Pressable onPress={() => setStyleOpen(true)} style={styles.toolButton}><SeoullyText variant="button" color={colors.plum}>{copy.roomStyle}</SeoullyText></Pressable>
-          {canUndo ? <Pressable onPress={() => void undoPlacement()} style={styles.toolButton}><SeoullyText variant="button" color={colors.plum}>{copy.roomUndo}</SeoullyText></Pressable> : null}
-          {canRedo ? <Pressable onPress={() => void redoPlacement()} style={styles.toolButton}><SeoullyText variant="button" color={colors.plum}>{copy.roomRedo}</SeoullyText></Pressable> : null}
-          <Pressable onPress={() => void saveEditing()} style={styles.toolButton}><SeoullyText variant="button" color={colors.plum}>{copy.finishEditing}</SeoullyText></Pressable>
+          <Pressable onPress={() => setShopOpen(true)} style={[styles.toolButton, controlSurface]}><SeoullyText variant="button" color={overlayTheme.color}>{copy.roomShop}</SeoullyText></Pressable>
+          <Pressable onPress={() => setStyleOpen(true)} style={[styles.toolButton, controlSurface]}><SeoullyText variant="button" color={overlayTheme.color}>{copy.roomStyle}</SeoullyText></Pressable>
+          {canUndo ? <Pressable onPress={() => void undoPlacement()} style={[styles.toolButton, controlSurface]}><SeoullyText variant="button" color={overlayTheme.color}>{copy.roomUndo}</SeoullyText></Pressable> : null}
+          {canRedo ? <Pressable onPress={() => void redoPlacement()} style={[styles.toolButton, controlSurface]}><SeoullyText variant="button" color={overlayTheme.color}>{copy.roomRedo}</SeoullyText></Pressable> : null}
+          <Pressable onPress={() => void saveEditing()} style={[styles.toolButton, controlSurface]}><SeoullyText variant="button" color={overlayTheme.color}>{copy.finishEditing}</SeoullyText></Pressable>
         </View>
       </View> : null}
       {!readOnly && photoStringId && roomLayout.objects.find((o) => o.id === photoStringId) ? <PhotoStringSheet
+        roomChrome={overlayTheme}
         key={photoStringId} object={roomLayout.objects.find((o) => o.id === photoStringId)!} holdings={holdings}
         copy={copy} reducedMotion={reducedMotion} bottomInset={insets.bottom}
         onSave={savePhotoString} onClose={() => setPhotoStringId(null)}
       /> : null}
-      {deskPresent && view.kind === "zone" && view.zone === "desk" && !selectedItem ? <View style={[styles.hint, { bottom: insets.bottom + chrome.companionSize + chrome.gutter }]}>
-        <Pressable accessibilityRole="button" onPress={() => openBinderFromWorld()} style={styles.toolChip}><SeoullyText variant="caption" color={colors.plum}>{copy.openBinder}</SeoullyText></Pressable>
+      {deskPresent && view.kind === "zone" && view.zone === "desk" && !selectedItem ? <View style={[styles.hint, controlSurface, { bottom: insets.bottom + chrome.companionSize + chrome.gutter }]}>
+        <Pressable accessibilityRole="button" onPress={() => openBinderFromWorld()} style={[styles.toolChip, controlSurface]}><SeoullyText variant="caption" color={overlayTheme.color}>{copy.openBinder}</SeoullyText></Pressable>
       </View> : null}
       {!readOnly && editing ? <RoomShopSheet
+        roomChrome={overlayTheme}
         visible={shopOpen}
         objects={roomLayout.objects}
         reducedMotion={reducedMotion}
@@ -1306,6 +1311,7 @@ export function RoomWorldScreen({
         onClose={() => setShopOpen(false)}
       /> : null}
       {!readOnly && editing ? <RoomStyleSheet
+        roomChrome={overlayTheme}
         visible={styleOpen}
         style={roomStyle}
         reducedMotion={reducedMotion}
@@ -1315,6 +1321,7 @@ export function RoomWorldScreen({
         onClose={() => setStyleOpen(false)}
       /> : null}
       {!readOnly ? <StoredCollectionSheet
+        roomChrome={overlayTheme}
         visible={storageOpen}
         holdings={unplaced}
         query={storageQuery}
@@ -1333,6 +1340,7 @@ export function RoomWorldScreen({
 }
 
 function InspectionTray({
+  roomChrome,
   holding,
   copy,
   notice,
@@ -1344,6 +1352,7 @@ function InspectionTray({
   onClose,
   closeLabel,
 }: {
+  roomChrome: ReturnType<typeof roomOverlayChrome>;
   holding: NativeHolding;
   copy: MobileCopy;
   notice?: string | null;
@@ -1355,21 +1364,21 @@ function InspectionTray({
   onClose: () => void;
   closeLabel: string;
 }) {
-  return <View style={[styles.inspection, style]}>
+  return <View style={[styles.inspection, roomChromeSurface(roomChrome), style]}>
     <View style={styles.inspectionCopy}>
-      <SeoullyText numberOfLines={1} variant="handle" style={styles.inspectionTitle}>{holding.template.name}</SeoullyText>
-      <SeoullyText numberOfLines={1} variant="caption" style={styles.inspectionMeta}>
+      <SeoullyText numberOfLines={1} variant="handle" color={roomChrome.color} style={styles.inspectionTitle}>{holding.template.name}</SeoullyText>
+      <SeoullyText numberOfLines={1} variant="caption" color={roomChrome.color} style={styles.inspectionMeta}>
         {[holding.template.groupName, holding.template.memberName, collectibleKindLabel(holding.template.kind, copy)].filter(Boolean).join(" · ")}
       </SeoullyText>
     </View>
     <View style={styles.inspectionActions}>
-      {onView ? <Pressable onPress={onView} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.viewCollectible}</SeoullyText></Pressable> : null}
-      {onOpenBinder ? <Pressable onPress={onOpenBinder} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.openBinder}</SeoullyText></Pressable> : null}
-      {onWishlist ? <Pressable onPress={onWishlist} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.saveToWishlist}</SeoullyText></Pressable> : null}
-      {onMessage ? <Pressable onPress={onMessage} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{copy.messageAboutCollectible}</SeoullyText></Pressable> : null}
-      <Pressable onPress={onClose} style={styles.inspectAction}><SeoullyText variant="button" color={colors.plum} style={styles.inspectActionText}>{closeLabel}</SeoullyText></Pressable>
+      {onView ? <Pressable onPress={onView} style={[styles.inspectAction, roomChromeSurface(roomChrome)]}><SeoullyText variant="button" color={roomChrome.color} style={styles.inspectActionText}>{copy.viewCollectible}</SeoullyText></Pressable> : null}
+      {onOpenBinder ? <Pressable onPress={onOpenBinder} style={[styles.inspectAction, roomChromeSurface(roomChrome)]}><SeoullyText variant="button" color={roomChrome.color} style={styles.inspectActionText}>{copy.openBinder}</SeoullyText></Pressable> : null}
+      {onWishlist ? <Pressable onPress={onWishlist} style={[styles.inspectAction, roomChromeSurface(roomChrome)]}><SeoullyText variant="button" color={roomChrome.color} style={styles.inspectActionText}>{copy.saveToWishlist}</SeoullyText></Pressable> : null}
+      {onMessage ? <Pressable onPress={onMessage} style={[styles.inspectAction, roomChromeSurface(roomChrome)]}><SeoullyText variant="button" color={roomChrome.color} style={styles.inspectActionText}>{copy.messageAboutCollectible}</SeoullyText></Pressable> : null}
+      <Pressable onPress={onClose} style={[styles.inspectAction, roomChromeSurface(roomChrome)]}><SeoullyText variant="button" color={roomChrome.color} style={styles.inspectActionText}>{closeLabel}</SeoullyText></Pressable>
     </View>
-    {notice ? <SeoullyText variant="caption" color={colors.plum} style={styles.inspectionNotice}>{notice}</SeoullyText> : null}
+    {notice ? <SeoullyText variant="caption" color={roomChrome.color} style={styles.inspectionNotice}>{notice}</SeoullyText> : null}
   </View>;
 }
 
@@ -1396,7 +1405,7 @@ function OverlayChrome({
   showStorage?: boolean;
   onStorage?: () => void;
 }) {
-  const chip = [styles.overlayChip, { backgroundColor: chrome.background, borderColor: chrome.border }];
+  const chip = [styles.overlayChip, roomChromeSurface(chrome)];
   return <View pointerEvents="box-none" style={[styles.overlayBar, style]}>
     <Pressable accessibilityRole="button" onPress={onBack} style={chip}>
       <SeoullyText variant="button" color={chrome.color}>{copy.back}</SeoullyText>
@@ -1466,30 +1475,30 @@ const styles = StyleSheet.create({
   entrance: { alignItems: "center", bottom: 0, justifyContent: "center", left: 0, paddingHorizontal: 28, position: "absolute", right: 0, top: 0 },
   entranceText: { fontSize: 22, lineHeight: 28, textAlign: "center", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 8 },
   overlayActions: { flexDirection: "row", flexShrink: 0, gap: spacing.xs },
-  error: { paddingHorizontal: chrome.gutter, paddingTop: spacing.xs },
+  error: { minHeight: 44, justifyContent: "center", paddingHorizontal: chrome.gutter, paddingTop: spacing.xs },
   empty: { padding: chrome.gutter },
   stage: StyleSheet.absoluteFill,
-  hint: { alignSelf: "center", backgroundColor: "rgba(247,241,244,0.82)", borderRadius: 999, paddingHorizontal: spacing.sm, paddingVertical: 5, position: "absolute" },
-  hintText: { color: colors.ink, fontSize: 11, fontWeight: "600" },
-  helper: { alignSelf: "center", backgroundColor: "rgba(247,241,244,0.9)", borderRadius: 16, left: 20, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, position: "absolute", right: 20 },
+  hint: { alignSelf: "center", borderRadius: 999, paddingHorizontal: spacing.sm, paddingVertical: 5, position: "absolute" },
+  hintText: { fontSize: 11, fontWeight: "600" },
+  helper: { alignSelf: "center", borderRadius: 16, left: 20, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, position: "absolute", right: 20 },
   helperTitle: { fontWeight: "700", textAlign: "center" },
   helperLead: { marginTop: 2, textAlign: "center" },
   editBar: { alignItems: "center", bottom: 0, gap: 8, left: 0, paddingHorizontal: spacing.sm, position: "absolute", right: 0 },
   toolRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center" },
-  toolButton: { alignItems: "center", backgroundColor: "rgba(247,241,244,0.92)", borderColor: colors.border, borderRadius: 999, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: spacing.sm },
-  toolChip: { alignItems: "center", backgroundColor: "rgba(247,241,244,0.92)", borderColor: colors.border, borderRadius: 999, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: spacing.sm },
-  contextRow: { alignItems: "center", flexDirection: "row", gap: spacing.sm, justifyContent: "center" },
+  toolButton: { alignItems: "center", borderRadius: 999, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: spacing.sm },
+  toolChip: { alignItems: "center", borderRadius: 999, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: spacing.sm },
+  contextRow: { borderRadius: 22, paddingHorizontal: spacing.sm, alignItems: "center", flexDirection: "row", gap: spacing.sm, justifyContent: "center" },
   selectionColumn: { gap: spacing.xs },
   selectionRow: { alignItems: "center", flexDirection: "row", gap: spacing.sm, justifyContent: "center" },
-  selection: { color: colors.plum, flexShrink: 1, fontWeight: "700" },
+  selection: { flexShrink: 1, fontWeight: "700" },
   transformRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, justifyContent: "center" },
-  transformButton: { borderColor: colors.border, borderRadius: 999, borderWidth: 1, justifyContent: "center", minHeight: 34, paddingHorizontal: spacing.sm },
-  inspection: { backgroundColor: "rgba(247,241,244,0.94)", borderTopColor: colors.border, borderTopWidth: 1, bottom: 0, gap: 6, left: 0, paddingHorizontal: spacing.sm, paddingTop: 8, position: "absolute", right: 0 },
+  transformButton: { borderRadius: 999, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: spacing.sm },
+  inspection: { borderTopWidth: 1, bottom: 0, gap: 6, left: 0, paddingHorizontal: spacing.sm, paddingTop: 8, position: "absolute", right: 0 },
   inspectionCopy: { minWidth: 0 },
-  inspectionTitle: { color: colors.ink, fontSize: 14, fontWeight: "700" },
-  inspectionMeta: { color: colors.muted, fontSize: 11, marginTop: 1 },
+  inspectionTitle: { fontSize: 14, fontWeight: "700" },
+  inspectionMeta: { fontSize: 11, marginTop: 1 },
   inspectionActions: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   inspectionNotice: { marginTop: 2 },
-  inspectAction: { borderColor: colors.plum, borderRadius: 8, borderWidth: 1, justifyContent: "center", minHeight: 30, paddingHorizontal: 8 },
-  inspectActionText: { color: colors.plum, fontSize: 11, fontWeight: "700" },
+  inspectAction: { borderRadius: 8, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: 8 },
+  inspectActionText: { fontSize: 11, fontWeight: "700" },
 });

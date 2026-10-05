@@ -5,7 +5,7 @@ import type { NativeRoomSurface, NativeRoomVector } from "./model";
 
 /** Basic V1 Room Shop catalog — one canonical version of each object. */
 import { ROOM_OBJECT_KINDS, validPhotoStringConfig, type PhotoStringConfig, type RoomObjectKind } from "seoully-domain/room-object-schema";
-import { furnitureGroundY, DESK_TABLETOP_TOP } from "./roomGrounding";
+import { furnitureGroundY, DESK_TABLETOP_TOP, CHAIR_SEAT_TOP } from "./roomGrounding";
 export { ROOM_OBJECT_KINDS } from "seoully-domain/room-object-schema";
 export type { RoomObjectKind } from "seoully-domain/room-object-schema";
 export function isWallObject(kind: RoomObjectKind) { return kind === "wall-frame" || kind === "photo-string"; }
@@ -79,7 +79,7 @@ const FOOTPRINT: Record<RoomObjectKind, { halfX: number; halfZ: number; halfY?: 
   plant: { halfX: 0.22, halfZ: 0.22 },
   rug: { halfX: 1.18, halfZ: 0.76 },
   archive: { halfX: 0.92, halfZ: 0.62 },
-  chair: { halfX: 0.46, halfZ: 0.48 },
+  chair: { halfX: 0.76, halfZ: 0.70 },
   "photo-string": { halfX: 1.38, halfY: 0.5, halfZ: 0.04 },
   "wall-frame": { halfX: 0.66, halfY: 0.76, halfZ: 0.04 },
 };
@@ -101,7 +101,7 @@ const SURFACE_LOCAL: Record<"shelf" | "desk" | "case" | "chair" | "archive", Sur
     { suffix: "shelf-bay-3", kind: "horizontal", lx: 0, ly: 1.75, lz: 0.12, width: 2.04, depth: 0.62 },
     { suffix: "shelf-bay-2", kind: "horizontal", lx: 0, ly: 0.92, lz: 0.12, width: 2.04, depth: 0.62 },
   ],
-  chair: [{ suffix: "chair-seat", kind: "horizontal", lx: 0, ly: 0.06, lz: 0, width: 0.82, depth: 0.78 }],
+  chair: [{ suffix: "chair-seat", kind: "horizontal", lx: 0, ly: CHAIR_SEAT_TOP, lz: 0.06, width: 0.84, depth: 0.76 }],
   desk: [
     { suffix: "desk", kind: "horizontal", lx: 0, ly: DESK_TABLETOP_TOP, lz: 0, width: 3.25, depth: 1.65 },
     { suffix: "binder", kind: "horizontal", lx: layoutX(-1), ly: DESK_TABLETOP_TOP, lz: layoutZ(0.15), width: 0.95, depth: 0.72 },

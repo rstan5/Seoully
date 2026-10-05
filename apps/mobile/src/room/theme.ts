@@ -95,3 +95,9 @@ export function roomOverlayChrome(theme: RoomChromeSource) {
     : firstReadable([theme.ink, theme.furniture, "#2c2e4c"], background, "#2c2e4c");
   return { background, border, color, dark };
 }
+
+/** Shared appearance contract for every immersive Room control. */
+export type RoomChrome = ReturnType<typeof roomOverlayChrome>;
+export function roomChromeSurface(chrome: RoomChrome) {
+  return { backgroundColor: chrome.background, borderColor: chrome.border, borderTopColor: chrome.border, borderBottomColor: chrome.border };
+}

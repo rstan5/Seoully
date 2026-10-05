@@ -4,18 +4,11 @@ import { layoutX, layoutZ } from "./roomLayout";
 import type { NativeRoomSurface, NativeRoomVector } from "./model";
 
 /** Basic V1 Room Shop catalog — one canonical version of each object. */
-export const ROOM_OBJECT_KINDS = [
-  "shelf",
-  "desk",
-  "case",
-  "lamp",
-  "plant",
-  "rug",
-  "archive",
-  "wall-frame",
-] as const;
-
-export type RoomObjectKind = (typeof ROOM_OBJECT_KINDS)[number];
+import { ROOM_OBJECT_KINDS, validPhotoStringConfig, type PhotoStringConfig, type RoomObjectKind } from "seoully-domain/room-object-schema";
+import { furnitureGroundY, DESK_TABLETOP_TOP } from "./roomGrounding";
+export { ROOM_OBJECT_KINDS } from "seoully-domain/room-object-schema";
+export type { RoomObjectKind } from "seoully-domain/room-object-schema";
+export function isWallObject(kind: RoomObjectKind) { return kind === "wall-frame" || kind === "photo-string"; }
 
 export type RoomObjectInstance = {
   id: string;
@@ -24,6 +17,7 @@ export type RoomObjectInstance = {
   y: number;
   z: number;
   rotateY: 0 | 90 | 180 | 270;
+  photoString?: PhotoStringConfig;
 };
 
 export type RoomLayoutSource = "legacy" | "authored";
@@ -41,35 +35,39 @@ export type RoomLayoutDocument = {
 };
 
 /** Unique structural pieces — one in the Room for V1. */
-export const UNIQUE_ROOM_OBJECT_KINDS = new Set<RoomObjectKind>(["desk", "case", "archive", "rug"]);
+export const UNIQUE_ROOM_OBJECT_KINDS = new Set<RoomObjectKind>(["desk", "case", "chair", "archive", "rug"]);
 
 /** Safe to place more than one when instance ids stay stable. */
-export const MULTI_ROOM_OBJECT_KINDS = new Set<RoomObjectKind>(["shelf", "lamp", "plant", "wall-frame"]);
+export const MULTI_ROOM_OBJECT_KINDS = new Set<RoomObjectKind>(["shelf", "lamp", "plant", "wall-frame", "photo-string"]);
 
 /** 90° Turn is only exposed where landing surfaces do not depend on facing. */
 export const TURNABLE_ROOM_OBJECT_KINDS = new Set<RoomObjectKind>(["lamp", "plant", "rug"]);
 
-export const CARRIER_ROOM_OBJECT_KINDS = new Set<RoomObjectKind>(["shelf", "desk", "case", "archive"]);
+export const CARRIER_ROOM_OBJECT_KINDS = new Set<RoomObjectKind>(["shelf", "desk", "case", "chair", "archive"]);
 
 export const SHOP_CATALOG: readonly RoomObjectKind[] = [
   "shelf",
   "desk",
+  "chair",
   "case",
   "rug",
   "lamp",
   "plant",
   "archive",
   "wall-frame",
+  "photo-string",
 ];
 
 export const ROOM_OBJECT_DEFAULTS: Record<RoomObjectKind, NativeRoomVector> = {
-  shelf: { x: layoutX(-3.15), y: -0.55, z: layoutZ(-3.78) },
-  desk: { x: layoutX(1.45), y: -0.82, z: layoutZ(-2.85) },
-  case: { x: layoutX(3.65), y: -0.55, z: layoutZ(-3.78) },
-  lamp: { x: layoutX(-3.72), y: -2.08, z: layoutZ(-0.58) },
-  plant: { x: layoutX(3.42), y: -1.95, z: layoutZ(-1.62) },
-  rug: { x: layoutX(0.22), y: -2.05, z: layoutZ(-1.15) },
-  archive: { x: layoutX(-1.2), y: -1.86, z: layoutZ(-0.65) },
+  shelf: { x: Math.max(layoutX(-3.15), -ROOM_BOX.wallX + 1.12 + 0.16), y: furnitureGroundY("shelf"), z: layoutZ(-3.78) },
+  desk: { x: layoutX(1.45), y: furnitureGroundY("desk"), z: layoutZ(-2.85) },
+  case: { x: Math.min(layoutX(3.65), ROOM_BOX.wallX - 0.78 - 0.16), y: furnitureGroundY("case"), z: layoutZ(-3.78) },
+  lamp: { x: layoutX(-3.72), y: furnitureGroundY("lamp"), z: layoutZ(-0.58) },
+  plant: { x: layoutX(3.42), y: furnitureGroundY("plant"), z: layoutZ(-1.62) },
+  rug: { x: layoutX(0.22), y: furnitureGroundY("rug"), z: layoutZ(-1.15) },
+  archive: { x: layoutX(-1.2), y: furnitureGroundY("archive"), z: layoutZ(-0.65) },
+  chair: { x: layoutX(0.4), y: furnitureGroundY("chair"), z: layoutZ(-0.6) },
+  "photo-string": { x: 0, y: 1.25, z: ROOM_BOX.backZ + 0.12 },
   "wall-frame": { x: layoutX(1.55), y: 0.88, z: ROOM_BOX.backZ + 0.12 },
 };
 
@@ -81,6 +79,8 @@ const FOOTPRINT: Record<RoomObjectKind, { halfX: number; halfZ: number; halfY?: 
   plant: { halfX: 0.22, halfZ: 0.22 },
   rug: { halfX: 1.18, halfZ: 0.76 },
   archive: { halfX: 0.92, halfZ: 0.62 },
+  chair: { halfX: 0.46, halfZ: 0.48 },
+  "photo-string": { halfX: 1.38, halfY: 0.5, halfZ: 0.04 },
   "wall-frame": { halfX: 0.66, halfY: 0.76, halfZ: 0.04 },
 };
 
@@ -94,32 +94,36 @@ type SurfaceLocal = {
   depth: number;
 };
 
-const SURFACE_LOCAL: Record<"shelf" | "desk" | "case" | "archive", SurfaceLocal[]> = {
+const SURFACE_LOCAL: Record<"shelf" | "desk" | "case" | "chair" | "archive", SurfaceLocal[]> = {
   shelf: [
-    { suffix: "shelf-bay-0", kind: "horizontal", lx: 0, ly: -0.85, lz: layoutZ(0.3), width: 2.1, depth: 0.8 },
-    { suffix: "shelf-bay-1", kind: "horizontal", lx: 0, ly: 0.05, lz: layoutZ(0.3), width: 2.1, depth: 0.8 },
-    { suffix: "shelf-bay-2", kind: "horizontal", lx: 0, ly: 0.95, lz: layoutZ(0.3), width: 2.1, depth: 0.8 },
+    { suffix: "shelf-bay-0", kind: "horizontal", lx: 0, ly: -0.88, lz: 0.12, width: 2.04, depth: 0.62 },
+    { suffix: "shelf-bay-1", kind: "horizontal", lx: 0, ly: 0.02, lz: 0.12, width: 2.04, depth: 0.62 },
+    { suffix: "shelf-bay-3", kind: "horizontal", lx: 0, ly: 1.75, lz: 0.12, width: 2.04, depth: 0.62 },
+    { suffix: "shelf-bay-2", kind: "horizontal", lx: 0, ly: 0.92, lz: 0.12, width: 2.04, depth: 0.62 },
   ],
+  chair: [{ suffix: "chair-seat", kind: "horizontal", lx: 0, ly: 0.06, lz: 0, width: 0.82, depth: 0.78 }],
   desk: [
-    { suffix: "desk", kind: "horizontal", lx: 0, ly: 0.1, lz: 0, width: 3.25, depth: 1.65 },
-    { suffix: "binder", kind: "horizontal", lx: layoutX(-1), ly: 0.14, lz: layoutZ(0.15), width: 0.95, depth: 0.72 },
+    { suffix: "desk", kind: "horizontal", lx: 0, ly: DESK_TABLETOP_TOP, lz: 0, width: 3.25, depth: 1.65 },
+    { suffix: "binder", kind: "horizontal", lx: layoutX(-1), ly: DESK_TABLETOP_TOP, lz: layoutZ(0.15), width: 0.95, depth: 0.72 },
   ],
   case: [
-    { suffix: "display-case-shelf", kind: "horizontal", lx: 0, ly: 0.05, lz: layoutZ(0.26), width: 1.45, depth: 0.72 },
-    { suffix: "display-case-top", kind: "horizontal", lx: 0, ly: 1.03, lz: layoutZ(0.26), width: 1.45, depth: 0.72 },
+    { suffix: "display-case-shelf", kind: "horizontal", lx: 0, ly: 0.0175, lz: 0.16, width: 1.36, depth: 0.56 },
+    { suffix: "display-case-lower", kind: "horizontal", lx: 0, ly: -0.9125, lz: 0.16, width: 1.36, depth: 0.56 },
+    { suffix: "display-case-crown", kind: "horizontal", lx: 0, ly: 1.8475, lz: 0.16, width: 1.36, depth: 0.56 },
+    { suffix: "display-case-top", kind: "horizontal", lx: 0, ly: 0.9975, lz: 0.16, width: 1.36, depth: 0.56 },
   ],
   archive: [
-    { suffix: "archive", kind: "horizontal", lx: 0, ly: 0.18, lz: 0, width: 1.7, depth: 1.05 },
+    { suffix: "archive", kind: "horizontal", lx: 0, ly: 0.365, lz: 0.03, width: 1.64, depth: 1.04 },
   ],
 };
 
 export function defaultRoomObject(kind: RoomObjectKind, id: string = kind): RoomObjectInstance {
   const at = ROOM_OBJECT_DEFAULTS[kind];
-  return { id, kind, x: at.x, y: at.y, z: at.z, rotateY: 0 };
+  return clampRoomObject({ id, kind, x: at.x, y: at.y, z: at.z, rotateY: 0, ...(kind === "photo-string" ? { photoString: { slots: Array(5).fill(null) } } : {}) });
 }
 
 export function legacyRoomObjects(): RoomObjectInstance[] {
-  return ROOM_OBJECT_KINDS.map((kind) => kind === "archive" ? spawnRoomObject([], kind) : defaultRoomObject(kind));
+  return ROOM_OBJECT_KINDS.filter((kind) => kind !== "chair" && kind !== "photo-string").map((kind) => kind === "archive" ? spawnRoomObject([], kind) : defaultRoomObject(kind));
 }
 
 export function starterRoomObjects(): RoomObjectInstance[] {
@@ -153,6 +157,7 @@ export function parseRoomLayout(value: unknown): RoomLayoutState {
     const id = typeof row.id === "string" ? row.id.trim() : "";
     if (!isRoomObjectKind(kind) || !id || seen.has(id)) continue;
     if (UNIQUE_ROOM_OBJECT_KINDS.has(kind) && objects.some((item) => item.kind === kind)) continue;
+    if (row.photoString !== undefined && (kind !== "photo-string" || !validPhotoStringConfig(row.photoString))) throw new Error("photo_string_invalid");
     seen.add(id);
     objects.push(clampRoomObject({
       id,
@@ -161,6 +166,7 @@ export function parseRoomLayout(value: unknown): RoomLayoutState {
       y: finite(row.y, ROOM_OBJECT_DEFAULTS[kind].y),
       z: finite(row.z, ROOM_OBJECT_DEFAULTS[kind].z),
       rotateY: normalizeRotateY(row.rotateY),
+      ...(row.photoString ? { photoString: { slots: [...(row.photoString as PhotoStringConfig).slots] } } : {}),
     }));
   }
   if (!objects.length) return legacyRoomLayout();
@@ -175,6 +181,7 @@ export function serializeRoomLayout(state: RoomLayoutState): RoomLayoutDocument 
   if (state.source === "legacy" && state.firstRoomEditCompleted && objectsMatchDefaults(state.objects, legacyRoomObjects())) {
     return {};
   }
+  if (state.objects.some((object) => object.photoString && (object.kind !== "photo-string" || !validPhotoStringConfig(object.photoString)))) throw new Error("photo_string_invalid");
   return {
     version: 1,
     objects: state.objects.map(cloneRoomObject),
@@ -195,7 +202,7 @@ export function cloneRoomObjects(objects: RoomObjectInstance[]) {
 }
 
 export function cloneRoomObject(object: RoomObjectInstance): RoomObjectInstance {
-  return { ...object };
+  return { ...object, ...(object.photoString ? { photoString: { slots: [...object.photoString.slots] } } : {}) };
 }
 
 export function objectsMatchDefaults(objects: RoomObjectInstance[], expected: RoomObjectInstance[]) {
@@ -215,7 +222,7 @@ export function isRoomObjectKind(value: unknown): value is RoomObjectKind {
 }
 
 export function furnitureDelta(object: RoomObjectInstance): NativeRoomVector {
-  const origin = ROOM_OBJECT_DEFAULTS[object.kind];
+  const origin = defaultRoomObject(object.kind);
   return { x: object.x - origin.x, y: object.y - origin.y, z: object.z - origin.z };
 }
 
@@ -243,13 +250,17 @@ export function nextRoomObjectId(objects: RoomObjectInstance[], kind: RoomObject
 export function spawnRoomObject(objects: RoomObjectInstance[], kind: RoomObjectKind): RoomObjectInstance {
   const id = nextRoomObjectId(objects, kind);
   const drafted = defaultRoomObject(kind, id);
-  const separated = kind === "archive"
-    ? { ...drafted, x: layoutX(-2.95), z: layoutZ(1.05) }
-    : drafted;
-  const draft = clampRoomObject(separated);
-  const clash = objects.some((item) => item.kind === kind && distanceXZ(item, draft) < 0.35);
-  if (!clash) return draft;
-  return clampRoomObject({ ...draft, x: draft.x + 0.48, z: Math.min(draft.z + 0.4, 1.2) });
+  const candidates = isWallObject(kind)
+    ? [{ ...drafted, x: 0, y: 1.25 }, { ...drafted, x: -1.6, y: 1.5 }, { ...drafted, x: 1.6, y: 0.1 }]
+    : [drafted, ...[-0.8, 0.1, 0.9, -1.6, -2.5].flatMap((z) => [-1.8, 0, 1.8].map((x) => ({ ...drafted, x, z })))];
+  const safe = candidates.map(clampRoomObject).find((candidate) => objects.every((other) => {
+    if (isWallObject(kind) !== isWallObject(other.kind) || other.kind === "rug" || kind === "rug") return true;
+    const a = FOOTPRINT[kind], b = FOOTPRINT[other.kind];
+    return Math.abs(candidate.x - other.x) >= a.halfX + b.halfX + 0.08
+      || (isWallObject(kind) ? Math.abs(candidate.y - other.y) >= (a.halfY ?? 0) + (b.halfY ?? 0) + 0.08
+        : Math.abs(candidate.z - other.z) >= a.halfZ + b.halfZ + 0.08);
+  }));
+  return safe ?? clampRoomObject({ ...drafted, x: 0, z: isWallObject(kind) ? drafted.z : 0.9 });
 }
 
 export function replaceRoomObject(objects: RoomObjectInstance[], next: RoomObjectInstance) {
@@ -267,12 +278,12 @@ export function turnRoomObject(object: RoomObjectInstance): RoomObjectInstance {
 }
 
 export function clampRoomObject(object: RoomObjectInstance): RoomObjectInstance {
-  if (object.kind === "wall-frame") {
+  if (isWallObject(object.kind)) {
     const foot = FOOTPRINT[object.kind];
     return {
       ...object,
       x: clamp(object.x, -ROOM_BOX.wallX + foot.halfX + 0.2, ROOM_BOX.wallX - foot.halfX - 0.2),
-      y: clamp(object.y, -1.15, 2.15),
+      y: clamp(object.y, -1.15 + (foot.halfY ?? 0), 2.9 - (foot.halfY ?? 0)),
       z: ROOM_BOX.backZ + 0.12,
       rotateY: 0,
     };
@@ -283,7 +294,7 @@ export function clampRoomObject(object: RoomObjectInstance): RoomObjectInstance 
   return {
     ...object,
     x: clamp(object.x, -maxX, maxX),
-    y: ROOM_OBJECT_DEFAULTS[object.kind].y,
+    y: furnitureGroundY(object.kind),
     z: clamp(object.z, minZ, 1.65),
   };
 }
@@ -375,21 +386,21 @@ export function childrenOnObject<T extends { placement?: { surfaceId?: string | 
 }
 
 export function applyObjectSurfaces(roomId: string, defaults: NativeRoomSurface[], objects: RoomObjectInstance[]): NativeRoomSurface[] {
-  const bySuffix = new Map(defaults.map((surface) => [surface.id.slice(roomId.length + 1), surface]));
+
   const next: NativeRoomSurface[] = defaults.filter((surface) => surface.id.endsWith("-wall") || surface.id.endsWith("-floor"));
   for (const object of objects) {
     if (!CARRIER_ROOM_OBJECT_KINDS.has(object.kind)) continue;
     for (const local of SURFACE_LOCAL[object.kind as keyof typeof SURFACE_LOCAL]) {
       const id = surfaceIdFor(roomId, object, local.suffix);
-      const fallback = bySuffix.get(local.suffix);
+
       next.push({
         id,
         kind: local.kind,
         x: object.x + local.lx,
         y: object.y + local.ly,
         z: object.z + local.lz,
-        width: fallback?.width ?? local.width,
-        depth: fallback?.depth ?? local.depth,
+        width: local.width,
+        depth: local.depth,
       });
     }
   }
@@ -435,10 +446,16 @@ function finite(value: unknown, fallback: number) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
-function distanceXZ(a: { x: number; z: number }, b: { x: number; z: number }) {
-  return Math.hypot(a.x - b.x, a.z - b.z);
-}
+
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+export function objectSurfaceTop(roomId: string, objects: RoomObjectInstance[], surfaceId: string) {
+  for (const object of objects) {
+    const local = (SURFACE_LOCAL[object.kind as keyof typeof SURFACE_LOCAL] ?? []).find((s) => surfaceIdFor(roomId, object, s.suffix) === surfaceId);
+    if (local) return object.y + local.ly;
+  }
+  return undefined;
 }

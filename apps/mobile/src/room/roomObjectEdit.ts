@@ -1,6 +1,7 @@
 import { CAMERA_FOV_DEG, type CameraPose } from "./camera";
 import {
   clampRoomObject,
+  isWallObject,
   roomObjectInBounds,
   type RoomObjectInstance,
 } from "./roomObjects";
@@ -33,8 +34,8 @@ export function acquireRoomObject(origin: RoomObjectInstance, placing = false): 
 }
 
 export function liftRoomObject(object: RoomObjectInstance, reducedMotion = false): RoomObjectInstance {
-  const lift = reducedMotion ? 0.04 : object.kind === "wall-frame" ? WALL_HELD_LIFT : OBJECT_HELD_LIFT;
-  if (object.kind === "wall-frame") {
+  const lift = reducedMotion ? 0.04 : isWallObject(object.kind) ? WALL_HELD_LIFT : OBJECT_HELD_LIFT;
+  if (isWallObject(object.kind)) {
     return { ...object, z: object.z + lift };
   }
   return { ...object, y: object.y + lift };
@@ -49,7 +50,7 @@ export function projectRoomObjectOntoWorld(
   origin: RoomObjectInstance,
 ): { current: RoomObjectInstance; valid: boolean; surfaceKind: NativeRoomSurface["kind"] } | null {
   const ray = screenRay(locX, locY, width, height, pose, CAMERA_FOV_DEG);
-  if (origin.kind === "wall-frame") {
+  if (isWallObject(origin.kind)) {
     if (Math.abs(ray.dir.z) < 1e-5) return null;
     const z = origin.z;
     const t = (z - ray.origin.z) / ray.dir.z;

@@ -1,3 +1,5 @@
+import { PhotoStringSheet } from "./PhotoStringSheet";
+import { configuredPhotoString, type PublicPhotoStringCard } from "./photoString";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Stack, useFocusEffect } from "expo-router";
 import { AccessibilityInfo, Animated, AppState, Easing, PanResponder, Pressable, StyleSheet, View, type GestureResponderEvent } from "react-native";
@@ -47,6 +49,7 @@ import { RoomShopSheet } from "./RoomShopSheet";
 import { RoomStyleSheet } from "./RoomStyleSheet";
 import {
   canAddRoomObject,
+  isWallObject,
   cloneRoomObjects,
   legacyRoomLayout,
   markFirstRoomEditComplete,
@@ -124,6 +127,10 @@ export function RoomWorldScreen({
   const [roomStyle, setRoomStyle] = useState<NativeRoomStyle>(DEFAULT_ROOM_STYLE);
   const [styleOpen, setStyleOpen] = useState(false);
   const [shopOpen, setShopOpen] = useState(false);
+  const [photoStringId, setPhotoStringId] = useState<string | null>(null);
+  const [publicStringCards, setPublicStringCards] = useState<PublicPhotoStringCard[]>([]);
+  const helperOpacity = useRef(new Animated.Value(1)).current;
+  const shopSaving = useRef(false);
   const [roomLayout, setRoomLayout] = useState<RoomLayoutState>(legacyRoomLayout);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [heldObjectId, setHeldObjectId] = useState<string | null>(null);
@@ -174,6 +181,10 @@ export function RoomWorldScreen({
   useEffect(() => { snapshotRef.current = snapshot; }, [snapshot]);
   useEffect(() => { reducedMotionRef.current = reducedMotion; }, [reducedMotion]);
   useEffect(() => { void AccessibilityInfo.isReduceMotionEnabled().then(setReducedMotion); }, []);
+  useEffect(() => () => {
+    if (helperTimer.current) clearTimeout(helperTimer.current);
+    helperOpacity.stopAnimation();
+  }, [helperOpacity]);
 
   function applyLoadedLayout(next: RoomLayoutState, readOnlyRoom: boolean, loadedItems: RoomRenderable[] = latestItems.current) {
     setRoomLayout(next);
@@ -192,8 +203,16 @@ export function RoomWorldScreen({
 
   function showHelper(kind: "first" | "edit") {
     if (helperTimer.current) clearTimeout(helperTimer.current);
+    helperOpacity.stopAnimation();
+    helperOpacity.setValue(1);
     setHelperKind(kind);
-    helperTimer.current = setTimeout(() => setHelperKind(null), reducedMotionRef.current ? 1800 : 2600);
+    const lifetime = reducedMotionRef.current ? 1800 : 2600;
+    const duration = reducedMotionRef.current ? 100 : 350;
+    helperTimer.current = setTimeout(() => {
+      Animated.timing(helperOpacity, { toValue: 0, duration, useNativeDriver: true }).start(({ finished }) => {
+        if (finished) setHelperKind(null);
+      });
+    }, lifetime - duration);
   }
 
   function showToast(message: string) {
@@ -218,6 +237,11 @@ export function RoomWorldScreen({
         if (mode === "public" && userId) {
           const next = demoRoom.buildFixtureRoomSnapshot(userId);
           setSnapshot(next);
+          const publicLayout = parseRoomLayout(next.room.layout);
+          setPublicStringCards(publicLayout.objects.flatMap((object) => (object.photoString?.slots ?? []).flatMap((id, slot) => {
+            const h = next.holdings.find((holding) => holding.id === id && holding.template.kind === "photocard" && holding.template.status !== "restricted");
+            return h ? [{ objectId: object.id, slot, templateId: h.templateId, template: { id: h.template.id, name: h.template.name, kind: h.template.kind, groupName: h.template.groupName, memberName: h.template.memberName } }] : [];
+          })));
           setHoldings(next.holdings);
           setItems(buildRoomRenderables(next.holdings, next.placements));
           setRoomStyle(parseRoomStyle(next.room.style, defaultStyleForTheme(next.room.themeId)));
@@ -244,6 +268,7 @@ export function RoomWorldScreen({
         const nextItems = publicRoom.room ? buildPublicRoomRenderables(publicRoom.room.id, publicRoom.room.placements) : [];
         setItems(nextItems);
         setHoldings(nextItems.map((item) => item.holding));
+        setPublicStringCards(publicRoom.room?.photoStringCards ?? []);
         setRoomStyle(parseRoomStyle(publicRoom.room?.style, DEFAULT_ROOM_STYLE));
         applyLoadedLayout(parseRoomLayout(publicRoom.room?.layout), true, nextItems);
         setSnapshot(publicRoom.room ? {
@@ -647,6 +672,7 @@ export function RoomWorldScreen({
   }
 
   async function cancelEditing() {
+    if (shopSaving.current) return;
     clearPendingPress();
     clearHeldVisual();
     const room = snapshotRef.current?.room;
@@ -747,7 +773,7 @@ export function RoomWorldScreen({
       const authoredRest = asAuthoredRenderable(held.rest, room.id, latestObjects.current);
       if (held.origin && placementsMatch(held.origin, authoredRest)) return;
       const stored = await persistPlacement(held.rest);
-      rememberPlacement(held.origin ?? { storedHoldingId: held.holdingId }, stored ?? authoredRest);
+      if (stored) rememberPlacement(held.origin ?? { storedHoldingId: held.holdingId }, stored);
     } finally {
       clearHeldVisual();
       gestureRef.current.releasing = false;
@@ -756,7 +782,7 @@ export function RoomWorldScreen({
 
   async function persistLayout(next: RoomLayoutState, options?: { silent?: boolean }) {
     const room = snapshotRef.current?.room ?? snapshot?.room;
-    if (!room || readOnly) return;
+    if (!room || readOnly) return false;
     const document = serializeRoomLayout(next);
     try {
       if (demo) loadDemoRoom().saveDemoRoomLayout(room.ownerUserId, next);
@@ -764,14 +790,17 @@ export function RoomWorldScreen({
       setSnapshot((current) => current ? { ...current, room: { ...current.room, layout: document } } : current);
       setRoomLayout(next);
       layoutStateRef.current = next;
-    } catch {
-      if (!options?.silent) setError(copy.roomSaveFailed);
+      latestObjects.current = next.objects;
+      return true;
+    } catch (err) {
+      if (!options?.silent) setError(err instanceof Error && err.message === "room_layout_unavailable" ? copy.roomLayoutUnavailable : copy.roomSaveFailed);
+      return false;
     }
   }
 
   async function applyRoomObjects(nextObjects: RoomObjectInstance[]) {
     const next = { ...layoutStateRef.current, source: "authored" as const, objects: cloneRoomObjects(nextObjects) };
-    await persistLayout(next);
+    return persistLayout(next);
   }
 
   async function releaseHeldObject() {
@@ -783,7 +812,7 @@ export function RoomWorldScreen({
       if (!held.valid) {
         objectPreviewRef.current = null;
         furnitureCarryRef.current = null;
-        if (!held.placing) showToast(held.origin.kind === "wall-frame" ? copy.roomPlaceOnWall : copy.roomPlaceOnFloor);
+        if (!held.placing) showToast(isWallObject(held.origin.kind) ? copy.roomPlaceOnWall : copy.roomPlaceOnFloor);
         if (held.placing) {
           setRoomLayout((current) => ({ ...current, objects: removeRoomObject(current.objects, held.objectId) }));
         }
@@ -794,8 +823,7 @@ export function RoomWorldScreen({
       const afterObjects = held.placing
         ? [...removeRoomObject(beforeObjects, held.objectId), held.current]
         : replaceRoomObject(beforeObjects, held.current);
-      setRoomLayout((current) => ({ ...current, source: "authored", objects: afterObjects }));
-      await persistLayout({ ...layoutStateRef.current, source: "authored", objects: afterObjects });
+      if (!await persistLayout({ ...layoutStateRef.current, source: "authored", objects: afterObjects })) return;
       pushPlacementHistory(undoStack.current, redoStack.current, {
         before: { storedHoldingId: held.objectId },
         after: { storedHoldingId: held.objectId },
@@ -812,12 +840,15 @@ export function RoomWorldScreen({
   }
 
   async function undoPlacement() {
+    if (shopSaving.current) return;
     const entry = undoStack.current.pop();
     if (!entry) return;
     redoStack.current.push(entry);
     syncHistory();
     if (isObjectHistory(entry) && entry.objectsBefore) {
-      await applyRoomObjects(entry.objectsBefore);
+      if (!await applyRoomObjects(entry.objectsBefore)) {
+        redoStack.current.pop(); undoStack.current.push(entry); syncHistory();
+      }
       return;
     }
     const before = entry.before;
@@ -833,12 +864,15 @@ export function RoomWorldScreen({
   }
 
   async function redoPlacement() {
+    if (shopSaving.current) return;
     const entry = redoStack.current.pop();
     if (!entry) return;
     undoStack.current.push(entry);
     syncHistory();
     if (isObjectHistory(entry) && entry.objectsAfter) {
-      await applyRoomObjects(entry.objectsAfter);
+      if (!await applyRoomObjects(entry.objectsAfter)) {
+        undoStack.current.pop(); redoStack.current.push(entry); syncHistory();
+      }
       return;
     }
     const after = entry.after;
@@ -854,6 +888,7 @@ export function RoomWorldScreen({
   }
 
   async function saveEditing() {
+    if (shopSaving.current) return;
     const room = snapshot?.room;
     if (!room) {
       setView({ kind: "home" });
@@ -871,7 +906,7 @@ export function RoomWorldScreen({
           : removeNativeRoomPlacement(room.id, id)),
       ]);
       const completed = markFirstRoomEditComplete(layoutStateRef.current);
-      await persistLayout(completed);
+      if (!await persistLayout(completed)) return;
       firstEntryRef.current = false;
       exploreRef.current = { ...homeExploreRef.current };
       setView({ kind: "home" });
@@ -900,30 +935,60 @@ export function RoomWorldScreen({
     setStorageQuery("");
   }
 
-  function beginPlaceFromShop(kind: RoomObjectKind) {
-    if (readOnly || viewRef.current.kind !== "edit" || !canAddRoomObject(latestObjects.current, kind)) return;
-    const draft = spawnRoomObject(latestObjects.current, kind);
-    setRoomLayout((current) => ({ ...current, source: "authored", objects: [...current.objects, draft] }));
-    const held = acquireRoomObject(draft, true);
-    heldObjectRef.current = held;
-    objectPreviewRef.current = liftRoomObject(draft, reducedMotionRef.current);
-    furnitureCarryRef.current = snapshotRef.current?.room
-      ? { roomId: snapshotRef.current.room.id, origin: draft, current: draft }
-      : null;
-    suppressTapRef.current = true;
+  async function beginPlaceFromShop(kind: RoomObjectKind) {
+    if (readOnly || shopSaving.current || viewRef.current.kind !== "edit" || !canAddRoomObject(latestObjects.current, kind)) return;
+    shopSaving.current = true;
+    const beforeLayout = layoutStateRef.current;
+    const beforeObjects = cloneRoomObjects(latestObjects.current);
+    const draft = spawnRoomObject(beforeObjects, kind);
+    const next = { ...layoutStateRef.current, source: "authored" as const, objects: [...beforeObjects, draft] };
+    // Render the grounded starter immediately; pointer movement is a separate Move action.
+    latestObjects.current = next.objects;
+    setRoomLayout(next);
     setSelectedObjectId(draft.id);
     setSelectedId(null);
-    setHeldObjectId(draft.id);
     setShopOpen(false);
     setHelperKind(null);
+    try {
+      if (await persistLayout(next)) {
+        pushPlacementHistory(undoStack.current, redoStack.current, {
+          before: { storedHoldingId: draft.id }, after: { storedHoldingId: draft.id },
+          objectsBefore: beforeObjects, objectsAfter: cloneRoomObjects(next.objects),
+        });
+        syncHistory();
+      } else {
+        latestObjects.current = beforeObjects;
+        layoutStateRef.current = beforeLayout;
+        setRoomLayout(beforeLayout);
+        setSelectedObjectId(null);
+      }
+    } finally { shopSaving.current = false; }
+  }
+
+  async function savePhotoString(slots: (string | null)[]) {
+    if (readOnly || !photoStringId || shopSaving.current) return false;
+    const before = cloneRoomObjects(latestObjects.current);
+    const object = before.find((o) => o.id === photoStringId);
+    if (!object) return false;
+    const nextObject = configuredPhotoString(object, slots, holdings);
+    const after = replaceRoomObject(before, nextObject);
+    if (!await persistLayout({ ...layoutStateRef.current, source: "authored", objects: after })) return false;
+    if (viewRef.current.kind === "edit") {
+      pushPlacementHistory(undoStack.current, redoStack.current, {
+        before: { storedHoldingId: object.id }, after: { storedHoldingId: object.id }, objectsBefore: before, objectsAfter: cloneRoomObjects(after),
+      });
+      syncHistory();
+    }
+    return true;
   }
 
   async function removeSelectedObject() {
-    if (!selectedObjectId || readOnly) return;
+    if (!selectedObjectId || readOnly || shopSaving.current) return;
     const current = latestObjects.current;
     const target = current.find((item) => item.id === selectedObjectId);
     if (!target) return;
     const next = removeRoomObject(current, selectedObjectId);
+    if (!await persistLayout({ ...layoutStateRef.current, source: "authored", objects: next })) return;
     pushPlacementHistory(undoStack.current, redoStack.current, {
       before: { storedHoldingId: selectedObjectId },
       after: { storedHoldingId: selectedObjectId },
@@ -934,16 +999,16 @@ export function RoomWorldScreen({
     });
     syncHistory();
     setSelectedObjectId(null);
-    await persistLayout({ ...layoutStateRef.current, source: "authored", objects: next });
   }
 
   async function turnSelectedObject() {
-    if (!selectedObjectId || readOnly) return;
+    if (!selectedObjectId || readOnly || shopSaving.current) return;
     const current = latestObjects.current;
     const target = current.find((item) => item.id === selectedObjectId);
     if (!target || !TURNABLE_ROOM_OBJECT_KINDS.has(target.kind)) return;
     const nextObject = turnRoomObject(target);
     const next = replaceRoomObject(current, nextObject);
+    if (!await persistLayout({ ...layoutStateRef.current, source: "authored", objects: next })) return;
     pushPlacementHistory(undoStack.current, redoStack.current, {
       before: { storedHoldingId: selectedObjectId },
       after: { storedHoldingId: selectedObjectId },
@@ -953,11 +1018,10 @@ export function RoomWorldScreen({
       childrenAfter: [],
     });
     syncHistory();
-    await persistLayout({ ...layoutStateRef.current, source: "authored", objects: next });
   }
 
   function onObjectPressStart(objectId: string) {
-    if (viewRef.current.kind !== "edit" || readOnly) return;
+    if (viewRef.current.kind !== "edit" || readOnly || shopSaving.current) return;
     clearPendingPress();
     pendingPressRef.current = {
       holdingId: `object:${objectId}`,
@@ -1070,6 +1134,9 @@ export function RoomWorldScreen({
         <NativeRoomRenderer
           key={canvasEpoch}
           items={items}
+          photoStringHoldings={holdings}
+          publicStringCards={publicStringCards}
+          onConfigurePhotoString={readOnly ? undefined : (id) => setPhotoStringId(id)}
           selectedId={selectedId}
           focusedId={editing ? null : selectedId}
           heldId={heldId}
@@ -1167,13 +1234,13 @@ export function RoomWorldScreen({
           onLeave();
         }}
       ><SeoullyText variant="caption" color={overlayTheme.color}>Reset Demo to Starter Room</SeoullyText></Pressable> : null}
-      {helperKind ? <View pointerEvents="none" style={[styles.helper, { top: insets.top + 52 }]}>
+      {helperKind ? <Animated.View pointerEvents="none" style={[styles.helper, { top: insets.top + 52, opacity: helperOpacity }]}>
         <SeoullyText variant="handle" color={colors.ink} style={styles.helperTitle}>
           {helperKind === "first" ? copy.roomFirstTitle : copy.roomEditHoldHint}
         </SeoullyText>
         {helperKind === "first" ? <SeoullyText variant="caption" color={colors.muted} style={styles.helperLead}>{copy.roomFirstLead}</SeoullyText> : null}
         {helperKind === "edit" ? <SeoullyText variant="caption" color={colors.muted} style={styles.helperLead}>{copy.roomEditLookHint}</SeoullyText> : null}
-      </View> : null}
+      </Animated.View> : null}
       {!loading ? <RoomEntranceTitle key={entranceLabel} label={entranceLabel} color={entranceTone.color} shadow={entranceTone.shadow} reducedMotion={reducedMotion} /> : null}
       {error ? <Pressable onPress={() => void refresh()} style={styles.error}><SeoullyText variant="secondary" color={colors.plum}>{error} · {copy.retry}</SeoullyText></Pressable> : null}
       {hint ? <View pointerEvents="none" style={[styles.hint, { bottom: insets.bottom + chrome.companionSize + chrome.gutter }]}><SeoullyText variant="caption" color={colors.ink} style={styles.hintText}>{hint}</SeoullyText></View> : null}
@@ -1206,6 +1273,7 @@ export function RoomWorldScreen({
           <Pressable onPress={() => void storeSelected()} style={styles.toolChip}><SeoullyText variant="caption" color={colors.plum}>{copy.removeFromRoom}</SeoullyText></Pressable>
         </View> : null}
         {selectedRoomObject && !heldObjectId && !placingItem ? <View style={styles.contextRow}>
+          {selectedRoomObject.kind === "photo-string" ? <Pressable onPress={() => setPhotoStringId(selectedRoomObject.id)} style={styles.toolChip}><SeoullyText variant="caption" color={colors.plum}>{copy.roomChoosePhotocards}</SeoullyText></Pressable> : null}
           {TURNABLE_ROOM_OBJECT_KINDS.has(selectedRoomObject.kind) ? <Pressable onPress={() => void turnSelectedObject()} style={styles.toolChip}><SeoullyText variant="caption" color={colors.plum}>{copy.roomTurn}</SeoullyText></Pressable> : null}
           <Pressable onPress={() => void removeSelectedObject()} style={styles.toolChip}><SeoullyText variant="caption" color={colors.plum}>{copy.roomRemoveObject}</SeoullyText></Pressable>
         </View> : null}
@@ -1219,6 +1287,14 @@ export function RoomWorldScreen({
           {canRedo ? <Pressable onPress={() => void redoPlacement()} style={styles.toolButton}><SeoullyText variant="button" color={colors.plum}>{copy.roomRedo}</SeoullyText></Pressable> : null}
           <Pressable onPress={() => void saveEditing()} style={styles.toolButton}><SeoullyText variant="button" color={colors.plum}>{copy.finishEditing}</SeoullyText></Pressable>
         </View>
+      </View> : null}
+      {!readOnly && photoStringId && roomLayout.objects.find((o) => o.id === photoStringId) ? <PhotoStringSheet
+        key={photoStringId} object={roomLayout.objects.find((o) => o.id === photoStringId)!} holdings={holdings}
+        copy={copy} reducedMotion={reducedMotion} bottomInset={insets.bottom}
+        onSave={savePhotoString} onClose={() => setPhotoStringId(null)}
+      /> : null}
+      {deskPresent && view.kind === "zone" && view.zone === "desk" && !selectedItem ? <View style={[styles.hint, { bottom: insets.bottom + chrome.companionSize + chrome.gutter }]}>
+        <Pressable accessibilityRole="button" onPress={() => openBinderFromWorld()} style={styles.toolChip}><SeoullyText variant="caption" color={colors.plum}>{copy.openBinder}</SeoullyText></Pressable>
       </View> : null}
       {!readOnly && editing ? <RoomShopSheet
         visible={shopOpen}

@@ -1,4 +1,5 @@
 import "server-only";
+import { ROOM_OBJECT_KINDS, validPhotoStringConfig } from "@/domain/room-object-schema";
 
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -40,7 +41,7 @@ const roomStyleSchema = z.object({
   }).strict(),
 }).strict();
 
-const roomObjectKind = z.enum(["shelf", "desk", "case", "lamp", "plant", "rug", "archive", "wall-frame"]);
+const roomObjectKind = z.enum(ROOM_OBJECT_KINDS);
 const roomLayoutSchema = z.object({
   roomId: uuid,
   layout: z.object({
@@ -53,7 +54,8 @@ const roomLayoutSchema = z.object({
       y: coordinate(-20, 20),
       z: coordinate(-20, 20),
       rotateY: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]),
-    }).strict()).min(1).max(24),
+      photoString: z.object({ slots: z.array(uuid.nullable()).length(5) }).strict().optional(),
+    }).strict().refine((obj) => !obj.photoString || (obj.kind === "photo-string" && validPhotoStringConfig(obj.photoString)), "photo_string_invalid")).min(1).max(24),
   }).strict(),
 }).strict();
 
@@ -139,6 +141,16 @@ export async function updateMyRoomLayout(input: unknown, client?: SupabaseClient
   const room = await ensureMyRoom(client);
   if (room.id !== payload.roomId) throw new Error("room_not_found");
   const supabase = client ?? await createSupabaseServerClient();
+  const attachmentIds = payload.layout.objects.flatMap((obj) => obj.photoString?.slots.filter((id): id is string => id !== null) ?? []);
+  if (attachmentIds.length) {
+    const { data: eligible, error: readError } = await supabase.from("holdings")
+      .select("id,collectible_templates!inner(kind,status)")
+      .eq("owner_user_id", room.ownerUserId).in("id", [...new Set(attachmentIds)])
+      .eq("collectible_templates.kind", "photocard").neq("collectible_templates.status", "restricted");
+    if (readError || new Set((eligible ?? []).map((row) => row.id)).size !== new Set(attachmentIds).size) {
+      throw new Error("photo_string_holding_ineligible");
+    }
+  }
   const { data, error } = await supabase.from("rooms")
     .update({ layout: payload.layout })
     .eq("id", room.id)
@@ -146,7 +158,7 @@ export async function updateMyRoomLayout(input: unknown, client?: SupabaseClient
     .select(ROOM_OWNER_SELECT)
     .single();
   if (error || !data) {
-    if (isMissingLayoutColumn(error)) throw new Error("room_layout_unavailable");
+    if (isMissingLayoutColumn(error) || error?.code === "23514") throw new Error("room_layout_unavailable");
     throw new Error(error?.code === "42501" ? "room_layout_forbidden" : "room_layout_write_failed");
   }
   return mapRoom(data);

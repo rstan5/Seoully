@@ -1,7 +1,10 @@
+import { visibleLowerBound, type NativeRepresentationKind } from "./representation";
+import { FLOOR_Y, CONTACT_EPSILON, groundedOrigin } from "./roomGrounding";
 import { ZONE_DOCKS, type CameraPose } from "./camera";
 import type { NativeRoomVector, RoomRenderable } from "./model";
 import {
   CARRIER_ROOM_OBJECT_KINDS,
+  objectSurfaceTop,
   furnitureDelta,
   objectByKind,
   objectOwnsSurface,
@@ -18,6 +21,8 @@ export type FurnitureCarry = {
 export type RoomTransformSource = {
   position: NativeRoomVector;
   rotation?: NativeRoomVector;
+  geometry?: NativeRepresentationKind;
+  scale?: number;
   placement?: { surfaceId?: string | null };
 };
 
@@ -66,10 +71,17 @@ export function resolveRoomWorldTransform(
   carry?: FurnitureCarry | null,
 ): { position: NativeRoomVector; rotation: NativeRoomVector } {
   const delta = parentDisplacement(roomId, item.placement?.surfaceId, objects, carry);
+  const surfaceId = item.placement?.surfaceId;
+  const liveObjects = carry ? objects.map((obj) => obj.id === carry.current.id ? carry.current : obj) : objects;
+  const surfaceY = surfaceId?.endsWith("-floor") ? FLOOR_Y
+    : roomId && surfaceId ? objectSurfaceTop(roomId, liveObjects, surfaceId) : undefined;
+  const contactY = item.geometry && surfaceY !== undefined
+    ? groundedOrigin(surfaceY, visibleLowerBound(item.geometry, item.scale ?? 1, item.rotation ?? ZERO), CONTACT_EPSILON)
+    : item.position.y + delta.y;
   return {
     position: {
       x: item.position.x + delta.x,
-      y: item.position.y + delta.y,
+      y: contactY,
       z: item.position.z + delta.z,
     },
     rotation: item.rotation ?? { x: 0, y: 0, z: 0 },

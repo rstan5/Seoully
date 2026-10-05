@@ -5,7 +5,7 @@ export const REPAIR02_WINDOW_Z = -0.82;
 export const REPAIR02_FURNITURE_Z = -3.58;
 export const REPAIR02_WALL_NEAR_Z = 8.6;
 
-export const ROOM_WIDTH_SCALE = 0.9;
+export const ROOM_WIDTH_SCALE = 0.81;
 export const ROOM_DEPTH_SCALE = 0.8;
 
 export function layoutX(x: number) {

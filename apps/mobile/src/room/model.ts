@@ -1,6 +1,7 @@
 import type { NativeHolding, NativeRoomPlacement } from "../api";
-import { extentsForGeometry, representationForHolding, representationKindForHolding, type NativeRepresentationKind } from "./representation";
-import { applyObjectSurfaces, type RoomObjectInstance } from "./roomObjects";
+import { visibleLowerBound, extentsForGeometry, representationForHolding, representationKindForHolding, type NativeRepresentationKind } from "./representation";
+import { FLOOR_Y, CONTACT_EPSILON, groundedOrigin } from "./roomGrounding";
+import { legacyRoomObjects, applyObjectSurfaces, type RoomObjectInstance } from "./roomObjects";
 import { layoutX, layoutZ, ROOM_LAYOUT } from "./roomLayout";
 
 export type NativeRoomVector = { x: number; y: number; z: number };
@@ -154,18 +155,7 @@ export function moveRenderable(renderable: RoomRenderable, dx: number, depthOrVe
 
 export function surfaceAcceptsGeometry(surface: NativeRoomSurface, geometry: RoomRenderable["geometry"]) {
   if (geometry === "poster") return surface.kind === "wall";
-  if (geometry === "photocard") return surface.id.includes("binder") || surface.id.includes("desk");
-  if (geometry === "album" || geometry === "vinyl" || geometry === "book" || geometry === "disc-case") {
-    return surface.id.includes("shelf") || surface.id.includes("desk");
-  }
-  if (geometry === "lightstick" || geometry === "figure" || geometry === "plushie") {
-    return surface.id.includes("display-case") || surface.id.includes("desk") || surface.id.includes("shelf");
-  }
-  if (geometry === "apparel" || geometry === "ticket" || geometry === "memorabilia") {
-    return surface.id.includes("archive") || surface.id.includes("desk") || surface.id.includes("shelf");
-  }
-  if (surface.kind === "wall") return false;
-  return surface.id.includes("shelf") || surface.id.includes("desk") || surface.id.includes("display-case");
+  return surface.kind !== "wall";
 }
 
 export function isSupportedRoomPlacement(renderable: RoomRenderable, roomId: string, objects?: RoomObjectInstance[]) {
@@ -181,13 +171,13 @@ export function settleRoomRenderable(renderable: RoomRenderable, roomId: string,
   const surface = preferred ?? surfaces
     .map((candidate) => ({ candidate, distance: footprintDistance(renderable.position, candidate) }))
     .sort((a, b) => a.distance - b.distance)[0]?.candidate ?? all.find((item) => item.id.endsWith("-floor")) ?? all[0];
-  const halfHeight = extentsForGeometry(renderable.geometry).y * renderable.scale / 2;
+  const lowerBound = visibleLowerBound(renderable.geometry, renderable.scale, renderable.rotation);
   return {
     renderable: {
       ...renderable,
       position: surface.kind === "wall"
         ? { ...renderable.position, z: surface.z + 0.06 }
-        : { ...renderable.position, y: surface.y + halfHeight },
+        : { ...renderable.position, y: groundedOrigin(surface.y, lowerBound, CONTACT_EPSILON) },
     },
     surfaceId: surface.id,
   };
@@ -203,10 +193,10 @@ export function nativeRoomSurfaces(roomId: string, objects?: RoomObjectInstance[
     { id: `${roomId}-display-case-shelf`, kind: "horizontal", x: layoutX(3.65), y: -0.5, z: layoutZ(-3.52), width: 1.45, depth: 0.72 },
     { id: `${roomId}-display-case-top`, kind: "horizontal", x: layoutX(3.65), y: 0.48, z: layoutZ(-3.52), width: 1.45, depth: 0.72 },
     { id: `${roomId}-archive`, kind: "horizontal", x: layoutX(-1.2), y: -1.68, z: layoutZ(-0.65), width: 1.7, depth: 1.05 },
-    { id: `${roomId}-wall`, kind: "wall", x: layoutX(1.1), y: 0.75, z: ROOM_LAYOUT.backZ + 0.28, width: 3.15, depth: 2.5 },
-    { id: `${roomId}-floor`, kind: "horizontal", x: 0, y: -2.15, z: layoutZ(-1.2), width: 9.2, depth: 5.8 },
+    { id: `${roomId}-wall`, kind: "wall", x: 0, y: 0.75, z: ROOM_LAYOUT.backZ + 0.12, width: ROOM_LAYOUT.wallX * 2 - 0.4, depth: 3.4 },
+    { id: `${roomId}-floor`, kind: "horizontal", x: 0, y: FLOOR_Y, z: (ROOM_LAYOUT.backZ + 1.65) / 2, width: ROOM_LAYOUT.wallX * 2 - 0.32, depth: 1.65 - ROOM_LAYOUT.backZ },
   ];
-  return objects ? applyObjectSurfaces(roomId, defaults, objects) : defaults;
+  return applyObjectSurfaces(roomId, defaults, objects ?? legacyRoomObjects());
 }
 
 export function nativeHomeForHolding(holding: NativeHolding, roomId: string, slot: number) {
@@ -306,7 +296,8 @@ function restOnAuthoredSurface(
   geometry: NativeRepresentationKind,
 ): NativeRoomVector {
   const surface = nativeRoomSurfaces(roomId).find((item) => item.id === surfaceId);
-  const halfHeight = extentsForGeometry(geometry).y / 2;
+  const halfHeight = -visibleLowerBound(geometry, 1, { x: 0, y: 0, z: 0 });
+  const lowerBound = -halfHeight;
   if (!surface) return { ...position, y: -0.72 + halfHeight };
   if (surface.kind === "wall") return { x: position.x, y: position.y, z: surface.z + 0.06 };
   const size = extentsForGeometry(geometry);
@@ -314,7 +305,7 @@ function restOnAuthoredSurface(
   const padZ = size.z / 2 + 0.015;
   return {
     x: clamp(position.x, surface.x - surface.width / 2 + padX, surface.x + surface.width / 2 - padX),
-    y: surface.y + halfHeight,
+    y: groundedOrigin(surface.y, lowerBound, CONTACT_EPSILON),
     z: clamp(position.z, surface.z - surface.depth / 2 + padZ, surface.z + surface.depth / 2 - padZ),
   };
 }

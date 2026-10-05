@@ -724,6 +724,7 @@ export type NativePublicRoom = {
     id: string;
     style?: NativeRoomStyle;
     layout?: Record<string, unknown>;
+    photoStringCards?: import("./room/photoString").PublicPhotoStringCard[];
     placements: {
       id: string;
       zoneId: string;
@@ -845,7 +846,10 @@ export async function saveNativeRoomLayout(roomId: string, layout: Record<string
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({ roomId, layout }),
   });
-  if (!response.ok) throw new Error("room_layout_write_failed");
+  if (!response.ok) {
+    const failure = await response.json().catch(() => ({})) as { error?: string };
+    throw new Error(failure.error === "room_layout_unavailable" ? failure.error : "room_layout_write_failed");
+  }
   const payload = await response.json() as { room: NativeRoom };
   return payload.room;
 }

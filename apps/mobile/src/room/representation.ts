@@ -76,7 +76,7 @@ export function extentsForGeometry(geometry: NativeRepresentationKind) {
     case "book": return { x: 0.14, y: 0.82, z: 0.64 };
     case "lightstick": return { x: 0.22, y: 0.78, z: 0.22 };
     case "plushie": return { x: 0.52, y: 0.62, z: 0.42 };
-    case "figure": return { x: 0.32, y: 0.78, z: 0.16 };
+    case "figure": return { x: 0.36, y: 0.78, z: 0.36 };
     case "apparel": return { x: 0.72, y: 0.12, z: 0.52 };
     case "ticket": return { x: 0.78, y: 0.016, z: 0.32 };
     case "disc-case": return { x: 0.1, y: 0.68, z: 0.58 };
@@ -99,4 +99,30 @@ function mixSeed(hex: string, seed: string) {
   const value = Number.parseInt(hex.slice(1), 16);
   const channel = (offset: number) => Math.min(255, Math.max(40, ((value >> offset) & 255) + shift));
   return `#${[16, 8, 0].map((offset) => channel(offset).toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** Actual visible mesh bounds in the representation pivot frame. */
+export function boundsForGeometry(geometry: NativeRepresentationKind) {
+  const size = extentsForGeometry(geometry);
+  let minY = -size.y / 2, maxY = size.y / 2;
+  if (geometry === "photocard") { minY -= 0.006; maxY += 0.006; }
+  if (geometry === "lightstick") { minY = -0.37; maxY = 0.4; }
+  if (geometry === "plushie") { minY = -0.26; maxY = 0.36; }
+  if (geometry === "figure") { minY = -0.38; maxY = 0.4; }
+  return { minX: -size.x / 2, maxX: size.x / 2, minY, maxY, minZ: -size.z / 2, maxZ: size.z / 2 };
+}
+/** XYZ Euler rotated/scaled bounds, shared by preview, settle and live world contact. */
+export function visibleLowerBound(geometry: NativeRepresentationKind, scale: number, rotation: { x: number; y: number; z: number }) {
+  const b = boundsForGeometry(geometry);
+  const sx = Math.sin(rotation.x), cx = Math.cos(rotation.x);
+  const sy = Math.sin(rotation.y), cy = Math.cos(rotation.y);
+  const sz = Math.sin(rotation.z), cz = Math.cos(rotation.z);
+  let min = Infinity;
+  for (const x of [b.minX, b.maxX]) for (const y of [b.minY, b.maxY]) for (const z of [b.minZ, b.maxZ]) {
+    // Three Euler XYZ: Rz applied first, then Ry, then Rx.
+    const rzX = cz * x - sz * y, rzY = sz * x + cz * y;
+    const ryZ = -sy * rzX + cy * z;
+    min = Math.min(min, (cx * rzY - sx * ryZ) * scale);
+  }
+  return min;
 }

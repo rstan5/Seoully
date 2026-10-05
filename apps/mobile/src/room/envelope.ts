@@ -1,3 +1,4 @@
+import { FLOOR_Y } from "./roomGrounding";
 import {
   applyExploreOffset,
   CAMERA_FOV_DEG,
@@ -18,7 +19,7 @@ import { ROOM_LAYOUT } from "./roomLayout";
  * Extends past accepted 7A/7B/7C clamps — bounds are not shrunk to hide gaps.
  */
 export const WORLD_ENVELOPE = {
-  floorTop: -2.08,
+  floorTop: FLOOR_Y,
   floorBottom: -2.72,
   floorX: 7.35,
   floorNearZ: 26.4,

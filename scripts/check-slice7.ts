@@ -414,7 +414,7 @@ assertContains(worldScreen, "previewRef", "drag preview is ref-driven");
 assertContains(worldScreen, "heldRef.current", "acquired object owns the drag");
 assertContains(worldScreen, "if (heldRef.current) {", "held drag does not pan the camera");
 assertContains(worldScreen, "async function releaseHeld", "release commits or rolls back");
-assertContains(worldScreen, "rememberPlacement(held.origin ?? { storedHoldingId: held.holdingId }, stored ?? authoredRest)", "committed move or place is undoable");
+assertContains(worldScreen, "if (stored) rememberPlacement(held.origin ?? { storedHoldingId: held.holdingId }, stored)", "committed move or place is undoable");
 assertContains(worldScreen, "revertDrop(all, origin)", "invalid release restores origin");
 assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "onPressStart", "collectibles receive long-press");
 assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "LandingHighlights", "compatible surfaces highlight while held");
@@ -432,16 +432,16 @@ const display = roomSurfaces.find((surface) => surface.id.includes("display-case
 assert.ok(shelf && desk && wall && floor && binder && display);
 assert.equal(surfaceAcceptsGeometry(shelf, "album"), true);
 assert.equal(surfaceAcceptsGeometry(desk, "album"), true);
-assert.equal(surfaceAcceptsGeometry(floor, "album"), false);
+assert.equal(surfaceAcceptsGeometry(floor, "album"), true);
 assert.equal(surfaceAcceptsGeometry(wall, "album"), false);
 assert.equal(surfaceAcceptsGeometry(wall, "poster"), true);
 assert.equal(surfaceAcceptsGeometry(floor, "poster"), false);
 assert.equal(surfaceAcceptsGeometry(desk, "poster"), false);
 assert.equal(surfaceAcceptsGeometry(binder, "photocard"), true);
 assert.equal(surfaceAcceptsGeometry(desk, "photocard"), true);
-assert.equal(surfaceAcceptsGeometry(floor, "photocard"), false);
+assert.equal(surfaceAcceptsGeometry(floor, "photocard"), true);
 assert.equal(surfaceAcceptsGeometry(display, "figure"), true);
-assert.equal(surfaceAcceptsGeometry(floor, "figure"), false);
+assert.equal(surfaceAcceptsGeometry(floor, "figure"), true);
 assert.equal(compatibleSurfaces("room-qa", "poster").every((surface) => surface.kind === "wall"), true);
 
 const originAlbum = {
@@ -657,7 +657,7 @@ const inspectB = inspectionPresentation({ ...albumAuthored, position: atB.positi
 assert.ok(Math.abs(inspectB.camera.lookAt.x - atB.position.x) < 1e-6, "A: inspection target equals resolved album X");
 assert.ok(Math.abs((atB.position.x - atA.position.x) - 1) < 1e-6, "B: shelf +1 moves album +1");
 assert.ok(Math.abs(atB.position.x - albumAuthored.position.x - 2) > 0.5, "B: album is not double-delta +2");
-assert.deepEqual(authoredPlacementFromWorld(atB.position, roomId, albumAuthored.placement.surfaceId, [shelfB]), albumAuthored.position, "B: authored placement is unchanged after parent move");
+assert.deepEqual(authoredPlacementFromWorld(atB.position, roomId, albumAuthored.placement.surfaceId, [shelfB]), { ...albumAuthored.position, y: atA.position.y }, "B: grounded authored placement is unchanged after parent move");
 const undone = resolveRoomWorldTransform(albumAuthored, roomId, [shelfA]);
 assert.ok(Math.abs(undone.position.x - atA.position.x) < 1e-6, "C: undo returns album to A");
 const redone = resolveRoomWorldTransform(albumAuthored, roomId, [shelfB]);

@@ -1,3 +1,4 @@
+import { DESK_DRAWER_CENTERS } from "./roomGrounding";
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
 import { useRef, type MutableRefObject, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber/native";
@@ -97,10 +98,14 @@ export function RoomFurniture({
   onSelectObject,
   onObjectPressStart,
   onObjectPressEnd,
+  photoStringVisuals,
+  onConfigurePhotoString,
 }: {
   theme: RoomLook;
   objects: import("./roomObjects").RoomObjectInstance[];
   hideClosedBinder: boolean;
+  photoStringVisuals?: (object: RoomObjectInstance) => ReactNode;
+  onConfigurePhotoString?: (objectId: string) => void;
   binderAt?: { x: number; y: number; z: number } | null;
   showLegacyBoxes?: boolean;
   selectedObjectId?: string | null;
@@ -129,14 +134,17 @@ export function RoomFurniture({
         onObjectPressStart={onObjectPressStart}
         onObjectPressEnd={onObjectPressEnd}
         onOpenStorage={onOpenStorage}
+        onConfigurePhotoString={onConfigurePhotoString}
       >
         {object.kind === "shelf" ? <ShelfUnit theme={theme} maps={maps} /> : null}
         {object.kind === "desk" ? <DeskUnit theme={theme} maps={maps} /> : null}
+        {object.kind === "chair" ? <ChairUnit theme={theme} maps={maps} /> : null}
         {object.kind === "case" ? <CaseUnit theme={theme} maps={maps} /> : null}
         {object.kind === "archive" ? <ArchiveCrate theme={theme} maps={maps} /> : null}
         {object.kind === "rug" ? <Rug theme={theme} maps={maps} /> : null}
         {object.kind === "lamp" ? <FloorLamp theme={theme} /> : null}
         {object.kind === "plant" ? <Plant theme={theme} maps={maps} /> : null}
+        {object.kind === "photo-string" ? photoStringVisuals?.(object) : null}
         {object.kind === "wall-frame" ? <WallFrame theme={theme} maps={maps} /> : null}
       </FurniturePose>
     ))}
@@ -155,6 +163,7 @@ function FurniturePose({
   onObjectPressStart,
   onObjectPressEnd,
   onOpenStorage,
+  onConfigurePhotoString,
   children,
 }: {
   object: RoomObjectInstance;
@@ -166,6 +175,7 @@ function FurniturePose({
   onObjectPressStart?: (objectId: string) => void;
   onObjectPressEnd?: (objectId: string) => void;
   onOpenStorage?: () => void;
+  onConfigurePhotoString?: (objectId: string) => void;
   children: ReactNode;
 }) {
   const group = useRef<Group>(null);
@@ -196,6 +206,7 @@ function FurniturePose({
         onSelectObject?.(object.id);
         return;
       }
+      if (object.kind === "photo-string") { onConfigurePhotoString?.(object.id); return; }
       if (object.kind === "archive") {
         if (onOpenStorage) onOpenStorage();
         else onSelectZone?.("archive");
@@ -239,7 +250,7 @@ function DeskUnit({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
       <mesh key={pos.join()} position={pos} castShadow><boxGeometry args={[0.07, 1.02, 0.07]} /><meshStandardMaterial color={theme.furniture} map={maps.woodFine} roughness={0.7} /></mesh>
     ))}
     <mesh position={[0.82, -0.42, 0.02]} castShadow receiveShadow><boxGeometry args={[1.18, 0.78, 1.28]} /><meshStandardMaterial color={theme.furniture} map={maps.woodFine} roughness={0.68} /></mesh>
-    {[0.18, -0.08, -0.34].map((y) => (
+    {DESK_DRAWER_CENTERS.map((y) => (
       <group key={y} position={[0.82, y, 0.66]}>
         <mesh><boxGeometry args={[1.08, 0.22, 0.04]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.5} /></mesh>
         <mesh position={[0, 0.07, 0.018]}><boxGeometry args={[1.08, 0.01, 0.01]} /><meshStandardMaterial color={theme.metal} roughness={0.34} metalness={0.16} /></mesh>
@@ -314,7 +325,7 @@ function ArchiveCrate({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
       <mesh key={`slat-${z}`} position={[0, 0.02, z]}><boxGeometry args={[1.68, 0.46, 0.06]} /><meshStandardMaterial color={theme.paper} map={maps.cardboard} roughness={0.86} /></mesh>
     ))}
     {[-0.82, 0.82].map((x) => <mesh key={`crate-${x}`} position={[x, 0, 0]}><boxGeometry args={[0.06, 0.56, 1.12]} /><meshStandardMaterial color={theme.edge} map={maps.cardboard} roughness={0.72} /></mesh>)}
-    <mesh position={[0, 0.34, 0.03]} rotation={[-0.1, 0, 0]}><boxGeometry args={[1.64, 0.05, 1.04]} /><meshStandardMaterial color={theme.paper} map={maps.cardboard} roughness={0.84} /></mesh>
+    <mesh position={[0, 0.34, 0.03]} ><boxGeometry args={[1.64, 0.05, 1.04]} /><meshStandardMaterial color={theme.paper} map={maps.cardboard} roughness={0.84} /></mesh>
     <mesh position={[0, 0.36, 0.52]}><boxGeometry args={[1.6, 0.01, 0.012]} /><meshStandardMaterial color={theme.edge} roughness={0.5} /></mesh>
     <mesh position={[0, 0.08, 0.56]}><boxGeometry args={[0.62, 0.16, 0.03]} /><meshStandardMaterial color={theme.paper} map={maps.paper} roughness={0.82} /></mesh>
     <group position={[0, -0.26, 0]}><ContactShadow width={1.78} depth={1.12} opacity={0.2} /></group>
@@ -362,5 +373,13 @@ function StorageBoxes({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
     <mesh position={[0.18, 0.3, 0.02]}><boxGeometry args={[0.26, 0.08, 0.2]} /><meshStandardMaterial color={theme.edge} map={maps.cardboard} roughness={0.62} /></mesh>
     <mesh position={[0, 0.25, 0.16]}><boxGeometry args={[0.4, 0.01, 0.01]} /><meshStandardMaterial color={theme.edge} roughness={0.48} /></mesh>
     <ContactShadow width={0.82} depth={0.46} opacity={0.15} />
+  </group>;
+}
+
+function ChairUnit({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
+  return <group>
+    <mesh castShadow receiveShadow><boxGeometry args={[0.86, 0.12, 0.82]} /><meshStandardMaterial color={theme.furniture} map={maps.woodFine} roughness={0.68} /></mesh>
+    <mesh position={[0, 0.46, -0.35]} castShadow><boxGeometry args={[0.84, 0.76, 0.08]} /><meshStandardMaterial color={theme.furniture} map={maps.woodFine} roughness={0.68} /></mesh>
+    {[-0.34, 0.34].flatMap((x) => [-0.32, 0.32].map((z) => <mesh key={`${x}:${z}`} position={[x, -0.48, z]} castShadow><boxGeometry args={[0.075, 0.84, 0.075]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.7} /></mesh>))}
   </group>;
 }

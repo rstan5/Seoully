@@ -1,3 +1,4 @@
+import { ShopMiniature } from "./ShopMiniature";
 import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { MobileCopy } from "../i18n";
 import { colors, spacing } from "../theme";
@@ -43,7 +44,10 @@ export function RoomShopSheet({
           {SHOP_CATALOG.map((kind) => {
             const available = canAddRoomObject(objects, kind);
             const placed = objectHasKind(objects, kind);
-            return <View key={kind} style={styles.row}>
+            return <View key={kind}>
+              {kind === "shelf" || kind === "rug" || kind === "wall-frame" ? <SeoullyText variant="caption" color={colors.muted} style={{ marginTop: spacing.sm }}>{kind === "shelf" ? copy.roomFurnitureGroup : kind === "rug" ? copy.roomDecorGroup : copy.roomWallGroup}</SeoullyText> : null}
+              <View style={styles.row}>
+              <ShopMiniature kind={kind} />
               <View style={styles.copy}>
                 <SeoullyText variant="handle" style={styles.name}>{shopName(copy, kind)}</SeoullyText>
                 <SeoullyText variant="caption" color={colors.muted}>
@@ -53,7 +57,7 @@ export function RoomShopSheet({
               {available ? <Pressable accessibilityRole="button" onPress={() => onAdd(kind)} style={styles.add}>
                 <SeoullyText variant="button" color={colors.plum}>{copy.roomShopAdd}</SeoullyText>
               </Pressable> : null}
-            </View>;
+            </View></View>;
           })}
         </ScrollView>
       </View>
@@ -64,6 +68,8 @@ export function RoomShopSheet({
 function shopName(copy: MobileCopy, kind: RoomObjectKind) {
   if (kind === "shelf") return copy.roomObjectShelf;
   if (kind === "desk") return copy.roomObjectDesk;
+  if (kind === "chair") return copy.roomObjectChair;
+  if (kind === "photo-string") return copy.roomObjectPhotoString;
   if (kind === "case") return copy.roomObjectCase;
   if (kind === "lamp") return copy.roomObjectLamp;
   if (kind === "plant") return copy.roomObjectPlant;

@@ -1,16 +1,17 @@
+import { eligiblePhotocards, photoStringSlot, publicPhotoStringHolding, type PublicPhotoStringCard } from "./photoString";
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
 import "./threeFiberCompat";
 import { Suspense, useMemo, useRef, type MutableRefObject } from "react";
 import { StyleSheet } from "react-native";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber/native";
-import { Color, Euler, Group, MeshBasicMaterial, PCFShadowMap, Quaternion, TextureLoader, Vector3 } from "three";
+import { CatmullRomCurve3, Color, Euler, Group, MeshBasicMaterial, PCFShadowMap, Quaternion, TextureLoader, Vector3 } from "three";
 import type { NativeBinderSpread } from "../binder/model";
 import type { NativeHolding } from "../api";
 import { useCachedSignedMedia } from "../media/cachedMedia";
 import { applyExploreOffset, cameraLerpAlpha, DESK_BINDER_AT, exploreAllowedForView, IDENTITY_EXPLORE, poseForView, type ExploreOffset } from "./camera";
 import { binderCameraForViewport, inspectionPresentation } from "./composition";
 import { NativeOpenBinder } from "./NativeOpenBinder";
-import { extentsForGeometry } from "./representation";
+import { representationForHolding, boundsForGeometry, extentsForGeometry } from "./representation";
 import { layoutX, layoutZ, ROOM_LAYOUT } from "./roomLayout";
 import { ContactShadow, prepCollectibleTexture } from "./roomMaterials";
 import { ROOM_SHADOW_CAMERA, ROOM_SHADOW_MAP_SIZE } from "./roomRendererQuality";
@@ -33,6 +34,9 @@ const ZONE_HOTSPOTS: Record<CanonicalZoneKind, { position: [number, number, numb
 
 export function NativeRoomRenderer({
   items,
+  photoStringHoldings = [],
+  publicStringCards = [],
+  onConfigurePhotoString,
   selectedId,
   focusedId,
   heldId = null,
@@ -72,6 +76,9 @@ export function NativeRoomRenderer({
   placingItem = null,
 }: {
   items: RoomRenderable[];
+  photoStringHoldings?: NativeHolding[];
+  publicStringCards?: PublicPhotoStringCard[];
+  onConfigurePhotoString?: (objectId: string) => void;
   selectedId: string | null;
   focusedId: string | null;
   heldId?: string | null;
@@ -166,6 +173,8 @@ export function NativeRoomRenderer({
       <RoomShell theme={theme} onSelectZone={view.kind === "home" || view.kind === "zone" ? onSelectZone : undefined} />
       <RoomFurniture
       theme={theme}
+      photoStringVisuals={(object) => <PhotoStringForm object={object} holdings={photoStringHoldings} publicCards={publicStringCards} readOnly={readOnly} color={theme.metal} />}
+      onConfigurePhotoString={onConfigurePhotoString}
       objects={layoutObjects}
       hideClosedBinder
       binderAt={binderAt}
@@ -182,7 +191,7 @@ export function NativeRoomRenderer({
       onObjectPressEnd={view.kind === "edit" && !readOnly ? onObjectPressEnd : undefined}
     />
     </Suspense>
-    {view.kind === "home" ? CANONICAL_ZONE_KINDS.filter((zone) => zone !== "archive").map((zone) => {
+    {view.kind === "home" ? CANONICAL_ZONE_KINDS.filter((zone) => zone !== "archive" && zone !== "binder").map((zone) => {
       if (zone === "wall") return <ZoneHotspot key={zone} zone={zone} onSelect={onSelectZone} />;
       const spot = zoneHotspotFor(zone, layoutObjects);
       return spot ? <ZoneHotspot key={zone} zone={zone} onSelect={onSelectZone} spot={spot} /> : null;
@@ -391,7 +400,7 @@ function RoomObject({
     const world = resolveRoomWorldTransform(item, roomId, objects, furnitureCarryRef?.current);
     const aspect = size.width / Math.max(1, size.height);
     const presented = focused ? inspectionPresentation({ ...item, position: world.position, rotation: world.rotation }, aspect) : null;
-    const restScale = item.scale * (held ? HELD_SCALE : selected && !focused ? 1.08 : 1);
+    const restScale = item.scale * (held ? HELD_SCALE : 1);
     targetPos.set(
       presented?.position.x ?? world.position.x,
       presented?.position.y ?? world.position.y,
@@ -431,7 +440,7 @@ function RoomObject({
   >
     <CollectibleForm item={item} selected={selected || held} loadTexture={loadTexture} />
     {!focused && !held && !item.placement?.surfaceId?.endsWith("-wall") ? (
-      <group position={[0, -extentsForGeometry(item.geometry).y / 2 - 0.012, 0]}>
+      <group position={[0, boundsForGeometry(item.geometry).minY - 0.001, 0]}>
         <ContactShadow width={0.26} depth={0.2} opacity={0.1} />
       </group>
     ) : null}
@@ -531,7 +540,7 @@ function PlushieForm({ color, accent }: { color: string; accent: string }) {
 
 function FigureForm({ color, accent, imageUrl, cacheKey }: { color: string; accent: string; imageUrl?: string; cacheKey: string }) {
   return <>
-    <mesh position={[0, -0.36, 0]} rotation={[-Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.18, 0.18, 0.04, 28]} /><meshStandardMaterial color="#d8d4cc" roughness={0.25} metalness={0.15} /></mesh>
+    <mesh position={[0, -0.36, 0]}><cylinderGeometry args={[0.18, 0.18, 0.04, 28]} /><meshStandardMaterial color="#d8d4cc" roughness={0.25} metalness={0.15} /></mesh>
     <mesh position={[0, 0.04, 0]}><boxGeometry args={[0.28, 0.72, 0.04]} /><meshStandardMaterial color={color} roughness={0.35} /></mesh>
     {imageUrl ? <CachedPersonalMediaFace cacheKey={cacheKey} url={imageUrl} width={0.24} height={0.62} depth={0.04} /> : <mesh position={[0, 0.08, 0.022]}><planeGeometry args={[0.16, 0.42]} /><meshStandardMaterial color={accent} roughness={0.4} /></mesh>}
   </>;
@@ -564,4 +573,33 @@ function zoneOfItem(item: RoomRenderable): CanonicalZoneKind {
   if (surface.includes("archive")) return "archive";
   if (surface.includes("binder")) return "binder";
   return "desk";
+}
+
+/** Static sag and card poses. FurniturePose owns the single live instance transform. */
+function PhotoStringForm({ object, holdings, publicCards, readOnly, color }: {
+  object: RoomObjectInstance; holdings: NativeHolding[]; publicCards: PublicPhotoStringCard[]; readOnly: boolean; color: string;
+}) {
+  const curve = useMemo(() => new CatmullRomCurve3(Array.from({ length: 17 }, (_, i) => {
+    const x = -1.35 + i * 2.7 / 16;
+    return new Vector3(x, -0.17 * (1 - (x / 1.35) ** 2), 0);
+  })), []);
+  const owned = new Map(eligiblePhotocards(holdings).map((h) => [h.id, h]));
+  return <group>
+    <mesh position={[0, -0.25, 0]}><boxGeometry args={[2.78, 0.9, 0.09]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>
+    <mesh><tubeGeometry args={[curve, 32, 0.012, 4, false]} /><meshStandardMaterial color={color} roughness={0.9} /></mesh>
+    {[-1.35, 1.35].map((x) => <mesh key={x} position={[x, 0, 0]}><sphereGeometry args={[0.035, 8, 6]} /><meshStandardMaterial color={color} roughness={0.65} /></mesh>)}
+    {Array.from({ length: 5 }, (_, slot) => {
+      const local = photoStringSlot(slot);
+      const publicCard = publicCards.find((c) => c.objectId === object.id && c.slot === slot);
+      const id = object.photoString?.slots[slot];
+      const holding = readOnly ? (publicCard ? publicPhotoStringHolding(publicCard) : undefined) : id ? owned.get(id) : undefined;
+      const look = holding ? representationForHolding(holding) : null;
+      return <group key={slot} position={[local.x, local.y, local.z]}>
+        <mesh position={[0, -0.025, 0.006]}><boxGeometry args={[0.035, 0.065, 0.025]} /><meshStandardMaterial color="#bdab8d" roughness={0.8} /></mesh>
+        {look && holding ? <group position={[0, -0.27, 0.014]} rotation={[0, 0, local.angle]}>
+          <Cardstock width={0.3} height={0.46} depth={0.018} color={look.color} edge={look.accent} imageUrl={look.imageUrl} cacheKey={holding.id} glossy />
+        </group> : null}
+      </group>;
+    })}
+  </group>;
 }

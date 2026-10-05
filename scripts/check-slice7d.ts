@@ -28,6 +28,7 @@ import { representationForHolding } from "../apps/mobile/src/room/representation
 
 import { buildRoomRenderables, createInitialRoomRenderable, nativeRoomSurfaces } from "../apps/mobile/src/room/model";
 import { openBinderWorldAt } from "../apps/mobile/src/room/composition";
+import { CONTACT_EPSILON } from "../apps/mobile/src/room/roomGrounding";
 import { extentsForGeometry } from "../apps/mobile/src/room/representation";
 import type { NativeHolding } from "../apps/mobile/src/api";
 
@@ -74,9 +75,9 @@ for (const prop of ["FloorLamp", "Plant", "StorageBoxes", "Rug", "RoomWindow"]) 
 assertContains(read("apps/mobile/src/room/model.ts"), "layoutX(-3.15)", "shelf landing follows layout X");
 assertContains(read("apps/mobile/src/room/model.ts"), "layoutZ(-2.85)", "desk landing follows layout Z");
 assertContains(read("apps/mobile/src/room/touchEdit.ts"), "layoutX(-1.2)", "storage takeout follows archive");
-assert.ok(Math.abs(ROOM_WIDTH_SCALE - 0.9) < 1e-9, "width scale is 10% narrower");
+assert.ok(Math.abs(ROOM_WIDTH_SCALE - 0.81) < 1e-9, "Repair 08 width is another 10% narrower");
 assert.ok(Math.abs(ROOM_DEPTH_SCALE - 0.8) < 1e-9, "depth scale is 20% shallower");
-assert.ok(Math.abs(ROOM_BOX.wallX / REPAIR02_WALL_X - 0.9) < 1e-9, "visible wall half-width is 90% of Repair 02");
+assert.ok(Math.abs(ROOM_BOX.wallX / REPAIR02_WALL_X - 0.81) < 1e-9, "visible wall half-width is 81% of Repair 02");
 assert.ok(Math.abs(ROOM_BOX.backZ / REPAIR02_BACK_Z - 0.8) < 1e-9, "visible back wall is 80% of Repair 02 depth");
 assert.equal(HOME_POSE.position.z, 5.72, "HOME was not pulled backward");
 assert.equal(HOME_POSE.position.y, 1.58, "HOME height remains Repair 02");
@@ -244,7 +245,7 @@ const placement07 = { id: "p07", roomId: "r07", holdingId: holding07.id, zoneId:
 assert.equal(buildRoomRenderables([holding07], [placement07]).length, 1);
 const album07 = createInitialRoomRenderable(holding07, 0, "r07");
 const shelf07 = nativeRoomSurfaces("r07").find((surface) => surface.id === "r07-shelf-bay-0")!;
-assert.equal(album07.position.y - extentsForGeometry("album").y / 2, shelf07.y);
+assert.equal(album07.position.y - extentsForGeometry("album").y / 2, shelf07.y + CONTACT_EPSILON);
 assertContains(worldScreen, "__DEV__ && demo && !readOnly && editing", "reset UI is Demo owner edit only");
 assertContains(worldScreen, 'if (!__DEV__ || !demo || mode !== "own" || !snapshot) return;', "reset handler guard");
 assertContains(worldScreen, "showLegacyBoxes={false}", "no decorative storage clutter");
@@ -275,3 +276,6 @@ const overlaps07 = buildRoomRenderables([holding07, twin07], [
 ]);
 assert.deepEqual(overlaps07[0].position, overlaps07[1].position, "intentional overlap remains authoritative");
 assertContains(worldScreen, 'if (!objectHasKind(latestObjects.current, "desk")) return;', "no Binder entry without Desk");
+
+// Repair 08 extends the physical builder and privacy checks.
+import "./check-room-repair08";

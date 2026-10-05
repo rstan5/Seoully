@@ -8,8 +8,8 @@ export const STARTER_ROOM_LAYOUT = {
   version: 1,
   firstRoomEditCompleted: false,
   objects: [
-    { id: "shelf", kind: "shelf", x: -2.835, y: -0.55, z: -3.024, rotateY: 0 },
-    { id: "lamp", kind: "lamp", x: -3.348, y: -2.08, z: -0.464, rotateY: 0 },
+    { id: "shelf", kind: "shelf", x: -2.3812, y: -0.505, z: -3.024, rotateY: 0 },
+    { id: "lamp", kind: "lamp", x: -3.0132, y: -2.09, z: -0.464, rotateY: 0 },
   ],
 } as const;
 export const DEFAULT_NATIVE_ROOM_THEME = "hearth" as const;

@@ -1,3 +1,4 @@
+import { groundedOrigin, CONTACT_EPSILON } from "./roomGrounding";
 import { CAMERA_FOV_DEG, type CameraPose } from "./camera";
 import { layoutX, layoutZ } from "./roomLayout";
 import {
@@ -9,7 +10,7 @@ import {
   type RoomRenderable,
 } from "./model";
 import type { RoomObjectInstance } from "./roomObjects";
-import { extentsForGeometry } from "./representation";
+import { visibleLowerBound, extentsForGeometry } from "./representation";
 
 /** Long enough that a normal tap does not acquire; short enough to feel immediate. */
 export const LONG_PRESS_MS = 320;
@@ -88,20 +89,20 @@ export function placementsMatch(a: RoomRenderable, b: RoomRenderable) {
 
 export function previewOnSurface(origin: RoomRenderable, surface: NativeRoomSurface, point: NativeRoomVector): RoomRenderable {
   const size = extentsForGeometry(origin.geometry);
-  const halfX = size.x / 2;
-  const halfY = size.y / 2;
-  const halfZ = size.z / 2;
+  const halfX = size.x * origin.scale / 2;
+  const halfY = size.y * origin.scale / 2;
+  const halfZ = size.z * origin.scale / 2;
   const rotation = orientationForSurface(origin, surface);
   const position = surface.kind === "wall"
     ? {
-      x: clamp(point.x, surface.x - surface.width / 2 + halfX, surface.x + surface.width / 2 - halfX),
+      x: clamp(point.x, surface.x - surface.width / 2 + Math.min(halfX, surface.width / 2 - 0.02), surface.x + surface.width / 2 - Math.min(halfX, surface.width / 2 - 0.02)),
       y: clamp(point.y, surface.y - surface.depth / 2 + halfY, surface.y + surface.depth / 2 - halfY),
       z: surface.z + 0.06,
     }
     : {
-      x: clamp(point.x, surface.x - surface.width / 2 + halfX, surface.x + surface.width / 2 - halfX),
-      y: surface.y + halfY,
-      z: clamp(point.z, surface.z - surface.depth / 2 + halfZ, surface.z + surface.depth / 2 - halfZ),
+      x: clamp(point.x, surface.x - surface.width / 2 + Math.min(halfX, surface.width / 2 - 0.02), surface.x + surface.width / 2 - Math.min(halfX, surface.width / 2 - 0.02)),
+      y: groundedOrigin(surface.y, visibleLowerBound(origin.geometry, origin.scale, rotation), CONTACT_EPSILON),
+      z: clamp(point.z, surface.z - surface.depth / 2 + Math.min(halfZ, surface.depth / 2 - 0.02), surface.z + surface.depth / 2 - Math.min(halfZ, surface.depth / 2 - 0.02)),
     };
   return {
     ...origin,

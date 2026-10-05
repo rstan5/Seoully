@@ -88,10 +88,10 @@ export async function createCatalogReferenceImage(input: {
   return signReference(supabase, row);
 }
 
-export async function listActiveCatalogReferenceImages(templateIds: string[]): Promise<CatalogReferenceImageDTO[]> {
+export async function listActiveCatalogReferenceImages(templateIds: string[], client?: SupabaseClient): Promise<CatalogReferenceImageDTO[]> {
   const ids = z.array(templateSchema).max(50).parse(templateIds);
   if (ids.length === 0) return [];
-  const supabase = await createSupabaseServerClient();
+  const supabase = client ?? await createSupabaseServerClient();
   const { data, error } = await supabase.from("catalog_reference_images")
     .select("id,template_id:collectible_template_id,contributed_by_user_id,source_type,status,mime_type,byte_size,storage_bucket,storage_path,created_at")
     .in("collectible_template_id", ids)

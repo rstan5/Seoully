@@ -1,4 +1,6 @@
 import "server-only";
+import { listActiveCatalogReferenceImages } from "@/server/dal/catalog-reference-images";
+import { publicPhotoStringVisuals, publicVisualRoomLayout, type PublicPhotoStringVisual } from "@/domain/public-room-layout";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -24,7 +26,7 @@ export interface PublicRoomPlacement {
 
 export interface PublicRoomDTO {
   owner: { userId: string; handle: string; displayName: string };
-  room: { id: string; style?: Record<string, unknown>; layout?: Record<string, unknown>; placements: PublicRoomPlacement[] } | null;
+  room: { id: string; style?: Record<string, unknown>; layout?: Record<string, unknown>; placements: PublicRoomPlacement[]; photoStringCards?: PublicPhotoStringVisual[] } | null;
   private: boolean;
   viewerUserId?: string;
 }
@@ -78,13 +80,23 @@ export async function getPublicRoomByHandle(input: unknown, client?: SupabaseCli
       },
     });
   }
+  const photoStringCards = publicPhotoStringVisuals(roomRaw.photoStringCards);
+  if (photoStringCards.length) {
+    // Only active, explicitly community-shared catalog imagery; failure keeps the safe fallback.
+    const references = await listActiveCatalogReferenceImages([...new Set(photoStringCards.map((card) => card.templateId))].slice(0, 50), supabase).catch(() => []);
+    for (const card of photoStringCards) {
+      const reference = references.find((image) => image.templateId === card.templateId && image.status === "active");
+      if (reference) card.catalogImageUrl = reference.url;
+    }
+  }
   return {
     owner: { userId: owner.userId, handle: owner.handle, displayName: String(owner.displayName ?? owner.handle) },
     room: {
       id: String(roomRaw.id),
       placements,
       ...(isRecord(roomRaw.style) ? { style: roomRaw.style } : {}),
-      ...(isRecord(roomRaw.layout) ? { layout: roomRaw.layout } : {}),
+      ...(isRecord(roomRaw.layout) ? { layout: publicVisualRoomLayout(roomRaw.layout) } : {}),
+      photoStringCards,
     },
     private: false,
     ...(viewerUserId ? { viewerUserId } : {}),

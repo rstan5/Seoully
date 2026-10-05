@@ -94,6 +94,7 @@ export function NativeOpenBinder({
     const rest = liveDeskBinderWorld(objects, objectPreviewRef?.current) ?? binderAt;
     const lifted = openBinderWorldAt(rest);
     if (group.current) {
+      group.current.visible = open || progress.current > 0;
       group.current.position.set(
         rest.x + (lifted.x - rest.x) * ease,
         rest.y + (lifted.y - rest.y) * ease,
@@ -111,6 +112,7 @@ export function NativeOpenBinder({
   return <>
     <group
       ref={group}
+      visible={open}
       position={[rest.x, rest.y, rest.z]}
       rotation={[-Math.PI / 2, -0.22, 0]}
       scale={0.62}

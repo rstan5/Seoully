@@ -1,11 +1,12 @@
 import type { NativeHolding, NativeRoomPlacement } from "../api";
 import { visibleLowerBound, extentsForGeometry, representationForHolding, representationKindForHolding, type NativeRepresentationKind } from "./representation";
 import { FLOOR_Y, CONTACT_EPSILON, groundedOrigin } from "./roomGrounding";
-import { legacyRoomObjects, applyObjectSurfaces, type RoomObjectInstance } from "./roomObjects";
+import { legacyRoomObjects, applyObjectSurfaces, rotateYaw, type RoomObjectInstance } from "./roomObjects";
+import { BACK_WALL } from "./envelope";
 import { layoutX, layoutZ, ROOM_LAYOUT } from "./roomLayout";
 
 export type NativeRoomVector = { x: number; y: number; z: number };
-export type NativeRoomSurface = { id: string; kind: "horizontal" | "wall"; x: number; y: number; z: number; width: number; depth: number };
+export type NativeRoomSurface = { id: string; kind: "horizontal" | "wall"; x: number; y: number; z: number; width: number; depth: number; rotateY?: number };
 export type RoomRenderable = {
   holding: NativeHolding;
   position: NativeRoomVector;
@@ -134,14 +135,9 @@ export function resizeRenderable(renderable: RoomRenderable, factor: number): Ro
 
 export function moveRenderable(renderable: RoomRenderable, dx: number, depthOrVertical: number): RoomRenderable {
   if (renderable.placement?.surfaceId?.endsWith("-wall")) {
-    return {
-      ...renderable,
-      position: {
-        ...renderable.position,
-        x: clamp(renderable.position.x + dx, -4.1, 4.1),
-        y: clamp(renderable.position.y - depthOrVertical, -1.5, 2.5),
-      },
-    };
+    const size = extentsForGeometry(renderable.geometry);
+    const wall = nativeRoomSurfaces("move").find((surface) => surface.kind === "wall")!;
+    return { ...renderable, position: clampToSurface({ ...renderable.position, x: renderable.position.x + dx, y: renderable.position.y - depthOrVertical }, wall, size.x * renderable.scale / 2, size.y * renderable.scale / 2, 0) };
   }
   return {
     ...renderable,
@@ -176,7 +172,7 @@ export function settleRoomRenderable(renderable: RoomRenderable, roomId: string,
     renderable: {
       ...renderable,
       position: surface.kind === "wall"
-        ? { ...renderable.position, z: surface.z + 0.06 }
+        ? clampToSurface(renderable.position, surface, extentsForGeometry(renderable.geometry).x * renderable.scale / 2, extentsForGeometry(renderable.geometry).y * renderable.scale / 2, 0)
         : { ...renderable.position, y: groundedOrigin(surface.y, lowerBound, CONTACT_EPSILON) },
     },
     surfaceId: surface.id,
@@ -193,7 +189,7 @@ export function nativeRoomSurfaces(roomId: string, objects?: RoomObjectInstance[
     { id: `${roomId}-display-case-shelf`, kind: "horizontal", x: layoutX(3.65), y: -0.5, z: layoutZ(-3.52), width: 1.45, depth: 0.72 },
     { id: `${roomId}-display-case-top`, kind: "horizontal", x: layoutX(3.65), y: 0.48, z: layoutZ(-3.52), width: 1.45, depth: 0.72 },
     { id: `${roomId}-archive`, kind: "horizontal", x: layoutX(-1.2), y: -1.68, z: layoutZ(-0.65), width: 1.7, depth: 1.05 },
-    { id: `${roomId}-wall`, kind: "wall", x: 0, y: 0.75, z: ROOM_LAYOUT.backZ + 0.12, width: ROOM_LAYOUT.wallX * 2 - 0.4, depth: 3.4 },
+    { id: `${roomId}-wall`, kind: "wall", x: (BACK_WALL.minX + BACK_WALL.maxX) / 2, y: (BACK_WALL.minY + BACK_WALL.maxY) / 2, z: BACK_WALL.z, width: BACK_WALL.maxX - BACK_WALL.minX, depth: BACK_WALL.maxY - BACK_WALL.minY },
     { id: `${roomId}-floor`, kind: "horizontal", x: 0, y: FLOOR_Y, z: (ROOM_LAYOUT.backZ + 1.65) / 2, width: ROOM_LAYOUT.wallX * 2 - 0.32, depth: 1.65 - ROOM_LAYOUT.backZ },
   ];
   return applyObjectSurfaces(roomId, defaults, objects ?? legacyRoomObjects());
@@ -299,7 +295,10 @@ function restOnAuthoredSurface(
   const halfHeight = -visibleLowerBound(geometry, 1, { x: 0, y: 0, z: 0 });
   const lowerBound = -halfHeight;
   if (!surface) return { ...position, y: -0.72 + halfHeight };
-  if (surface.kind === "wall") return { x: position.x, y: position.y, z: surface.z + 0.06 };
+  if (surface.kind === "wall") {
+    const size = extentsForGeometry(geometry);
+    return clampToSurface(position, surface, size.x / 2, size.y / 2, 0);
+  }
   const size = extentsForGeometry(geometry);
   const padX = size.x / 2 + 0.015;
   const padZ = size.z / 2 + 0.015;
@@ -374,12 +373,13 @@ function degreesToRadians(value: number) {
   return value * Math.PI / 180;
 }
 function footprintDistance(point: NativeRoomVector, surface: NativeRoomSurface) {
-  const outsideX = Math.max(0, Math.abs(point.x - surface.x) - surface.width / 2);
+  const local = surfaceLocalPoint(point, surface);
+  const outsideX = Math.max(0, Math.abs(local.x) - surface.width / 2);
   if (surface.kind === "wall") {
     const outsideY = Math.max(0, Math.abs(point.y - surface.y) - surface.depth / 2);
     return Math.hypot(outsideX, outsideY, Math.abs(point.z - surface.z));
   }
-  const outsideZ = Math.max(0, Math.abs(point.z - surface.z) - surface.depth / 2);
+  const outsideZ = Math.max(0, Math.abs(local.z) - surface.depth / 2);
   return Math.hypot(outsideX, outsideZ, Math.abs(point.y - surface.y) * 0.25);
 }
 function clamp(value: number, min: number, max: number) {
@@ -387,4 +387,26 @@ function clamp(value: number, min: number, max: number) {
 }
 function distanceToRoomLook(position: NativeRoomVector) {
   return Math.hypot(position.x, position.y - 0.4, position.z + 2);
+}
+
+/** Oriented physical landing rectangle, shared by projection and clamping. */
+export function surfaceLocalPoint(point: NativeRoomVector, surface: NativeRoomSurface) {
+  return rotateYaw({ x: point.x - surface.x, y: point.y - surface.y, z: point.z - surface.z }, -(surface.rotateY ?? 0));
+}
+export function surfaceWorldPoint(local: NativeRoomVector, surface: NativeRoomSurface) {
+  const offset = rotateYaw(local, surface.rotateY ?? 0);
+  return { x: surface.x + offset.x, y: surface.y + offset.y, z: surface.z + offset.z };
+}
+export function clampToSurface(point: NativeRoomVector, surface: NativeRoomSurface, halfX: number, halfY: number, halfZ: number): NativeRoomVector {
+  if (surface.kind === "wall") return {
+    x: clamp(point.x, surface.x - surface.width / 2 + halfX, surface.x + surface.width / 2 - halfX),
+    y: clamp(point.y, surface.y - surface.depth / 2 + halfY, surface.y + surface.depth / 2 - halfY),
+    z: surface.z + 0.06,
+  };
+  const local = surfaceLocalPoint(point, surface);
+  const padX = Math.min(halfX, surface.width / 2 - 0.02), padZ = Math.min(halfZ, surface.depth / 2 - 0.02);
+  return surfaceWorldPoint({ ...local,
+    x: clamp(local.x, -surface.width / 2 + padX, surface.width / 2 - padX),
+    z: clamp(local.z, -surface.depth / 2 + padZ, surface.depth / 2 - padZ),
+  }, surface);
 }

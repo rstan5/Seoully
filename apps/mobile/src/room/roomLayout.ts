@@ -23,4 +23,7 @@ export const ROOM_LAYOUT = {
   windowZ: REPAIR02_WINDOW_Z * ROOM_DEPTH_SCALE,
   furnitureZ: REPAIR02_FURNITURE_Z * ROOM_DEPTH_SCALE,
   wallNearZ: REPAIR02_WALL_NEAR_Z,
+  backWallCenterY: 0.62,
+  backWallHeight: 5.85,
+  baseboardHeight: 0.11,
 } as const;

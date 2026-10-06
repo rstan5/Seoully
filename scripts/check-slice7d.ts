@@ -279,3 +279,5 @@ assertContains(worldScreen, 'if (!objectHasKind(latestObjects.current, "desk")) 
 
 // Repair 08 extends the physical builder and privacy checks.
 import "./check-room-repair08";
+
+import "./check-room-interaction-polish";

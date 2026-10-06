@@ -724,11 +724,11 @@ export function RoomWorldScreen({
     await persistRoomStyle(next);
   }
 
-  async function persistPlacement(next: RoomRenderable, options?: { silent?: boolean }) {
+  async function persistPlacement(next: RoomRenderable, options?: { silent?: boolean; world?: boolean }) {
     const room = snapshotRef.current?.room ?? snapshot?.room;
     if (!room) return;
     const objects = latestObjects.current;
-    const world = withResolvedWorld(next, room.id, objects);
+    const world = options?.world ? next : withResolvedWorld(next, room.id, objects);
     const settled = settleRoomRenderable(world, room.id, next.placement?.surfaceId ?? undefined, objects);
     const authored = asAuthoredRenderable({
       ...settled.renderable,
@@ -773,7 +773,7 @@ export function RoomWorldScreen({
       }
       const authoredRest = asAuthoredRenderable(held.rest, room.id, latestObjects.current);
       if (held.origin && placementsMatch(held.origin, authoredRest)) return;
-      const stored = await persistPlacement(held.rest);
+      const stored = await persistPlacement(held.rest, { world: true });
       if (stored) rememberPlacement(held.origin ?? { storedHoldingId: held.holdingId }, stored);
     } finally {
       clearHeldVisual();
@@ -1007,9 +1007,23 @@ export function RoomWorldScreen({
     const current = latestObjects.current;
     const target = current.find((item) => item.id === selectedObjectId);
     if (!target || !TURNABLE_ROOM_OBJECT_KINDS.has(target.kind)) return;
+    const beforeLayout = layoutStateRef.current;
     const nextObject = turnRoomObject(target);
     const next = replaceRoomObject(current, nextObject);
-    if (!await persistLayout({ ...layoutStateRef.current, source: "authored", objects: next })) return;
+    const nextLayout = { ...beforeLayout, source: "authored" as const, objects: next };
+    // Show the turn and coherent clamp immediately; failed Live saves restore the prior state.
+    shopSaving.current = true;
+    latestObjects.current = next;
+    layoutStateRef.current = nextLayout;
+    setRoomLayout(nextLayout);
+    const saved = await persistLayout(nextLayout);
+    shopSaving.current = false;
+    if (!saved) {
+      latestObjects.current = current;
+      layoutStateRef.current = beforeLayout;
+      setRoomLayout(beforeLayout);
+      return;
+    }
     pushPlacementHistory(undoStack.current, redoStack.current, {
       before: { storedHoldingId: selectedObjectId },
       after: { storedHoldingId: selectedObjectId },

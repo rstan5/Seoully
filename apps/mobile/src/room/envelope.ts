@@ -169,3 +169,12 @@ export function permittedExploreSamples(): CameraPose[] {
     ...offsets.map((offset) => applyExploreOffset(EDIT_POSE, offset, "home")),
   ];
 }
+
+/** Existing visible back wall, excluding only baseboard/contact inset. No window exclusion. */
+export const BACK_WALL = {
+  minX: -ROOM_LAYOUT.wallX + 0.04,
+  maxX: ROOM_LAYOUT.wallX - 0.04,
+  minY: FLOOR_Y + ROOM_LAYOUT.baseboardHeight + 0.04,
+  maxY: Math.min(ROOM_LAYOUT.backWallCenterY + ROOM_LAYOUT.backWallHeight / 2, WORLD_ENVELOPE.ceilingY - 0.12) - 0.04,
+  z: ROOM_LAYOUT.backZ + 0.12,
+} as const;

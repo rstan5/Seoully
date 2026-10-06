@@ -7,7 +7,7 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import { mixHex } from "../ui/profileContrast";
 import { ROOM_BOX, WORLD_ENVELOPE } from "./envelope";
 import type { RoomObjectInstance } from "./roomObjects";
-import { layoutX, layoutZ } from "./roomLayout";
+import { layoutX, layoutZ, ROOM_LAYOUT } from "./roomLayout";
 import { ContactShadow, EdgeLip, RoomTextureQuality, useRoomMaps, type RoomMaps } from "./roomMaterials";
 import type { RoomLook } from "./roomStyle";
 import type { CanonicalZoneKind } from "./worldView";
@@ -46,8 +46,8 @@ export function RoomShell({ theme, onSelectZone }: { theme: RoomLook; onSelectZo
       <boxGeometry args={[env.wallX * 2 + 0.4, 6.9, 0.28]} />
       <meshStandardMaterial color={theme.wall} map={maps.plaster} roughness={0.95} />
     </mesh>
-    <mesh position={[0, 0.62, box.backZ + 0.06]} receiveShadow>
-      <boxGeometry args={[box.wallX * 2 + 0.12, 5.85, 0.08]} />
+    <mesh position={[0, ROOM_LAYOUT.backWallCenterY, box.backZ + 0.06]} receiveShadow>
+      <boxGeometry args={[box.wallX * 2 + 0.12, ROOM_LAYOUT.backWallHeight, 0.08]} />
       <meshStandardMaterial color={theme.wall} map={maps.plaster} roughness={0.92} />
     </mesh>
     <mesh position={[-env.wallX, (env.wallTop + env.wallBottom) / 2, wallZ]} rotation={[0, 0.02, 0]} receiveShadow>

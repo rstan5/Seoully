@@ -5,6 +5,8 @@ import type { NativeRoomVector, RoomRenderable } from "./model";
 import {
   CARRIER_ROOM_OBJECT_KINDS,
   objectSurfaceTop,
+  objectPointFromAuthored,
+  objectPointToAuthored,
   furnitureDelta,
   objectByKind,
   objectOwnsSurface,
@@ -62,7 +64,7 @@ export function parentDisplacement(
 /**
  * Current effective world transform for a physical Room object.
  * Authored/legacy placement stays default-furniture-relative; live furniture
- * displacement is applied exactly once here.
+ * translation and yaw are applied exactly once here.
  */
 export function resolveRoomWorldTransform(
   item: RoomTransformSource,
@@ -70,21 +72,23 @@ export function resolveRoomWorldTransform(
   objects: RoomObjectInstance[],
   carry?: FurnitureCarry | null,
 ): { position: NativeRoomVector; rotation: NativeRoomVector } {
-  const delta = parentDisplacement(roomId, item.placement?.surfaceId, objects, carry);
+  const parent = liveParentObject(roomId, item.placement?.surfaceId, objects, carry);
+  const position = parent ? objectPointFromAuthored(item.position, parent) : item.position;
+  const rotation = composeParentYaw(item.rotation ?? ZERO, parent?.rotateY ?? 0);
   const surfaceId = item.placement?.surfaceId;
   const liveObjects = carry ? objects.map((obj) => obj.id === carry.current.id ? carry.current : obj) : objects;
   const surfaceY = surfaceId?.endsWith("-floor") ? FLOOR_Y
     : roomId && surfaceId ? objectSurfaceTop(roomId, liveObjects, surfaceId) : undefined;
   const contactY = item.geometry && surfaceY !== undefined
-    ? groundedOrigin(surfaceY, visibleLowerBound(item.geometry, item.scale ?? 1, item.rotation ?? ZERO), CONTACT_EPSILON)
-    : item.position.y + delta.y;
+    ? groundedOrigin(surfaceY, visibleLowerBound(item.geometry, item.scale ?? 1, rotation), CONTACT_EPSILON)
+    : position.y;
   return {
     position: {
-      x: item.position.x + delta.x,
+      x: position.x,
       y: contactY,
-      z: item.position.z + delta.z,
+      z: position.z,
     },
-    rotation: item.rotation ?? { x: 0, y: 0, z: 0 },
+    rotation,
   };
 }
 
@@ -105,12 +109,8 @@ export function authoredPlacementFromWorld(
   objects: RoomObjectInstance[],
   carry?: FurnitureCarry | null,
 ): NativeRoomVector {
-  const delta = parentDisplacement(roomId, surfaceId, objects, carry);
-  return {
-    x: world.x - delta.x,
-    y: world.y - delta.y,
-    z: world.z - delta.z,
-  };
+  const parent = liveParentObject(roomId, surfaceId, objects, carry);
+  return parent ? objectPointToAuthored(world, parent) : { ...world };
 }
 
 export function asAuthoredRenderable<T extends RoomTransformSource>(
@@ -122,6 +122,7 @@ export function asAuthoredRenderable<T extends RoomTransformSource>(
   return {
     ...item,
     position: authoredPlacementFromWorld(item.position, roomId, item.placement?.surfaceId, objects, carry),
+    ...(item.rotation ? { rotation: composeParentYaw(item.rotation, -(liveParentObject(roomId, item.placement?.surfaceId, objects, carry)?.rotateY ?? 0)) } : {}),
   };
 }
 
@@ -131,13 +132,27 @@ export function liveZoneDock(zone: CanonicalZoneKind, objects: RoomObjectInstanc
   if (kind === "wall" || !CARRIER_ROOM_OBJECT_KINDS.has(kind as RoomObjectInstance["kind"])) return dock;
   const object = objectByKind(objects, kind as RoomObjectInstance["kind"]);
   if (!object) return dock;
-  const delta = furnitureDelta(object);
   return {
-    position: { x: dock.position.x + delta.x, y: dock.position.y + delta.y, z: dock.position.z + delta.z },
-    lookAt: { x: dock.lookAt.x + delta.x, y: dock.lookAt.y + delta.y, z: dock.lookAt.z + delta.z },
+    position: objectPointFromAuthored(dock.position, object),
+    lookAt: objectPointFromAuthored(dock.lookAt, object),
   };
 }
 
 export function inspectItemAtWorld(item: RoomRenderable, roomId: string | undefined, objects: RoomObjectInstance[], carry?: FurnitureCarry | null): RoomRenderable {
   return withResolvedWorld(item, roomId, objects, carry);
+}
+
+/** Compose parent yaw with the child's XYZ Euler pose, including tilted legacy collectibles. */
+export function composeParentYaw(rotation: NativeRoomVector, degrees: number): NativeRoomVector {
+  if (degrees === 0) return { ...rotation };
+  if (rotation.x === 0 && rotation.z === 0) return { ...rotation, y: rotation.y + degrees * Math.PI / 180 };
+  const a = Math.cos(rotation.x), b = Math.sin(rotation.x);
+  const c = Math.cos(rotation.y), d = Math.sin(rotation.y);
+  const e = Math.cos(rotation.z), f = Math.sin(rotation.z);
+  const yaw = degrees * Math.PI / 180, cy = Math.cos(yaw), sy = Math.sin(yaw);
+  const m11 = cy*c*e + sy*(b*f-a*d*e), m12 = -cy*c*f + sy*(b*e+a*d*f), m13 = cy*d+sy*a*c;
+  const m22 = a*e-b*d*f, m23 = -b*c;
+  const m32 = sy*c*f+cy*(b*e+a*d*f), m33 = -sy*d+cy*a*c;
+  const y = Math.asin(Math.max(-1, Math.min(1, m13)));
+  return Math.abs(m13) < 0.9999999 ? { x: Math.atan2(-m23,m33), y, z: Math.atan2(-m12,m11) } : { x: Math.atan2(m32,m22), y, z: 0 };
 }

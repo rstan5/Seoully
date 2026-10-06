@@ -48,6 +48,27 @@ for (const [kind, name] of Object.entries(names)) {
   assert.ok(Math.abs(contact - FLOOR_Y - (kind === "rug" ? 0.002 : 0)) < 1e-6, `${kind} floor contact`);
   console.log(`${kind}: visible bottom ${contact.toFixed(3)} / floor ${FLOOR_Y}`);
 }
+const { turnRoomObject, rotatedRoomObjectFootprint, defaultRoomObject: floorObject } = require("../.tmp/build/apps/mobile/src/room/roomObjects.js");
+for (const [kind,name] of Object.entries(names)) for (const rotateY of [0,90,180,270]) {
+  const object = floorObject(kind);
+  const matrix = new THREE.Matrix4().makeRotationY(rotateY*Math.PI/180);
+  const measured = bounds(sandbox[name]({theme,maps:{}}),matrix);
+  const footprint = rotatedRoomObjectFootprint({...object,rotateY});
+  assert.ok(Math.max(Math.abs(measured.min.x),Math.abs(measured.max.x)) <= footprint.halfX+1e-6, `${kind} ${rotateY} measured X footprint`);
+  assert.ok(Math.max(Math.abs(measured.min.z),Math.abs(measured.max.z)) <= footprint.halfZ+1e-6, `${kind} ${rotateY} measured Z footprint`);
+  assert.ok(Math.abs(measured.min.y-FURNITURE_LOWER_BOUND[kind])<1e-6,`${kind} stays grounded through turn`);
+}
+const { composeParentYaw } = require("../.tmp/build/apps/mobile/src/room/roomWorldTransform.js");
+for (const degrees of [0,90,180,270]) for (const rotation of [{x:0,y:0.3,z:0},{x:0.4,y:0.6,z:-0.2},{x:-Math.PI/2,y:-0.22,z:0}]) {
+  const expected = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),degrees*Math.PI/180).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(rotation.x,rotation.y,rotation.z)));
+  const resolved = composeParentYaw(rotation,degrees);
+  const actual = new THREE.Quaternion().setFromEuler(new THREE.Euler(resolved.x,resolved.y,resolved.z));
+  assert.ok(expected.angleTo(actual)<1e-6,"parent yaw composes with tilted child/Binder pose exactly once");
+  const inverted = composeParentYaw(resolved,-degrees);
+  const restored = new THREE.Quaternion().setFromEuler(new THREE.Euler(inverted.x,inverted.y,inverted.z));
+  assert.ok(restored.angleTo(new THREE.Quaternion().setFromEuler(new THREE.Euler(rotation.x,rotation.y,rotation.z)))<1e-6,"inverse parent yaw preserves original pose");
+}
+console.log("Interaction polish actual quarter-turn bounds, grounding and Three quaternion composition passed");
 const lounge = sandbox.ChairUnit({ theme, maps: {} });
 const cushions = children(lounge).filter((node) => node.type === sandbox.ChairCushion);
 assert.equal(cushions.length, 4, "upholstered base, seat and two arms");

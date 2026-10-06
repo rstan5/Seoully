@@ -57,7 +57,7 @@ export function projectRoomObjectOntoWorld(
     if (t < 0.08) return null;
     const point = along(ray, t);
     const current = clampRoomObject({ ...origin, x: point.x, y: point.y, z });
-    return { current, valid: roomObjectInBounds({ ...origin, x: point.x, y: point.y, z }), surfaceKind: "wall" };
+    return { current, valid: true, surfaceKind: "wall" };
   }
   if (Math.abs(ray.dir.y) < 1e-5) return null;
   const y = origin.y;

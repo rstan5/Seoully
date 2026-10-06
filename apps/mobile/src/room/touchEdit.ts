@@ -3,6 +3,8 @@ import { CAMERA_FOV_DEG, type CameraPose } from "./camera";
 import { layoutX, layoutZ } from "./roomLayout";
 import {
   nativeRoomSurfaces,
+  surfaceLocalPoint,
+  clampToSurface,
   settleRoomRenderable,
   surfaceAcceptsGeometry,
   type NativeRoomSurface,
@@ -93,17 +95,11 @@ export function previewOnSurface(origin: RoomRenderable, surface: NativeRoomSurf
   const halfY = size.y * origin.scale / 2;
   const halfZ = size.z * origin.scale / 2;
   const rotation = orientationForSurface(origin, surface);
-  const position = surface.kind === "wall"
-    ? {
-      x: clamp(point.x, surface.x - surface.width / 2 + Math.min(halfX, surface.width / 2 - 0.02), surface.x + surface.width / 2 - Math.min(halfX, surface.width / 2 - 0.02)),
-      y: clamp(point.y, surface.y - surface.depth / 2 + halfY, surface.y + surface.depth / 2 - halfY),
-      z: surface.z + 0.06,
-    }
-    : {
-      x: clamp(point.x, surface.x - surface.width / 2 + Math.min(halfX, surface.width / 2 - 0.02), surface.x + surface.width / 2 - Math.min(halfX, surface.width / 2 - 0.02)),
-      y: groundedOrigin(surface.y, visibleLowerBound(origin.geometry, origin.scale, rotation), CONTACT_EPSILON),
-      z: clamp(point.z, surface.z - surface.depth / 2 + Math.min(halfZ, surface.depth / 2 - 0.02), surface.z + surface.depth / 2 - Math.min(halfZ, surface.depth / 2 - 0.02)),
-    };
+  const relativeYaw = rotation.y - (surface.rotateY ?? 0) * Math.PI / 180;
+  const padX = Math.abs(Math.cos(relativeYaw)) * halfX + Math.abs(Math.sin(relativeYaw)) * halfZ;
+  const padZ = Math.abs(Math.sin(relativeYaw)) * halfX + Math.abs(Math.cos(relativeYaw)) * halfZ;
+  const contact = { ...point, y: surface.kind === "wall" ? point.y : groundedOrigin(surface.y, visibleLowerBound(origin.geometry, origin.scale, rotation), CONTACT_EPSILON) };
+  const position = clampToSurface(contact, surface, surface.kind === "wall" ? halfX : padX, halfY, padZ);
   return {
     ...origin,
     position,
@@ -155,8 +151,9 @@ export function intersectSurface(ray: Ray, surface: NativeRoomSurface) {
   const t = (surface.y - ray.origin.y) / ray.dir.y;
   if (t < RAY_MIN_T) return null;
   const point = along(ray, t);
-  const inBounds = Math.abs(point.x - surface.x) <= surface.width / 2 + SURFACE_MARGIN
-    && Math.abs(point.z - surface.z) <= surface.depth / 2 + SURFACE_MARGIN;
+  const local = surfaceLocalPoint(point, surface);
+  const inBounds = Math.abs(local.x) <= surface.width / 2 + SURFACE_MARGIN
+    && Math.abs(local.z) <= surface.depth / 2 + SURFACE_MARGIN;
   return { t, point, inBounds };
 }
 
@@ -258,8 +255,4 @@ function cross(a: NativeRoomVector, b: NativeRoomVector): NativeRoomVector {
     y: a.z * b.x - a.x * b.z,
     z: a.x * b.y - a.y * b.x,
   };
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
 }

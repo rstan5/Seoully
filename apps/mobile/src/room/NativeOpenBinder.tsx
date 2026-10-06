@@ -1,3 +1,4 @@
+import { composeParentYaw } from "./roomWorldTransform";
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
 import { Suspense, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { useFrame, useLoader, useThree } from "@react-three/fiber/native";
@@ -8,7 +9,7 @@ import type { NativeBinderPage, NativeBinderSpread } from "../binder/model";
 import { BINDER_POCKETS_PER_PAGE } from "../binder/model";
 import { cameraLerpAlpha, DESK_BINDER_AT } from "./camera";
 import { prepCollectibleTexture } from "./roomMaterials";
-import { liveDeskBinderWorld, type RoomObjectInstance } from "./roomObjects";
+import { liveDeskBinderYaw, liveDeskBinderWorld, type RoomObjectInstance } from "./roomObjects";
 import {
   BINDER_CARD_H,
   BINDER_CARD_W,
@@ -100,7 +101,8 @@ export function NativeOpenBinder({
         rest.y + (lifted.y - rest.y) * ease,
         rest.z + (lifted.z - rest.z) * ease,
       );
-      group.current.rotation.set(-Math.PI / 2 + (Math.PI / 2 - 0.08) * ease, -0.22 * (1 - ease), 0);
+      const rotation = composeParentYaw({ x: -Math.PI / 2 + (Math.PI / 2 - 0.08) * ease, y: -0.22 * (1 - ease), z: 0 }, liveDeskBinderYaw(objects, objectPreviewRef?.current) * (1 - ease));
+      group.current.rotation.set(rotation.x, rotation.y, rotation.z);
       group.current.scale.setScalar(0.62 + 0.38 * ease);
     }
     const spreadAmount = Math.max(0, Math.min(1, (ease - 0.28) / 0.72));
@@ -109,12 +111,13 @@ export function NativeOpenBinder({
   });
 
   const rest = binderAt;
+  const restRotation = composeParentYaw({ x: -Math.PI / 2, y: -0.22, z: 0 }, liveDeskBinderYaw(objects));
   return <>
     <group
       ref={group}
       visible={open}
       position={[rest.x, rest.y, rest.z]}
-      rotation={[-Math.PI / 2, -0.22, 0]}
+      rotation={[restRotation.x, restRotation.y, restRotation.z]}
       scale={0.62}
       onClick={(event) => {
         event.stopPropagation();

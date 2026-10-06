@@ -1,5 +1,5 @@
 import { DESK_BINDER_AT } from "./camera";
-import { ROOM_BOX } from "./envelope";
+import { BACK_WALL, ROOM_BOX } from "./envelope";
 import { layoutX, layoutZ } from "./roomLayout";
 import type { NativeRoomSurface, NativeRoomVector } from "./model";
 
@@ -40,8 +40,8 @@ export const UNIQUE_ROOM_OBJECT_KINDS = new Set<RoomObjectKind>(["desk", "case",
 /** Safe to place more than one when instance ids stay stable. */
 export const MULTI_ROOM_OBJECT_KINDS = new Set<RoomObjectKind>(["shelf", "lamp", "plant", "wall-frame", "photo-string"]);
 
-/** 90° Turn is only exposed where landing surfaces do not depend on facing. */
-export const TURNABLE_ROOM_OBJECT_KINDS = new Set<RoomObjectKind>(["lamp", "plant", "rug"]);
+/** Every floor-bound Shop object uses the existing authored quarter-turn interaction. */
+export const TURNABLE_ROOM_OBJECT_KINDS = new Set<RoomObjectKind>(ROOM_OBJECT_KINDS.filter((kind) => !isWallObject(kind)));
 
 export const CARRIER_ROOM_OBJECT_KINDS = new Set<RoomObjectKind>(["shelf", "desk", "case", "chair", "archive"]);
 
@@ -71,16 +71,16 @@ export const ROOM_OBJECT_DEFAULTS: Record<RoomObjectKind, NativeRoomVector> = {
   "wall-frame": { x: layoutX(1.55), y: 0.88, z: ROOM_BOX.backZ + 0.12 },
 };
 
-const FOOTPRINT: Record<RoomObjectKind, { halfX: number; halfZ: number; halfY?: number }> = {
-  shelf: { halfX: 1.12, halfZ: 0.42 },
+const FOOTPRINT: Record<RoomObjectKind, { halfX: number; halfZ: number; halfY?: number; lowerY?: number; upperY?: number }> = {
+  shelf: { halfX: 1.12, halfZ: 0.44 },
   desk: { halfX: 1.68, halfZ: 0.88 },
-  case: { halfX: 0.78, halfZ: 0.38 },
-  lamp: { halfX: 0.24, halfZ: 0.24 },
-  plant: { halfX: 0.22, halfZ: 0.22 },
+  case: { halfX: 0.78, halfZ: 0.46 },
+  lamp: { halfX: 0.28, halfZ: 0.28 },
+  plant: { halfX: 0.26, halfZ: 0.22 },
   rug: { halfX: 1.18, halfZ: 0.76 },
   archive: { halfX: 0.92, halfZ: 0.62 },
   chair: { halfX: 0.76, halfZ: 0.70 },
-  "photo-string": { halfX: 1.38, halfY: 0.5, halfZ: 0.04 },
+  "photo-string": { halfX: 1.38, halfY: 0.5, halfZ: 0.04, lowerY: -0.68, upperY: 0.035 },
   "wall-frame": { halfX: 0.66, halfY: 0.76, halfZ: 0.04 },
 };
 
@@ -255,7 +255,7 @@ export function spawnRoomObject(objects: RoomObjectInstance[], kind: RoomObjectK
     : [drafted, ...[-0.8, 0.1, 0.9, -1.6, -2.5].flatMap((z) => [-1.8, 0, 1.8].map((x) => ({ ...drafted, x, z })))];
   const safe = candidates.map(clampRoomObject).find((candidate) => objects.every((other) => {
     if (isWallObject(kind) !== isWallObject(other.kind) || other.kind === "rug" || kind === "rug") return true;
-    const a = FOOTPRINT[kind], b = FOOTPRINT[other.kind];
+    const a = rotatedRoomObjectFootprint(candidate), b = rotatedRoomObjectFootprint(other);
     return Math.abs(candidate.x - other.x) >= a.halfX + b.halfX + 0.08
       || (isWallObject(kind) ? Math.abs(candidate.y - other.y) >= (a.halfY ?? 0) + (b.halfY ?? 0) + 0.08
         : Math.abs(candidate.z - other.z) >= a.halfZ + b.halfZ + 0.08);
@@ -274,28 +274,30 @@ export function removeRoomObject(objects: RoomObjectInstance[], objectId: string
 export function turnRoomObject(object: RoomObjectInstance): RoomObjectInstance {
   if (!TURNABLE_ROOM_OBJECT_KINDS.has(object.kind)) return object;
   const rotateY = ((object.rotateY + 90) % 360) as RoomObjectInstance["rotateY"];
-  return { ...object, rotateY };
+  return clampRoomObject({ ...object, rotateY });
 }
 
 export function clampRoomObject(object: RoomObjectInstance): RoomObjectInstance {
   if (isWallObject(object.kind)) {
     const foot = FOOTPRINT[object.kind];
+    const lowerY = foot.lowerY ?? -(foot.halfY ?? 0);
+    const upperY = foot.upperY ?? (foot.halfY ?? 0);
     return {
       ...object,
-      x: clamp(object.x, -ROOM_BOX.wallX + foot.halfX + 0.2, ROOM_BOX.wallX - foot.halfX - 0.2),
-      y: clamp(object.y, -1.15 + (foot.halfY ?? 0), 2.9 - (foot.halfY ?? 0)),
-      z: ROOM_BOX.backZ + 0.12,
+      x: clamp(object.x, BACK_WALL.minX + foot.halfX, BACK_WALL.maxX - foot.halfX),
+      y: clamp(object.y, BACK_WALL.minY - lowerY, BACK_WALL.maxY - upperY),
+      z: BACK_WALL.z,
       rotateY: 0,
     };
   }
-  const foot = FOOTPRINT[object.kind];
+  const foot = rotatedRoomObjectFootprint(object);
   const maxX = ROOM_BOX.wallX - foot.halfX - 0.16;
   const minZ = ROOM_BOX.backZ + foot.halfZ + 0.22;
   return {
     ...object,
     x: clamp(object.x, -maxX, maxX),
     y: furnitureGroundY(object.kind),
-    z: clamp(object.z, minZ, 1.65),
+    z: clamp(object.z, minZ, 1.65 - foot.halfZ),
   };
 }
 
@@ -309,8 +311,7 @@ export function roomObjectInBounds(object: RoomObjectInstance) {
 export function deskBinderWorld(objects: RoomObjectInstance[]): NativeRoomVector | null {
   const desk = objectByKind(objects, "desk");
   if (!desk) return null;
-  const delta = furnitureDelta(desk);
-  return { x: DESK_BINDER_AT.x + delta.x, y: DESK_BINDER_AT.y + delta.y, z: DESK_BINDER_AT.z + delta.z };
+  return objectPointFromAuthored(DESK_BINDER_AT, desk);
 }
 
 /** Live Desk drag preview — same rest as `deskBinderWorld` once the preview matches the stored Desk. */
@@ -318,16 +319,7 @@ export function liveDeskBinderWorld(
   objects: RoomObjectInstance[],
   preview?: RoomObjectInstance | null,
 ): NativeRoomVector | null {
-  const rest = deskBinderWorld(objects);
-  if (!rest) return null;
-  if (preview?.kind !== "desk") return rest;
-  const origin = objectByKind(objects, "desk");
-  if (!origin) return rest;
-  return {
-    x: rest.x + preview.x - origin.x,
-    y: rest.y + preview.y - origin.y,
-    z: rest.z + preview.z - origin.z,
-  };
+  return deskBinderWorld(preview?.kind === "desk" ? objects.map((object) => object.kind === "desk" ? preview : object) : objects);
 }
 
 export function storageTakeoutFor(objects: RoomObjectInstance[]): NativeRoomVector {
@@ -396,9 +388,8 @@ export function applyObjectSurfaces(roomId: string, defaults: NativeRoomSurface[
       next.push({
         id,
         kind: local.kind,
-        x: object.x + local.lx,
-        y: object.y + local.ly,
-        z: object.z + local.lz,
+        ...offsetFromObject(object, { x: local.lx, y: local.ly, z: local.lz }),
+        rotateY: object.rotateY,
         width: local.width,
         depth: local.depth,
       });
@@ -410,7 +401,7 @@ export function applyObjectSurfaces(roomId: string, defaults: NativeRoomSurface[
 export function zoneHotspotFor(kind: "shelf" | "case" | "desk" | "binder" | "archive", objects: RoomObjectInstance[]) {
   if (kind === "binder") {
     const at = deskBinderWorld(objects);
-    return at ? { position: [at.x, at.y + 0.17, at.z] as [number, number, number], size: [1.05, 0.9, 0.7] as [number, number, number] } : null;
+    return at ? { position: [at.x, at.y + 0.17, at.z] as [number, number, number], size: [1.05, 0.9, 0.7] as [number, number, number], rotateY: liveDeskBinderYaw(objects) } : null;
   }
   const object = objectByKind(objects, kind);
   if (!object) return null;
@@ -422,7 +413,8 @@ export function zoneHotspotFor(kind: "shelf" | "case" | "desk" | "binder" | "arc
   };
   const lift = kind === "archive" ? 0.31 : kind === "desk" ? 0.27 : 0.35;
   const zNudge = kind === "shelf" || kind === "case" ? 0.23 : 0;
-  return { position: [object.x, object.y + lift, object.z + zNudge] as [number, number, number], size: size[kind] };
+  const at = offsetFromObject(object, { x: 0, y: lift, z: zNudge });
+  return { position: [at.x, at.y, at.z] as [number, number, number], size: size[kind], rotateY: object.rotateY };
 }
 
 export function shopHasNoCommerce() {
@@ -458,4 +450,33 @@ export function objectSurfaceTop(roomId: string, objects: RoomObjectInstance[], 
     if (local) return object.y + local.ly;
   }
   return undefined;
+}
+
+/** Three-compatible positive Y rotation; shared by children, surfaces, docks and Binder. */
+export function rotateYaw(point: NativeRoomVector, degrees: number): NativeRoomVector {
+  const angle = degrees * Math.PI / 180;
+  const cos = Math.round(Math.cos(angle) * 1e12) / 1e12;
+  const sin = Math.round(Math.sin(angle) * 1e12) / 1e12;
+  return { x: cos * point.x + sin * point.z, y: point.y, z: -sin * point.x + cos * point.z };
+}
+export function offsetFromObject(object: RoomObjectInstance, local: NativeRoomVector): NativeRoomVector {
+  const rotated = rotateYaw(local, object.rotateY);
+  return { x: object.x + rotated.x, y: object.y + rotated.y, z: object.z + rotated.z };
+}
+export function objectPointFromAuthored(point: NativeRoomVector, object: RoomObjectInstance): NativeRoomVector {
+  const origin = defaultRoomObject(object.kind);
+  return offsetFromObject(object, { x: point.x - origin.x, y: point.y - origin.y, z: point.z - origin.z });
+}
+export function objectPointToAuthored(point: NativeRoomVector, object: RoomObjectInstance): NativeRoomVector {
+  const origin = defaultRoomObject(object.kind);
+  const local = rotateYaw({ x: point.x - object.x, y: point.y - object.y, z: point.z - object.z }, -object.rotateY);
+  return { x: origin.x + local.x, y: origin.y + local.y, z: origin.z + local.z };
+}
+export function rotatedRoomObjectFootprint(object: RoomObjectInstance) {
+  const foot = FOOTPRINT[object.kind];
+  return object.rotateY === 90 || object.rotateY === 270 ? { ...foot, halfX: foot.halfZ, halfZ: foot.halfX } : foot;
+}
+
+export function liveDeskBinderYaw(objects: RoomObjectInstance[], preview?: RoomObjectInstance | null) {
+  return (preview?.kind === "desk" ? preview : objectByKind(objects, "desk"))?.rotateY ?? 0;
 }

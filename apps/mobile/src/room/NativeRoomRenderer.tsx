@@ -1,3 +1,4 @@
+import { BACK_WALL } from "./envelope";
 import { eligiblePhotocards, photoStringSlot, publicPhotoStringHolding, type PublicPhotoStringCard } from "./photoString";
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
 import "./threeFiberCompat";
@@ -25,7 +26,7 @@ import { CANONICAL_ZONE_KINDS, zoneInteractive, type CanonicalZoneKind, type Nat
 
 const ZONE_HOTSPOTS: Record<CanonicalZoneKind, { position: [number, number, number]; size: [number, number, number] }> = {
   shelf: { position: [layoutX(-3.15), -0.2, layoutZ(-3.55)], size: [2.4, 3.2, 0.9] },
-  wall: { position: [layoutX(1.1), 0.75, ROOM_LAYOUT.backZ + 0.36], size: [3.2, 2.6, 0.2] },
+  wall: { position: [0, (BACK_WALL.minY + BACK_WALL.maxY) / 2, BACK_WALL.z + 0.24], size: [BACK_WALL.maxX - BACK_WALL.minX, BACK_WALL.maxY - BACK_WALL.minY, 0.2] },
   case: { position: [layoutX(3.65), -0.2, layoutZ(-3.52)], size: [1.7, 3.2, 0.8] },
   desk: { position: [layoutX(1.55), -0.55, layoutZ(-2.85)], size: [3.3, 1.1, 1.7] },
   binder: { position: [layoutX(0.45), -0.35, layoutZ(-2.58)], size: [1.05, 0.9, 0.7] },
@@ -299,10 +300,11 @@ function ZoneHotspot({
 }: {
   zone: CanonicalZoneKind;
   onSelect: (zone: CanonicalZoneKind) => void;
-  spot?: { position: [number, number, number]; size: [number, number, number] };
+  spot?: { position: [number, number, number]; size: [number, number, number]; rotateY?: number };
 }) {
   return <mesh
     position={spot.position}
+    rotation={[0, (spot.rotateY ?? 0) * Math.PI / 180, 0]}
     onClick={(event) => { event.stopPropagation(); onSelect(zone); }}
   >
     <boxGeometry args={spot.size} />
@@ -342,10 +344,10 @@ function LandingPlane({
       <meshBasicMaterial ref={material} color={color} transparent opacity={0.12} depthWrite={false} />
     </mesh>;
   }
-  return <mesh position={[surface.x, surface.y + 0.02, surface.z]} rotation={[-Math.PI / 2, 0, 0]}>
+  return <group position={[surface.x, surface.y + 0.02, surface.z]} rotation={[0, (surface.rotateY ?? 0) * Math.PI / 180, 0]}><mesh rotation={[-Math.PI / 2, 0, 0]}>
     <planeGeometry args={[surface.width, surface.depth]} />
     <meshBasicMaterial ref={material} color={color} transparent opacity={0.12} depthWrite={false} />
-  </mesh>;
+  </mesh></group>;
 }
 
 function RoomObject({

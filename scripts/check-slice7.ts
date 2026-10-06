@@ -224,7 +224,7 @@ assertContains(worldScreen, "Math.hypot(gesture.dx, gesture.dy) > 10", "drag thr
 assertContains(worldScreen, "exploreRef={exploreRef}", "camera reads explore ref");
 assertContains(worldScreen, "openBinderFromWorld()", "desk Binder tap");
 assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "ZONE_HOTSPOTS", "world zone taps");
-assertContains(read("apps/mobile/src/room/roomEnvironment.tsx"), 'onSelectZone?.("shelf")', "shelf furniture tap");
+assertContains(read("apps/mobile/src/room/roomEnvironment.tsx"), 'onSelectZone?.("shelf", object.id)', "shelf furniture tap");
 assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "onOpenBinder", "desk Binder tap");
 assertContains(read("apps/mobile/app/room.tsx"), "immersiveRoomFill", "own Room fills the physical viewport");
 assertContains(read("apps/mobile/app/collector-room.tsx"), "immersiveRoomFill", "collector Room fills the physical viewport");
@@ -605,8 +605,8 @@ assert.equal(legacy.firstRoomEditCompleted, true);
 assert.equal(shouldAutoEnterFirstRoomEdit(legacy, false), false);
 assert.equal(JSON.stringify(serializeRoomLayout(legacy)), "{}");
 assert.equal(canAddRoomObject(starter.objects, "desk"), true);
-assert.equal(canAddRoomObject(legacy.objects, "desk"), false);
-assert.equal(UNIQUE_ROOM_OBJECT_KINDS.has("desk"), true);
+assert.equal(canAddRoomObject(legacy.objects, "desk"), true);
+assert.equal(UNIQUE_ROOM_OBJECT_KINDS.has("desk"), false);
 assert.equal(shopHasNoCommerce(), true);
 const starterShelf = starter.objects.find((item) => item.kind === "shelf")!;
 const carried = translateChildren([{

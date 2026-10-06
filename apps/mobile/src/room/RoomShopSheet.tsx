@@ -7,9 +7,7 @@ import { chrome } from "../ui/shellLayout";
 import { SeoullyText } from "../ui/SeoullyText";
 import {
   canAddRoomObject,
-  objectHasKind,
   SHOP_CATALOG,
-  UNIQUE_ROOM_OBJECT_KINDS,
   type RoomObjectInstance,
   type RoomObjectKind,
 } from "./roomObjects";
@@ -46,7 +44,6 @@ export function RoomShopSheet({
         <ScrollView keyboardShouldPersistTaps="handled">
           {SHOP_CATALOG.map((kind) => {
             const available = canAddRoomObject(objects, kind);
-            const placed = objectHasKind(objects, kind);
             return <View key={kind}>
               {kind === "shelf" || kind === "rug" || kind === "wall-frame" ? <SeoullyText variant="caption" color={roomChrome.color} style={{ marginTop: spacing.sm }}>{kind === "shelf" ? copy.roomFurnitureGroup : kind === "rug" ? copy.roomDecorGroup : copy.roomWallGroup}</SeoullyText> : null}
               <View style={[styles.row, roomChromeSurface(roomChrome)]}>
@@ -54,7 +51,7 @@ export function RoomShopSheet({
               <View style={styles.copy}>
                 <SeoullyText color={roomChrome.color} variant="handle" style={styles.name}>{shopName(copy, kind)}</SeoullyText>
                 <SeoullyText variant="caption" color={roomChrome.color}>
-                  {placed && UNIQUE_ROOM_OBJECT_KINDS.has(kind) ? copy.roomShopInRoom : shopHint(copy, kind)}
+                  {shopHint(copy, kind)}
                 </SeoullyText>
               </View>
               {available ? <Pressable accessibilityRole="button" onPress={() => onAdd(kind)} style={[styles.add, roomChromeSurface(roomChrome)]}>

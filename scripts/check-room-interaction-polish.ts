@@ -21,7 +21,7 @@ for (const kind of SHOP_CATALOG) {
   const before = defaultRoomObject(kind);
   if (!TURNABLE_ROOM_OBJECT_KINDS.has(kind)) { assert.equal(turnRoomObject(before),before); continue; }
   let turned = before;
-  for (const angle of [90,180,270,0]) {
+  for (const angle of [30,60,90,120,150,180,210,240,270,300,330,0]) {
     turned = turnRoomObject(turned);
     assert.equal(turned.rotateY, angle);
     near(turned.y, furnitureGroundY(kind));

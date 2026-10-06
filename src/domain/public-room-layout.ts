@@ -14,7 +14,7 @@ export function publicPhotoStringVisuals(raw: unknown): PublicPhotoStringVisual[
   if (!Array.isArray(raw)) return [];
   const result: PublicPhotoStringVisual[] = [];
   const seen = new Set<string>();
-  for (const value of raw.slice(0, 120)) {
+  for (const value of raw) {
     if (!value || typeof value !== "object") continue;
     const v = value as Record<string, unknown>, t = v.template as Record<string, unknown> | undefined;
     if (typeof v.objectId !== "string" || typeof v.templateId !== "string" || typeof v.slot !== "number" || !Number.isInteger(v.slot) || v.slot < 0 || v.slot >= 5 || !t || t.kind !== "photocard" || t.status === "restricted") continue;

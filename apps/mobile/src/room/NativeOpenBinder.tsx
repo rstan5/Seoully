@@ -46,6 +46,7 @@ export function NativeOpenBinder({
   paper,
   binderAt = DESK_BINDER_AT,
   objects = [],
+  deskInstanceId,
   objectPreviewRef,
   onOpen,
   onHold,
@@ -63,6 +64,7 @@ export function NativeOpenBinder({
   paper: string;
   binderAt?: { x: number; y: number; z: number };
   objects?: RoomObjectInstance[];
+  deskInstanceId?: string | null;
   objectPreviewRef?: MutableRefObject<RoomObjectInstance | null>;
   onOpen?: () => void;
   onHold: (holding: NativeHolding | null) => void;
@@ -92,7 +94,7 @@ export function NativeOpenBinder({
     const rate = reducedMotion ? BINDER_TRAVEL_RATE_REDUCED : BINDER_TRAVEL_RATE;
     progress.current = Math.max(0, Math.min(1, progress.current + (open ? 1 : -1) * delta * rate / 3));
     const ease = progress.current * progress.current * (3 - 2 * progress.current);
-    const rest = liveDeskBinderWorld(objects, objectPreviewRef?.current) ?? binderAt;
+    const rest = liveDeskBinderWorld(objects, objectPreviewRef?.current, deskInstanceId) ?? binderAt;
     const lifted = openBinderWorldAt(rest);
     if (group.current) {
       group.current.visible = open || progress.current > 0;
@@ -101,7 +103,7 @@ export function NativeOpenBinder({
         rest.y + (lifted.y - rest.y) * ease,
         rest.z + (lifted.z - rest.z) * ease,
       );
-      const rotation = composeParentYaw({ x: -Math.PI / 2 + (Math.PI / 2 - 0.08) * ease, y: -0.22 * (1 - ease), z: 0 }, liveDeskBinderYaw(objects, objectPreviewRef?.current) * (1 - ease));
+      const rotation = composeParentYaw({ x: -Math.PI / 2 + (Math.PI / 2 - 0.08) * ease, y: -0.22 * (1 - ease), z: 0 }, liveDeskBinderYaw(objects, objectPreviewRef?.current, deskInstanceId) * (1 - ease));
       group.current.rotation.set(rotation.x, rotation.y, rotation.z);
       group.current.scale.setScalar(0.62 + 0.38 * ease);
     }
@@ -111,7 +113,7 @@ export function NativeOpenBinder({
   });
 
   const rest = binderAt;
-  const restRotation = composeParentYaw({ x: -Math.PI / 2, y: -0.22, z: 0 }, liveDeskBinderYaw(objects));
+  const restRotation = composeParentYaw({ x: -Math.PI / 2, y: -0.22, z: 0 }, liveDeskBinderYaw(objects, undefined, deskInstanceId));
   return <>
     <group
       ref={group}

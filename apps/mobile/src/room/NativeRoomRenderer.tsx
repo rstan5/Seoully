@@ -49,6 +49,7 @@ export function NativeRoomRenderer({
   themeId,
   style,
   view,
+  binderDeskId,
   binderSpread,
   turningSpread,
   turnDir,
@@ -91,13 +92,14 @@ export function NativeRoomRenderer({
   themeId: import("../api").NativeRoomThemeId;
   style?: NativeRoomStyle;
   view: NativeWorldView;
+  binderDeskId?: string | null;
   binderSpread?: NativeBinderSpread;
   turningSpread?: NativeBinderSpread;
   turnDir?: 1 | -1 | 0;
   reducedMotion?: boolean;
   paused?: boolean;
   readOnly?: boolean;
-  onSelectZone: (zone: CanonicalZoneKind) => void;
+  onSelectZone: (zone: CanonicalZoneKind, objectId?: string) => void;
   onSelect: (holdingId: string) => void;
   onSelectObject?: (objectId: string) => void;
   onClearSelection: () => void;
@@ -115,13 +117,13 @@ export function NativeRoomRenderer({
   onPressEnd?: (holdingId: string) => void;
   onObjectPressStart?: (objectId: string) => void;
   onObjectPressEnd?: (objectId: string) => void;
-  onOpenStorage?: () => void;
+  onOpenStorage?: (objectId?: string) => void;
   placingItem?: RoomRenderable | null;
 }) {
   const focused = items.find((item) => item.holding.id === focusedId) ?? null;
   const theme = resolveRoomLook(style ?? defaultStyleForTheme(themeId));
   const layoutObjects = objects;
-  const binderAt = deskBinderWorld(layoutObjects);
+  const binderAt = deskBinderWorld(layoutObjects, binderDeskId);
   const textured = roomTextureIds(items, selectedId, focusedId);
   if (placingItem?.imageUrl) textured.add(placingItem.holding.id);
   const binderOpen = view.kind === "binder";
@@ -194,8 +196,10 @@ export function NativeRoomRenderer({
     </Suspense>
     {view.kind === "home" ? CANONICAL_ZONE_KINDS.filter((zone) => zone !== "archive" && zone !== "binder").map((zone) => {
       if (zone === "wall") return <ZoneHotspot key={zone} zone={zone} onSelect={onSelectZone} />;
-      const spot = zoneHotspotFor(zone, layoutObjects);
-      return spot ? <ZoneHotspot key={zone} zone={zone} onSelect={onSelectZone} spot={spot} /> : null;
+      return layoutObjects.filter((object) => object.kind === zone).map((object) => {
+        const spot = zoneHotspotFor(zone as "shelf" | "case" | "desk" | "archive", layoutObjects, object.id);
+        return spot ? <ZoneHotspot key={object.id} zone={zone} onSelect={(selectedZone) => onSelectZone(selectedZone, object.id)} spot={spot} /> : null;
+      });
     }) : null}
     {(heldId || heldObjectId) && compatibleSurfaces.length ? <LandingHighlights
       surfaces={compatibleSurfaces}
@@ -236,6 +240,7 @@ export function NativeRoomRenderer({
       paper={theme.paper}
       binderAt={binderAt}
       objects={layoutObjects}
+      deskInstanceId={binderDeskId}
       objectPreviewRef={objectPreviewRef}
       onOpen={view.kind === "binder" || view.kind === "edit" || Boolean(heldId) || Boolean(heldObjectId) ? undefined : onOpenBinder}
       onHold={(holding) => onHoldCard?.(holding)}
@@ -277,7 +282,7 @@ function AuthoredCamera({
       : view.kind === "binder"
         ? binderCameraForViewport(aspect, binderAt)
         : view.kind === "inspect" || view.kind === "zone"
-          ? liveZoneDock(view.zone, objects)
+          ? liveZoneDock(view.zone, objects, view.objectId)
           : poseForView(view, liveFocused);
     const offset = exploreRef?.current ?? IDENTITY_EXPLORE;
     const pose = exploreAllowedForView(view)

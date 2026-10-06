@@ -207,7 +207,7 @@ assert.equal(starter.objects.length, 2);
 assert.equal(starter.objects.some((item) => item.kind === "desk"), false);
 assert.equal(shouldAutoEnterFirstRoomEdit(parseRoomLayout({}), false), false);
 assert.equal(shopHasNoCommerce(), true);
-assert.equal(UNIQUE_ROOM_OBJECT_KINDS.has("rug"), true);
+assert.equal(UNIQUE_ROOM_OBJECT_KINDS.has("rug"), false);
 assertContains(worldScreen, "RoomShopSheet", "Shop sheet");
 assertContains(worldScreen, "styles.editBar", "compact floating toolbar");
 assertNotContains(worldScreen, "styles.editTray", "giant white edit block removed");
@@ -257,7 +257,7 @@ assertContains(reset07, "starterRoomLayout()", "reset clears first-edit flag");
 assertNotContains(reset07, "await", "no server reset");
 assertNotContains(reset07, "delete", "no data deletion");
 assertContains(renderer, "{binderAt ? <NativeOpenBinder", "Binder lifecycle follows Desk, not open view");
-assertContains(binder, "liveDeskBinderWorld(objects, objectPreviewRef?.current)", "open and close use live Desk");
+assertContains(binder, "liveDeskBinderWorld(objects, objectPreviewRef?.current, deskInstanceId)", "open and close use live Desk");
 assertContains(binder, "open ? 1 : -1", "reverse the same spatial motion on close");
 assertNotContains(binder, "setY(", "page turn uses refs");
 assertNotContains(binder, "<Canvas", "no second Canvas");
@@ -275,9 +275,11 @@ const overlaps07 = buildRoomRenderables([holding07, twin07], [
   { ...placement07, id: "p08", holdingId: twin07.id, transform: saved07 },
 ]);
 assert.deepEqual(overlaps07[0].position, overlaps07[1].position, "intentional overlap remains authoritative");
-assertContains(worldScreen, 'if (!objectHasKind(latestObjects.current, "desk")) return;', "no Binder entry without Desk");
+assertContains(worldScreen, 'if (!desk) return;', "no Binder entry without Desk");
 
 // Repair 08 extends the physical builder and privacy checks.
 import "./check-room-repair08";
 
 import "./check-room-interaction-polish";
+
+import "./check-room-builder-completeness";

@@ -4,8 +4,8 @@ import { layoutX, layoutZ } from "./roomLayout";
 import type { NativeRoomSurface, NativeRoomVector } from "./model";
 
 /** Basic V1 Room Shop catalog — one canonical version of each object. */
-import { ROOM_OBJECT_KINDS, validPhotoStringConfig, type PhotoStringConfig, type RoomObjectKind } from "seoully-domain/room-object-schema";
-import { furnitureGroundY, DESK_TABLETOP_TOP, CHAIR_SEAT_TOP } from "./roomGrounding";
+import { ROOM_OBJECT_KINDS, validPhotoStringConfig, type PhotoStringConfig, type RoomObjectKind, type RoomYaw, ROOM_TURN_DEGREES, normalizeRoomYaw } from "seoully-domain/room-object-schema";
+import { furnitureGroundY, DESK_TABLETOP_TOP, CHAIR_SEAT_TOP, SHELF_ROOF_TOP, CASE_ROOF_TOP } from "./roomGrounding";
 export { ROOM_OBJECT_KINDS } from "seoully-domain/room-object-schema";
 export type { RoomObjectKind } from "seoully-domain/room-object-schema";
 export function isWallObject(kind: RoomObjectKind) { return kind === "wall-frame" || kind === "photo-string"; }
@@ -16,7 +16,7 @@ export type RoomObjectInstance = {
   x: number;
   y: number;
   z: number;
-  rotateY: 0 | 90 | 180 | 270;
+  rotateY: RoomYaw;
   photoString?: PhotoStringConfig;
 };
 
@@ -34,13 +34,11 @@ export type RoomLayoutDocument = {
   firstRoomEditCompleted: boolean;
 };
 
-/** Unique structural pieces — one in the Room for V1. */
-export const UNIQUE_ROOM_OBJECT_KINDS = new Set<RoomObjectKind>(["desk", "case", "chair", "archive", "rug"]);
+/** Shop definitions are reusable; identity belongs to each placed instance. */
+export const UNIQUE_ROOM_OBJECT_KINDS = new Set<RoomObjectKind>();
+export const MULTI_ROOM_OBJECT_KINDS = new Set<RoomObjectKind>(ROOM_OBJECT_KINDS);
 
-/** Safe to place more than one when instance ids stay stable. */
-export const MULTI_ROOM_OBJECT_KINDS = new Set<RoomObjectKind>(["shelf", "lamp", "plant", "wall-frame", "photo-string"]);
-
-/** Every floor-bound Shop object uses the existing authored quarter-turn interaction. */
+/** Every floor-bound Shop object uses the existing authored 30° interaction. */
 export const TURNABLE_ROOM_OBJECT_KINDS = new Set<RoomObjectKind>(ROOM_OBJECT_KINDS.filter((kind) => !isWallObject(kind)));
 
 export const CARRIER_ROOM_OBJECT_KINDS = new Set<RoomObjectKind>(["shelf", "desk", "case", "chair", "archive"]);
@@ -98,7 +96,7 @@ const SURFACE_LOCAL: Record<"shelf" | "desk" | "case" | "chair" | "archive", Sur
   shelf: [
     { suffix: "shelf-bay-0", kind: "horizontal", lx: 0, ly: -0.88, lz: 0.12, width: 2.04, depth: 0.62 },
     { suffix: "shelf-bay-1", kind: "horizontal", lx: 0, ly: 0.02, lz: 0.12, width: 2.04, depth: 0.62 },
-    { suffix: "shelf-bay-3", kind: "horizontal", lx: 0, ly: 1.75, lz: 0.12, width: 2.04, depth: 0.62 },
+    { suffix: "shelf-bay-3", kind: "horizontal", lx: 0, ly: SHELF_ROOF_TOP, lz: 0.08, width: 2.04, depth: 0.62 },
     { suffix: "shelf-bay-2", kind: "horizontal", lx: 0, ly: 0.92, lz: 0.12, width: 2.04, depth: 0.62 },
   ],
   chair: [{ suffix: "chair-seat", kind: "horizontal", lx: 0, ly: CHAIR_SEAT_TOP, lz: 0.06, width: 0.84, depth: 0.76 }],
@@ -109,7 +107,7 @@ const SURFACE_LOCAL: Record<"shelf" | "desk" | "case" | "chair" | "archive", Sur
   case: [
     { suffix: "display-case-shelf", kind: "horizontal", lx: 0, ly: 0.0175, lz: 0.16, width: 1.36, depth: 0.56 },
     { suffix: "display-case-lower", kind: "horizontal", lx: 0, ly: -0.9125, lz: 0.16, width: 1.36, depth: 0.56 },
-    { suffix: "display-case-crown", kind: "horizontal", lx: 0, ly: 1.8475, lz: 0.16, width: 1.36, depth: 0.56 },
+    { suffix: "display-case-crown", kind: "horizontal", lx: 0, ly: CASE_ROOF_TOP, lz: 0.14, width: 1.36, depth: 0.56 },
     { suffix: "display-case-top", kind: "horizontal", lx: 0, ly: 0.9975, lz: 0.16, width: 1.36, depth: 0.56 },
   ],
   archive: [
@@ -123,7 +121,7 @@ export function defaultRoomObject(kind: RoomObjectKind, id: string = kind): Room
 }
 
 export function legacyRoomObjects(): RoomObjectInstance[] {
-  return ROOM_OBJECT_KINDS.filter((kind) => kind !== "chair" && kind !== "photo-string").map((kind) => kind === "archive" ? spawnRoomObject([], kind) : defaultRoomObject(kind));
+  return ROOM_OBJECT_KINDS.filter((kind) => kind !== "chair" && kind !== "photo-string").map((kind) => kind === "archive" ? spawnRoomObject([], kind, kind) : defaultRoomObject(kind));
 }
 
 export function starterRoomObjects(): RoomObjectInstance[] {
@@ -150,13 +148,12 @@ export function parseRoomLayout(value: unknown): RoomLayoutState {
   if (raw.version !== 1 || !Array.isArray(raw.objects)) return legacyRoomLayout();
   const objects: RoomObjectInstance[] = [];
   const seen = new Set<string>();
-  for (const entry of raw.objects.slice(0, 24)) {
+  for (const entry of raw.objects) {
     if (!entry || typeof entry !== "object") continue;
     const row = entry as Record<string, unknown>;
     const kind = row.kind;
     const id = typeof row.id === "string" ? row.id.trim() : "";
     if (!isRoomObjectKind(kind) || !id || seen.has(id)) continue;
-    if (UNIQUE_ROOM_OBJECT_KINDS.has(kind) && objects.some((item) => item.kind === kind)) continue;
     if (row.photoString !== undefined && (kind !== "photo-string" || !validPhotoStringConfig(row.photoString))) throw new Error("photo_string_invalid");
     seen.add(id);
     objects.push(clampRoomObject({
@@ -165,11 +162,11 @@ export function parseRoomLayout(value: unknown): RoomLayoutState {
       x: finite(row.x, ROOM_OBJECT_DEFAULTS[kind].x),
       y: finite(row.y, ROOM_OBJECT_DEFAULTS[kind].y),
       z: finite(row.z, ROOM_OBJECT_DEFAULTS[kind].z),
-      rotateY: normalizeRotateY(row.rotateY),
+      rotateY: normalizeRoomYaw(row.rotateY),
       ...(row.photoString ? { photoString: { slots: [...(row.photoString as PhotoStringConfig).slots] } } : {}),
     }));
   }
-  if (!objects.length) return legacyRoomLayout();
+  if (!objects.length && raw.objects.length) return legacyRoomLayout();
   return {
     source: "authored",
     objects,
@@ -181,6 +178,7 @@ export function serializeRoomLayout(state: RoomLayoutState): RoomLayoutDocument 
   if (state.source === "legacy" && state.firstRoomEditCompleted && objectsMatchDefaults(state.objects, legacyRoomObjects())) {
     return {};
   }
+  if (new Set(state.objects.map((object) => object.id)).size !== state.objects.length || state.objects.some((object) => !object.id.trim() || object.id !== object.id.trim() || object.id.length > 80 || normalizeRoomYaw(object.rotateY) !== object.rotateY)) throw new Error("room_object_invalid");
   if (state.objects.some((object) => object.photoString && (object.kind !== "photo-string" || !validPhotoStringConfig(object.photoString)))) throw new Error("photo_string_invalid");
   return {
     version: 1,
@@ -235,32 +233,43 @@ export function objectByKind(objects: RoomObjectInstance[], kind: RoomObjectKind
 }
 
 export function canAddRoomObject(objects: RoomObjectInstance[], kind: RoomObjectKind) {
-  if (UNIQUE_ROOM_OBJECT_KINDS.has(kind)) return !objectHasKind(objects, kind);
-  return MULTI_ROOM_OBJECT_KINDS.has(kind) && objects.filter((item) => item.kind === kind).length < 6;
+  return isRoomObjectKind(kind);
 }
 
+let instanceSequence = 0;
 export function nextRoomObjectId(objects: RoomObjectInstance[], kind: RoomObjectKind) {
-  if (UNIQUE_ROOM_OBJECT_KINDS.has(kind)) return kind;
-  if (!objects.some((item) => item.id === kind)) return kind;
-  let index = 2;
-  while (objects.some((item) => item.id === `${kind}-${index}`)) index += 1;
-  return `${kind}-${index}`;
+  let id: string;
+  do {
+    instanceSequence += 1;
+    id = `${kind}@${Date.now().toString(36)}-${instanceSequence.toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  } while (objects.some((object) => object.id === id));
+  return id;
 }
 
-export function spawnRoomObject(objects: RoomObjectInstance[], kind: RoomObjectKind): RoomObjectInstance {
-  const id = nextRoomObjectId(objects, kind);
+export function spawnRoomObject(objects: RoomObjectInstance[], kind: RoomObjectKind, id = nextRoomObjectId(objects, kind)): RoomObjectInstance {
   const drafted = defaultRoomObject(kind, id);
   const candidates = isWallObject(kind)
-    ? [{ ...drafted, x: 0, y: 1.25 }, { ...drafted, x: -1.6, y: 1.5 }, { ...drafted, x: 1.6, y: 0.1 }]
+    ? [{ ...drafted, x: 0, y: 1.25 }, ...[0.2, 0.5, 0.8].flatMap((height) => [-0.7, 0, 0.7].map((width) => ({ ...drafted, x: width * (BACK_WALL.maxX - BACK_WALL.minX) / 2, y: BACK_WALL.minY + height * (BACK_WALL.maxY - BACK_WALL.minY) })))]
     : [drafted, ...[-0.8, 0.1, 0.9, -1.6, -2.5].flatMap((z) => [-1.8, 0, 1.8].map((x) => ({ ...drafted, x, z })))];
-  const safe = candidates.map(clampRoomObject).find((candidate) => objects.every((other) => {
+  const available = candidates.map(clampRoomObject);
+  const safe = available.find((candidate) => objects.every((other) => {
     if (isWallObject(kind) !== isWallObject(other.kind) || other.kind === "rug" || kind === "rug") return true;
     const a = rotatedRoomObjectFootprint(candidate), b = rotatedRoomObjectFootprint(other);
     return Math.abs(candidate.x - other.x) >= a.halfX + b.halfX + 0.08
       || (isWallObject(kind) ? Math.abs(candidate.y - other.y) >= (a.halfY ?? 0) + (b.halfY ?? 0) + 0.08
         : Math.abs(candidate.z - other.z) >= a.halfZ + b.halfZ + 0.08);
   }));
-  return safe ?? clampRoomObject({ ...drafted, x: 0, z: isWallObject(kind) ? drafted.z : 0.9 });
+  if (safe && !objects.some((other) => other.kind === kind && Math.hypot(other.x - safe.x, other.y - safe.y, other.z - safe.z) < 0.05)) return safe;
+  // A crowded room may require overlap, but choose the least occupied visible
+  // starter position rather than repeatedly piling copies on one coordinate.
+  const crowding = (candidate: RoomObjectInstance) => objects.reduce((score, other) => {
+    if (isWallObject(kind) !== isWallObject(other.kind)) return score;
+    const a = rotatedRoomObjectFootprint(candidate), b = rotatedRoomObjectFootprint(other);
+    const overlapX = Math.max(0, a.halfX + b.halfX + 0.08 - Math.abs(candidate.x - other.x));
+    const overlapOther = Math.max(0, (isWallObject(kind) ? (a.halfY ?? 0) + (b.halfY ?? 0) : a.halfZ + b.halfZ) + 0.08 - Math.abs(isWallObject(kind) ? candidate.y - other.y : candidate.z - other.z));
+    return score + overlapX * overlapOther + (Math.hypot(candidate.x - other.x, candidate.y - other.y, candidate.z - other.z) < 0.05 ? 100 : 0);
+  }, 0);
+  return available.reduce((best, candidate) => crowding(candidate) < crowding(best) ? candidate : best);
 }
 
 export function replaceRoomObject(objects: RoomObjectInstance[], next: RoomObjectInstance) {
@@ -273,7 +282,7 @@ export function removeRoomObject(objects: RoomObjectInstance[], objectId: string
 
 export function turnRoomObject(object: RoomObjectInstance): RoomObjectInstance {
   if (!TURNABLE_ROOM_OBJECT_KINDS.has(object.kind)) return object;
-  const rotateY = ((object.rotateY + 90) % 360) as RoomObjectInstance["rotateY"];
+  const rotateY = ((object.rotateY + ROOM_TURN_DEGREES) % 360) as RoomObjectInstance["rotateY"];
   return clampRoomObject({ ...object, rotateY });
 }
 
@@ -308,8 +317,8 @@ export function roomObjectInBounds(object: RoomObjectInstance) {
     && Math.abs(clamped.y - object.y) < 0.08;
 }
 
-export function deskBinderWorld(objects: RoomObjectInstance[]): NativeRoomVector | null {
-  const desk = objectByKind(objects, "desk");
+export function deskBinderWorld(objects: RoomObjectInstance[], instanceId?: string | null): NativeRoomVector | null {
+  const desk = instanceId ? objects.find((object) => object.id === instanceId && object.kind === "desk") : objectByKind(objects, "desk");
   if (!desk) return null;
   return objectPointFromAuthored(DESK_BINDER_AT, desk);
 }
@@ -318,21 +327,19 @@ export function deskBinderWorld(objects: RoomObjectInstance[]): NativeRoomVector
 export function liveDeskBinderWorld(
   objects: RoomObjectInstance[],
   preview?: RoomObjectInstance | null,
+  instanceId?: string | null,
 ): NativeRoomVector | null {
-  return deskBinderWorld(preview?.kind === "desk" ? objects.map((object) => object.kind === "desk" ? preview : object) : objects);
+  return deskBinderWorld(preview?.kind === "desk" ? objects.map((object) => object.id === preview.id ? preview : object) : objects, instanceId);
 }
 
-export function storageTakeoutFor(objects: RoomObjectInstance[]): NativeRoomVector {
-  const archive = objectByKind(objects, "archive");
+export function storageTakeoutFor(objects: RoomObjectInstance[], instanceId?: string | null): NativeRoomVector {
+  const archive = instanceId ? objects.find((object) => object.id === instanceId && object.kind === "archive") : objectByKind(objects, "archive");
   if (!archive) return { x: layoutX(-1.2), y: -1.12, z: layoutZ(-0.65) };
   return { x: archive.x, y: archive.y + 0.74, z: archive.z };
 }
 
 export function canonicalSurfaceId(roomId: string, object: RoomObjectInstance, suffix: string) {
-  if ((object.kind === "shelf" || object.kind === "lamp" || object.kind === "plant" || object.kind === "wall-frame") && object.id !== object.kind) {
-    return `${roomId}-${object.kind}:${object.id}-${suffix.replace(`${object.kind}-`, "")}`;
-  }
-  return `${roomId}-${suffix}`;
+  return surfaceIdFor(roomId, object, suffix);
 }
 
 export function surfacesOwnedBy(roomId: string, object: RoomObjectInstance): string[] {
@@ -398,12 +405,12 @@ export function applyObjectSurfaces(roomId: string, defaults: NativeRoomSurface[
   return next;
 }
 
-export function zoneHotspotFor(kind: "shelf" | "case" | "desk" | "binder" | "archive", objects: RoomObjectInstance[]) {
+export function zoneHotspotFor(kind: "shelf" | "case" | "desk" | "binder" | "archive", objects: RoomObjectInstance[], instanceId?: string) {
   if (kind === "binder") {
     const at = deskBinderWorld(objects);
     return at ? { position: [at.x, at.y + 0.17, at.z] as [number, number, number], size: [1.05, 0.9, 0.7] as [number, number, number], rotateY: liveDeskBinderYaw(objects) } : null;
   }
-  const object = objectByKind(objects, kind);
+  const object = instanceId ? objects.find((object) => object.id === instanceId && object.kind === kind) : objectByKind(objects, kind);
   if (!object) return null;
   const size: Record<"shelf" | "case" | "desk" | "archive", [number, number, number]> = {
     shelf: [2.4, 3.2, 0.9],
@@ -422,16 +429,16 @@ export function shopHasNoCommerce() {
 }
 
 function surfaceIdFor(roomId: string, object: RoomObjectInstance, suffix: string) {
-  if (object.kind === "shelf" && object.id !== "shelf") {
-    const bay = suffix.replace("shelf-", "");
-    return `${roomId}-shelf:${object.id}-${bay}`;
-  }
-  return `${roomId}-${suffix}`;
+  if (object.id === object.kind) return `${roomId}-${suffix}`;
+  if (object.kind === "shelf") return `${roomId}-shelf:${object.id}-${suffix.replace("shelf-", "")}`;
+  return `${roomId}-${object.kind}:${object.id}-${suffix}`;
 }
-
-function normalizeRotateY(value: unknown): RoomObjectInstance["rotateY"] {
-  const numeric = typeof value === "number" && Number.isFinite(value) ? ((Math.round(value / 90) * 90) % 360 + 360) % 360 : 0;
-  return (numeric === 90 || numeric === 180 || numeric === 270 ? numeric : 0);
+/** Legacy unscoped placements resolve to the exact default instance first, then an old custom instance. New scoped IDs never fall back by kind. */
+export function surfaceOwner(roomId: string, objects: RoomObjectInstance[], surfaceId?: string | null) {
+  if (!surfaceId) return null;
+  const exact = objects.find((object) => objectOwnsSurface(roomId, object, surfaceId));
+  if (exact || surfaceId.includes(":")) return exact ?? null;
+  return objects.find((object) => !object.id.includes("@") && (SURFACE_LOCAL[object.kind as keyof typeof SURFACE_LOCAL] ?? []).some((local) => `${roomId}-${local.suffix}` === surfaceId)) ?? null;
 }
 
 function finite(value: unknown, fallback: number) {
@@ -445,11 +452,9 @@ function clamp(value: number, min: number, max: number) {
 }
 
 export function objectSurfaceTop(roomId: string, objects: RoomObjectInstance[], surfaceId: string) {
-  for (const object of objects) {
-    const local = (SURFACE_LOCAL[object.kind as keyof typeof SURFACE_LOCAL] ?? []).find((s) => surfaceIdFor(roomId, object, s.suffix) === surfaceId);
-    if (local) return object.y + local.ly;
-  }
-  return undefined;
+  const object = surfaceOwner(roomId, objects, surfaceId);
+  const local = object && (SURFACE_LOCAL[object.kind as keyof typeof SURFACE_LOCAL] ?? []).find((surface) => surfaceIdFor(roomId, object, surface.suffix) === surfaceId || `${roomId}-${surface.suffix}` === surfaceId);
+  return object && local ? object.y + local.ly : undefined;
 }
 
 /** Three-compatible positive Y rotation; shared by children, surfaces, docks and Binder. */
@@ -474,9 +479,16 @@ export function objectPointToAuthored(point: NativeRoomVector, object: RoomObjec
 }
 export function rotatedRoomObjectFootprint(object: RoomObjectInstance) {
   const foot = FOOTPRINT[object.kind];
-  return object.rotateY === 90 || object.rotateY === 270 ? { ...foot, halfX: foot.halfZ, halfZ: foot.halfX } : foot;
+  const angle = object.rotateY * Math.PI / 180;
+  const cos = Math.abs(Math.cos(angle)), sin = Math.abs(Math.sin(angle));
+  return { ...foot, halfX: cos * foot.halfX + sin * foot.halfZ, halfZ: sin * foot.halfX + cos * foot.halfZ };
 }
 
-export function liveDeskBinderYaw(objects: RoomObjectInstance[], preview?: RoomObjectInstance | null) {
-  return (preview?.kind === "desk" ? preview : objectByKind(objects, "desk"))?.rotateY ?? 0;
+export function liveDeskBinderYaw(objects: RoomObjectInstance[], preview?: RoomObjectInstance | null, instanceId?: string | null) {
+  const desk = instanceId ? objects.find((object) => object.id === instanceId && object.kind === "desk") : objectByKind(objects, "desk");
+  return (preview?.id === desk?.id ? preview : desk)?.rotateY ?? 0;
+}
+
+export function childrenOnInstance<T extends { placement?: { surfaceId?: string | null } }>(items: T[], roomId: string, objects: RoomObjectInstance[], instanceId: string): T[] {
+  return items.filter((item) => surfaceOwner(roomId, objects, item.placement?.surfaceId)?.id === instanceId);
 }

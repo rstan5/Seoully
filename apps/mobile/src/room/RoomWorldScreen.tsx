@@ -61,6 +61,8 @@ import {
   shouldAutoEnterFirstRoomEdit,
   spawnRoomObject,
   storageTakeoutFor,
+  surfaceOwner,
+  childrenOnInstance,
   TURNABLE_ROOM_OBJECT_KINDS,
   turnRoomObject,
   type RoomLayoutState,
@@ -122,6 +124,8 @@ export function RoomWorldScreen({
   const [turningSpreadIndex, setTurningSpreadIndex] = useState<number | null>(null);
   const [heldId, setHeldId] = useState<string | null>(null);
   const [placingItem, setPlacingItem] = useState<RoomRenderable | null>(null);
+  const [binderDeskId, setBinderDeskId] = useState<string | null>(null);
+  const [storageArchiveId, setStorageArchiveId] = useState<string | null>(null);
   const [storageOpen, setStorageOpen] = useState(false);
   const [storageQuery, setStorageQuery] = useState("");
   const [roomStyle, setRoomStyle] = useState<NativeRoomStyle>(DEFAULT_ROOM_STYLE);
@@ -544,7 +548,7 @@ export function RoomWorldScreen({
     setView(next);
   }
 
-  function selectZone(zone: CanonicalZoneKind) {
+  function selectZone(zone: CanonicalZoneKind, objectId?: string) {
     if (editing) return;
     if (viewRef.current.kind === "home") homeExploreRef.current = { ...exploreRef.current };
     exploreRef.current = { ...IDENTITY_EXPLORE };
@@ -553,7 +557,7 @@ export function RoomWorldScreen({
       return;
     }
     setSelectedId(null);
-    setView({ kind: "zone", zone });
+    setView({ kind: "zone", zone, ...(objectId ? { objectId } : {}) });
   }
 
   function selectObject(holdingId: string) {
@@ -573,12 +577,13 @@ export function RoomWorldScreen({
     frozenExploreRef.current = { ...exploreRef.current };
     const zone = zoneFromSurfaceId(item.placement?.surfaceId, snapshot?.room.id ?? "");
     const canonical = zone === "floor" ? "desk" : zone;
+    const parent = surfaceOwner(snapshot?.room.id ?? "", latestObjects.current, item.placement?.surfaceId);
     setSelectedId(holdingId);
     if (item.holding.template.kind === "photocard") {
-      openBinderFromWorld(holdingId);
+      openBinderFromWorld(holdingId, parent?.kind === "desk" ? parent.id : undefined);
       return;
     }
-    setView(inspectView(canonical, holdingId));
+    setView(inspectView(canonical, holdingId, parent?.id));
   }
 
   function onCollectiblePressStart(holdingId: string) {
@@ -619,8 +624,12 @@ export function RoomWorldScreen({
     binderReturnRef.current = { view: current, explore: { ...exploreRef.current } };
   }
 
-  function openBinderFromWorld(holdingId?: string) {
-    if (!objectHasKind(latestObjects.current, "desk")) return;
+  function openBinderFromWorld(holdingId?: string, deskId?: string) {
+    const current = viewRef.current;
+    const originId = deskId ?? (current.kind === "zone" && current.zone === "desk" ? current.objectId : undefined);
+    const desk = originId ? latestObjects.current.find((object) => object.id === originId && object.kind === "desk") : latestObjects.current.find((object) => object.kind === "desk");
+    if (!desk) return;
+    setBinderDeskId(desk.id);
     captureBinderReturn();
     const index = holdingId ? spreadIndexForHolding(spreads, holdingId) : 0;
     setSelectedId(null);
@@ -681,6 +690,9 @@ export function RoomWorldScreen({
     const currentIds = new Set(latestItems.current.map((item) => item.holding.id));
     const baselineIds = new Set(baseline.map((item) => item.holding.id));
     setItems(baseline);
+    // Restore parent instances before replaying their authored child placements.
+    const objects = cloneRoomObjects(objectBaseline.current);
+    if (!await persistLayout({ ...layoutStateRef.current, objects, source: "authored" })) return;
     if (room) {
       try {
         await Promise.all([
@@ -696,9 +708,6 @@ export function RoomWorldScreen({
     exploreRef.current = { ...homeExploreRef.current };
     setRoomStyle(styleBaseline.current);
     await persistRoomStyle(styleBaseline.current);
-    const objects = cloneRoomObjects(objectBaseline.current);
-    setRoomLayout((current) => ({ ...current, objects }));
-    await persistLayout({ ...layoutStateRef.current, objects, source: "authored" });
     setView({ kind: "home" });
     setSelectedId(null);
     setSelectedObjectId(null);
@@ -847,7 +856,7 @@ export function RoomWorldScreen({
     redoStack.current.push(entry);
     syncHistory();
     if (isObjectHistory(entry) && entry.objectsBefore) {
-      if (!await applyRoomObjects(entry.objectsBefore)) {
+      if (!await applyFurnitureHistory(entry, true)) {
         redoStack.current.pop(); undoStack.current.push(entry); syncHistory();
       }
       return;
@@ -871,7 +880,7 @@ export function RoomWorldScreen({
     undoStack.current.push(entry);
     syncHistory();
     if (isObjectHistory(entry) && entry.objectsAfter) {
-      if (!await applyRoomObjects(entry.objectsAfter)) {
+      if (!await applyFurnitureHistory(entry, false)) {
         undoStack.current.pop(); redoStack.current.push(entry); syncHistory();
       }
       return;
@@ -924,7 +933,7 @@ export function RoomWorldScreen({
   function beginPlaceFromStorage(holding: NativeHolding) {
     if (!snapshot || readOnly || viewRef.current.kind !== "edit") return;
     const draft = createInitialRoomRenderable(holding, nextNativeSlot(items.map((item) => item.placement?.slot ?? 0)), snapshot.room.id);
-    const held = acquirePlaceFromStorage(draft, reducedMotionRef.current, storageTakeoutFor(latestObjects.current));
+    const held = acquirePlaceFromStorage(draft, reducedMotionRef.current, storageTakeoutFor(latestObjects.current, storageArchiveId));
     heldRef.current = held;
     previewRef.current = held.preview;
     highlightSurfaceIdRef.current = null;
@@ -983,23 +992,58 @@ export function RoomWorldScreen({
     return true;
   }
 
+  async function replayFurnitureChildren(source: RoomRenderable[], target: RoomRenderable[]) {
+    const room = snapshotRef.current?.room;
+    if (!room) return;
+    const targetIds = new Set(target.map((item) => item.holding.id));
+    for (const item of source) {
+      if (targetIds.has(item.holding.id)) continue;
+      if (demo) loadDemoRoom().removeDemoPlacement(room.id, item.holding.id);
+      else await removeNativeRoomPlacement(room.id, item.holding.id);
+      setItems((items) => storeRenderable(items, item.holding.id));
+    }
+    for (const item of target) {
+      if (!await persistPlacement(item, { silent: true })) throw new Error("room_child_restore_failed");
+    }
+  }
+
+  async function applyFurnitureHistory(entry: PlacementHistoryEntry<RoomRenderable, RoomObjectInstance>, undo: boolean) {
+    const source = undo ? entry.objectsAfter! : entry.objectsBefore!;
+    const target = undo ? entry.objectsBefore! : entry.objectsAfter!;
+    const sourceChildren = undo ? entry.childrenAfter ?? [] : entry.childrenBefore ?? [];
+    const targetChildren = undo ? entry.childrenBefore ?? [] : entry.childrenAfter ?? [];
+    shopSaving.current = true;
+    try {
+      if (!await applyRoomObjects(target)) return false;
+      await replayFurnitureChildren(sourceChildren, targetChildren);
+      return true;
+    } catch {
+      await applyRoomObjects(source);
+      try { await replayFurnitureChildren(targetChildren, sourceChildren); } catch { /* Save error remains visible. */ }
+      setError(copy.roomSaveFailed);
+      return false;
+    } finally { shopSaving.current = false; }
+  }
+
   async function removeSelectedObject() {
     if (!selectedObjectId || readOnly || shopSaving.current) return;
     const current = latestObjects.current;
     const target = current.find((item) => item.id === selectedObjectId);
-    if (!target) return;
+    const room = snapshotRef.current?.room;
+    if (!target || !room) return;
     const next = removeRoomObject(current, selectedObjectId);
-    if (!await persistLayout({ ...layoutStateRef.current, source: "authored", objects: next })) return;
-    pushPlacementHistory(undoStack.current, redoStack.current, {
-      before: { storedHoldingId: selectedObjectId },
-      after: { storedHoldingId: selectedObjectId },
-      objectsBefore: cloneRoomObjects(current),
-      objectsAfter: cloneRoomObjects(next),
-      childrenBefore: [],
-      childrenAfter: [],
-    });
+    const children = cloneRenderables(childrenOnInstance(latestItems.current, room.id, current, selectedObjectId));
+    const entry: PlacementHistoryEntry<RoomRenderable, RoomObjectInstance> = {
+      before: { storedHoldingId: selectedObjectId }, after: { storedHoldingId: selectedObjectId },
+      objectsBefore: cloneRoomObjects(current), objectsAfter: cloneRoomObjects(next),
+      childrenBefore: children, childrenAfter: [],
+    };
+    // Store only this instance's placements. Holdings and Binder eligibility stay untouched.
+    if (!await applyFurnitureHistory(entry, false)) return;
+    pushPlacementHistory(undoStack.current, redoStack.current, entry);
     syncHistory();
     setSelectedObjectId(null);
+    if (children.some((item) => item.holding.id === selectedId)) setSelectedId(null);
   }
 
   async function turnSelectedObject() {
@@ -1179,6 +1223,7 @@ export function RoomWorldScreen({
           onPressEnd={onCollectiblePressEnd}
           onObjectPressStart={onObjectPressStart}
           onObjectPressEnd={onObjectPressEnd}
+          binderDeskId={binderDeskId}
           onSelectZone={selectZone}
           onSelect={selectObject}
           onSelectObject={(objectId) => {
@@ -1194,12 +1239,12 @@ export function RoomWorldScreen({
             setSelectedObjectId(null);
             if (view.kind === "inspect") {
               exploreRef.current = { ...frozenExploreRef.current };
-              setView({ kind: "zone", zone: view.zone });
+              setView({ kind: "zone", zone: view.zone, ...(view.objectId ? { objectId: view.objectId } : {}) });
             }
             setSelectedId(null);
           }}
           onOpenBinder={deskPresent ? () => openBinderFromWorld() : undefined}
-          onOpenStorage={readOnly ? undefined : () => setStorageOpen(true)}
+          onOpenStorage={readOnly ? undefined : (objectId) => { setStorageArchiveId(objectId ?? null); setStorageOpen(true); }}
           placingItem={placingItem}
           onHoldCard={(holding) => {
             if (view.kind !== "binder") return;
@@ -1290,6 +1335,7 @@ export function RoomWorldScreen({
           <Pressable onPress={() => void storeSelected()} style={[styles.toolChip, controlSurface]}><SeoullyText variant="caption" color={overlayTheme.color}>{copy.removeFromRoom}</SeoullyText></Pressable>
         </View> : null}
         {selectedRoomObject && !heldObjectId && !placingItem ? <View style={[styles.contextRow, controlSurface]}>
+          {selectedRoomObject.kind === "desk" ? <Pressable onPress={() => openBinderFromWorld(undefined, selectedRoomObject.id)} style={[styles.toolChip, controlSurface]}><SeoullyText variant="caption" color={overlayTheme.color}>{copy.openBinder}</SeoullyText></Pressable> : null}
           {selectedRoomObject.kind === "photo-string" ? <Pressable onPress={() => setPhotoStringId(selectedRoomObject.id)} style={[styles.toolChip, controlSurface]}><SeoullyText variant="caption" color={overlayTheme.color}>{copy.roomChoosePhotocards}</SeoullyText></Pressable> : null}
           {TURNABLE_ROOM_OBJECT_KINDS.has(selectedRoomObject.kind) ? <Pressable onPress={() => void turnSelectedObject()} style={[styles.toolChip, controlSurface]}><SeoullyText variant="caption" color={overlayTheme.color}>{copy.roomTurn}</SeoullyText></Pressable> : null}
           <Pressable onPress={() => void removeSelectedObject()} style={[styles.toolChip, controlSurface]}><SeoullyText variant="caption" color={overlayTheme.color}>{copy.roomRemoveObject}</SeoullyText></Pressable>

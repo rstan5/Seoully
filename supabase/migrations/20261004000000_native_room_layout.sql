@@ -12,7 +12,7 @@ comment on column public.rooms.layout is
 -- Repair 08: amended BEFORE application. No ownership or media is stored here.
 create or replace function public.room_layout_is_valid(p jsonb)
 returns boolean language plpgsql immutable set search_path = pg_catalog as $$
-declare obj jsonb; config jsonb; slots jsonb; slot jsonb; ids text[];
+declare obj jsonb; config jsonb; slots jsonb; slot jsonb; ids text[]; object_ids text[] := array[]::text[];
 begin
   if jsonb_typeof(p) is distinct from 'object' then return false; end if;
   if p = '{}'::jsonb then return true; end if;
@@ -20,12 +20,16 @@ begin
     or jsonb_typeof(p->'objects') is distinct from 'array'
     or coalesce(p->>'firstRoomEditCompleted', 'false') not in ('true', 'false')
     or p ?| array['price','sku','currency','purchase'] then return false; end if;
-  if jsonb_array_length(p->'objects') not between 1 and 24 then return false; end if;
   for obj in select value from jsonb_array_elements(p->'objects') loop
     if jsonb_typeof(obj) is distinct from 'object'
-      or coalesce(obj->>'id', '') = ''
+      or coalesce(btrim(obj->>'id'), '') = ''
+      or obj->>'id' <> btrim(obj->>'id')
       or coalesce(obj->>'kind', '') not in ('shelf', 'desk', 'case', 'chair', 'lamp', 'plant', 'rug', 'archive', 'wall-frame', 'photo-string')
-      or coalesce(obj->>'rotateY', '0') not in ('0','90','180','270') then return false; end if;
+      or jsonb_typeof(obj->'id') is distinct from 'string'
+      or char_length(obj->>'id') > 80
+      or (obj->>'id') = any(object_ids)
+      or coalesce(obj->>'rotateY', '0') not in ('0','30','60','90','120','150','180','210','240','270','300','330') then return false; end if;
+    object_ids := array_append(object_ids, obj->>'id');
     if obj ? 'photoString' then
       if obj->>'kind' <> 'photo-string' then return false; end if;
       config := obj->'photoString';

@@ -1,7 +1,7 @@
 import type { NativeHolding, NativeRoomPlacement } from "../api";
 import { visibleLowerBound, extentsForGeometry, representationForHolding, representationKindForHolding, type NativeRepresentationKind } from "./representation";
 import { FLOOR_Y, CONTACT_EPSILON, groundedOrigin } from "./roomGrounding";
-import { legacyRoomObjects, applyObjectSurfaces, rotateYaw, type RoomObjectInstance } from "./roomObjects";
+import { legacyRoomObjects, applyObjectSurfaces, rotateYaw, surfaceOwner, canonicalSurfaceId, type RoomObjectInstance } from "./roomObjects";
 import { BACK_WALL } from "./envelope";
 import { layoutX, layoutZ, ROOM_LAYOUT } from "./roomLayout";
 
@@ -163,7 +163,11 @@ export function isSupportedRoomPlacement(renderable: RoomRenderable, roomId: str
 export function settleRoomRenderable(renderable: RoomRenderable, roomId: string, preferredSurfaceId?: string, objects?: RoomObjectInstance[]) {
   const all = nativeRoomSurfaces(roomId, objects);
   const surfaces = all.filter((surface) => surfaceAcceptsGeometry(surface, renderable.geometry));
-  const preferred = surfaces.find((candidate) => candidate.id === preferredSurfaceId);
+  const legacyParent = objects && preferredSurfaceId ? surfaceOwner(roomId, objects, preferredSurfaceId) : null;
+  const resolvedId = legacyParent && preferredSurfaceId?.startsWith(`${roomId}-`) && !preferredSurfaceId.includes(":")
+    ? canonicalSurfaceId(roomId, legacyParent, preferredSurfaceId.slice(roomId.length + 1))
+    : preferredSurfaceId;
+  const preferred = surfaces.find((candidate) => candidate.id === resolvedId);
   const surface = preferred ?? surfaces
     .map((candidate) => ({ candidate, distance: footprintDistance(renderable.position, candidate) }))
     .sort((a, b) => a.distance - b.distance)[0]?.candidate ?? all.find((item) => item.id.endsWith("-floor")) ?? all[0];
@@ -268,9 +272,9 @@ export function nativeHomeForHolding(holding: NativeHolding, roomId: string, slo
 
 export function zoneIdForNativeSurface(roomId: string, surfaceId: string) {
   if (surfaceId.startsWith(`${roomId}-shelf-bay-`) || surfaceId.startsWith(`${roomId}-shelf:`)) return `${roomId}-shelf`;
-  if (surfaceId.startsWith(`${roomId}-display-case-`)) return `${roomId}-display-case`;
+  if (surfaceId.startsWith(`${roomId}-display-case-`) || surfaceId.startsWith(`${roomId}-case:`)) return `${roomId}-display-case`;
   for (const zone of ["binder", "desk", "archive", "wall", "floor"]) {
-    if (surfaceId === `${roomId}-${zone}`) return `${roomId}-${zone}`;
+    if (surfaceId === `${roomId}-${zone}` || surfaceId.startsWith(`${roomId}-${zone}:`)) return `${roomId}-${zone}`;
   }
   return `${roomId}-floor`;
 }

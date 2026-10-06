@@ -17,8 +17,8 @@ export const CANONICAL_ZONE_LABELS: Record<CanonicalZoneKind, string> = {
 
 export type NativeWorldView =
   | { kind: "home" }
-  | { kind: "zone"; zone: CanonicalZoneKind }
-  | { kind: "inspect"; zone: CanonicalZoneKind; holdingId: string }
+  | { kind: "zone"; zone: CanonicalZoneKind; objectId?: string }
+  | { kind: "inspect"; zone: CanonicalZoneKind; holdingId: string; objectId?: string }
   | { kind: "binder"; spread: number; heldHoldingId?: string }
   | { kind: "edit" };
 
@@ -45,7 +45,7 @@ export function zoneInteractive(view: NativeWorldView, zone: CanonicalZoneKind) 
 export function stepBack(view: NativeWorldView): NativeWorldView | "leave" {
   switch (view.kind) {
     case "inspect":
-      return { kind: "zone", zone: view.zone };
+      return { kind: "zone", zone: view.zone, ...(view.objectId ? { objectId: view.objectId } : {}) };
     case "binder":
       if (view.heldHoldingId) return { kind: "binder", spread: view.spread };
       return { kind: "zone", zone: "desk" };
@@ -63,8 +63,8 @@ export function openBinderView(spread = 0): NativeWorldView {
   return { kind: "binder", spread: Math.max(0, spread) };
 }
 
-export function inspectView(zone: CanonicalZoneKind, holdingId: string): NativeWorldView {
-  return { kind: "inspect", zone, holdingId };
+export function inspectView(zone: CanonicalZoneKind, holdingId: string, objectId?: string): NativeWorldView {
+  return { kind: "inspect", zone, holdingId, ...(objectId ? { objectId } : {}) };
 }
 
 export function zoneFromSurfaceId(surfaceId: string | null | undefined, roomId: string): CanonicalZoneKind | "floor" {

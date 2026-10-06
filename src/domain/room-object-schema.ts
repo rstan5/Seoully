@@ -16,3 +16,10 @@ export function validPhotoStringConfig(value: unknown): value is PhotoStringConf
 export function eligiblePhotoStringHolding(holding: { ownerUserId: string; template: { kind: string; status: string } }, ownerId: string) {
   return holding.ownerUserId === ownerId && holding.template.kind === "photocard" && holding.template.status !== "restricted";
 }
+
+export const ROOM_TURN_DEGREES = 30;
+export const ROOM_YAWS = [0,30,60,90,120,150,180,210,240,270,300,330] as const;
+export type RoomYaw = typeof ROOM_YAWS[number];
+export function normalizeRoomYaw(value: unknown): RoomYaw {
+  return (typeof value === "number" && Number.isFinite(value) ? ((Math.round(value / ROOM_TURN_DEGREES) * ROOM_TURN_DEGREES) % 360 + 360) % 360 : 0) as RoomYaw;
+}

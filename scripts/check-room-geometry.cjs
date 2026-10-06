@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const ts = require("typescript");
 let THREE;
 require("./register-build-alias.cjs");
-const { FLOOR_Y, FURNITURE_LOWER_BOUND, furnitureGroundY, DESK_TABLETOP_TOP, DESK_DRAWER_CENTERS, CHAIR_SEAT_TOP } = require("../.tmp/build/apps/mobile/src/room/roomGrounding.js");
+const { FLOOR_Y, FURNITURE_LOWER_BOUND, furnitureGroundY, DESK_TABLETOP_TOP, DESK_DRAWER_CENTERS, CHAIR_SEAT_TOP, SHELF_BOARD_Y, CASE_BOARD_Y } = require("../.tmp/build/apps/mobile/src/room/roomGrounding.js");
 async function main() {
 const { RoundedBoxGeometry } = await import("../apps/mobile/node_modules/three/examples/jsm/geometries/RoundedBoxGeometry.js");
 THREE = await import("../apps/mobile/node_modules/three/build/three.module.js");
@@ -14,7 +14,7 @@ const names = { shelf: "ShelfUnit", desk: "DeskUnit", case: "CaseUnit", chair: "
 const file = ts.createSourceFile("geometry.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const functions = file.statements.filter((node) => ts.isFunctionDeclaration(node) && [...Object.values(names), "ChairCushion"].includes(node.name?.text)).map((node) => node.getText(file)).join("\n");
 const jsx = (type, props) => ({ type, props: props ?? {} });
-const sandbox = { exports: {}, require: () => ({ jsx, jsxs: jsx, Fragment: "group" }), ContactShadow: () => null, EdgeLip: () => null, DESK_DRAWER_CENTERS, CHAIR_SEAT_TOP, RoundedBoxGeometry, useMemo: (fn) => fn(), useEffect: () => {}, mixHex: () => "#ffffff" };
+const sandbox = { exports: {}, require: () => ({ jsx, jsxs: jsx, Fragment: "group" }), ContactShadow: () => null, EdgeLip: () => null, DESK_DRAWER_CENTERS, CHAIR_SEAT_TOP, SHELF_BOARD_Y, CASE_BOARD_Y, RoundedBoxGeometry, useMemo: (fn) => fn(), useEffect: () => {}, mixHex: () => "#ffffff" };
 vm.createContext(sandbox);
 vm.runInContext(ts.transpileModule(functions, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText, sandbox);
 const theme = new Proxy({}, { get: () => "#ffffff" });
@@ -48,8 +48,23 @@ for (const [kind, name] of Object.entries(names)) {
   assert.ok(Math.abs(contact - FLOOR_Y - (kind === "rug" ? 0.002 : 0)) < 1e-6, `${kind} floor contact`);
   console.log(`${kind}: visible bottom ${contact.toFixed(3)} / floor ${FLOOR_Y}`);
 }
+// Measure the real visible lips too, rather than ignoring them as interaction geometry.
+const materialSource = fs.readFileSync("apps/mobile/src/room/roomMaterials.tsx", "utf8");
+const materialFile = ts.createSourceFile("materials.tsx", materialSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const lip = materialFile.statements.find((node)=>ts.isFunctionDeclaration(node)&&node.name?.text==="EdgeLip");
+const lipCode = ts.transpileModule(lip.getText(materialFile), {compilerOptions:{jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+vm.runInContext(`(function () { ${lipCode} }).call(globalThis);`,sandbox);
+sandbox.EdgeLip = sandbox.exports.EdgeLip;
+for (const [name,top] of [["ShelfUnit",1.5675],["CaseUnit",1.565]]) {
+  const node=sandbox[name]({theme,maps:{}});
+  assert.ok(Math.abs(bounds(node).max.y-top)<1e-6,`${name} no visible board/lip protrudes above the connected frame roof`);
+  const boards=children(node).filter((child)=>child.type==="group"&&child.props.position?.[2]===(name==="ShelfUnit"?0.12:0.16));
+  assert.equal(boards.length,3,`${name} has three interior boards and existing frame roof`);
+  assert.ok(boards.every((board)=>bounds(board).max.y<1.54),`${name} interior boards stay within frame`);
+}
+console.log("Completeness actual Shelf/Case visible boards, lips and connected roof bounds passed");
 const { turnRoomObject, rotatedRoomObjectFootprint, defaultRoomObject: floorObject } = require("../.tmp/build/apps/mobile/src/room/roomObjects.js");
-for (const [kind,name] of Object.entries(names)) for (const rotateY of [0,90,180,270]) {
+for (const [kind,name] of Object.entries(names)) for (const rotateY of Array.from({length:12},(_,i)=>i*30)) {
   const object = floorObject(kind);
   const matrix = new THREE.Matrix4().makeRotationY(rotateY*Math.PI/180);
   const measured = bounds(sandbox[name]({theme,maps:{}}),matrix);
@@ -59,7 +74,7 @@ for (const [kind,name] of Object.entries(names)) for (const rotateY of [0,90,180
   assert.ok(Math.abs(measured.min.y-FURNITURE_LOWER_BOUND[kind])<1e-6,`${kind} stays grounded through turn`);
 }
 const { composeParentYaw } = require("../.tmp/build/apps/mobile/src/room/roomWorldTransform.js");
-for (const degrees of [0,90,180,270]) for (const rotation of [{x:0,y:0.3,z:0},{x:0.4,y:0.6,z:-0.2},{x:-Math.PI/2,y:-0.22,z:0}]) {
+for (const degrees of Array.from({length:12},(_,i)=>i*30)) for (const rotation of [{x:0,y:0.3,z:0},{x:0.4,y:0.6,z:-0.2},{x:-Math.PI/2,y:-0.22,z:0}]) {
   const expected = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),degrees*Math.PI/180).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(rotation.x,rotation.y,rotation.z)));
   const resolved = composeParentYaw(rotation,degrees);
   const actual = new THREE.Quaternion().setFromEuler(new THREE.Euler(resolved.x,resolved.y,resolved.z));
@@ -68,7 +83,7 @@ for (const degrees of [0,90,180,270]) for (const rotation of [{x:0,y:0.3,z:0},{x
   const restored = new THREE.Quaternion().setFromEuler(new THREE.Euler(inverted.x,inverted.y,inverted.z));
   assert.ok(restored.angleTo(new THREE.Quaternion().setFromEuler(new THREE.Euler(rotation.x,rotation.y,rotation.z)))<1e-6,"inverse parent yaw preserves original pose");
 }
-console.log("Interaction polish actual quarter-turn bounds, grounding and Three quaternion composition passed");
+console.log("Interaction polish actual 30° bounds, grounding and Three quaternion composition passed");
 const lounge = sandbox.ChairUnit({ theme, maps: {} });
 const cushions = children(lounge).filter((node) => node.type === sandbox.ChairCushion);
 assert.equal(cushions.length, 4, "upholstered base, seat and two arms");

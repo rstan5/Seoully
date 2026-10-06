@@ -18,3 +18,9 @@ export function furnitureGroundY(kind: RoomObjectKind) {
 
 /** Flat top of the lounge cushion; rounded edges/arms/back are not landing surfaces. */
 export const CHAIR_SEAT_TOP = 0.15;
+
+/** Interior boards only; the existing frame roof supplies the fourth/crown landing surface. */
+export const SHELF_BOARD_Y = [-0.9, 0, 0.9] as const;
+export const CASE_BOARD_Y = [-0.93, 0, 0.98] as const;
+export const SHELF_ROOF_TOP = 1.5675;
+export const CASE_ROOF_TOP = 1.565;

@@ -1,5 +1,5 @@
 import "server-only";
-import { ROOM_OBJECT_KINDS, validPhotoStringConfig } from "@/domain/room-object-schema";
+import { ROOM_OBJECT_KINDS, ROOM_YAWS, validPhotoStringConfig } from "@/domain/room-object-schema";
 
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -53,9 +53,9 @@ const roomLayoutSchema = z.object({
       x: coordinate(-20, 20),
       y: coordinate(-20, 20),
       z: coordinate(-20, 20),
-      rotateY: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]),
+      rotateY: z.number().refine((value) => (ROOM_YAWS as readonly number[]).includes(value), "room_yaw_invalid"),
       photoString: z.object({ slots: z.array(uuid.nullable()).length(5) }).strict().optional(),
-    }).strict().refine((obj) => !obj.photoString || (obj.kind === "photo-string" && validPhotoStringConfig(obj.photoString)), "photo_string_invalid")).min(1).max(24),
+    }).strict().refine((obj) => !obj.photoString || (obj.kind === "photo-string" && validPhotoStringConfig(obj.photoString)), "photo_string_invalid")).refine((objects) => new Set(objects.map((object) => object.id)).size === objects.length, "room_object_id_duplicate"),
   }).strict(),
 }).strict();
 

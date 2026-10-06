@@ -1,4 +1,4 @@
-import { DESK_DRAWER_CENTERS } from "./roomGrounding";
+import { DESK_DRAWER_CENTERS, SHELF_BOARD_Y, CASE_BOARD_Y } from "./roomGrounding";
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
 import { useEffect, useMemo, useRef, type MutableRefObject, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber/native";
@@ -12,7 +12,7 @@ import { ContactShadow, EdgeLip, RoomTextureQuality, useRoomMaps, type RoomMaps 
 import type { RoomLook } from "./roomStyle";
 import type { CanonicalZoneKind } from "./worldView";
 
-export function RoomShell({ theme, onSelectZone }: { theme: RoomLook; onSelectZone?: (zone: CanonicalZoneKind) => void }) {
+export function RoomShell({ theme, onSelectZone }: { theme: RoomLook; onSelectZone?: (zone: CanonicalZoneKind, objectId?: string) => void }) {
   const maps = useRoomMaps();
   const env = WORLD_ENVELOPE;
   const box = ROOM_BOX;
@@ -115,8 +115,8 @@ export function RoomFurniture({
   objectPreviewRef?: MutableRefObject<RoomObjectInstance | null>;
   editing?: boolean;
   onOpenBinder?: () => void;
-  onOpenStorage?: () => void;
-  onSelectZone?: (zone: CanonicalZoneKind) => void;
+  onOpenStorage?: (objectId?: string) => void;
+  onSelectZone?: (zone: CanonicalZoneKind, objectId?: string) => void;
   onSelectObject?: (objectId: string) => void;
   onObjectPressStart?: (objectId: string) => void;
   onObjectPressEnd?: (objectId: string) => void;
@@ -172,11 +172,11 @@ function FurniturePose({
   held: boolean;
   previewRef?: MutableRefObject<RoomObjectInstance | null>;
   editing: boolean;
-  onSelectZone?: (zone: CanonicalZoneKind) => void;
+  onSelectZone?: (zone: CanonicalZoneKind, objectId?: string) => void;
   onSelectObject?: (objectId: string) => void;
   onObjectPressStart?: (objectId: string) => void;
   onObjectPressEnd?: (objectId: string) => void;
-  onOpenStorage?: () => void;
+  onOpenStorage?: (objectId?: string) => void;
   onConfigurePhotoString?: (objectId: string) => void;
   children: ReactNode;
 }) {
@@ -210,13 +210,13 @@ function FurniturePose({
       }
       if (object.kind === "photo-string") { onConfigurePhotoString?.(object.id); return; }
       if (object.kind === "archive") {
-        if (onOpenStorage) onOpenStorage();
-        else onSelectZone?.("archive");
+        if (onOpenStorage) onOpenStorage(object.id);
+        else onSelectZone?.("archive", object.id);
         return;
       }
-      if (object.kind === "shelf") onSelectZone?.("shelf");
-      if (object.kind === "desk") onSelectZone?.("desk");
-      if (object.kind === "case") onSelectZone?.("case");
+      if (object.kind === "shelf") onSelectZone?.("shelf", object.id);
+      if (object.kind === "desk") onSelectZone?.("desk", object.id);
+      if (object.kind === "case") onSelectZone?.("case", object.id);
     }}
   >
     {children}
@@ -224,7 +224,7 @@ function FurniturePose({
 }
 
 function ShelfUnit({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
-  const boards = [-1.45, -0.55, 0.35, 1.18];
+  const boards = SHELF_BOARD_Y;
   return <group>
     <mesh position={[0, 0, -0.28]} castShadow receiveShadow><boxGeometry args={[2.18, 3.08, 0.05]} /><meshStandardMaterial color={theme.furniture} map={maps.woodFine} roughness={0.78} /></mesh>
     <mesh position={[-1.06, 0, 0.08]} castShadow><boxGeometry args={[0.055, 3.12, 0.68]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.56} /></mesh>
@@ -232,7 +232,7 @@ function ShelfUnit({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
     <mesh position={[0, 1.54, 0.08]} castShadow><boxGeometry args={[2.16, 0.055, 0.68]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.5} /></mesh>
     <mesh position={[0, -1.54, 0.06]} castShadow><boxGeometry args={[2.16, 0.07, 0.64]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.54} /></mesh>
     {boards.map((y) => (
-      <group key={y} position={[0, y + 0.55, 0.12]}>
+      <group key={y} position={[0, y, 0.12]}>
         <mesh receiveShadow><boxGeometry args={[2.04, 0.04, 0.62]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.48} /></mesh>
         <EdgeLip width={2.04} color={theme.metal} depth={0.3} />
         <mesh position={[0, -0.028, 0.28]}><boxGeometry args={[2.04, 0.018, 0.04]} /><meshStandardMaterial color={theme.metal} roughness={0.4} metalness={0.22} /></mesh>
@@ -308,8 +308,8 @@ function CaseUnit({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
     <mesh position={[0.72, 0, 0.14]} castShadow><boxGeometry args={[0.055, 3.12, 0.62]} /><meshStandardMaterial color={theme.furniture} map={maps.woodFine} roughness={0.66} /></mesh>
     <mesh position={[0, 1.54, 0.14]} castShadow><boxGeometry args={[1.48, 0.05, 0.62]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.46} /></mesh>
     <mesh position={[0, -1.54, 0.12]} castShadow><boxGeometry args={[1.48, 0.07, 0.58]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.5} /></mesh>
-    {[-1.48, -0.55, 0.43, 1.28].map((y) => (
-      <group key={`case-${y}`} position={[0, y + 0.55, 0.16]}>
+    {CASE_BOARD_Y.map((y) => (
+      <group key={`case-${y}`} position={[0, y, 0.16]}>
         <mesh receiveShadow><boxGeometry args={[1.36, 0.035, 0.56]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.44} /></mesh>
         <EdgeLip width={1.34} color={theme.metal} depth={0.26} />
       </group>

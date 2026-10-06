@@ -9,7 +9,7 @@ import {
   objectPointToAuthored,
   furnitureDelta,
   objectByKind,
-  objectOwnsSurface,
+  surfaceOwner,
   type RoomObjectInstance,
 } from "./roomObjects";
 import type { CanonicalZoneKind } from "./worldView";
@@ -36,7 +36,7 @@ export function parentObjectForSurface(
   objects: RoomObjectInstance[],
 ): RoomObjectInstance | null {
   if (!roomId || !surfaceId) return null;
-  return objects.find((object) => objectOwnsSurface(roomId, object, surfaceId)) ?? null;
+  return surfaceOwner(roomId, objects, surfaceId);
 }
 
 export function liveParentObject(
@@ -45,7 +45,7 @@ export function liveParentObject(
   objects: RoomObjectInstance[],
   carry?: FurnitureCarry | null,
 ): RoomObjectInstance | null {
-  if (carry && roomId && objectOwnsSurface(carry.roomId, carry.origin, surfaceId)) {
+  if (carry && roomId && parentObjectForSurface(roomId, surfaceId, objects)?.id === carry.origin.id) {
     return carry.current;
   }
   return parentObjectForSurface(roomId, surfaceId, objects);
@@ -126,11 +126,11 @@ export function asAuthoredRenderable<T extends RoomTransformSource>(
   };
 }
 
-export function liveZoneDock(zone: CanonicalZoneKind, objects: RoomObjectInstance[]): CameraPose {
+export function liveZoneDock(zone: CanonicalZoneKind, objects: RoomObjectInstance[], instanceId?: string): CameraPose {
   const dock = ZONE_DOCKS[zone];
   const kind = zone === "binder" ? "desk" : zone;
   if (kind === "wall" || !CARRIER_ROOM_OBJECT_KINDS.has(kind as RoomObjectInstance["kind"])) return dock;
-  const object = objectByKind(objects, kind as RoomObjectInstance["kind"]);
+  const object = instanceId ? objects.find((object) => object.id === instanceId && object.kind === kind) : objectByKind(objects, kind as RoomObjectInstance["kind"]);
   if (!object) return dock;
   return {
     position: objectPointFromAuthored(dock.position, object),

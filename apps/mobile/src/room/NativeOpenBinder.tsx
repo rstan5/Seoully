@@ -1,5 +1,5 @@
 import { BinderOwnerLabel } from "./BinderOwnerLabel";
-import { BINDER_DISPLAY_TILT, BINDER_DISPLAY_CENTER_Y, binderTravel } from "./binderPresentation";
+import { BINDER_DISPLAY_TILT, BINDER_DISPLAY_CENTER_Y, BINDER_CLOSED_CENTER_Z, binderTravel } from "./binderPresentation";
 import { composeParentYaw } from "./roomWorldTransform";
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
 import { Suspense, useMemo, useRef, useState, type MutableRefObject } from "react";
@@ -33,7 +33,7 @@ const V_ANGLE = BINDER_V_ANGLE;
 const CARD_W = BINDER_CARD_W;
 const CARD_H = BINDER_CARD_H;
 
-export const BINDER_TRAVEL_RATE = 5.6;
+export const BINDER_TRAVEL_RATE = 4.3;
 export const BINDER_TRAVEL_RATE_REDUCED = 14;
 
 export function NativeOpenBinder({
@@ -51,6 +51,8 @@ export function NativeOpenBinder({
   objects = [],
   deskInstanceId,
   objectPreviewRef,
+  motionRef,
+  motionResetRef,
   onOpen,
   onHold,
   onTurnComplete,
@@ -70,6 +72,8 @@ export function NativeOpenBinder({
   objects?: RoomObjectInstance[];
   deskInstanceId?: string | null;
   objectPreviewRef?: MutableRefObject<RoomObjectInstance | null>;
+  motionRef?: MutableRefObject<number>;
+  motionResetRef?: MutableRefObject<number>;
   onOpen?: () => void;
   onHold: (holding: NativeHolding | null) => void;
   onTurnComplete: () => void;
@@ -77,8 +81,13 @@ export function NativeOpenBinder({
 }) {
   const group = useRef<Group>(null);
   const stand = useRef<Group>(null);
-  const closedRef = useRef<Group>(null);
-  const readingRef = useRef<Group>(null);
+
+  const bodyRef = useRef<Group>(null);
+  const wasOpen = useRef(false);
+  const resetSeen = useRef(0);
+  const origin = useRef({position:new Vector3(),quaternion:new Quaternion(),scale:0.62});
+  const restQuaternion = useMemo(()=>new Quaternion(),[]);
+  const openQuaternion = useMemo(()=>new Quaternion().setFromEuler(new Euler(-0.08,0,0)),[]);
   const leftRef = useRef<Group>(null);
   const rightRef = useRef<Group>(null);
   const progress = useRef(0);
@@ -99,57 +108,66 @@ export function NativeOpenBinder({
   useFrame((_, delta) => {
     if (paused) return;
     const rate = reducedMotion ? BINDER_TRAVEL_RATE_REDUCED : BINDER_TRAVEL_RATE;
-    progress.current = Math.max(0, Math.min(1, progress.current + (open ? 1 : -1) * delta * rate / 3));
-    const travel = binderTravel(progress.current, reducedMotion);
-    const ease = travel.ease;
     const rest = liveDeskBinderWorld(objects, objectPreviewRef?.current, deskInstanceId) ?? binderAt;
-    const lifted = openBinderWorldAt(rest);
+    const yaw=liveDeskBinderYaw(objects,objectPreviewRef?.current,deskInstanceId)*Math.PI/180;
+    restQuaternion.setFromEuler(new Euler(0,yaw,0)).multiply(new Quaternion().setFromEuler(new Euler(BINDER_DISPLAY_TILT-Math.PI/2,0,0))).multiply(new Quaternion().setFromEuler(new Euler(0,-Math.PI/2,0)));
     if (stand.current) {
       stand.current.position.set(rest.x,rest.y,rest.z);
       stand.current.rotation.y=liveDeskBinderYaw(objects,objectPreviewRef?.current,deskInstanceId)*Math.PI/180;
     }
+    if(motionResetRef && resetSeen.current!==motionResetRef.current) {
+      resetSeen.current=motionResetRef.current;
+      progress.current=0;wasOpen.current=false;
+      if(group.current){group.current.position.set(rest.x,rest.y+BINDER_DISPLAY_CENTER_Y*0.62,rest.z);group.current.quaternion.copy(restQuaternion);group.current.scale.setScalar(0.62);}
+    }
+    // Capture the actual rendered pose, including arbitrary Desk yaw, before advancing.
+    const starting=open && !wasOpen.current;
+    if(starting && group.current) {
+      origin.current.position.copy(group.current.position);
+      origin.current.quaternion.copy(group.current.quaternion);
+      origin.current.scale=group.current.scale.x;
+    }
+    wasOpen.current=open;
+    if(!starting) progress.current = Math.max(0, Math.min(1, progress.current + (open ? 1 : -1) * delta * rate / 3));
+    const travel = binderTravel(progress.current, reducedMotion);
+    const ease = travel.ease;
+    if(motionRef) motionRef.current=travel.camera;
+    const lifted = openBinderWorldAt(rest);
     if (group.current) {
       group.current.visible = true;
-      if (closedRef.current) closedRef.current.visible = !travel.reading;
-      if (readingRef.current) {
-        readingRef.current.visible = travel.reading;
-        readingRef.current.position.y = BINDER_DISPLAY_CENTER_Y * (1 - ease);
-        readingRef.current.rotation.x = (-Math.PI / 2 + BINDER_DISPLAY_TILT) * (1 - ease);
+      if(progress.current===0 && !open) {
+        group.current.position.set(rest.x,rest.y+BINDER_DISPLAY_CENTER_Y*0.62,rest.z);
+        group.current.quaternion.copy(restQuaternion);
+        group.current.scale.setScalar(0.62);
+      } else {
+        group.current.position.copy(origin.current.position).lerp(new Vector3(lifted.x,lifted.y,lifted.z),ease);
+        group.current.position.y+=travel.lift;
+        // Move away from the rear support before major reorientation (Desk-local forward).
+        group.current.position.x+=Math.sin(yaw)*0.16*Math.sin(Math.PI*progress.current)**2;
+        group.current.position.z+=Math.cos(yaw)*0.16*Math.sin(Math.PI*progress.current)**2;
+        group.current.quaternion.copy(origin.current.quaternion).slerp(openQuaternion,travel.orientation);
+        group.current.scale.setScalar(origin.current.scale+(1-origin.current.scale)*ease);
       }
-      group.current.position.set(
-        rest.x + (lifted.x - rest.x) * ease,
-        rest.y + (lifted.y - rest.y) * ease + travel.lift,
-        rest.z + (lifted.z - rest.z) * ease,
-      );
-      const rotation = composeParentYaw({ x: -0.08 * ease, y: 0, z: 0 }, liveDeskBinderYaw(objects, objectPreviewRef?.current, deskInstanceId) * (1 - ease));
-      group.current.rotation.set(rotation.x, rotation.y, rotation.z);
-      group.current.scale.setScalar(0.62 + 0.38 * ease);
     }
-    const spreadAmount = Math.max(0, Math.min(1, (ease - 0.28) / 0.72));
-    if (leftRef.current) leftRef.current.rotation.y = Math.PI / 3 * (1 - spreadAmount) + V_ANGLE * spreadAmount;
-    if (rightRef.current) rightRef.current.rotation.y = -Math.PI / 3 * (1 - spreadAmount) - V_ANGLE * spreadAmount;
+    if(bodyRef.current) bodyRef.current.position.z=-BINDER_CLOSED_CENTER_Z*(1-ease);
+    const spreadAmount=travel.spread;
+    if (leftRef.current) leftRef.current.rotation.y = Math.PI / 2 * (1 - spreadAmount) + V_ANGLE * spreadAmount;
+    if (rightRef.current) rightRef.current.rotation.y = -Math.PI / 2 * (1 - spreadAmount) - V_ANGLE * spreadAmount;
   });
 
   const rest = binderAt;
   const restRotation = composeParentYaw({ x: 0, y: 0, z: 0 }, liveDeskBinderYaw(objects, undefined, deskInstanceId));
+  const [initialQuaternion]=useState(()=>new Quaternion().setFromEuler(new Euler(0,restRotation.y,0))
+    .multiply(new Quaternion().setFromEuler(new Euler(BINDER_DISPLAY_TILT-Math.PI/2,0,0)))
+    .multiply(new Quaternion().setFromEuler(new Euler(0,-Math.PI/2,0))));
+  const [initialPosition]=useState<[number,number,number]>(()=>[rest.x,rest.y+BINDER_DISPLAY_CENTER_Y*0.62,rest.z]);
   return <>
     <group ref={stand} position={[rest.x,rest.y,rest.z]} rotation={[0,restRotation.y,0]} scale={0.62}><BinderDisplayStand /></group>
-    <group
-      ref={group}
-      visible
-      position={[rest.x, rest.y, rest.z]}
-      rotation={[restRotation.x, restRotation.y, restRotation.z]}
-      scale={0.62}
-      onClick={(event) => {
-        event.stopPropagation();
-        if (!open) onOpen?.();
-      }}
-    >
-      <group ref={closedRef} visible><DisplayBinder cover={cover} paper={paper} ownerName={ownerName} /></group>
-      <group ref={readingRef} visible={false}>
-        <mesh position={[0, 0, -0.06]}><boxGeometry args={[BINDER_SPINE_W, BINDER_PAGE_H + 0.08, 0.08]} /><meshStandardMaterial color={cover} roughness={0.55} /></mesh>
-        {left ? <BinderLeaf page={left} side="left" leafRef={leftRef} heldHoldingId={heldHoldingId} paper={paper} cover={cover} interactive={open} onHold={open ? onHold : () => onOpen?.()} onTurnEdge={() => onTurnEdge(-1)} /> : null}
-        {right ? <BinderLeaf page={right} side="right" leafRef={rightRef} heldHoldingId={heldHoldingId} paper={paper} cover={cover} interactive={open} onHold={open ? onHold : () => onOpen?.()} onTurnEdge={() => onTurnEdge(1)} /> : null}
+    <group ref={group} position={initialPosition} quaternion={initialQuaternion} scale={0.62}
+      onClick={(event)=>{event.stopPropagation();if (!open && progress.current===0) onOpen?.();}}>
+      <group ref={bodyRef} position={[0,0,-BINDER_CLOSED_CENTER_Z]}>
+        <DisplayBinder cover={cover} paper={paper} ownerName={ownerName} left={left} right={right} leftRef={leftRef} rightRef={rightRef}
+          heldHoldingId={heldHoldingId} interactive={open} onHold={onHold} onTurnEdge={onTurnEdge} />
         {open && leaf && turnDir !== 0 ? <TurningLeaf page={leaf} back={leafBack} dir={turnDir} reducedMotion={reducedMotion} paused={paused} paper={paper} cover={cover} heldHoldingId={heldHoldingId} onHold={onHold} onComplete={onTurnComplete} /> : null}
       </group>
     </group>
@@ -170,26 +188,30 @@ export function NativeOpenBinder({
 /** Small permanent support; never participates in object picking. */
 export function BinderDisplayStand() {
   return <group>
-    <mesh raycast={()=>{}} position={[0,-0.635,0]}><boxGeometry args={[1.12,0.03,0.75]} /><meshStandardMaterial color="#b9ad98" roughness={0.76} /></mesh>
-    <mesh raycast={()=>{}} position={[0,-0.515,0]} rotation={[BINDER_DISPLAY_TILT,0,0]}><boxGeometry args={[1.16,0.04,0.90]} /><meshStandardMaterial color="#d5c9b6" roughness={0.72} /></mesh>
-    <mesh raycast={()=>{}} position={[0,-0.54,-0.31]}><boxGeometry args={[0.62,0.17,0.06]} /><meshStandardMaterial color="#b9ad98" roughness={0.76} /></mesh>
-    <mesh raycast={()=>{}} position={[0,-0.592,0.445]}><boxGeometry args={[1.12,0.06,0.045]} /><meshStandardMaterial color="#b9ad98" roughness={0.72} /></mesh>
+    {[-0.38,0.38].map(x=><mesh key={x} raycast={()=>{}} position={[x,-0.635,0]}><boxGeometry args={[0.035,0.03,0.65]} /><meshStandardMaterial color="#8f9295" metalness={0.7} roughness={0.42} /></mesh>)}
+    {[-0.38,0.38].map(x=><mesh key={x} raycast={()=>{}} position={[x,-0.015,-0.11]} rotation={[BINDER_DISPLAY_TILT-Math.PI/2,0,0]}><boxGeometry args={[0.025,1.28,0.025]} /><meshStandardMaterial color="#8f9295" metalness={0.7} roughness={0.42} /></mesh>)}
+    {[-0.38,0.38].map(x=><mesh key={x} raycast={()=>{}} position={[x,-0.14,-0.27]} rotation={[0.08,0,0]}><boxGeometry args={[0.025,1.0,0.025]} /><meshStandardMaterial color="#8f9295" metalness={0.7} roughness={0.42} /></mesh>)}
+    <mesh raycast={()=>{}} position={[0,-0.64,0.235]}><boxGeometry args={[0.82,0.02,0.14]} /><meshStandardMaterial color="#8f9295" metalness={0.7} roughness={0.42} /></mesh>
+    <mesh raycast={()=>{}} position={[0,-0.61,0.305]}><boxGeometry args={[0.82,0.06,0.02]} /><meshStandardMaterial color="#8f9295" metalness={0.7} roughness={0.42} /></mesh>
   </group>;
 }
-/** Closed, laid-back binder: broad covers, paper edges and a visible bound spine. */
-export function DisplayBinder({ cover, paper, ownerName = "" }: { cover:string;paper:string;ownerName?:string }) {
-  return <group position={[0,BINDER_DISPLAY_CENTER_Y,0]} rotation={[BINDER_DISPLAY_TILT,0,0]}>
-    {[-0.061,0.061].map(y=><mesh key={y} position={[0,y,0]} castShadow><boxGeometry args={[1.24,0.03,0.98]} /><meshStandardMaterial color={cover} roughness={0.62} /></mesh>)}
-    <mesh position={[0,0,0]}><boxGeometry args={[1.16,0.09,0.91]} /><meshStandardMaterial color={paper} roughness={0.88} /></mesh>
-    {[-0.023,0,0.023].map(y=><mesh key={y} position={[0,y,0.458]}><boxGeometry args={[1.12,0.002,0.003]} /><meshStandardMaterial color="#bfb5a8" roughness={0.88} /></mesh>)}
-    <mesh position={[-0.58,0,0]}><boxGeometry args={[0.09,0.15,0.98]} /><meshStandardMaterial color={cover} roughness={0.62} /></mesh>
-    {[ -0.24,0,0.24 ].map(z=><mesh key={z} position={[-0.555,0,z]} rotation={[Math.PI/2,0,0]}><torusGeometry args={[0.033,0.007,5,10]} /><meshStandardMaterial color="#b5b0a6" metalness={0.65} roughness={0.32} /></mesh>)}
-    <BinderOwnerLabel ownerName={ownerName} cover={cover} />
-  </group>;
+/** The same hinged covers/pages remain mounted from closed rest through reading. */
+export function DisplayBinder({cover,paper,ownerName="",left,right,leftRef,rightRef,heldHoldingId,interactive=false,onHold=()=>{},onTurnEdge=()=>{}}:{
+ cover:string;paper:string;ownerName?:string;left?:NativeBinderPage;right?:NativeBinderPage;
+ leftRef?:MutableRefObject<Group|null>;rightRef?:MutableRefObject<Group|null>;heldHoldingId?:string;interactive?:boolean;
+ onHold?:(holding:NativeHolding|null)=>void;onTurnEdge?:(dir:1|-1)=>void;
+}) {
+ return <group>
+  <mesh position={[0,0,-0.06]}><boxGeometry args={[BINDER_SPINE_W,BINDER_PAGE_H+0.08,0.08]} /><meshStandardMaterial color={cover} roughness={0.55} /></mesh>
+  {[-0.35,0,0.35].map(y=><mesh key={y} position={[0,y,0.025]} rotation={[Math.PI/2,0,0]}><torusGeometry args={[0.055,0.009,5,10]} /><meshStandardMaterial color="#aeb2b6" metalness={0.7} roughness={0.35} /></mesh>)}
+  <BinderLeaf page={left} side="left" leafRef={leftRef} heldHoldingId={heldHoldingId} paper={paper} cover={cover} interactive={interactive} onHold={onHold} onTurnEdge={()=>onTurnEdge(-1)} />
+  <BinderLeaf page={right} side="right" leafRef={rightRef} heldHoldingId={heldHoldingId} paper={paper} cover={cover} ownerName={ownerName} interactive={interactive} onHold={onHold} onTurnEdge={()=>onTurnEdge(1)} />
+ </group>;
 }
 
 function BinderLeaf({
   page,
+  ownerName,
   side,
   leafRef,
   heldHoldingId,
@@ -199,9 +221,10 @@ function BinderLeaf({
   onHold,
   onTurnEdge,
 }: {
-  page: NativeBinderPage;
+  page?: NativeBinderPage;
+  ownerName?: string;
   side: "left" | "right";
-  leafRef: MutableRefObject<Group | null>;
+  leafRef?: MutableRefObject<Group | null>;
   heldHoldingId?: string;
   paper: string;
   cover: string;
@@ -210,7 +233,7 @@ function BinderLeaf({
   onTurnEdge: () => void;
 }) {
   const x = pageLocalX(side);
-  const angle = side === "left" ? V_ANGLE : -V_ANGLE;
+  const angle = side === "left" ? Math.PI/2 : -Math.PI/2;
   return <group ref={leafRef} position={[side === "left" ? -BINDER_SPINE_W / 2 : BINDER_SPINE_W / 2, 0, 0]} rotation={[0, angle, 0]}>
     <group position={[x - (side === "left" ? -BINDER_SPINE_W / 2 : BINDER_SPINE_W / 2), 0, 0]}>
     <mesh position={[side === "left" ? -0.04 : 0.04, 0, -0.025]} onClick={(event) => { if (interactive) { event.stopPropagation(); onTurnEdge(); } }}>
@@ -221,7 +244,9 @@ function BinderLeaf({
       <planeGeometry args={[BINDER_PAGE_W, BINDER_PAGE_H]} />
       <meshStandardMaterial color={paper} roughness={0.82} side={DoubleSide} />
     </mesh>
-    <PagePockets page={page} heldHoldingId={heldHoldingId} paper={paper} onHold={onHold} />
+    <mesh position={[0,0,-0.008]}><boxGeometry args={[BINDER_PAGE_W,BINDER_PAGE_H,0.025]} /><meshStandardMaterial color={paper} roughness={0.88} /></mesh>
+    {side === "right" ? <BinderOwnerLabel ownerName={ownerName ?? ""} cover={cover} /> : null}
+    {page ? <PagePockets page={page} heldHoldingId={heldHoldingId} paper={paper} onHold={onHold} /> : null}
     </group>
   </group>;
 }

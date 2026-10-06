@@ -5,7 +5,8 @@ import { BACK_WALL } from "./envelope";
 import { eligiblePhotocards, photoStringSlot, publicPhotoStringHolding, type PublicPhotoStringCard } from "./photoString";
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
 import "./threeFiberCompat";
-import { Suspense, useMemo, useRef, type MutableRefObject } from "react";
+import { useFocusEffect } from "expo-router";
+import { Suspense, useCallback, useMemo, useRef, type MutableRefObject } from "react";
 import { StyleSheet } from "react-native";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber/native";
 import { CatmullRomCurve3, Color, Euler, Group, MeshBasicMaterial, PCFShadowMap, Quaternion, TextureLoader, Vector3 } from "three";
@@ -131,6 +132,9 @@ export function NativeRoomRenderer({
   const binderAt = binderDeskId ? deskBinderWorld(layoutObjects, binderDeskId) : null;
   const textured = roomTextureIds(items, selectedId, focusedId);
   if (placingItem?.imageUrl) textured.add(placingItem.holding.id);
+  const binderMotionRef = useRef(0);
+  const binderResetRef = useRef(0);
+  useFocusEffect(useCallback(()=>{binderResetRef.current++;binderMotionRef.current=0;},[]));
   const binderOpen = view.kind === "binder";
   const placedItems = binderOpen ? items.filter((item) => item.geometry !== "photocard") : items;
   const worldItems = placingItem && !placedItems.some((item) => item.holding.id === placingItem.holding.id)
@@ -176,6 +180,7 @@ export function NativeRoomRenderer({
       paused={paused}
       exploreRef={exploreRef}
       binderAt={binderAt ?? DESK_BINDER_AT}
+      binderMotionRef={binderMotionRef}
     />
     <Suspense fallback={null}>
       <RoomShell theme={theme} onSelectZone={view.kind === "home" || view.kind === "zone" ? onSelectZone : undefined} />
@@ -236,6 +241,8 @@ export function NativeRoomRenderer({
     {binderAt ? <NativeOpenBinder
       ownerName={ownerName}
       open={binderOpen}
+      motionRef={binderMotionRef}
+      motionResetRef={binderResetRef}
       spread={binderSpread}
       turningTo={turningSpread}
       turnDir={turnDir ?? 0}
@@ -265,6 +272,7 @@ function AuthoredCamera({
   paused,
   exploreRef,
   binderAt,
+  binderMotionRef,
 }: {
   view: NativeWorldView;
   focused: RoomRenderable | null;
@@ -274,6 +282,7 @@ function AuthoredCamera({
   paused: boolean;
   exploreRef?: MutableRefObject<ExploreOffset>;
   binderAt: { x: number; y: number; z: number };
+  binderMotionRef: MutableRefObject<number>;
 }) {
   const { camera, size } = useThree();
   const targetPosition = useMemo(() => new Vector3(), []);
@@ -296,7 +305,7 @@ function AuthoredCamera({
       : authored;
     targetPosition.set(pose.position.x, pose.position.y, pose.position.z);
     desiredLook.set(pose.lookAt.x, pose.lookAt.y, pose.lookAt.z);
-    const alpha = cameraLerpAlpha(delta, reducedMotion);
+    const alpha = cameraLerpAlpha(delta, reducedMotion) * (view.kind === "binder" ? binderMotionRef.current : 1-binderMotionRef.current);
     camera.position.lerp(targetPosition, alpha);
     lookAt.lerp(desiredLook, alpha);
     camera.lookAt(lookAt);

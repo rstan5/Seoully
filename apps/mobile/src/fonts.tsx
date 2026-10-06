@@ -11,6 +11,7 @@ import { colors } from "./theme";
 
 export function FontProvider({ children }: PropsWithChildren) {
   const [loaded, error] = useFonts({
+    DancingScript: require("../assets/fonts/DancingScript.ttf"),
     Baloo2_400Regular,
     Baloo2_600SemiBold,
     Baloo2_700Bold,

@@ -123,20 +123,80 @@ const standingCode=ts.transpileModule(standingFunction.getText(binderFile),{comp
 vm.runInContext(`(function () { ${standingCode} }).call(globalThis);`,sandbox);
 Object.assign(sandbox,require("../.tmp/build/apps/mobile/src/room/binderPresentation.js"));
 sandbox.BinderOwnerLabel=()=>null;
+sandbox.PagePockets=()=>null;
+Object.assign(sandbox,require("../.tmp/build/apps/mobile/src/room/composition.js"));
+const leafFunction=binderFile.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==="BinderLeaf");
+vm.runInContext(`(function () { ${ts.transpileModule(leafFunction.getText(binderFile),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText} globalThis.BinderLeaf=BinderLeaf; }).call(globalThis);`,sandbox);
+sandbox.V_ANGLE=sandbox.BINDER_V_ANGLE;
 const standFunction=binderFile.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==="BinderDisplayStand");
 const standCode=ts.transpileModule(standFunction.getText(binderFile),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
 vm.runInContext(`(function () { ${standCode} }).call(globalThis);`,sandbox);
-const book=sandbox.exports.DisplayBinder({cover:"#f3e8da",paper:"#efe8da"});
+const assembly=sandbox.exports.DisplayBinder({cover:"#f3e8da",paper:"#efe8da"});
+const book={type:"group",props:{position:[0,sandbox.BINDER_DISPLAY_CENTER_Y,0],rotation:[sandbox.BINDER_DISPLAY_TILT-Math.PI/2,-Math.PI/2,0],children:{type:"group",props:{position:[0,0,-sandbox.BINDER_CLOSED_CENTER_Z],children:assembly}}}};
 const support=sandbox.exports.BinderDisplayStand();
 const standingBounds=bounds({type:"group",props:{children:[book,support]}});
 const bookBounds=bounds(book);
-assert.ok(bookBounds.max.y-bookBounds.min.y<0.4,"closed laid-back Binder has no upright silhouette");
+assert.ok(Math.abs(bookBounds.min.y+0.63)<1e-6,"actual Binder lower edge contacts easel tray top");
+assert.ok(children(support).flatMap(children).filter(n=>n.type==="meshStandardMaterial").every(n=>n.props.metalness>=0.7),"easel uses restrained metal material");
+assert.ok(bookBounds.max.y-bookBounds.min.y>1.15,"closed displayed Binder has an upright leaned silhouette");
 assert.ok(standingBounds.max.z*0.62<0.42 && standingBounds.min.z*0.62> -0.42,"display Binder stays within reserved Desk footprint");
 assert.ok(children(support).every(n=>typeof n.props.raycast==='function' && !n.props.onClick),'stand does not participate in picking');
 const { CLOSED_BINDER_LOWER_BOUND, CLOSED_BINDER_SCALE }=require("../.tmp/build/apps/mobile/src/room/roomGrounding.js");
 assert.ok(Math.abs(standingBounds.min.y-CLOSED_BINDER_LOWER_BOUND)<1e-6,"display stand authored lower bound");
 const primary={...defaultRoomObject("desk"),binderDesk:true};const {deskBinderWorld}=require("../.tmp/build/apps/mobile/src/room/roomObjects.js");
 assert.ok(Math.abs(deskBinderWorld([primary],primary.id).y + standingBounds.min.y*CLOSED_BINDER_SCALE-primary.y-DESK_TABLETOP_TOP)<1e-6,"visible Binder contacts Desk");
+// Execute the actual native useFrame callback and rerenders with real Three transforms.
+sandbox.DisplayBinder=sandbox.exports.DisplayBinder; sandbox.BinderDisplayStand=sandbox.exports.BinderDisplayStand;
+const motionFunction=binderFile.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='NativeOpenBinder');
+vm.runInContext(`(function () { ${ts.transpileModule(motionFunction.getText(binderFile),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText} }).call(globalThis);`,sandbox);
+Object.assign(sandbox,{Quaternion:THREE.Quaternion,Euler:THREE.Euler,Vector3:THREE.Vector3,Group:THREE.Group,composeParentYaw,findHeldCard:()=>null,
+ BINDER_TRAVEL_RATE:4.3,BINDER_TRAVEL_RATE_REDUCED:14,DESK_BINDER_AT:{x:0,y:0,z:0},
+ ...require('../.tmp/build/apps/mobile/src/room/roomObjects.js')});
+for(const yaw of [0,30,60,150,270,330]) for(const reducedMotion of [false,true]) {
+ const hooks=[];let index=0,frame,taps=0;const motionResetRef={current:0};
+ sandbox.useRef=value=>hooks[index++]??(hooks[index-1]={current:value});
+ sandbox.useMemo=fn=>hooks[index++]??(hooks[index-1]=fn());
+ sandbox.useState=value=>{const i=index++;if(!(i in hooks))hooks[i]=typeof value==='function'?value():value;return [hooks[i],v=>hooks[i]=v];};
+ sandbox.useFrame=fn=>{frame=fn;};
+ const desk={...primary,rotateY:yaw}; const at=deskBinderWorld([desk],desk.id);
+ function render(open) {
+  index=0;const tree=sandbox.exports.NativeOpenBinder({open,ownerName:'Collector',objects:[desk],deskInstanceId:desk.id,binderAt:at,
+   motionResetRef,reducedMotion,paused:false,cover:'#f3e8da',paper:'#efe8da',turnDir:0,onOpen:()=>taps++,onHold:()=>{},onTurnComplete:()=>{},onTurnEdge:()=>{}});
+  function attach(node) {if(!node||typeof node!=='object')return;const p=node.props??{};
+   if(p.ref&&!p.ref.current){const g=new THREE.Group();if(p.position)g.position.fromArray(p.position);if(p.rotation)g.rotation.fromArray(p.rotation);if(p.quaternion)g.quaternion.copy(p.quaternion);if(p.scale)g.scale.setScalar(p.scale);p.ref.current=g;}
+   if(node.type===sandbox.exports.DisplayBinder){for(const [ref,sign] of [[p.leftRef,1],[p.rightRef,-1]])if(ref&&!ref.current){ref.current=new THREE.Group();ref.current.rotation.y=sign*Math.PI/2;}}
+   children(node).forEach(attach);
+  }attach(tree);return children(tree)[1];
+ }
+ let node=render(false);frame({},0);
+ const root=node.props.ref.current;
+ const initial={position:root.position.clone(),quaternion:root.quaternion.clone(),scale:root.scale.clone()};
+ const coverNormal=new THREE.Vector3(1,0,0).applyQuaternion(initial.quaternion);
+ assert.ok(Math.abs(Math.asin(Math.abs(coverNormal.y))*180/Math.PI-22)<1e-6,'front cover exactly 68 degrees above tabletop at any Desk yaw');
+ node=render(true);frame({},1/120);
+ assert.ok(root.position.distanceTo(initial.position)<1e-12,'actual first lift frame position T0');
+ assert.ok(root.quaternion.angleTo(initial.quaternion)<1e-7,'actual first lift frame quaternion T0');
+ assert.ok(root.scale.distanceTo(initial.scale)<1e-12,'actual first lift frame scale T0');
+ let previous={position:root.position.clone(),quaternion:root.quaternion.clone(),scale:root.scale.clone()};
+ for(let i=0;i<120;i++) {frame({},1/240);assert.ok(root.position.distanceTo(previous.position)<0.06,'continuous actual pickup/travel');assert.ok(root.quaternion.angleTo(previous.quaternion)<0.15,'shortest-path orientation continuity');assert.ok(root.scale.distanceTo(previous.scale)<0.06,'scale continuity');previous={position:root.position.clone(),quaternion:root.quaternion.clone(),scale:root.scale.clone()};}
+ node.props.onClick({stopPropagation(){}});assert.equal(taps,0,'rapid tap cannot restart active open');
+ for(let i=0;i<240;i++)frame({},1/240);
+ const end=sandbox.openBinderWorldAt(at);assert.ok(root.position.distanceTo(new THREE.Vector3(end.x,end.y,end.z))<1e-9,'existing reading spatial endpoint');
+ assert.ok(root.quaternion.angleTo(new THREE.Quaternion().setFromEuler(new THREE.Euler(-.08,0,0)))<1e-7,'existing reading orientation');
+ assert.equal(root.scale.x,1);
+ node=render(false);node.props.onClick({stopPropagation(){}});assert.equal(taps,0,'rapid tap cannot restart return');
+ previous={position:root.position.clone(),quaternion:root.quaternion.clone(),scale:root.scale.clone()};
+ for(let i=0;i<360;i++){frame({},1/240);assert.ok(root.position.distanceTo(previous.position)<0.06,'return position continuous including final frame');assert.ok(root.quaternion.angleTo(previous.quaternion)<0.15,'return rotation continuous including final frame');assert.ok(root.scale.distanceTo(previous.scale)<0.06,'return scale continuous including final frame');previous={position:root.position.clone(),quaternion:root.quaternion.clone(),scale:root.scale.clone()};}
+ assert.ok(root.position.distanceTo(initial.position)<1e-9,'exact resting position after return');
+ assert.ok(root.quaternion.angleTo(initial.quaternion)<1e-7,'exact resting quaternion after return');
+ assert.ok(root.scale.distanceTo(initial.scale)<1e-9,'exact resting scale after return');
+ node.props.onClick({stopPropagation(){}});assert.equal(taps,1,'new tap accepted after complete settle');
+ render(true);frame({},1/120);for(let i=0;i<20;i++)frame({},1/120);
+ motionResetRef.current++;render(false);frame({},1/120);
+ assert.ok(root.position.distanceTo(initial.position)<1e-9 && root.quaternion.angleTo(initial.quaternion)<1e-7,'navigation focus interruption restores canonical rest');
+}
+console.log('Actual native Binder frame/rerender tests: exact T0, 68-degree face, shortest-path quaternion/scale continuity, reading/return endpoints, arbitrary yaw, rapid-tap and reduced motion passed');
+
 const palm=sandbox.LargePlant({theme});assert.equal(children(palm).filter(n=>n.type==="group").length,8,"eight separate arching fronds");
 const flowers=sandbox.Plant({theme,maps:{}});assert.equal(children(flowers).filter(n=>n.type==="group").length,5,"five authored blossoms with stems");
 console.log("Content actual Table Lamp/Flower Pot/palm bounds, distinct stems/fronds, and closed display Binder/stand Desk contact passed");

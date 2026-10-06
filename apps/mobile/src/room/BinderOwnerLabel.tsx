@@ -10,12 +10,9 @@ import { prepCollectibleTexture } from "./roomMaterials";
 export function BinderOwnerLabel({ ownerName, cover }: { ownerName: string; cover: string }) {
   const { locale }=useLocale();
   const label=binderLabel(ownerName,locale), ink=binderLabelInk(cover);
-  return <>
-    {label.name ? <LabelLine text={label.name} font={label.fontFamily} size={label.size} ink={ink} z={0.05} /> : null}
-    <LabelLine text={label.title} font={label.fontFamily} size={28} ink={ink} z={0.28} />
-  </>;
+  return label.name ? <LabelLine text={label.name} font={label.fontFamily} size={label.size} ink={ink} width={label.width} /> : null;
 }
-function LabelLine({text,font,size,ink,z}:{text:string;font:string;size:number;ink:string;z:number}) {
+function LabelLine({text,font,size,ink,width}:{text:string;font:string;size:number;ink:string;width:number}) {
   const [image,setImage]=useState<{texture:Texture;aspect:number;key:string}|null>(null);
   const key=`${font}:${text}:${size}:${ink}`;
   useEffect(()=>{
@@ -39,8 +36,8 @@ function LabelLine({text,font,size,ink,z}:{text:string;font:string;size:number;i
     return ()=>{cancelled=true;texture?.dispose();};
   },[text,font,size,ink,key]);
   if(!image || image.key!==key) return null;
-  const height=Math.min(0.17,1.04/image.aspect);
-  return <mesh position={[0,0.086,z]} rotation={[-Math.PI/2,0,0]} raycast={()=>{}}>
+  const height=Math.min(0.36,width/image.aspect);
+  return <mesh position={[0.04,0,-0.042]} rotation={[0,Math.PI,0]} raycast={()=>{}}>
     <planeGeometry args={[height*image.aspect,height]} />
     <meshBasicMaterial map={image.texture} transparent depthWrite={false} toneMapped={false} />
   </mesh>;

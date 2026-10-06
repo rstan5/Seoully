@@ -52,6 +52,10 @@ select ok(not has_function_privilege('anon','public.get_public_room_media_locati
 select ok(has_function_privilege('service_role','public.get_public_room_media_locations(uuid,uuid[])','execute'), 'trusted server locator enabled');
 select ok(not has_function_privilege('anon','public.get_public_room_by_handle(text)','execute'), 'anonymous public Room RPC disabled');
 select ok(not has_function_privilege('service_role','public.get_public_room_by_handle(text)','execute'), 'public Room RPC explicitly authenticated-only');
+select ok(not has_function_privilege('anon','public.can_view_public_collectible_media(text,text)','execute'), 'anonymous storage helper execution revoked');
+select ok(not has_function_privilege('service_role','public.can_view_public_collectible_media(text,text)','execute'), 'server locator does not require storage helper execution');
+select ok(has_function_privilege('authenticated','public.can_view_public_collectible_media(text,text)','execute'), 'viewer Storage policy can execute helper');
+select ok((select prosecdef and proconfig = array['search_path=pg_catalog'] from pg_proc where oid='public.can_view_public_collectible_media(text,text)'::regprocedure), 'storage definer uses hardened catalog-only search path');
 
 -- Runtime projection and owner trigger checks, including >500 real input rows.
 insert into auth.users (instance_id,id,aud,role,email,encrypted_password,email_confirmed_at,
@@ -73,14 +77,72 @@ select md5('room-test-placement-'||n)::uuid,'a7110000-0000-4000-8000-00000000000
   '2026-01-01'::timestamptz + n * interval '1 minute','{"x":1,"y":0,"z":0,"privateMetadata":"hidden"}'
 from generate_series(1,501) n;
 insert into public.media_assets (owner_user_id,holding_id,storage_path,mime_type,byte_size)
-select (select user_id from public.profiles where handle='roomtestowner'),md5('room-test-holding-'||n)::uuid,'test-only/room-'||n||'.jpg','image/jpeg',100 from unnest(array[501,502]) n;
+select (select user_id from public.profiles where handle='roomtestowner'),md5('room-test-holding-'||n)::uuid,
+  (select user_id::text from public.profiles where handle='roomtestowner')||'/room-'||n||'.jpg','image/jpeg',100 from unnest(array[1,501,502]) n;
+insert into storage.objects (bucket_id,name)
+select storage_bucket,storage_path from public.media_assets where holding_id in (select md5('room-test-holding-'||n)::uuid from unnest(array[1,501,502]) n);
+select set_config('room.test_public_path',(select user_id::text||'/room-501.jpg' from public.profiles where handle='roomtestowner'),true);
+select set_config('room.test_unplaced_path',(select user_id::text||'/room-502.jpg' from public.profiles where handle='roomtestowner'),true);
+select set_config('room.test_cutoff_path',(select user_id::text||'/room-1.jpg' from public.profiles where handle='roomtestowner'),true);
 set local role authenticated;
 select is(jsonb_array_length(public.get_public_room_by_handle('roomtestowner')#>'{room,placements}'),500,'placement input is capped before aggregation');
 select is(public.get_public_room_by_handle('roomtestowner')#>>'{room,placements,0,id}',md5('room-test-placement-501')::uuid::text,'deterministic latest-first placement order');
 select ok(public.get_public_room_by_handle('roomtestowner')::text !~ 'test-only|storage_path|mediaPath|mediaBucket|hidden','authenticated RPC exposes no raw storage coordinates or arbitrary metadata');
+select ok(position(current_setting('room.test_public_path') in public.get_public_room_by_handle('roomtestowner')::text)=0,'actual personal-media path is absent from public projection');
+select is(public.get_public_room_by_handle('roomtestowner')#>'{room,placements,0,holding,hasPersonalMedia}','true'::jsonb,'eligible image-presence bit reaches server signing path');
 select is((select count(*)::integer from public.holdings where owner_user_id=(select user_id from public.profiles where handle='roomtestowner')),0,'visitor cannot enumerate owner Holdings');
 select is((select count(*)::integer from public.media_assets where owner_user_id=(select user_id from public.profiles where handle='roomtestowner')),0,'visitor cannot enumerate owner MediaAssets');
+select ok(public.can_view_public_collectible_media('collectible-media',current_setting('room.test_public_path')), 'legitimate public placed media authorized for viewer');
+select is((select count(*)::integer from storage.objects where name=current_setting('room.test_public_path')),1,'viewer Storage SELECT permits legitimate public signing');
+select ok(not public.can_view_public_collectible_media('collectible-media',current_setting('room.test_unplaced_path')), 'unplaced media denied even when its path is known');
+select ok(not public.can_view_public_collectible_media('collectible-media',current_setting('room.test_cutoff_path')), 'placed media outside first 500 denied');
+select ok(not public.can_view_public_collectible_media('other-bucket',current_setting('room.test_public_path')), 'forged bucket denied');
+select ok(not public.can_view_public_collectible_media('collectible-media',current_setting('room.test_public_path')||'-forged'), 'forged path denied');
+select ok(not public.can_view_public_collectible_media('collectible-media',bad_path), 'missing or malformed path denied') from unnest(array[null,'',' ','/absolute','a//b','a/../b','a/.','a/',E'a/\nb']) bad_path;
+select set_config('request.jwt.claim.sub','',true);
+select ok(not public.can_view_public_collectible_media('collectible-media',current_setting('room.test_public_path')), 'authenticated role without viewer JWT denied');
+select set_config('request.jwt.claim.sub','a7110000-0000-4000-8000-000000000002',true);
 reset role;
+set local role anon;
+select throws_ok($sql$ select public.can_view_public_collectible_media('collectible-media',current_setting('room.test_public_path')) $sql$,'42501','permission denied for function can_view_public_collectible_media','anonymous direct execution denied');
+select is((select count(*)::integer from storage.objects where name=current_setting('room.test_public_path')),0,'anonymous Storage read denied');
+reset role;
+
+-- Privileged fixture changes model states clients cannot necessarily forge.
+update public.collectible_templates set status='restricted' where id='a7110000-0000-4000-8000-000000000005';
+set local role authenticated;
+select ok(not public.can_view_public_collectible_media('collectible-media',current_setting('room.test_public_path')), 'restricted template media denied');
+select is((select count(*)::integer from storage.objects where name=current_setting('room.test_public_path')),0,'restricted media cannot pass viewer Storage signing policy');
+reset role;
+update public.collectible_templates set status='community' where id='a7110000-0000-4000-8000-000000000005';
+update public.media_assets set owner_user_id=(select user_id from public.profiles where handle='roomtestviewer') where holding_id=md5('room-test-holding-501')::uuid;
+set local role authenticated;
+select ok(not public.can_view_public_collectible_media('collectible-media',current_setting('room.test_public_path')), 'MediaAsset/Holding owner mismatch denied');
+select is((select count(*)::integer from storage.objects where name=current_setting('room.test_public_path')),0,'mismatched media cannot pass Storage SELECT');
+reset role;
+update public.media_assets set owner_user_id=(select user_id from public.profiles where handle='roomtestowner') where holding_id=md5('room-test-holding-501')::uuid;
+update public.holdings set owner_user_id=(select user_id from public.profiles where handle='roomtestviewer') where id=md5('room-test-holding-501')::uuid;
+set local role authenticated;
+select ok(not public.can_view_public_collectible_media('collectible-media',current_setting('room.test_public_path')), 'Holding/Room cross-user ownership mismatch denied');
+reset role;
+update public.holdings set owner_user_id=(select user_id from public.profiles where handle='roomtestowner') where id=md5('room-test-holding-501')::uuid;
+update public.media_assets set storage_path=(select user_id::text||'/room-forged.jpg' from public.profiles where handle='roomtestviewer') where holding_id=md5('room-test-holding-501')::uuid;
+set local role authenticated;
+select ok(not public.can_view_public_collectible_media('collectible-media',(select user_id::text||'/room-forged.jpg' from public.profiles where handle='roomtestviewer')), 'stored path with unrelated owner prefix denied');
+reset role;
+update public.media_assets set storage_path=current_setting('room.test_public_path') where holding_id=md5('room-test-holding-501')::uuid;
+update public.profiles set collection_public=false where handle='roomtestowner';
+set local role authenticated;
+select ok(not public.can_view_public_collectible_media('collectible-media',current_setting('room.test_public_path')), 'unrelated collector private media denied');
+select is((select count(*)::integer from storage.objects where name=current_setting('room.test_public_path')),0,'private collection cannot pass Storage signing policy');
+reset role;
+update public.profiles set collection_public=true where handle='roomtestowner';
+-- A known malformed path must fail even when stored on an otherwise eligible asset.
+update public.media_assets set storage_path=(select user_id::text||'/../forged.jpg' from public.profiles where handle='roomtestowner') where holding_id=md5('room-test-holding-501')::uuid;
+set local role authenticated;
+select ok(not public.can_view_public_collectible_media('collectible-media',(select user_id::text||'/../forged.jpg' from public.profiles where handle='roomtestowner')), 'stored malformed path denied');
+reset role;
+update public.media_assets set storage_path=current_setting('room.test_public_path') where holding_id=md5('room-test-holding-501')::uuid;
 set local role service_role;
 select is(jsonb_array_length(public.get_public_room_media_locations('a7110000-0000-4000-8000-000000000003',
   array[md5('room-test-placement-501')::uuid])),1,'server locator resolves eligible displayed media');

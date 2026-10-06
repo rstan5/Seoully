@@ -132,6 +132,19 @@ assert.match(locatorSQL, /where rp\.id = any\(p_placement_ids\)/);
 assert.match(sql03, /revoke all on function public\.get_public_room_media_locations\(uuid, uuid\[\]\) from public, anon, authenticated, service_role/);
 assert.match(sql03, /grant execute on function public\.get_public_room_media_locations\(uuid, uuid\[\]\) to service_role/);
 assert.match(sql03, /get_public_room_media_locations[^]*?security invoker/);
+const storageAuth = body(sql03, 'can_view_public_collectible_media');
+assert.match(sql03, /can_view_public_collectible_media\(p_bucket text, p_path text\)\s*returns boolean language sql stable security definer set search_path = pg_catalog/);
+assert.match(storageAuth, /auth\.uid\(\) is not null/);
+assert.match(storageAuth, /p_bucket = 'collectible-media'/);
+assert.match(storageAuth, /h\.owner_user_id = ma\.owner_user_id/);
+assert.match(storageAuth, /r\.owner_user_id = h\.owner_user_id/);
+assert.match(storageAuth, /p\.collection_public/);
+assert.match(storageAuth, /ct\.status <> 'restricted'/);
+assert.match(storageAuth, /ma\.storage_bucket = p_bucket and ma\.storage_path = p_path/);
+assert.match(storageAuth, /split_part\(p_path, '\/', 1\) = ma\.owner_user_id::text/);
+assert.match(storageAuth, /order by placed\.updated_at desc, placed\.id limit 500/);
+assert.match(sql03, /revoke all on function public\.can_view_public_collectible_media\(text, text\) from public, anon, authenticated, service_role/);
+assert.match(sql03, /grant execute on function public\.can_view_public_collectible_media\(text, text\) to authenticated/);
 assert.match(sql04, /h\.id = public\.room_holding_uuid\(chosen\.value #>> '\{\}'\)/);
 assert.match(body(sql04, 'room_holding_uuid'), /then return null; end if;\s*return p::uuid/);
 assert.match(body(sql04, 'validate_room_photo_string_holdings'), /h\.owner_user_id = new\.owner_user_id/);
@@ -197,6 +210,20 @@ assert.match(body(sql04, 'validate_room_photo_string_holdings'), /ct\.kind = 'ph
   assert.equal(dto.room.placements[0].holding.personalMediaUrl, 'https://authorized.example/image');
   assert.ok(!/private\/path|private\/bucket|hidden|hasPersonalMedia|holdingId/.test(JSON.stringify(dto)));
   assert.equal(dto.room.style.binder, 'cream'); assert.equal(dto.room.layout.objects.length, 24);
+  // Connect both real DAL modules. Only external SDK/Storage boundaries are mocked.
+  env.SUPABASE_SECRET_KEY = 'test-only-placeholder';
+  const connectedDal = load('src/server/dal/public-room.ts', {
+    './public-room-media': media, './room-schema': roomSchema, '@/domain/public-room-layout': privacy,
+    '@/server/dal/catalog-reference-images': { async listActiveCatalogReferenceImages() { return []; } },
+    '@/server/supabase/server': {}, '@/server/dal/profile': {},
+  });
+  const connectedDto = await connectedDal.getPublicRoomByHandle('collector', { ...publicClient, ...viewer });
+  assert.equal(connectedDto.room.placements[0].holding.personalMediaUrl, 'https://authorized.example/image');
+  assert.ok(!/owner\/public.jpg|private\/path|private\/bucket|hasPersonalMedia/.test(JSON.stringify(connectedDto)));
+  const deniedDto = await connectedDal.getPublicRoomByHandle('collector', { ...publicClient,
+    storage: { from() { return { async createSignedUrl() { return { data: null, error: { message: 'denied' } }; } }; } },
+  });
+  assert.equal(deniedDto.room.placements[0].holding.personalMediaUrl, undefined, 'denied viewer signing cannot produce a public image');
   await assert.rejects(() => publicDal.getPublicRoomByHandle('collector', { ...publicClient,
     auth: { async getUser() { return { data: { user: null } }; } } }), /unauthenticated/);
   console.log('Room persistence: actual TypeScript contracts, mocked media/DAL authorization, and SQL source guards passed (SQL replay not performed).');

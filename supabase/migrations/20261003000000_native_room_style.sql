@@ -65,6 +65,38 @@ grant execute on function public.room_style_is_valid(jsonb), public.public_room_
 alter table public.rooms drop constraint if exists rooms_style_valid;
 alter table public.rooms add constraint rooms_style_valid check (public.room_style_is_valid(style));
 
+-- Storage SELECT/signing still needs a definer boundary: viewer RLS intentionally
+-- hides another collector's Holdings/MediaAssets. Return only an eligibility bit;
+-- never use the server locator's service client for Storage signing.
+-- Replace in 03 so projection, locator and signing authorization change atomically.
+create or replace function public.can_view_public_collectible_media(p_bucket text, p_path text)
+returns boolean language sql stable security definer set search_path = pg_catalog as $$
+  select coalesce(auth.uid() is not null
+    and p_bucket = 'collectible-media'
+    and p_path <> '' and p_path = btrim(p_path)
+    and p_path !~ '(^/|//|/$|(^|/)\.{1,2}(/|$)|[[:cntrl:]])'
+    and exists (
+      select 1 from public.media_assets ma
+      join public.holdings h on h.id = ma.holding_id and h.owner_user_id = ma.owner_user_id
+      join public.rooms r on r.owner_user_id = h.owner_user_id
+      join public.profiles p on p.user_id = r.owner_user_id and p.collection_public
+      join public.collectible_templates ct on ct.id = h.template_id and ct.status <> 'restricted'
+      where ma.storage_bucket = p_bucket and ma.storage_path = p_path
+        and split_part(p_path, '/', 1) = ma.owner_user_id::text
+        and exists (
+          select 1 from (
+            select placed.holding_id from public.room_placements placed
+            join public.holdings owned on owned.id = placed.holding_id and owned.owner_user_id = r.owner_user_id
+            join public.collectible_templates visible on visible.id = owned.template_id and visible.status <> 'restricted'
+            where placed.room_id = r.id
+            order by placed.updated_at desc, placed.id limit 500
+          ) displayed where displayed.holding_id = h.id
+        )
+    ), false);
+$$;
+revoke all on function public.can_view_public_collectible_media(text, text) from public, anon, authenticated, service_role;
+grant execute on function public.can_view_public_collectible_media(text, text) to authenticated;
+
 
 -- Server-only locator. SECURITY INVOKER: no definer/RLS escape hatch for clients.
 -- service_role is already privileged; SQL still limits it to currently public,

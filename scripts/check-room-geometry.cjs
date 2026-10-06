@@ -118,21 +118,28 @@ console.log("Micro-polish actual native Shop lounge silhouette checks passed");
 
 const binderSource = fs.readFileSync("apps/mobile/src/room/NativeOpenBinder.tsx", "utf8");
 const binderFile = ts.createSourceFile("binder.tsx",binderSource,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
-const standingFunction=binderFile.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==="StandingBinder");
+const standingFunction=binderFile.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==="DisplayBinder");
 const standingCode=ts.transpileModule(standingFunction.getText(binderFile),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
 vm.runInContext(`(function () { ${standingCode} }).call(globalThis);`,sandbox);
-sandbox.RESTING_COVER_YAW=Math.PI/2-Math.PI/45;
-const standing=sandbox.exports.StandingBinder({cover:"#f3e8da",paper:"#efe8da"});
-const standingBounds=bounds(standing);
-assert.ok(standingBounds.max.z*0.62<0.42 && standingBounds.min.z*0.62> -0.42,"nearly-closed Binder stays centered within reserved Desk footprint");
-assert.ok(standingBounds.max.x-standingBounds.min.x < 0.42,"nearly-closed Binder has no wide V silhouette");
+Object.assign(sandbox,require("../.tmp/build/apps/mobile/src/room/binderPresentation.js"));
+sandbox.BinderOwnerLabel=()=>null;
+const standFunction=binderFile.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==="BinderDisplayStand");
+const standCode=ts.transpileModule(standFunction.getText(binderFile),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+vm.runInContext(`(function () { ${standCode} }).call(globalThis);`,sandbox);
+const book=sandbox.exports.DisplayBinder({cover:"#f3e8da",paper:"#efe8da"});
+const support=sandbox.exports.BinderDisplayStand();
+const standingBounds=bounds({type:"group",props:{children:[book,support]}});
+const bookBounds=bounds(book);
+assert.ok(bookBounds.max.y-bookBounds.min.y<0.4,"closed laid-back Binder has no upright silhouette");
+assert.ok(standingBounds.max.z*0.62<0.42 && standingBounds.min.z*0.62> -0.42,"display Binder stays within reserved Desk footprint");
+assert.ok(children(support).every(n=>typeof n.props.raycast==='function' && !n.props.onClick),'stand does not participate in picking');
 const { CLOSED_BINDER_LOWER_BOUND, CLOSED_BINDER_SCALE }=require("../.tmp/build/apps/mobile/src/room/roomGrounding.js");
-assert.ok(Math.abs(standingBounds.min.y-CLOSED_BINDER_LOWER_BOUND)<1e-6,"standing Binder authored bound");
+assert.ok(Math.abs(standingBounds.min.y-CLOSED_BINDER_LOWER_BOUND)<1e-6,"display stand authored lower bound");
 const primary={...defaultRoomObject("desk"),binderDesk:true};const {deskBinderWorld}=require("../.tmp/build/apps/mobile/src/room/roomObjects.js");
 assert.ok(Math.abs(deskBinderWorld([primary],primary.id).y + standingBounds.min.y*CLOSED_BINDER_SCALE-primary.y-DESK_TABLETOP_TOP)<1e-6,"visible Binder contacts Desk");
 const palm=sandbox.LargePlant({theme});assert.equal(children(palm).filter(n=>n.type==="group").length,8,"eight separate arching fronds");
 const flowers=sandbox.Plant({theme,maps:{}});assert.equal(children(flowers).filter(n=>n.type==="group").length,5,"five authored blossoms with stems");
-console.log("Content actual Table Lamp/Flower Pot/palm bounds, distinct stems/fronds, and standing Binder Desk contact passed");
+console.log("Content actual Table Lamp/Flower Pot/palm bounds, distinct stems/fronds, and closed display Binder/stand Desk contact passed");
 
 const desk = sandbox.DeskUnit({ theme, maps: {} });
 for (const drawer of children(desk).filter((node) => node.type === "group" && node.props.position?.[0] === 0.82)) {

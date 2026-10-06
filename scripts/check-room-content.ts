@@ -50,7 +50,7 @@ const parent=many.find(o=>o.binderDesk)!;many.push(attachRoomDecor({...defaultRo
 saveDemoRoomLayout(snapshot.room.ownerUserId,{source:'authored',firstRoomEditCompleted:true,objects:many});const restored=buildFixtureRoomSnapshot(undefined,{ownStarter:true});assert.deepEqual(parseRoomLayout(restored.room.layout).objects,many);assert.deepEqual(restored.holdings,snapshot.holdings);saveDemoRoomLayout(snapshot.room.ownerUserId,old);
 for(const binder of ROOM_BINDER_IDS){const style=parseRoomStyle({...snapshot.room.style,binder});assert.notEqual(resolveRoomLook(style).binder,'#4a1c2c');saveDemoRoomStyle(snapshot.room.ownerUserId,style);assert.equal(buildFixtureRoomSnapshot(undefined,{ownStarter:true}).room.style?.binder,binder);}saveDemoRoomStyle(snapshot.room.ownerUserId,snapshot.room.style!);
 assert.equal(parseRoomStyle({}).binder,'cream');
-const binderSource=read('apps/mobile/src/room/NativeOpenBinder.tsx');for(const visual of ['StandingBinder','torusGeometry','sheet','side*0.49','group.current.visible = true'])assert.ok(binderSource.includes(visual));
+const binderSource=read('apps/mobile/src/room/NativeOpenBinder.tsx');for(const visual of ['DisplayBinder','torusGeometry','BinderDisplayStand','BinderOwnerLabel','group.current.visible = true'])assert.ok(binderSource.includes(visual));
 assert.ok(read('apps/mobile/src/room/RoomStyleSheet.tsx').includes('copy.styleBinder'));
 assert.ok(read('supabase/migrations/20261004000000_native_room_layout.sql').includes("parent_obj ? 'parent'"));
 console.log('Content: 12-kind Shop, local decor parenting/reparent/floor/30° transforms, anchor transfer/protection, reservation, Demo ownership/style and public-safe relationships passed');

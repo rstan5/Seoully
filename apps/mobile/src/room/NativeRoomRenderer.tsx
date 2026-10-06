@@ -37,6 +37,7 @@ const ZONE_HOTSPOTS: Record<CanonicalZoneKind, { position: [number, number, numb
 };
 
 export function NativeRoomRenderer({
+  ownerName = "",
   items,
   photoStringHoldings = [],
   publicStringCards = [],
@@ -80,6 +81,7 @@ export function NativeRoomRenderer({
   onOpenStorage,
   placingItem = null,
 }: {
+  ownerName?: string;
   items: RoomRenderable[];
   photoStringHoldings?: NativeHolding[];
   publicStringCards?: PublicPhotoStringCard[];
@@ -232,6 +234,7 @@ export function NativeRoomRenderer({
       />;
     })}
     {binderAt ? <NativeOpenBinder
+      ownerName={ownerName}
       open={binderOpen}
       spread={binderSpread}
       turningTo={turningSpread}

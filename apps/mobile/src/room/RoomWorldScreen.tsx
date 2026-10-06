@@ -4,7 +4,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Stack, useFocusEffect } from "expo-router";
 import { AccessibilityInfo, Animated, AppState, Easing, PanResponder, Pressable, StyleSheet, View, type GestureResponderEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { loadCollectorRoom, loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomLayout, saveNativeRoomPlacement, saveNativeRoomStyle, type NativeHolding, type NativeRoomSnapshot } from "../api";
+import { loadCollectorProfile, loadCollectorRoom, loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomLayout, saveNativeRoomPlacement, saveNativeRoomStyle, type NativeHolding, type NativeRoomSnapshot } from "../api";
 import { binderSpreads, buildNativeBinderPages, spreadIndexForHolding } from "../binder/model";
 import { collectibleKindLabel, type MobileCopy } from "../i18n";
 import { spacing } from "../theme";
@@ -202,6 +202,8 @@ export function RoomWorldScreen({
     activeTouchesRef.current = 0;
     gestureRef.current.pinching = false;
     gestureRef.current.lastDx = gestureRef.current.lastDy = 0;
+    setSelectedObjectId(null);
+    setSelectedId(null);
     setRoomLayout(next);
     if (viewRef.current.kind === "edit") return;
     if (!shouldAutoEnterFirstRoomEdit(next, readOnlyRoom)) return;
@@ -265,6 +267,7 @@ export function RoomWorldScreen({
           setPrivateRoom(false);
         } else {
           const next = demoRoom.buildFixtureRoomSnapshot(undefined, { ownStarter: true });
+          setOwnerName(demoRoom.demoCollectorDisplayName(next.room.ownerUserId));
           setSnapshot(next);
           setHoldings(next.holdings);
           setItems(buildRoomRenderables(next.holdings, next.placements));
@@ -293,6 +296,8 @@ export function RoomWorldScreen({
         } : null);
       } else if (persistLive) {
         const next = await loadNativeRoom();
+        const identity = await loadCollectorProfile(next.room.ownerUserId).catch(() => null);
+        setOwnerName(identity?.profile.user.displayName ?? "");
         setSnapshot(next);
         setHoldings(next.holdings);
         setItems(buildRoomRenderables(next.holdings, next.placements));
@@ -317,6 +322,13 @@ export function RoomWorldScreen({
   useFocusEffect(useCallback(() => {
     clearPendingPress();
     clearHeldVisual();
+    setSelectedObjectId(null);
+    setSelectedId(null);
+    selectedRef.current = null;
+    binderReturnRef.current = null;
+    setOwnerName("");
+    viewRef.current = { kind: "home" };
+    setView({ kind: "home" });
     touchOwnerRef.current = null;
     activeTouchesRef.current = 0;
     gestureRef.current.pinching = false;
@@ -672,6 +684,7 @@ export function RoomWorldScreen({
     if (!desk) return;
 
     captureBinderReturn();
+    setSelectedObjectId(null);
     const index = holdingId ? spreadIndexForHolding(spreads, holdingId) : 0;
     setSelectedId(null);
     setStorageOpen(false);
@@ -691,6 +704,12 @@ export function RoomWorldScreen({
   function closeBinder() {
     const ret = binderReturnRef.current;
     binderReturnRef.current = null;
+    clearPendingPress();
+    clearHeldVisual();
+    touchOwnerRef.current = null;
+    activeTouchesRef.current = 0;
+    gestureRef.current.pinching = false;
+    setSelectedObjectId(null);
     setSelectedId(null);
     if (ret) {
       exploreRef.current = { ...ret.explore };
@@ -1272,6 +1291,7 @@ export function RoomWorldScreen({
       <Suspense fallback={null}>
         <NativeRoomRenderer
           key={canvasEpoch}
+          ownerName={ownerName}
           items={items}
           photoStringHoldings={holdings}
           publicStringCards={publicStringCards}

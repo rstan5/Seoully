@@ -68,7 +68,7 @@ const renderer=readFileSync('apps/mobile/src/room/NativeRoomRenderer.tsx','utf8'
 assert.ok(renderer.includes('focused ? item.scale : world.fittedScale'),'inspection scale independent');
 assert.ok(renderer.includes('scale={restWorld.fittedScale}'),'raycast geometry shares rendered fit');
 const binder=readFileSync('apps/mobile/src/room/NativeOpenBinder.tsx','utf8');
-assert.ok(binder.includes('Math.PI / 2 - Math.PI / 45'));
-near(Math.PI-2*(Math.PI/2-Math.PI/45),8*Math.PI/180);
+assert.ok(binder.includes('DisplayBinder') && !binder.includes('StandingBinder'));
+assert.ok(binder.includes('BinderDisplayStand'));
 assert.ok(binder.includes('V_ANGLE * spreadAmount'),'reading geometry remains separate');
-console.log('Physical repair: uniform local fit/contact/yaw, bounded Shelf/Case, unbounded top/floor, fixture paths, independent inspection/hits and 8° resting Binder passed');
+console.log('Physical repair: uniform local fit/contact/yaw, bounded Shelf/Case, unbounded top/floor, fixture paths, independent inspection/hits and closed display Binder passed');

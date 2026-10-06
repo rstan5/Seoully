@@ -287,3 +287,5 @@ import "./check-room-builder-completeness";
 import "./check-room-content";
 
 import "./check-room-physical-repair";
+
+import "./check-binder-presentation";

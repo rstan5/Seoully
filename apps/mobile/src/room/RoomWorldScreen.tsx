@@ -159,7 +159,12 @@ export function RoomWorldScreen({
   const homeExploreRef = useRef<ExploreOffset>({ ...IDENTITY_EXPLORE });
   const frozenExploreRef = useRef<ExploreOffset>({ ...IDENTITY_EXPLORE });
   const gestureRef = useRef({ lastDx: 0, lastDy: 0, pinching: false, pinchStart: 0, dollyStart: 1, objectDrag: false, releasing: false });
+  // Selection never owns touches. Only an object-origin long press grants drag ownership.
+  const activeTouchesRef = useRef(0);
+  const touchOwnerRef = useRef<string | null>(null);
+  const dragOwnerRef = useRef<string | null>(null);
   const heldRef = useRef<HeldEdit | null>(null);
+  const queuedStorageRef = useRef<HeldEdit | null>(null);
   const heldObjectRef = useRef<HeldRoomObject | null>(null);
   const previewRef = useRef<RoomRenderable | null>(null);
   const objectPreviewRef = useRef<RoomObjectInstance | null>(null);
@@ -191,6 +196,12 @@ export function RoomWorldScreen({
   }, [helperOpacity]);
 
   function applyLoadedLayout(next: RoomLayoutState, readOnlyRoom: boolean, loadedItems: RoomRenderable[] = latestItems.current) {
+    clearPendingPress();
+    clearHeldVisual();
+    touchOwnerRef.current = null;
+    activeTouchesRef.current = 0;
+    gestureRef.current.pinching = false;
+    gestureRef.current.lastDx = gestureRef.current.lastDy = 0;
     setRoomLayout(next);
     if (viewRef.current.kind === "edit") return;
     if (!shouldAutoEnterFirstRoomEdit(next, readOnlyRoom)) return;
@@ -304,7 +315,13 @@ export function RoomWorldScreen({
   }, [copy.demoRoomUnavailable, copy.roomUnavailable, demo, mode, persistLive, userId]);
 
   useFocusEffect(useCallback(() => {
+    clearPendingPress();
+    clearHeldVisual();
+    touchOwnerRef.current = null;
+    activeTouchesRef.current = 0;
+    gestureRef.current.pinching = false;
     void refresh();
+    return () => { clearPendingPress(); clearHeldVisual(); touchOwnerRef.current = null; };
   }, [refresh]));
 
   const binderPages = useMemo(() => buildNativeBinderPages(holdings, copy.binderGeneral ?? "Your Photocards"), [copy.binderGeneral, holdings]);
@@ -331,12 +348,14 @@ export function RoomWorldScreen({
 
   function clearHeldVisual() {
     heldRef.current = null;
+    queuedStorageRef.current = null;
     heldObjectRef.current = null;
     previewRef.current = null;
     objectPreviewRef.current = null;
     furnitureCarryRef.current = null;
     highlightSurfaceIdRef.current = null;
     gestureRef.current.objectDrag = false;
+    dragOwnerRef.current = null;
     setHeldId(null);
     setHeldObjectId(null);
     setPlacingItem(null);
@@ -359,6 +378,16 @@ export function RoomWorldScreen({
   /* PanResponder callbacks fire on gestures and read live refs, not render values. */
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponderCapture: (event, gesture) => {
+      if (viewRef.current.kind === "inspect") return false;
+      if (heldRef.current || heldObjectRef.current) return Math.hypot(gesture.dx, gesture.dy) > 2;
+      if (pendingPressRef.current && Math.hypot(gesture.dx, gesture.dy) > LONG_PRESS_SLOP_PX) {
+        if (pendingPressRef.current) clearTimeout(pendingPressRef.current.timer);
+        pendingPressRef.current = null;
+      }
+      if (event.nativeEvent.touches.length >= 2 && exploreAllowedForView(viewRef.current)) return true;
+      return Math.hypot(gesture.dx, gesture.dy) > 10;
+    },
     onMoveShouldSetPanResponder: (event, gesture) => {
       if (viewRef.current.kind === "inspect") return false;
       if (heldRef.current || heldObjectRef.current) return Math.hypot(gesture.dx, gesture.dy) > 2;
@@ -370,6 +399,7 @@ export function RoomWorldScreen({
       return Math.hypot(gesture.dx, gesture.dy) > 10;
     },
     onPanResponderGrant: (event) => {
+      clearPendingPress();
       gestureRef.current.lastDx = 0;
       gestureRef.current.lastDy = 0;
       gestureRef.current.objectDrag = Boolean(heldRef.current || heldObjectRef.current);
@@ -383,6 +413,8 @@ export function RoomWorldScreen({
       }
     },
     onPanResponderMove: (event, gesture) => {
+      const ownsDrag = dragOwnerRef.current !== null && event.nativeEvent.touches.length === 1 && String(event.nativeEvent.touches[0].identifier) === dragOwnerRef.current;
+      if ((heldRef.current || heldObjectRef.current) && !ownsDrag) clearHeldVisual();
       if (heldObjectRef.current) {
         gestureRef.current.objectDrag = true;
         setHelperKind(null);
@@ -479,14 +511,18 @@ export function RoomWorldScreen({
       exploreRef.current = nudgeExploreFromDrag(exploreRef.current, ddx, ddy, space);
     },
     onPanResponderRelease: () => {
+      clearPendingPress();
+      dragOwnerRef.current = null;
+      touchOwnerRef.current = null;
       gestureRef.current.pinching = false;
       if (heldObjectRef.current) void releaseHeldObject();
       else if (heldRef.current) void releaseHeld();
     },
     onPanResponderTerminate: () => {
+      clearPendingPress();
+      clearHeldVisual();
+      touchOwnerRef.current = null;
       gestureRef.current.pinching = false;
-      if (heldObjectRef.current) void releaseHeldObject();
-      else if (heldRef.current) void releaseHeld();
     },
   });
 
@@ -586,19 +622,25 @@ export function RoomWorldScreen({
     setView(inspectView(canonical, holdingId, parent?.id));
   }
 
-  function onCollectiblePressStart(holdingId: string) {
-    if (viewRef.current.kind !== "edit" || readOnly) return;
+  function onCollectiblePressStart(holdingId: string, pointerId?: number) {
+    if (viewRef.current.kind !== "edit" || readOnly || gestureRef.current.releasing) return;
+    const owner = pointerId === undefined ? touchOwnerRef.current : String(pointerId);
+    if (owner === null || owner === undefined || activeTouchesRef.current > 1) return;
+    touchOwnerRef.current = owner;
     clearPendingPress();
     pendingPressRef.current = {
       holdingId,
       timer: setTimeout(() => {
         pendingPressRef.current = null;
-        const item = latestItems.current.find((entry) => entry.holding.id === holdingId);
-        if (!item || viewRef.current.kind !== "edit") return;
+        const queued = queuedStorageRef.current?.holdingId === holdingId ? queuedStorageRef.current : null;
+        const item = latestItems.current.find((entry) => entry.holding.id === holdingId) ?? queued?.preview;
+        if (!item || viewRef.current.kind !== "edit" || touchOwnerRef.current !== owner || activeTouchesRef.current !== 1) return;
+        dragOwnerRef.current = owner;
         const room = snapshotRef.current?.room;
         const world = withResolvedWorld(item, room?.id, latestObjects.current);
-        const held = acquireHeld(world, reducedMotionRef.current);
-        held.origin = cloneRenderable(item);
+        const held = queued ?? acquireHeld(world, reducedMotionRef.current);
+        queuedStorageRef.current = null;
+        if (!queued) held.origin = cloneRenderable(item);
         heldRef.current = held;
         previewRef.current = held.preview;
         highlightSurfaceIdRef.current = held.surfaceId;
@@ -671,6 +713,9 @@ export function RoomWorldScreen({
     setCanRedo(false);
     clearPendingPress();
     clearHeldVisual();
+    touchOwnerRef.current = null;
+    activeTouchesRef.current = 0;
+    gestureRef.current.pinching = false;
     styleBaseline.current = roomStyle;
     firstEntryRef.current = false;
     showHelper("edit");
@@ -771,6 +816,7 @@ export function RoomWorldScreen({
     const room = snapshotRef.current?.room;
     if (!held || gestureRef.current.releasing) return;
     gestureRef.current.releasing = true;
+    clearHeldVisual();
     suppressTapRef.current = true;
     try {
       if (!room || !held.valid || !held.surfaceId || !isSupportedRoomPlacement(held.rest, room.id, latestObjects.current)) {
@@ -817,6 +863,7 @@ export function RoomWorldScreen({
     const held = heldObjectRef.current;
     if (!held || gestureRef.current.releasing) return;
     gestureRef.current.releasing = true;
+    clearHeldVisual();
     suppressTapRef.current = true;
     try {
       if (!held.valid) {
@@ -934,12 +981,14 @@ export function RoomWorldScreen({
     if (!snapshot || readOnly || viewRef.current.kind !== "edit") return;
     const draft = createInitialRoomRenderable(holding, nextNativeSlot(items.map((item) => item.placement?.slot ?? 0)), snapshot.room.id);
     const held = acquirePlaceFromStorage(draft, reducedMotionRef.current, storageTakeoutFor(latestObjects.current, storageArchiveId));
-    heldRef.current = held;
+    clearPendingPress();
+    clearHeldVisual();
+    queuedStorageRef.current = held;
     previewRef.current = held.preview;
     highlightSurfaceIdRef.current = null;
     suppressTapRef.current = true;
     setSelectedId(holding.id);
-    setHeldId(holding.id);
+    setHeldId(null);
     setPlacingItem(held.preview);
     setStorageOpen(false);
     setStorageQuery("");
@@ -1080,15 +1129,19 @@ export function RoomWorldScreen({
     syncHistory();
   }
 
-  function onObjectPressStart(objectId: string) {
-    if (viewRef.current.kind !== "edit" || readOnly || shopSaving.current) return;
+  function onObjectPressStart(objectId: string, pointerId?: number) {
+    if (viewRef.current.kind !== "edit" || readOnly || shopSaving.current || gestureRef.current.releasing) return;
+    const owner = pointerId === undefined ? touchOwnerRef.current : String(pointerId);
+    if (owner === null || owner === undefined || activeTouchesRef.current > 1) return;
+    touchOwnerRef.current = owner;
     clearPendingPress();
     pendingPressRef.current = {
       holdingId: `object:${objectId}`,
       timer: setTimeout(() => {
         pendingPressRef.current = null;
         const object = latestObjects.current.find((item) => item.id === objectId);
-        if (!object || viewRef.current.kind !== "edit") return;
+        if (!object || viewRef.current.kind !== "edit" || touchOwnerRef.current !== owner || activeTouchesRef.current !== 1) return;
+        dragOwnerRef.current = owner;
         const held = acquireRoomObject(object);
         heldObjectRef.current = held;
         objectPreviewRef.current = liftRoomObject(resolveRoomObjectTransform(object, latestObjects.current), reducedMotionRef.current);
@@ -1191,6 +1244,30 @@ export function RoomWorldScreen({
         });
       }}
       {...panResponder.panHandlers}
+      onTouchStart={(event) => {
+        const touches = event.nativeEvent.touches;
+        activeTouchesRef.current = touches.length;
+        if (touches.length !== 1) {
+          clearPendingPress(); clearHeldVisual(); touchOwnerRef.current = null;
+        } else {
+          touchOwnerRef.current = String(touches[0].identifier);
+        }
+      }}
+      onTouchEnd={(event) => {
+        // Mesh pointer-up is not guaranteed when the finger leaves its hit target.
+        activeTouchesRef.current = event.nativeEvent.touches.length;
+        gestureRef.current.pinching = false;
+        clearPendingPress();
+        touchOwnerRef.current = null;
+        dragOwnerRef.current = null;
+        if (heldObjectRef.current) void releaseHeldObject();
+        else if (heldRef.current) void releaseHeld();
+      }}
+      onTouchCancel={() => {
+        activeTouchesRef.current = 0;
+        gestureRef.current.pinching = false;
+        clearPendingPress(); clearHeldVisual(); touchOwnerRef.current = null;
+      }}
     >
       <Suspense fallback={null}>
         <NativeRoomRenderer

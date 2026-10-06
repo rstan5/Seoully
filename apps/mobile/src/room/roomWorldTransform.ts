@@ -1,3 +1,5 @@
+import { surfaceFitScale } from "./surfaceFit";
+import { nativeRoomSurfaces } from "./model";
 import { visibleLowerBound, type NativeRepresentationKind } from "./representation";
 import { FLOOR_Y, CONTACT_EPSILON, groundedOrigin } from "./roomGrounding";
 import { ZONE_DOCKS, type CameraPose } from "./camera";
@@ -71,7 +73,7 @@ export function resolveRoomWorldTransform(
   roomId: string | undefined,
   objects: RoomObjectInstance[],
   carry?: FurnitureCarry | null,
-): { position: NativeRoomVector; rotation: NativeRoomVector } {
+): { position: NativeRoomVector; rotation: NativeRoomVector; fittedScale: number } {
   const parent = liveParentObject(roomId, item.placement?.surfaceId, objects, carry);
   const position = parent ? objectPointFromAuthored(item.position, parent) : item.position;
   const rotation = composeParentYaw(item.rotation ?? ZERO, parent?.rotateY ?? 0);
@@ -79,16 +81,16 @@ export function resolveRoomWorldTransform(
   const liveObjects = carry ? objects.map((obj) => obj.id === carry.current.id ? carry.current : obj) : objects;
   const surfaceY = surfaceId?.endsWith("-floor") ? FLOOR_Y
     : roomId && surfaceId ? objectSurfaceTop(roomId, liveObjects, surfaceId) : undefined;
+  const surface = roomId && surfaceId ? nativeRoomSurfaces(roomId, liveObjects).find(s => s.id === surfaceId) : undefined;
+  const fittedScale = item.geometry ? surfaceFitScale(item.geometry, item.scale ?? 1, item.rotation ?? ZERO, surface) : item.scale ?? 1;
   const contactY = item.geometry && surfaceY !== undefined
-    ? groundedOrigin(surfaceY, visibleLowerBound(item.geometry, item.scale ?? 1, rotation), CONTACT_EPSILON)
+    ? groundedOrigin(surfaceY, visibleLowerBound(item.geometry, fittedScale, rotation), CONTACT_EPSILON)
     : position.y;
+  const contact = { ...position, y: contactY };
   return {
-    position: {
-      x: position.x,
-      y: contactY,
-      z: position.z,
-    },
+    position: contact,
     rotation,
+    fittedScale,
   };
 }
 

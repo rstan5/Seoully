@@ -1,5 +1,5 @@
 import { resolveRoomObjectTransform } from "./roomObjects";
-import { DESK_DRAWER_CENTERS, SHELF_BOARD_Y, CASE_BOARD_Y } from "./roomGrounding";
+import { DESK_DRAWER_CENTERS, SHELF_BOARD_Y, CASE_BOARD_Y, SHELF_BOARD_THICKNESS, CASE_BOARD_THICKNESS, SHELF_ROOF_THICKNESS, CASE_ROOF_THICKNESS } from "./roomGrounding";
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
 import { useEffect, useMemo, useRef, type MutableRefObject, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber/native";
@@ -119,7 +119,7 @@ export function RoomFurniture({
   onOpenStorage?: (objectId?: string) => void;
   onSelectZone?: (zone: CanonicalZoneKind, objectId?: string) => void;
   onSelectObject?: (objectId: string) => void;
-  onObjectPressStart?: (objectId: string) => void;
+  onObjectPressStart?: (objectId: string, pointerId?: number) => void;
   onObjectPressEnd?: (objectId: string) => void;
 }) {
   const maps = useRoomMaps();
@@ -180,7 +180,7 @@ function FurniturePose({
   editing: boolean;
   onSelectZone?: (zone: CanonicalZoneKind, objectId?: string) => void;
   onSelectObject?: (objectId: string) => void;
-  onObjectPressStart?: (objectId: string) => void;
+  onObjectPressStart?: (objectId: string, pointerId?: number) => void;
   onObjectPressEnd?: (objectId: string) => void;
   onOpenStorage?: (objectId?: string) => void;
   onConfigurePhotoString?: (objectId: string) => void;
@@ -202,7 +202,7 @@ function FurniturePose({
     onPointerDown={(event) => {
       if (!editing) return;
       event.stopPropagation();
-      onObjectPressStart?.(object.id);
+      onObjectPressStart?.(object.id, event.pointerId);
     }}
     onPointerUp={(event) => {
       if (!editing) return;
@@ -236,11 +236,11 @@ function ShelfUnit({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
     <mesh position={[0, 0, -0.28]} castShadow receiveShadow><boxGeometry args={[2.18, 3.08, 0.05]} /><meshStandardMaterial color={theme.furniture} map={maps.woodFine} roughness={0.78} /></mesh>
     <mesh position={[-1.06, 0, 0.08]} castShadow><boxGeometry args={[0.055, 3.12, 0.68]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.56} /></mesh>
     <mesh position={[1.06, 0, 0.08]} castShadow><boxGeometry args={[0.055, 3.12, 0.68]} /><meshStandardMaterial color={theme.furniture} map={maps.woodFine} roughness={0.68} /></mesh>
-    <mesh position={[0, 1.54, 0.08]} castShadow><boxGeometry args={[2.16, 0.055, 0.68]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.5} /></mesh>
+    <mesh position={[0, 1.54, 0.08]} castShadow><boxGeometry args={[2.16, SHELF_ROOF_THICKNESS, 0.68]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.5} /></mesh>
     <mesh position={[0, -1.54, 0.06]} castShadow><boxGeometry args={[2.16, 0.07, 0.64]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.54} /></mesh>
     {boards.map((y) => (
       <group key={y} position={[0, y, 0.12]}>
-        <mesh receiveShadow><boxGeometry args={[2.04, 0.04, 0.62]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.48} /></mesh>
+        <mesh receiveShadow><boxGeometry args={[2.04, SHELF_BOARD_THICKNESS, 0.62]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.48} /></mesh>
         <EdgeLip width={2.04} color={theme.metal} depth={0.3} />
         <mesh position={[0, -0.028, 0.28]}><boxGeometry args={[2.04, 0.018, 0.04]} /><meshStandardMaterial color={theme.metal} roughness={0.4} metalness={0.22} /></mesh>
       </group>
@@ -313,11 +313,11 @@ function CaseUnit({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
     <mesh position={[0, 0, -0.18]} castShadow receiveShadow><boxGeometry args={[1.48, 3.08, 0.05]} /><meshStandardMaterial color={theme.furniture} map={maps.woodFine} roughness={0.74} /></mesh>
     <mesh position={[-0.72, 0, 0.14]} castShadow><boxGeometry args={[0.055, 3.12, 0.62]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.52} /></mesh>
     <mesh position={[0.72, 0, 0.14]} castShadow><boxGeometry args={[0.055, 3.12, 0.62]} /><meshStandardMaterial color={theme.furniture} map={maps.woodFine} roughness={0.66} /></mesh>
-    <mesh position={[0, 1.54, 0.14]} castShadow><boxGeometry args={[1.48, 0.05, 0.62]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.46} /></mesh>
+    <mesh position={[0, 1.54, 0.14]} castShadow><boxGeometry args={[1.48, CASE_ROOF_THICKNESS, 0.62]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.46} /></mesh>
     <mesh position={[0, -1.54, 0.12]} castShadow><boxGeometry args={[1.48, 0.07, 0.58]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.5} /></mesh>
     {CASE_BOARD_Y.map((y) => (
       <group key={`case-${y}`} position={[0, y, 0.16]}>
-        <mesh receiveShadow><boxGeometry args={[1.36, 0.035, 0.56]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.44} /></mesh>
+        <mesh receiveShadow><boxGeometry args={[1.36, CASE_BOARD_THICKNESS, 0.56]} /><meshStandardMaterial color={theme.edge} map={maps.woodFine} roughness={0.44} /></mesh>
         <EdgeLip width={1.34} color={theme.metal} depth={0.26} />
       </group>
     ))}

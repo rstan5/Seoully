@@ -14,7 +14,7 @@ const names = { shelf: "ShelfUnit", desk: "DeskUnit", case: "CaseUnit", chair: "
 const file = ts.createSourceFile("geometry.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const functions = file.statements.filter((node) => ts.isFunctionDeclaration(node) && [...Object.values(names), "ChairCushion"].includes(node.name?.text)).map((node) => node.getText(file)).join("\n");
 const jsx = (type, props) => ({ type, props: props ?? {} });
-const sandbox = { exports: {}, require: () => ({ jsx, jsxs: jsx, Fragment: "group" }), ContactShadow: () => null, EdgeLip: () => null, DESK_DRAWER_CENTERS, CHAIR_SEAT_TOP, SHELF_BOARD_Y, CASE_BOARD_Y, BufferGeometry: THREE.BufferGeometry, Float32BufferAttribute: THREE.Float32BufferAttribute, DoubleSide: THREE.DoubleSide, RoundedBoxGeometry, useMemo: (fn) => fn(), useEffect: () => {}, mixHex: () => "#ffffff" };
+const sandbox = { ...require("../.tmp/build/apps/mobile/src/room/roomGrounding.js"), exports: {}, require: () => ({ jsx, jsxs: jsx, Fragment: "group" }), ContactShadow: () => null, EdgeLip: () => null, DESK_DRAWER_CENTERS, CHAIR_SEAT_TOP, SHELF_BOARD_Y, CASE_BOARD_Y, BufferGeometry: THREE.BufferGeometry, Float32BufferAttribute: THREE.Float32BufferAttribute, DoubleSide: THREE.DoubleSide, RoundedBoxGeometry, useMemo: (fn) => fn(), useEffect: () => {}, mixHex: () => "#ffffff" };
 vm.createContext(sandbox);
 vm.runInContext(ts.transpileModule(functions, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText, sandbox);
 const theme = new Proxy({}, { get: () => "#ffffff" });
@@ -121,8 +121,11 @@ const binderFile = ts.createSourceFile("binder.tsx",binderSource,ts.ScriptTarget
 const standingFunction=binderFile.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==="StandingBinder");
 const standingCode=ts.transpileModule(standingFunction.getText(binderFile),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
 vm.runInContext(`(function () { ${standingCode} }).call(globalThis);`,sandbox);
+sandbox.RESTING_COVER_YAW=Math.PI/2-Math.PI/45;
 const standing=sandbox.exports.StandingBinder({cover:"#f3e8da",paper:"#efe8da"});
 const standingBounds=bounds(standing);
+assert.ok(standingBounds.max.z*0.62<0.42 && standingBounds.min.z*0.62> -0.42,"nearly-closed Binder stays centered within reserved Desk footprint");
+assert.ok(standingBounds.max.x-standingBounds.min.x < 0.42,"nearly-closed Binder has no wide V silhouette");
 const { CLOSED_BINDER_LOWER_BOUND, CLOSED_BINDER_SCALE }=require("../.tmp/build/apps/mobile/src/room/roomGrounding.js");
 assert.ok(Math.abs(standingBounds.min.y-CLOSED_BINDER_LOWER_BOUND)<1e-6,"standing Binder authored bound");
 const primary={...defaultRoomObject("desk"),binderDesk:true};const {deskBinderWorld}=require("../.tmp/build/apps/mobile/src/room/roomObjects.js");

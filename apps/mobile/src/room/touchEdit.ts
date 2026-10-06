@@ -1,3 +1,5 @@
+import { surfaceFitScale, rotatedRepresentationSize } from "./surfaceFit";
+import { composeParentYaw } from "./roomWorldTransform";
 import { groundedOrigin, CONTACT_EPSILON } from "./roomGrounding";
 import { CAMERA_FOV_DEG, type CameraPose } from "./camera";
 import { layoutX, layoutZ } from "./roomLayout";
@@ -12,7 +14,7 @@ import {
   type RoomRenderable,
 } from "./model";
 import type { RoomObjectInstance } from "./roomObjects";
-import { visibleLowerBound, extentsForGeometry } from "./representation";
+import { visibleLowerBound } from "./representation";
 
 /** Long enough that a normal tap does not acquire; short enough to feel immediate. */
 export const LONG_PRESS_MS = 320;
@@ -90,15 +92,13 @@ export function placementsMatch(a: RoomRenderable, b: RoomRenderable) {
 }
 
 export function previewOnSurface(origin: RoomRenderable, surface: NativeRoomSurface, point: NativeRoomVector): RoomRenderable {
-  const size = extentsForGeometry(origin.geometry);
-  const halfX = size.x * origin.scale / 2;
-  const halfY = size.y * origin.scale / 2;
-  const halfZ = size.z * origin.scale / 2;
   const rotation = orientationForSurface(origin, surface);
-  const relativeYaw = rotation.y - (surface.rotateY ?? 0) * Math.PI / 180;
-  const padX = Math.abs(Math.cos(relativeYaw)) * halfX + Math.abs(Math.sin(relativeYaw)) * halfZ;
-  const padZ = Math.abs(Math.sin(relativeYaw)) * halfX + Math.abs(Math.cos(relativeYaw)) * halfZ;
-  const contact = { ...point, y: surface.kind === "wall" ? point.y : groundedOrigin(surface.y, visibleLowerBound(origin.geometry, origin.scale, rotation), CONTACT_EPSILON) };
+  const localRotation = composeParentYaw(rotation, -(surface.rotateY ?? 0));
+  const fittedScale = surfaceFitScale(origin.geometry, origin.scale, localRotation, surface);
+  const size = rotatedRepresentationSize(origin.geometry, localRotation);
+  const halfX = size.x * fittedScale / 2, halfY = size.y * fittedScale / 2;
+  const padX = halfX, padZ = size.z * fittedScale / 2;
+  const contact = { ...point, y: surface.kind === "wall" ? point.y : groundedOrigin(surface.y, visibleLowerBound(origin.geometry, fittedScale, rotation), CONTACT_EPSILON) };
   const position = clampToSurface(contact, surface, surface.kind === "wall" ? halfX : padX, halfY, padZ);
   return {
     ...origin,

@@ -1,3 +1,6 @@
+import { surfaceFitScale } from "./surfaceFit";
+import { nativeRoomSurfaces } from "./model";
+import { composeParentYaw } from "./roomWorldTransform";
 import { BACK_WALL } from "./envelope";
 import { eligiblePhotocards, photoStringSlot, publicPhotoStringHolding, type PublicPhotoStringCard } from "./photoString";
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
@@ -113,9 +116,9 @@ export function NativeRoomRenderer({
   furnitureCarryRef?: MutableRefObject<FurnitureCarry | null>;
   highlightSurfaceIdRef?: MutableRefObject<string | null>;
   compatibleSurfaces?: NativeRoomSurface[];
-  onPressStart?: (holdingId: string) => void;
+  onPressStart?: (holdingId: string, pointerId?: number) => void;
   onPressEnd?: (holdingId: string) => void;
-  onObjectPressStart?: (objectId: string) => void;
+  onObjectPressStart?: (objectId: string, pointerId?: number) => void;
   onObjectPressEnd?: (objectId: string) => void;
   onOpenStorage?: (objectId?: string) => void;
   placingItem?: RoomRenderable | null;
@@ -385,7 +388,7 @@ function RoomObject({
   reducedMotion: boolean;
   paused: boolean;
   onSelect: (id: string) => void;
-  onPressStart?: (id: string) => void;
+  onPressStart?: (id: string, pointerId?: number) => void;
   onPressEnd?: (id: string) => void;
 }) {
   const group = useRef<Group>(null);
@@ -401,13 +404,15 @@ function RoomObject({
     if (held && preview && preview.holding.id === item.holding.id) {
       mesh.position.set(preview.position.x, preview.position.y, preview.position.z);
       mesh.rotation.set(preview.rotation.x, preview.rotation.y, preview.rotation.z);
-      mesh.scale.setScalar(preview.scale * HELD_SCALE);
+      const surface = roomId ? nativeRoomSurfaces(roomId, objects).find(s => s.id === preview.placement?.surfaceId) : undefined;
+      const localRotation = composeParentYaw(preview.rotation, -(surface?.rotateY ?? 0));
+      mesh.scale.setScalar(surfaceFitScale(preview.geometry, preview.scale, localRotation, surface) * HELD_SCALE);
       return;
     }
     const world = resolveRoomWorldTransform(item, roomId, objects, furnitureCarryRef?.current);
     const aspect = size.width / Math.max(1, size.height);
     const presented = focused ? inspectionPresentation({ ...item, position: world.position, rotation: world.rotation }, aspect) : null;
-    const restScale = item.scale * (held ? HELD_SCALE : 1);
+    const restScale = (focused ? item.scale : world.fittedScale) * (held ? HELD_SCALE : 1);
     targetPos.set(
       presented?.position.x ?? world.position.x,
       presented?.position.y ?? world.position.y,
@@ -428,11 +433,11 @@ function RoomObject({
     ref={group}
     position={[restWorld.position.x, restWorld.position.y, restWorld.position.z]}
     rotation={[restWorld.rotation.x, restWorld.rotation.y, restWorld.rotation.z]}
-    scale={item.scale}
+    scale={restWorld.fittedScale}
     onPointerDown={(event) => {
       if (!interactive) return;
       event.stopPropagation();
-      onPressStart?.(item.holding.id);
+      onPressStart?.(item.holding.id, event.pointerId);
     }}
     onPointerUp={(event) => {
       if (!interactive) return;

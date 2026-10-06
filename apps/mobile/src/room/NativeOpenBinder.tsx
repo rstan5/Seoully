@@ -153,12 +153,14 @@ export function NativeOpenBinder({
 }
 
 /** Recognizable inactive portal: two covers, layered sheets, spine and three rings. */
+export const RESTING_COVER_YAW = Math.PI / 2 - Math.PI / 45; // 8° total opening; reading leaves stay independent.
+
 export function StandingBinder({ cover, paper }: { cover: string; paper: string }) {
   return <group>
     <mesh position={[0,-0.635,0]}><boxGeometry args={[0.16,0.03,0.16]} /><meshStandardMaterial color={cover} roughness={0.6} /></mesh>
-    <group position={[0,-0.62,0]} rotation={[-0.16,0,0]}>
+    <group position={[0,-0.62,-0.39]} rotation={[-0.16,0,0]}>
       <mesh position={[0,0.62,0]}><boxGeometry args={[0.13,1.24,0.1]} /><meshStandardMaterial color={cover} roughness={0.62} /></mesh>
-      {[-1,1].map(side=><group key={side} position={[side*0.065,0,0]} rotation={[0,side===-1?0.38:-0.38,0]}>
+      {[-1,1].map(side=><group key={side} position={[side*0.065,0,0]} rotation={[0,side===-1?RESTING_COVER_YAW:-RESTING_COVER_YAW,0]}>
         <mesh position={[side*0.49,0.62,-0.035]}><boxGeometry args={[0.98,1.24,0.055]} /><meshStandardMaterial color={cover} roughness={0.64} /></mesh>
         {[0,1,2,3].map(sheet=><mesh key={sheet} position={[side*0.48,0.62,0.004+sheet*0.013]}><boxGeometry args={[0.92-sheet*0.008,1.16,0.009]} /><meshStandardMaterial color={paper} roughness={0.88} /></mesh>)}
         <mesh position={[side*0.48,0.62,0.055]}><boxGeometry args={[0.82,1.05,0.004]} /><meshStandardMaterial color={paper} roughness={0.9} /></mesh>

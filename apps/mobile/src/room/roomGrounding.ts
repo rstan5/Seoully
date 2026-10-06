@@ -20,6 +20,10 @@ export function furnitureGroundY(kind: RoomObjectKind) {
 export const CHAIR_SEAT_TOP = 0.15;
 
 /** Interior boards only; the existing frame roof supplies the fourth/crown landing surface. */
+export const SHELF_BOARD_THICKNESS = 0.04;
+export const CASE_BOARD_THICKNESS = 0.035;
+export const SHELF_ROOF_THICKNESS = 0.055;
+export const CASE_ROOF_THICKNESS = 0.05;
 export const SHELF_BOARD_Y = [-0.9, 0, 0.9] as const;
 export const CASE_BOARD_Y = [-0.93, 0, 0.98] as const;
 export const SHELF_ROOF_TOP = 1.5675;

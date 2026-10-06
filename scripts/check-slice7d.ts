@@ -285,3 +285,5 @@ import "./check-room-interaction-polish";
 import "./check-room-builder-completeness";
 
 import "./check-room-content";
+
+import "./check-room-physical-repair";

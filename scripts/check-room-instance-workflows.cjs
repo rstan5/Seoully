@@ -69,3 +69,5 @@ const actions=sandbox.exports;
  let notice; sandbox.showToast=value=>notice=value;sandbox.copy.roomBinderNeedsDesk='Binder needs Desk';sandbox.selectedObjectId='anchor-b';const historyCount=sandbox.undoStack.current.length;await actions.removeSelectedObject();assert.equal(notice,'Binder needs Desk');assert.equal(sandbox.undoStack.current.length,historyCount);assert.ok(sandbox.latestObjects.current.some(o=>o.id==='anchor-b'));assert.equal(sandbox.spreads,contents);
  console.log('Completeness real screen Add/Turn/Remove/Undo/Redo/selected-Desk workflows, actual API schema and 150-card public allowlist passed');
 })().catch(error=>{console.error(error);process.exitCode=1});
+
+require("./check-room-touch-state.cjs");

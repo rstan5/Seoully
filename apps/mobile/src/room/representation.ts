@@ -109,7 +109,15 @@ export function boundsForGeometry(geometry: NativeRepresentationKind) {
   if (geometry === "lightstick") { minY = -0.37; maxY = 0.4; }
   if (geometry === "plushie") { minY = -0.26; maxY = 0.36; }
   if (geometry === "figure") { minY = -0.38; maxY = 0.4; }
-  return { minX: -size.x / 2, maxX: size.x / 2, minY, maxY, minZ: -size.z / 2, maxZ: size.z / 2 };
+  let minX = -size.x / 2, maxX = size.x / 2, minZ = -size.z / 2, maxZ = size.z / 2;
+  if (geometry === "lightstick") { minX = minZ = -0.14; maxX = maxZ = 0.14; }
+  if (geometry === "plushie") { minZ = -0.26; maxZ = 0.26; }
+  if (geometry === "photocard") { minX -= 0.006; maxX += 0.006; minZ = -0.011; maxZ = 0.014; }
+  if (geometry === "book") maxZ += 0.009;
+  if (geometry === "album" || geometry === "disc-case") maxZ += 0.002;
+  if (geometry === "ticket" || geometry === "memorabilia") { minX -= 0.006; maxX += 0.006; minZ -= 0.006; maxZ += 0.006; }
+  if (geometry === "vinyl") maxY = Math.max(maxY, 0.08 + size.x * 0.42);
+  return { minX, maxX, minY, maxY, minZ, maxZ };
 }
 /** XYZ Euler rotated/scaled bounds, shared by preview, settle and live world contact. */
 export function visibleLowerBound(geometry: NativeRepresentationKind, scale: number, rotation: { x: number; y: number; z: number }) {

@@ -1,3 +1,5 @@
+import { surfaceFitScale, rotatedRepresentationSize } from "./surfaceFit";
+import { composeParentYaw } from "./roomWorldTransform";
 import type { NativeHolding, NativeRoomPlacement } from "../api";
 import { visibleLowerBound, extentsForGeometry, representationForHolding, representationKindForHolding, type NativeRepresentationKind } from "./representation";
 import { FLOOR_Y, CONTACT_EPSILON, groundedOrigin } from "./roomGrounding";
@@ -6,7 +8,7 @@ import { BACK_WALL } from "./envelope";
 import { layoutX, layoutZ, ROOM_LAYOUT } from "./roomLayout";
 
 export type NativeRoomVector = { x: number; y: number; z: number };
-export type NativeRoomSurface = { id: string; kind: "horizontal" | "wall"; x: number; y: number; z: number; width: number; depth: number; rotateY?: number; reserved?: { halfX: number; halfZ: number } };
+export type NativeRoomSurface = { id: string; kind: "horizontal" | "wall"; x: number; y: number; z: number; width: number; depth: number; clearanceHeight?: number; rotateY?: number; reserved?: { halfX: number; halfZ: number } };
 export type RoomRenderable = {
   holding: NativeHolding;
   position: NativeRoomVector;
@@ -171,13 +173,16 @@ export function settleRoomRenderable(renderable: RoomRenderable, roomId: string,
   const surface = preferred ?? surfaces
     .map((candidate) => ({ candidate, distance: footprintDistance(renderable.position, candidate) }))
     .sort((a, b) => a.distance - b.distance)[0]?.candidate ?? all.find((item) => item.id.endsWith("-floor")) ?? all[0];
-  const lowerBound = visibleLowerBound(renderable.geometry, renderable.scale, renderable.rotation);
+  const localRotation = composeParentYaw(renderable.rotation, -(surface.rotateY ?? 0));
+  const fittedScale = surfaceFitScale(renderable.geometry, renderable.scale, localRotation, surface);
+  const fittedSize = rotatedRepresentationSize(renderable.geometry, localRotation);
+  const lowerBound = visibleLowerBound(renderable.geometry, fittedScale, renderable.rotation);
   return {
     renderable: {
       ...renderable,
       position: surface.kind === "wall"
         ? clampToSurface(renderable.position, surface, extentsForGeometry(renderable.geometry).x * renderable.scale / 2, extentsForGeometry(renderable.geometry).y * renderable.scale / 2, 0)
-        : clampToSurface({ ...renderable.position, y: groundedOrigin(surface.y, lowerBound, CONTACT_EPSILON) }, surface, extentsForGeometry(renderable.geometry).x * renderable.scale / 2, 0, extentsForGeometry(renderable.geometry).z * renderable.scale / 2),
+        : clampToSurface({ ...renderable.position, y: groundedOrigin(surface.y, lowerBound, CONTACT_EPSILON) }, surface, fittedSize.x * fittedScale / 2, 0, fittedSize.z * fittedScale / 2),
     },
     surfaceId: surface.id,
   };

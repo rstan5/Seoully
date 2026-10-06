@@ -5,7 +5,7 @@ import type { NativeRoomSurface, NativeRoomVector } from "./model";
 
 /** Basic V1 Room Shop catalog — one canonical version of each object. */
 import { ROOM_OBJECT_KINDS, validPhotoStringConfig, type PhotoStringConfig, type RoomObjectKind, type RoomYaw, ROOM_TURN_DEGREES, normalizeRoomYaw, ROOM_CARRIER_SURFACES, validRoomObjectRelationships, type RoomObjectParent } from "seoully-domain/room-object-schema";
-import { furnitureGroundY, DESK_TABLETOP_TOP, CHAIR_SEAT_TOP, SHELF_ROOF_TOP, CASE_ROOF_TOP } from "./roomGrounding";
+import { SHELF_BOARD_THICKNESS, CASE_BOARD_THICKNESS, SHELF_ROOF_THICKNESS, CASE_ROOF_THICKNESS, SHELF_BOARD_Y, CASE_BOARD_Y, furnitureGroundY, DESK_TABLETOP_TOP, CHAIR_SEAT_TOP, SHELF_ROOF_TOP, CASE_ROOF_TOP } from "./roomGrounding";
 export { ROOM_OBJECT_KINDS } from "seoully-domain/room-object-schema";
 export type { RoomObjectKind } from "seoully-domain/room-object-schema";
 export function isWallObject(kind: RoomObjectKind) { return kind === "wall-frame" || kind === "photo-string"; }
@@ -98,14 +98,15 @@ type SurfaceLocal = {
   lz: number;
   width: number;
   depth: number;
+  clearanceHeight?: number;
 };
 
 const SURFACE_LOCAL: Record<"shelf" | "desk" | "case" | "chair" | "archive", SurfaceLocal[]> = {
   shelf: [
-    { suffix: "shelf-bay-0", kind: "horizontal", lx: 0, ly: -0.88, lz: 0.12, width: 2.04, depth: 0.62 },
-    { suffix: "shelf-bay-1", kind: "horizontal", lx: 0, ly: 0.02, lz: 0.12, width: 2.04, depth: 0.62 },
+    { suffix: "shelf-bay-0", kind: "horizontal", lx: 0, ly: -0.88, lz: 0.12, width: 2.04, depth: 0.62, clearanceHeight: SHELF_BOARD_Y[1] - SHELF_BOARD_THICKNESS / 2 - (-0.88) },
+    { suffix: "shelf-bay-1", kind: "horizontal", lx: 0, ly: 0.02, lz: 0.12, width: 2.04, depth: 0.62, clearanceHeight: SHELF_BOARD_Y[2] - SHELF_BOARD_THICKNESS / 2 - 0.02 },
     { suffix: "shelf-bay-3", kind: "horizontal", lx: 0, ly: SHELF_ROOF_TOP, lz: 0.08, width: 2.04, depth: 0.62 },
-    { suffix: "shelf-bay-2", kind: "horizontal", lx: 0, ly: 0.92, lz: 0.12, width: 2.04, depth: 0.62 },
+    { suffix: "shelf-bay-2", kind: "horizontal", lx: 0, ly: 0.92, lz: 0.12, width: 2.04, depth: 0.62, clearanceHeight: SHELF_ROOF_TOP - SHELF_ROOF_THICKNESS - 0.92 },
   ],
   chair: [{ suffix: "chair-seat", kind: "horizontal", lx: 0, ly: CHAIR_SEAT_TOP, lz: 0.06, width: 0.84, depth: 0.76 }],
   desk: [
@@ -113,10 +114,10 @@ const SURFACE_LOCAL: Record<"shelf" | "desk" | "case" | "chair" | "archive", Sur
     { suffix: "binder", kind: "horizontal", lx: layoutX(-1), ly: DESK_TABLETOP_TOP, lz: layoutZ(0.15), width: 0.95, depth: 0.72 },
   ],
   case: [
-    { suffix: "display-case-shelf", kind: "horizontal", lx: 0, ly: 0.0175, lz: 0.16, width: 1.36, depth: 0.56 },
-    { suffix: "display-case-lower", kind: "horizontal", lx: 0, ly: -0.9125, lz: 0.16, width: 1.36, depth: 0.56 },
+    { suffix: "display-case-shelf", kind: "horizontal", lx: 0, ly: 0.0175, lz: 0.16, width: 1.36, depth: 0.56, clearanceHeight: CASE_BOARD_Y[2] - CASE_BOARD_THICKNESS / 2 - 0.0175 },
+    { suffix: "display-case-lower", kind: "horizontal", lx: 0, ly: -0.9125, lz: 0.16, width: 1.36, depth: 0.56, clearanceHeight: CASE_BOARD_Y[1] - CASE_BOARD_THICKNESS / 2 - (-0.9125) },
     { suffix: "display-case-crown", kind: "horizontal", lx: 0, ly: CASE_ROOF_TOP, lz: 0.14, width: 1.36, depth: 0.56 },
-    { suffix: "display-case-top", kind: "horizontal", lx: 0, ly: 0.9975, lz: 0.16, width: 1.36, depth: 0.56 },
+    { suffix: "display-case-top", kind: "horizontal", lx: 0, ly: 0.9975, lz: 0.16, width: 1.36, depth: 0.56, clearanceHeight: CASE_ROOF_TOP - CASE_ROOF_THICKNESS - 0.9975 },
   ],
   archive: [
     { suffix: "archive", kind: "horizontal", lx: 0, ly: 0.365, lz: 0.03, width: 1.64, depth: 1.04 },
@@ -412,6 +413,7 @@ export function applyObjectSurfaces(roomId: string, defaults: NativeRoomSurface[
         rotateY: object.rotateY,
         width: local.width,
         depth: local.depth,
+        ...(local.clearanceHeight !== undefined ? { clearanceHeight: local.clearanceHeight } : {}),
         ...(object.binderDesk && local.suffix === "desk" ? { reserved: { halfX: 0.66, halfZ: 0.42 } } : {}),
       });
     }

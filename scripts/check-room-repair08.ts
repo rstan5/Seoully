@@ -1,3 +1,4 @@
+import { surfaceFitScale } from "../apps/mobile/src/room/surfaceFit";
 import { roomOverlayChrome, roomChromeSurface } from "../apps/mobile/src/room/theme";
 import { ROOM_WALL_IDS, ROOM_FURNITURE_IDS, ROOM_LIGHT_IDS, ROOM_BRIGHTNESS_IDS, parseRoomStyle, resolveRoomLook } from "../apps/mobile/src/room/roomStyle";
 import { contrastRatio, mixHex } from "../apps/mobile/src/ui/profileContrast";
@@ -56,7 +57,7 @@ for (const form of normal) {
     assert.ok(surface && surfaceAcceptsGeometry(surface, form), `${form} on ${suffix}`);
     const item = { geometry: form, scale: 1.2, rotation: { x: 0, y: 0.4, z: 0 }, position: { x: surface.x, y: 100, z: surface.z }, placement: { surfaceId: surface.id } } as RoomRenderable;
     const settled = settleRoomRenderable(item, roomId, surface.id, objects).renderable;
-    assert.ok(Math.abs(settled.position.y + visibleLowerBound(form, item.scale, item.rotation) - surface.y - 0.002) < 1e-9, `${form}/${suffix} contact`);
+    assert.ok(Math.abs(settled.position.y + visibleLowerBound(form, surfaceFitScale(form, item.scale, item.rotation, surface), item.rotation) - surface.y - 0.002) < 1e-9, `${form}/${suffix} contact`);
   }
   assert.equal(surfaceAcceptsGeometry(surfaces.find((s) => s.kind === "wall")!, form), false, `${form} direct-wall rejection`);
 }

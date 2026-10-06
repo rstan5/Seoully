@@ -53,7 +53,7 @@ for (const kind of CARRIER_ROOM_OBJECT_KINDS) {
     near(world.position.x,turned.x+expected[0]); near(world.position.z,turned.z+expected[1]);
     near(world.rotation.y,authored.rotation.y+angle*Math.PI/180);
     const landing = nativeRoomSurfaces(roomId,[turned]).find((s)=>s.id===surfaceId)!;
-    near(world.position.y+visibleLowerBound("album",1,world.rotation),landing.y+0.002);
+    near(world.position.y+visibleLowerBound("album",world.fittedScale,world.rotation),landing.y+0.002);
     assert.equal(landing.rotateY,angle);
     const hitPoint=surfaceWorldPoint({x:0.1,y:0,z:0.05},landing);
     assert.equal(intersectSurface({origin:{...hitPoint,y:hitPoint.y+2},dir:{x:0,y:-1,z:0}},landing)?.inBounds,true);

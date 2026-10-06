@@ -137,7 +137,7 @@ export function ContactShadow({
   depth: number;
   opacity?: number;
 }) {
-  return <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]} renderOrder={-1}>
+  return <mesh raycast={() => {}} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]} renderOrder={-1}>
     <planeGeometry args={[width, depth]} />
     <meshBasicMaterial color="#1a1214" transparent opacity={opacity} depthWrite={false} />
   </mesh>;

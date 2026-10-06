@@ -1,8 +1,4 @@
--- Native Room V2: durable, owner-scoped visual theme preset.
-
-alter table public.rooms
-  add column if not exists theme_id text not null default 'hearth'
-  check (theme_id in ('hearth', 'blossom', 'midnight'));
-
-comment on column public.rooms.theme_id is
-  'Validated visual preset shared by native Room renderers; writable only through existing owner RLS.';
+-- Intentionally superseded UNAPPLIED migration: preserve version/order as a no-op.
+-- 20261003 persists curated Room Style; the current DAL never reads/writes theme_id.
+-- Do not add or remove any column here. No rollback of any deployed schema is intended.
+select 1;

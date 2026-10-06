@@ -1,6 +1,8 @@
 import "server-only";
+import { signPublicRoomMedia } from "./public-room-media";
+import { nativeRoomStyleFromRow } from "./room-schema";
 import { listActiveCatalogReferenceImages } from "@/server/dal/catalog-reference-images";
-import { publicPhotoStringVisuals, publicVisualRoomLayout, type PublicPhotoStringVisual } from "@/domain/public-room-layout";
+import { publicPhotoStringVisuals, publicVisualRoomLayout, publicRoomVisualTransform, publicRoomTemplate, type PublicPhotoStringVisual } from "@/domain/public-room-layout";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -37,6 +39,7 @@ export async function getPublicRoomByHandle(input: unknown, client?: SupabaseCli
   const viewerUserId = client
     ? (await supabase.auth.getUser()).data.user?.id
     : (await getCurrentIdentity().catch(() => null))?.user.id;
+  if (!viewerUserId) throw new Error("unauthenticated");
   const { data, error } = await supabase.rpc("get_public_room_by_handle", { p_handle: handle });
   if (error) throw new Error("public_room_read_failed");
   if (!data || typeof data !== "object") return null;
@@ -45,37 +48,37 @@ export async function getPublicRoomByHandle(input: unknown, client?: SupabaseCli
   if (!owner || typeof owner.userId !== "string" || typeof owner.handle !== "string") return null;
   const privateRoom = raw.private === true;
   const roomRaw = raw.room as Record<string, unknown> | null;
-  if (privateRoom || !roomRaw) return {
+  if (privateRoom || !roomRaw || typeof roomRaw.id !== "string" || !z.string().uuid().safeParse(roomRaw.id).success) return {
     owner: { userId: owner.userId, handle: owner.handle, displayName: String(owner.displayName ?? owner.handle) },
     room: null,
-    private: true,
+    private: privateRoom,
     ...(viewerUserId ? { viewerUserId } : {}),
   };
   const rows = Array.isArray(roomRaw.placements) ? roomRaw.placements : [];
+  const mediaIds = rows.slice(0, 500).flatMap((value) => {
+    if (!isRecord(value) || typeof value.id !== "string" || !z.string().uuid().safeParse(value.id).success || !isRecord(value.holding)) return [];
+    return value.holding.hasPersonalMedia === true ? [value.id] : [];
+  });
+  const signedMedia = await signPublicRoomMedia(supabase, roomRaw.id, mediaIds);
   const placements: PublicRoomPlacement[] = [];
   for (const value of rows.slice(0, 500)) {
-    const row = value as Record<string, unknown>;
+    if (!isRecord(value)) continue;
+    const row = value;
     const holding = row.holding as Record<string, unknown> | null;
     const template = holding?.template as Record<string, unknown> | null;
     if (!holding || !template || typeof row.id !== "string" || typeof holding.templateId !== "string") continue;
-    const mediaPath = typeof holding.mediaPath === "string" ? holding.mediaPath : null;
-    const mediaBucket = typeof holding.mediaBucket === "string" ? holding.mediaBucket : null;
-    let personalMediaUrl: string | undefined;
-    if (mediaPath && mediaBucket) {
-      const signed = await supabase.storage.from(mediaBucket).createSignedUrl(mediaPath, 300);
-      if (signed.data?.signedUrl) personalMediaUrl = signed.data.signedUrl;
-    }
+    const personalMediaUrl = signedMedia.get(row.id);
     placements.push({
       id: row.id,
       zoneId: String(row.zoneId ?? ""),
       slot: Number(row.slot ?? 0),
-      offset: isRecord(row.offset) ? row.offset as Record<string, number> : null,
-      transform: isRecord(row.transform) ? row.transform as Record<string, number> : null,
+      offset: publicRoomVisualTransform(row.offset),
+      transform: publicRoomVisualTransform(row.transform),
       surfaceId: typeof row.surfaceId === "string" ? row.surfaceId : null,
       holding: {
         templateId: holding.templateId,
         tradeStatus: String(holding.tradeStatus ?? "not-for-trade"),
-        template,
+        template: publicRoomTemplate(template),
         ...(personalMediaUrl ? { personalMediaUrl } : {}),
       },
     });
@@ -92,9 +95,9 @@ export async function getPublicRoomByHandle(input: unknown, client?: SupabaseCli
   return {
     owner: { userId: owner.userId, handle: owner.handle, displayName: String(owner.displayName ?? owner.handle) },
     room: {
-      id: String(roomRaw.id),
+      id: roomRaw.id,
       placements,
-      ...(isRecord(roomRaw.style) ? { style: roomRaw.style } : {}),
+      ...(isRecord(roomRaw.style) ? { style: nativeRoomStyleFromRow({ style: roomRaw.style }) } : {}),
       ...(isRecord(roomRaw.layout) ? { layout: publicVisualRoomLayout(roomRaw.layout) } : {}),
       photoStringCards,
     },

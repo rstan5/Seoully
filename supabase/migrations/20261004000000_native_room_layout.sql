@@ -1,3 +1,5 @@
+-- Ordered once-only migration; apply via the Supabase transactional migration runner.
+-- No explicit transaction control: preserve atomic statement/history batching.
 -- Slice 7D Repair 04: basic Room object instances + first-room-edit completion.
 -- Empty {} is legacy furnished Room with first Room edit already complete.
 -- New rooms insert an authored starter document (Shelf + Lamp + Desk/Binder).
@@ -11,25 +13,32 @@ comment on column public.rooms.layout is
 
 -- Repair 08: amended BEFORE application. No ownership or media is stored here.
 create or replace function public.room_layout_is_valid(p jsonb)
-returns boolean language plpgsql immutable set search_path = pg_catalog as $$
-declare obj jsonb; config jsonb; slots jsonb; slot jsonb; ids text[]; parent_obj jsonb; parent_ref jsonb; object_ids text[] := array[]::text[];
+returns boolean language plpgsql immutable security invoker set search_path = pg_catalog as $$
+declare k text; obj jsonb; config jsonb; slots jsonb; slot jsonb; ids text[]; parent_obj jsonb; parent_ref jsonb; object_ids text[] := array[]::text[];
 begin
   if jsonb_typeof(p) is distinct from 'object' then return false; end if;
   if p = '{}'::jsonb then return true; end if;
   if p->'version' is distinct from '1'::jsonb
     or jsonb_typeof(p->'objects') is distinct from 'array'
-    or coalesce(p->>'firstRoomEditCompleted', 'false') not in ('true', 'false')
-    or p ?| array['price','sku','currency','purchase'] then return false; end if;
+    or jsonb_typeof(p->'firstRoomEditCompleted') is distinct from 'boolean'
+    or p - array['version','objects','firstRoomEditCompleted'] <> '{}'::jsonb then return false; end if;
   if (select count(*) from jsonb_array_elements(p->'objects') o where o->'binderDesk' = 'true'::jsonb) > 1 then return false; end if;
   for obj in select value from jsonb_array_elements(p->'objects') loop
-    if jsonb_typeof(obj) is distinct from 'object'
+    if jsonb_typeof(obj) is distinct from 'object' then return false; end if;
+    if obj - array['id','kind','x','y','z','rotateY','parent','binderDesk','photoString'] <> '{}'::jsonb
       or coalesce(btrim(obj->>'id'), '') = ''
       or obj->>'id' <> btrim(obj->>'id')
       or coalesce(obj->>'kind', '') not in ('shelf', 'desk', 'case', 'chair', 'lamp', 'table-lamp', 'plant', 'large-plant', 'rug', 'archive', 'wall-frame', 'photo-string')
       or jsonb_typeof(obj->'id') is distinct from 'string'
       or char_length(obj->>'id') > 80
       or (obj->>'id') = any(object_ids)
-      or coalesce(obj->>'rotateY', '0') not in ('0','30','60','90','120','150','180','210','240','270','300','330') then return false; end if;
+      or jsonb_typeof(obj->'kind') is distinct from 'string'
+      or jsonb_typeof(obj->'rotateY') is distinct from 'number' then return false; end if;
+    if (obj->>'rotateY')::numeric not in (0,30,60,90,120,150,180,210,240,270,300,330) then return false; end if;
+    foreach k in array array['x','y','z'] loop
+      if jsonb_typeof(obj->k) is distinct from 'number' then return false; end if;
+      if (obj->>k)::numeric not between -20 and 20 then return false; end if;
+    end loop;
     object_ids := array_append(object_ids, obj->>'id');
     if obj ? 'binderDesk' and (obj->>'kind' <> 'desk' or obj->'binderDesk' is distinct from 'true'::jsonb) then return false; end if;
     if obj ? 'parent' then
@@ -71,7 +80,7 @@ $$;
 
 -- Existing owner RLS remains authoritative. Also guards direct REST layout writes.
 create or replace function public.validate_room_photo_string_holdings()
-returns trigger language plpgsql set search_path = public, pg_catalog as $$
+returns trigger language plpgsql security invoker set search_path = pg_catalog, public as $$
 declare obj jsonb; slot jsonb;
 begin
   if not public.room_layout_is_valid(new.layout) then
@@ -96,15 +105,27 @@ for each row execute function public.validate_room_photo_string_holdings();
 
 -- Public geometry allowlist. Never return owner Holding IDs/configuration wholesale.
 create or replace function public.public_room_visual_layout(p jsonb)
-returns jsonb language sql immutable set search_path = pg_catalog as $$
-  select case when p = '{}'::jsonb then p else jsonb_build_object(
+returns jsonb language sql immutable security invoker set search_path = pg_catalog as $$
+  select case when p = '{}'::jsonb or not public.room_layout_is_valid(p) then '{}'::jsonb else jsonb_build_object(
     'version', 1, 'firstRoomEditCompleted', true,
     'objects', coalesce((select jsonb_agg(jsonb_build_object(
       'id', obj->'id', 'kind', obj->'kind', 'x', obj->'x', 'y', obj->'y', 'z', obj->'z', 'rotateY', obj->'rotateY'
     ) || case when obj ? 'binderDesk' then jsonb_build_object('binderDesk', obj->'binderDesk') else '{}'::jsonb end
-      || case when jsonb_typeof(obj->'parent'->'objectId') = 'string' and jsonb_typeof(obj->'parent'->'surfaceId') = 'string' then jsonb_build_object('parent', jsonb_build_object('objectId', obj->'parent'->'objectId', 'surfaceId', obj->'parent'->'surfaceId')) else '{}'::jsonb end) from jsonb_array_elements(coalesce(p->'objects', '[]'::jsonb)) obj), '[]'::jsonb)
+      || case when jsonb_typeof(obj->'parent'->'objectId') = 'string' and jsonb_typeof(obj->'parent'->'surfaceId') = 'string' then jsonb_build_object('parent', jsonb_build_object('objectId', obj->'parent'->'objectId', 'surfaceId', obj->'parent'->'surfaceId')) else '{}'::jsonb end order by ordinal) from jsonb_array_elements(coalesce(p->'objects', '[]'::jsonb)) with ordinality entry(obj, ordinal)), '[]'::jsonb)
   ) end;
 $$;
+
+-- Safe UUID conversion used by public projection, including uppercase UUID input.
+create or replace function public.room_holding_uuid(p text)
+returns uuid language plpgsql immutable strict security invoker set search_path = pg_catalog as $$
+begin
+  if p !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then return null; end if;
+  return p::uuid;
+end;
+$$;
+revoke all on function public.room_layout_is_valid(jsonb), public.public_room_visual_layout(jsonb), public.room_holding_uuid(text) from public, anon, authenticated;
+grant execute on function public.room_layout_is_valid(jsonb), public.public_room_visual_layout(jsonb), public.room_holding_uuid(text) to authenticated, service_role;
+revoke all on function public.validate_room_photo_string_holdings() from public, anon, authenticated, service_role;
 
 alter table public.rooms drop constraint if exists rooms_layout_valid;
 alter table public.rooms add constraint rooms_layout_valid check (public.room_layout_is_valid(layout));
@@ -113,7 +134,7 @@ create or replace function public.get_public_room_by_handle(p_handle text)
 returns jsonb
 language sql
 security definer
-set search_path = public
+set search_path = pg_catalog, public
 stable
 as $$
   select case when p.user_id is null then null else jsonb_build_object(
@@ -122,9 +143,9 @@ as $$
       'handle', p.handle,
       'displayName', p.display_name
     ),
-    'room', case when p.collection_public then jsonb_build_object(
+    'room', case when p.collection_public and r.id is not null then jsonb_build_object(
       'id', r.id,
-      'style', coalesce(r.style, '{"wall":"plum","floor":"walnut","furniture":"walnut","rug":"rose","light":"warm","brightness":"normal","binder":"cream"}'::jsonb),
+      'style', public.public_room_visual_style(r.style),
        'layout', public.public_room_visual_layout(coalesce(r.layout, '{}'::jsonb)),
       -- Safe catalog identity only. Personal crops/storage paths are intentionally absent.
       'photoStringCards', coalesce((
@@ -137,7 +158,7 @@ as $$
         ))
         from jsonb_array_elements(coalesce(r.layout->'objects', '[]'::jsonb)) obj
         cross join lateral jsonb_array_elements(coalesce(obj->'photoString'->'slots', '[]'::jsonb)) with ordinality chosen(value, ordinality)
-        join public.holdings h on h.id::text = (chosen.value #>> '{}') and h.owner_user_id = p.user_id
+        join public.holdings h on h.id = public.room_holding_uuid(chosen.value #>> '{}') and h.owner_user_id = p.user_id
         join public.collectible_templates ct on ct.id = h.template_id and ct.kind = 'photocard' and ct.status <> 'restricted'
         where obj->>'kind' = 'photo-string'
       ), '[]'::jsonb),
@@ -146,8 +167,8 @@ as $$
           'id', rp.id,
           'zoneId', rp.zone_id,
           'slot', rp.slot,
-          'offset', rp.spatial_offset,
-          'transform', rp.transform,
+          'offset', public.public_room_visual_transform(rp.spatial_offset),
+          'transform', public.public_room_visual_transform(rp.transform),
           'surfaceId', rp.surface_id,
           'holding', jsonb_build_object(
             'templateId', h.template_id,
@@ -164,25 +185,32 @@ as $$
               'releaseId', ct.release_id,
               'releaseName', cr.title
             ),
-            'mediaPath', ma.storage_path,
-            'mediaBucket', ma.storage_bucket
+            'hasPersonalMedia', ma.id is not null
           )
         ) order by rp.updated_at desc, rp.id)
-        from public.room_placements rp
+        from (
+          select placed.* from public.room_placements placed
+          join public.holdings owned on owned.id = placed.holding_id and owned.owner_user_id = p.user_id
+          join public.collectible_templates visible on visible.id = owned.template_id and visible.status <> 'restricted'
+          where placed.room_id = r.id
+          order by placed.updated_at desc, placed.id limit 500
+        ) rp
         join public.holdings h on h.id = rp.holding_id and h.owner_user_id = p.user_id
         join public.collectible_templates ct on ct.id = h.template_id and ct.status <> 'restricted'
-        left join public.catalog_groups cg on cg.id = ct.group_id
-        left join public.catalog_members cm on cm.id = ct.member_id
-        left join public.catalog_releases cr on cr.id = ct.release_id
-        left join public.media_assets ma on ma.holding_id = h.id
+        left join public.catalog_groups cg on cg.id = ct.group_id and cg.status <> 'restricted'
+        left join public.catalog_members cm on cm.id = ct.member_id and cm.status <> 'restricted'
+        left join public.catalog_releases cr on cr.id = ct.release_id and cr.status <> 'restricted'
+        left join public.media_assets ma on ma.holding_id = h.id and ma.owner_user_id = p.user_id and ma.storage_bucket = 'collectible-media'
         where rp.room_id = r.id
-        limit 500
       ), '[]'::jsonb)
     ) else null end,
     'private', not p.collection_public
   ) end
   from public.profiles p
   left join public.rooms r on r.owner_user_id = p.user_id
-  where p.handle = lower(trim(both '@' from p_handle))
+  where p.handle = lower(trim(both '@' from p_handle)) and auth.uid() is not null
   limit 1;
 $$;
+
+revoke all on function public.get_public_room_by_handle(text) from public, anon, authenticated, service_role;
+grant execute on function public.get_public_room_by_handle(text) to authenticated;

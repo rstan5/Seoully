@@ -57,7 +57,7 @@ const roomLayoutSchema = z.object({
       rotateY: z.number().refine((value) => (ROOM_YAWS as readonly number[]).includes(value), "room_yaw_invalid"),
       parent: z.object({ objectId: z.string().min(1).max(80), surfaceId: z.string().min(1).max(80) }).strict().optional(),
       binderDesk: z.literal(true).optional(),
-      photoString: z.object({ slots: z.array(uuid.nullable()).length(5) }).strict().optional(),
+      photoString: z.object({ slots: z.array(uuid.transform((id) => id.toLowerCase()).nullable()).length(5) }).strict().optional(),
     }).strict().refine((obj) => !obj.photoString || (obj.kind === "photo-string" && validPhotoStringConfig(obj.photoString)), "photo_string_invalid")).refine((objects) => new Set(objects.map((object) => object.id)).size === objects.length, "room_object_id_duplicate").refine(validRoomObjectRelationships, "room_object_parent_invalid"),
   }).strict(),
 }).strict();

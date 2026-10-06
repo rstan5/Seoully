@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false
+  },
+  "include": [
+    "src/server/dal/public-room.ts",
+    "src/server/dal/public-room-media.ts",
+    "src/server/dal/rooms.ts",
+    "src/domain/public-room-layout.ts"
+  ],
+  "exclude": ["node_modules", "apps/mobile"]
+}

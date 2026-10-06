@@ -72,6 +72,8 @@ function shopName(copy: MobileCopy, kind: RoomObjectKind) {
   if (kind === "photo-string") return copy.roomObjectPhotoString;
   if (kind === "case") return copy.roomObjectCase;
   if (kind === "lamp") return copy.roomObjectLamp;
+  if (kind === "table-lamp") return copy.roomObjectTableLamp;
+  if (kind === "large-plant") return copy.roomObjectLargePlant;
   if (kind === "plant") return copy.roomObjectPlant;
   if (kind === "rug") return copy.roomObjectRug;
   if (kind === "archive") return copy.roomObjectArchive;

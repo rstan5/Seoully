@@ -6,7 +6,7 @@ import { BACK_WALL } from "./envelope";
 import { layoutX, layoutZ, ROOM_LAYOUT } from "./roomLayout";
 
 export type NativeRoomVector = { x: number; y: number; z: number };
-export type NativeRoomSurface = { id: string; kind: "horizontal" | "wall"; x: number; y: number; z: number; width: number; depth: number; rotateY?: number };
+export type NativeRoomSurface = { id: string; kind: "horizontal" | "wall"; x: number; y: number; z: number; width: number; depth: number; rotateY?: number; reserved?: { halfX: number; halfZ: number } };
 export type RoomRenderable = {
   holding: NativeHolding;
   position: NativeRoomVector;
@@ -177,7 +177,7 @@ export function settleRoomRenderable(renderable: RoomRenderable, roomId: string,
       ...renderable,
       position: surface.kind === "wall"
         ? clampToSurface(renderable.position, surface, extentsForGeometry(renderable.geometry).x * renderable.scale / 2, extentsForGeometry(renderable.geometry).y * renderable.scale / 2, 0)
-        : { ...renderable.position, y: groundedOrigin(surface.y, lowerBound, CONTACT_EPSILON) },
+        : clampToSurface({ ...renderable.position, y: groundedOrigin(surface.y, lowerBound, CONTACT_EPSILON) }, surface, extentsForGeometry(renderable.geometry).x * renderable.scale / 2, 0, extentsForGeometry(renderable.geometry).z * renderable.scale / 2),
     },
     surfaceId: surface.id,
   };
@@ -409,8 +409,8 @@ export function clampToSurface(point: NativeRoomVector, surface: NativeRoomSurfa
   };
   const local = surfaceLocalPoint(point, surface);
   const padX = Math.min(halfX, surface.width / 2 - 0.02), padZ = Math.min(halfZ, surface.depth / 2 - 0.02);
-  return surfaceWorldPoint({ ...local,
-    x: clamp(local.x, -surface.width / 2 + padX, surface.width / 2 - padX),
-    z: clamp(local.z, -surface.depth / 2 + padZ, surface.depth / 2 - padZ),
-  }, surface);
+  let x = clamp(local.x, -surface.width / 2 + padX, surface.width / 2 - padX);
+  const z = clamp(local.z, -surface.depth / 2 + padZ, surface.depth / 2 - padZ);
+  if (surface.reserved && Math.abs(x) < surface.reserved.halfX + padX && Math.abs(z) < surface.reserved.halfZ + padZ) x = (x < 0 ? -1 : 1) * Math.min(surface.width/2-padX, surface.reserved.halfX+padX+0.002);
+  return surfaceWorldPoint({ ...local, x, z }, surface);
 }

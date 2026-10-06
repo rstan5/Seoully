@@ -6,6 +6,7 @@ import { spacing } from "../theme";
 import { chrome } from "../ui/shellLayout";
 import { SeoullyText } from "../ui/SeoullyText";
 import {
+  ROOM_BINDER_IDS,
   ROOM_BRIGHTNESS_IDS,
   ROOM_FLOOR_IDS,
   ROOM_FURNITURE_IDS,
@@ -49,6 +50,7 @@ export function RoomStyleSheet({
           <StyleRow roomChrome={roomChrome} label={copy.styleWall} ids={ROOM_WALL_IDS} selected={style.wall} kind="wall" nameFor={(id) => styleLabel(copy, "wall", id)} onPick={(wall) => onChange({ ...style, wall })} />
           <StyleRow roomChrome={roomChrome} label={copy.styleFloor} ids={ROOM_FLOOR_IDS} selected={style.floor} kind="floor" nameFor={(id) => styleLabel(copy, "floor", id)} onPick={(floor) => onChange({ ...style, floor })} />
           <StyleRow roomChrome={roomChrome} label={copy.styleFurniture} ids={ROOM_FURNITURE_IDS} selected={style.furniture} kind="furniture" nameFor={(id) => styleLabel(copy, "furniture", id)} onPick={(furniture) => onChange({ ...style, furniture })} />
+          <StyleRow roomChrome={roomChrome} label={copy.styleBinder} ids={ROOM_BINDER_IDS} selected={style.binder ?? "cream"} kind="binder" nameFor={(id) => styleLabel(copy, "binder", id)} onPick={(binder) => onChange({ ...style, binder })} />
           <StyleRow roomChrome={roomChrome} label={copy.styleRug} ids={ROOM_RUG_IDS} selected={style.rug} kind="rug" nameFor={(id) => styleLabel(copy, "rug", id)} onPick={(rug) => onChange({ ...style, rug })} />
           <StyleRow roomChrome={roomChrome} label={copy.styleLight} ids={ROOM_LIGHT_IDS} selected={style.light} kind="light" nameFor={(id) => styleLabel(copy, "light", id)} onPick={(light) => onChange({ ...style, light })} />
           <StyleRow roomChrome={roomChrome} label={copy.styleBrightness} ids={ROOM_BRIGHTNESS_IDS} selected={style.brightness} kind="brightness" nameFor={(id) => styleLabel(copy, "brightness", id)} onPick={(brightness) => onChange({ ...style, brightness })} />
@@ -60,6 +62,13 @@ export function RoomStyleSheet({
 
 function styleLabel(copy: MobileCopy, kind: string, id: string) {
   const labels: Record<string, string> = {
+    "binder:cream": copy.styleWallCream,
+    "binder:blush": copy.styleWallBlush,
+    "binder:lavender": copy.styleBinderLavender,
+    "binder:sage": copy.styleWallSage,
+    "binder:sky": copy.styleBinderSky,
+    "binder:cocoa": copy.styleBinderCocoa,
+    "binder:charcoal": copy.styleFloorCharcoal,
     "wall:plum": copy.styleWallPlum,
     "wall:cream": copy.styleWallCream,
     "wall:ink": copy.styleWallInk,

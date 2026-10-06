@@ -1,4 +1,4 @@
-import { furnitureGroundY, DESK_TABLETOP_TOP } from "./roomGrounding";
+import { furnitureGroundY, DESK_TABLETOP_TOP, CLOSED_BINDER_LOWER_BOUND, CLOSED_BINDER_SCALE } from "./roomGrounding";
 import { layoutX, layoutZ, ROOM_LAYOUT } from "./roomLayout";
 import type { CanonicalZoneKind, NativeWorldView } from "./worldView";
 
@@ -50,7 +50,7 @@ export const ZONE_DOCKS: Record<CanonicalZoneKind, CameraPose> = {
   archive: { position: { x: layoutX(-0.52), y: 0.28, z: layoutZ(1.62) }, lookAt: { x: layoutX(-1.2), y: -1.52, z: layoutZ(-0.62) } },
 };
 
-export const DESK_BINDER_AT = { x: layoutX(0.45), y: furnitureGroundY("desk") + DESK_TABLETOP_TOP + 0.04, z: layoutZ(-2.62) };
+export const DESK_BINDER_AT = { x: layoutX(1.45), y: furnitureGroundY("desk") + DESK_TABLETOP_TOP - CLOSED_BINDER_LOWER_BOUND * CLOSED_BINDER_SCALE, z: layoutZ(-2.85) };
 export const OPEN_BINDER_LIFT = { y: 0.52, z: 1.12 };
 
 export function poseForView(

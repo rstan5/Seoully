@@ -1,12 +1,13 @@
 import { CAMERA_FOV_DEG, type CameraPose } from "./camera";
 import {
-  clampRoomObject,
+  clampRoomObject, resolveRoomObjectTransform, attachRoomDecor, detachRoomDecor, surfaceOwner, authoredSurfaceIdFor,
   isWallObject,
   roomObjectInBounds,
   type RoomObjectInstance,
 } from "./roomObjects";
 import type { NativeRoomSurface, NativeRoomVector } from "./model";
-import { screenRay } from "./touchEdit";
+import { nativeRoomSurfaces } from "./model";
+import { screenRay, intersectSurface } from "./touchEdit";
 
 export const OBJECT_HELD_LIFT = 0.1;
 export const WALL_HELD_LIFT = 0.08;
@@ -48,8 +49,26 @@ export function projectRoomObjectOntoWorld(
   height: number,
   pose: CameraPose,
   origin: RoomObjectInstance,
+  objects: RoomObjectInstance[] = [],
+  roomId = "",
 ): { current: RoomObjectInstance; valid: boolean; surfaceKind: NativeRoomSurface["kind"] } | null {
+  const worldOrigin = resolveRoomObjectTransform(origin, objects);
   const ray = screenRay(locX, locY, width, height, pose, CAMERA_FOV_DEG);
+  if (origin.kind === "plant" || origin.kind === "table-lamp" || origin.kind === "large-plant") {
+    const hits = nativeRoomSurfaces(roomId, objects).filter(s => s.kind === "horizontal").flatMap(surface => {
+      const hit = intersectSurface(ray, surface); return hit?.inBounds ? [{ surface, ...hit }] : [];
+    }).sort((a,b) => a.t-b.t);
+    const hit = hits[0];
+    if (!hit) return null;
+    const parent = surfaceOwner(roomId, objects, hit.surface.id);
+    if (origin.kind === "large-plant" && parent) return { current: origin, valid: false, surfaceKind: "horizontal" };
+    const world = { ...worldOrigin, x: hit.point.x, y: hit.point.y, z: hit.point.z };
+    try {
+      const suffix = parent && authoredSurfaceIdFor(roomId,parent,hit.surface.id);
+      const current = parent && suffix ? attachRoomDecor(world,parent,suffix,objects) : detachRoomDecor(world);
+      return { current, valid: parent ? true : roomObjectInBounds({ ...current,x:hit.point.x,z:hit.point.z }), surfaceKind: "horizontal" };
+    } catch { return { current: origin, valid: false, surfaceKind: "horizontal" }; }
+  }
   if (isWallObject(origin.kind)) {
     if (Math.abs(ray.dir.z) < 1e-5) return null;
     const z = origin.z;
@@ -78,7 +97,8 @@ export function objectsMatch(a: RoomObjectInstance, b: RoomObjectInstance) {
     && Math.abs(a.x - b.x) < 0.04
     && Math.abs(a.y - b.y) < 0.04
     && Math.abs(a.z - b.z) < 0.04
-    && a.rotateY === b.rotateY;
+    && a.rotateY === b.rotateY
+    && a.parent?.objectId === b.parent?.objectId && a.parent?.surfaceId === b.parent?.surfaceId;
 }
 
 function along(ray: { origin: NativeRoomVector; dir: NativeRoomVector }, t: number): NativeRoomVector {

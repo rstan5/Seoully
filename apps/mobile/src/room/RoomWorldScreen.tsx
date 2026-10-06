@@ -62,7 +62,7 @@ import {
   spawnRoomObject,
   storageTakeoutFor,
   surfaceOwner,
-  childrenOnInstance,
+  childrenOnInstance, surfacesOwnedBy, authoredSurfaceIdFor, normalizeBinderDesk, primaryBinderDeskId, resolveRoomObjectTransform, removeFurnitureSafely,
   TURNABLE_ROOM_OBJECT_KINDS,
   turnRoomObject,
   type RoomLayoutState,
@@ -124,7 +124,7 @@ export function RoomWorldScreen({
   const [turningSpreadIndex, setTurningSpreadIndex] = useState<number | null>(null);
   const [heldId, setHeldId] = useState<string | null>(null);
   const [placingItem, setPlacingItem] = useState<RoomRenderable | null>(null);
-  const [binderDeskId, setBinderDeskId] = useState<string | null>(null);
+
   const [storageArchiveId, setStorageArchiveId] = useState<string | null>(null);
   const [storageOpen, setStorageOpen] = useState(false);
   const [storageQuery, setStorageQuery] = useState("");
@@ -394,7 +394,7 @@ export function RoomWorldScreen({
           layoutRef.current.width,
           layoutRef.current.height,
           pose,
-          held.origin,
+          held.origin, latestObjects.current, snapshotRef.current?.room.id ?? "",
         );
         if (!candidate) {
           held.valid = false;
@@ -403,12 +403,12 @@ export function RoomWorldScreen({
         }
         held.current = candidate.current;
         held.valid = candidate.valid;
-        objectPreviewRef.current = liftRoomObject(candidate.current, reducedMotionRef.current);
+        objectPreviewRef.current = liftRoomObject(resolveRoomObjectTransform(candidate.current, latestObjects.current), reducedMotionRef.current);
         furnitureCarryRef.current = snapshotRef.current?.room
           ? { roomId: snapshotRef.current.room.id, origin: held.origin, current: candidate.current }
           : null;
         highlightSurfaceIdRef.current = candidate.valid
-          ? (candidate.surfaceKind === "wall" ? `${snapshotRef.current?.room.id ?? ""}-wall` : `${snapshotRef.current?.room.id ?? ""}-floor`)
+          ? (candidate.current.parent ? surfacesOwnedBy(snapshotRef.current?.room.id ?? "", latestObjects.current.find(o => o.id === candidate.current.parent?.objectId)!).find(id => authoredSurfaceIdFor(snapshotRef.current?.room.id ?? "", latestObjects.current.find(o => o.id === candidate.current.parent?.objectId)!, id) === candidate.current.parent?.surfaceId) ?? null : candidate.surfaceKind === "wall" ? `${snapshotRef.current?.room.id ?? ""}-wall` : `${snapshotRef.current?.room.id ?? ""}-floor`)
           : null;
         return;
       }
@@ -625,11 +625,10 @@ export function RoomWorldScreen({
   }
 
   function openBinderFromWorld(holdingId?: string, deskId?: string) {
-    const current = viewRef.current;
-    const originId = deskId ?? (current.kind === "zone" && current.zone === "desk" ? current.objectId : undefined);
-    const desk = originId ? latestObjects.current.find((object) => object.id === originId && object.kind === "desk") : latestObjects.current.find((object) => object.kind === "desk");
+    const originId = primaryBinderDeskId(latestObjects.current);
+    const desk = latestObjects.current.find((object) => object.id === originId && object.kind === "desk");
     if (!desk) return;
-    setBinderDeskId(desk.id);
+
     captureBinderReturn();
     const index = holdingId ? spreadIndexForHolding(spreads, holdingId) : 0;
     setSelectedId(null);
@@ -793,6 +792,7 @@ export function RoomWorldScreen({
   async function persistLayout(next: RoomLayoutState, options?: { silent?: boolean }) {
     const room = snapshotRef.current?.room ?? snapshot?.room;
     if (!room || readOnly) return false;
+    next = { ...next, objects: normalizeBinderDesk(next.objects) };
     const document = serializeRoomLayout(next);
     try {
       if (demo) loadDemoRoom().saveDemoRoomLayout(room.ownerUserId, next);
@@ -951,7 +951,7 @@ export function RoomWorldScreen({
     const beforeLayout = layoutStateRef.current;
     const beforeObjects = cloneRoomObjects(latestObjects.current);
     const draft = spawnRoomObject(beforeObjects, kind);
-    const next = { ...layoutStateRef.current, source: "authored" as const, objects: [...beforeObjects, draft] };
+    const next = { ...layoutStateRef.current, source: "authored" as const, objects: normalizeBinderDesk([...beforeObjects, draft]) };
     // Render the grounded starter immediately; pointer movement is a separate Move action.
     latestObjects.current = next.objects;
     setRoomLayout(next);
@@ -1031,7 +1031,8 @@ export function RoomWorldScreen({
     const target = current.find((item) => item.id === selectedObjectId);
     const room = snapshotRef.current?.room;
     if (!target || !room) return;
-    const next = removeRoomObject(current, selectedObjectId);
+    let next: RoomObjectInstance[];
+    try { next = removeFurnitureSafely(current, selectedObjectId); } catch { showToast(copy.roomBinderNeedsDesk); return; }
     const children = cloneRenderables(childrenOnInstance(latestItems.current, room.id, current, selectedObjectId));
     const entry: PlacementHistoryEntry<RoomRenderable, RoomObjectInstance> = {
       before: { storedHoldingId: selectedObjectId }, after: { storedHoldingId: selectedObjectId },
@@ -1052,7 +1053,7 @@ export function RoomWorldScreen({
     const target = current.find((item) => item.id === selectedObjectId);
     if (!target || !TURNABLE_ROOM_OBJECT_KINDS.has(target.kind)) return;
     const beforeLayout = layoutStateRef.current;
-    const nextObject = turnRoomObject(target);
+    const nextObject = turnRoomObject(target, current);
     const next = replaceRoomObject(current, nextObject);
     const nextLayout = { ...beforeLayout, source: "authored" as const, objects: next };
     // Show the turn and coherent clamp immediately; failed Live saves restore the prior state.
@@ -1090,7 +1091,7 @@ export function RoomWorldScreen({
         if (!object || viewRef.current.kind !== "edit") return;
         const held = acquireRoomObject(object);
         heldObjectRef.current = held;
-        objectPreviewRef.current = liftRoomObject(object, reducedMotionRef.current);
+        objectPreviewRef.current = liftRoomObject(resolveRoomObjectTransform(object, latestObjects.current), reducedMotionRef.current);
         furnitureCarryRef.current = snapshotRef.current?.room
           ? { roomId: snapshotRef.current.room.id, origin: object, current: object }
           : null;
@@ -1134,7 +1135,9 @@ export function RoomWorldScreen({
   const landingSurfaces = editing && snapshot && heldId && heldItem
     ? compatibleSurfaces(snapshot.room.id, heldItem.geometry, roomLayout.objects)
     : editing && snapshot && heldObjectId
-      ? nativeRoomSurfaces(snapshot.room.id, roomLayout.objects).filter((surface) => surface.id.endsWith("-floor") || surface.id.endsWith("-wall"))
+      ? nativeRoomSurfaces(snapshot.room.id, roomLayout.objects).filter((surface) => heldObjectRef.current?.origin.kind === "plant" || heldObjectRef.current?.origin.kind === "table-lamp"
+        ? surface.kind === "horizontal" && !surface.id.endsWith("-binder")
+        : isWallObject(heldObjectRef.current?.origin.kind ?? "lamp") ? surface.kind === "wall" : surface.id.endsWith("-floor"))
       : [];
   const binderHeld = view.kind === "binder" && view.heldHoldingId
     ? holdings.find((item) => item.id === view.heldHoldingId) ?? null
@@ -1223,7 +1226,7 @@ export function RoomWorldScreen({
           onPressEnd={onCollectiblePressEnd}
           onObjectPressStart={onObjectPressStart}
           onObjectPressEnd={onObjectPressEnd}
-          binderDeskId={binderDeskId}
+          binderDeskId={primaryBinderDeskId(roomLayout.objects)}
           onSelectZone={selectZone}
           onSelect={selectObject}
           onSelectObject={(objectId) => {

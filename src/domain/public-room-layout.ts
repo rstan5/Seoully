@@ -7,7 +7,7 @@ export function publicVisualRoomLayout(raw: Record<string, unknown>): Record<str
     if (!value || typeof value !== "object") return [];
     const o = value as Record<string, unknown>;
     if (typeof o.id !== "string" || !(ROOM_OBJECT_KINDS as readonly unknown[]).includes(o.kind)) return [];
-    return [{ id: o.id, kind: o.kind, x: o.x, y: o.y, z: o.z, rotateY: o.rotateY }];
+    return [{ id: o.id, kind: o.kind, x: o.x, y: o.y, z: o.z, rotateY: o.rotateY, ...(o.binderDesk === true && o.kind === "desk" ? { binderDesk: true } : {}), ...(o.parent && typeof o.parent === "object" && !Array.isArray(o.parent) && typeof (o.parent as Record<string,unknown>).objectId === "string" && typeof (o.parent as Record<string,unknown>).surfaceId === "string" && (o.kind === "plant" || o.kind === "table-lamp") ? { parent: { objectId: (o.parent as Record<string,unknown>).objectId, surfaceId: (o.parent as Record<string,unknown>).surfaceId } } : {}) }];
   }) };
 }
 export function publicPhotoStringVisuals(raw: unknown): PublicPhotoStringVisual[] {

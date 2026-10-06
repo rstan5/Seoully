@@ -4,7 +4,7 @@ export const FLOOR_Y = -2.08;
 export const CONTACT_EPSILON = 0.002;
 export const FURNITURE_LOWER_BOUND: Record<Exclude<RoomObjectKind, "wall-frame" | "photo-string">, number> = {
   shelf: -1.575, desk: -1.09, case: -1.575, chair: -0.61,
-  lamp: 0.01, plant: 0, archive: -0.28, rug: -0.01,
+  lamp: 0.01, "table-lamp": 0, "large-plant": 0, plant: 0, archive: -0.28, rug: -0.01,
 };
 export const DESK_TABLETOP_TOP = 0.0825;
 export const DESK_DRAWER_CENTERS = [-0.16, -0.42, -0.68] as const;
@@ -24,3 +24,6 @@ export const SHELF_BOARD_Y = [-0.9, 0, 0.9] as const;
 export const CASE_BOARD_Y = [-0.93, 0, 0.98] as const;
 export const SHELF_ROOF_TOP = 1.5675;
 export const CASE_ROOF_TOP = 1.565;
+
+export const CLOSED_BINDER_LOWER_BOUND = -0.65;
+export const CLOSED_BINDER_SCALE = 0.62;

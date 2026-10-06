@@ -1,9 +1,9 @@
--- Slice 7D: curated Room style (wall/floor/furniture/rug/light/brightness).
+-- Slice 7D: curated Room style (wall/floor/furniture/rug/light/brightness/binder).
 -- Replaces the unapplied 20261002 theme_id preset. Owner RLS is unchanged.
 -- Public visitors receive only this style object via the existing public Room RPC.
 
 alter table public.rooms
-  add column if not exists style jsonb not null default '{"wall":"plum","floor":"walnut","furniture":"walnut","rug":"rose","light":"warm","brightness":"normal"}'::jsonb;
+  add column if not exists style jsonb not null default '{"wall":"plum","floor":"walnut","furniture":"walnut","rug":"rose","light":"warm","brightness":"normal","binder":"cream"}'::jsonb;
 
 comment on column public.rooms.style is
   'Curated collector Room style. Owner write via existing rooms_update_own RLS. Public read only through get_public_room_by_handle.';
@@ -20,7 +20,8 @@ as $$
     and coalesce(p->>'furniture', '') in ('walnut', 'oak', 'ink', 'blush')
     and coalesce(p->>'rug', '') in ('rose', 'cream', 'ink', 'sage')
     and coalesce(p->>'light', '') in ('warm', 'day', 'soft', 'night')
-    and coalesce(p->>'brightness', '') in ('dim', 'normal', 'bright');
+    and coalesce(p->>'brightness', '') in ('dim', 'normal', 'bright')
+    and (not (p ? 'binder') or (jsonb_typeof(p->'binder') = 'string' and p->>'binder' in ('cream','blush','lavender','sage','sky','cocoa','charcoal')));
 $$;
 
 alter table public.rooms drop constraint if exists rooms_style_valid;
@@ -41,7 +42,7 @@ as $$
     ),
     'room', case when p.collection_public then jsonb_build_object(
       'id', r.id,
-      'style', coalesce(r.style, '{"wall":"plum","floor":"walnut","furniture":"walnut","rug":"rose","light":"warm","brightness":"normal"}'::jsonb),
+      'style', coalesce(r.style, '{"wall":"plum","floor":"walnut","furniture":"walnut","rug":"rose","light":"warm","brightness":"normal","binder":"cream"}'::jsonb),
       'placements', coalesce((
         select jsonb_agg(jsonb_build_object(
           'id', rp.id,

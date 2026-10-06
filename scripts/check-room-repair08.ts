@@ -19,7 +19,7 @@ import type { NativeHolding } from "../apps/mobile/src/api";
 const read = (path: string) => readFileSync(path, "utf8");
 const roomId = "repair08";
 const starter = starterRoomLayout();
-assert.deepEqual(starter.objects.map((o) => o.kind), ["shelf", "lamp"]);
+assert.deepEqual(starter.objects.map((o) => o.kind), ["shelf", "lamp", "desk"]);
 assert.equal(starter.firstRoomEditCompleted, false);
 for (const [i, o] of parseRoomLayout(STARTER_ROOM_LAYOUT).objects.entries()) {
   assert.equal(o.kind, starter.objects[i].kind);
@@ -42,12 +42,12 @@ for (const kind of Object.keys(FURNITURE_LOWER_BOUND) as (keyof typeof FURNITURE
 assert.ok(DESK_DRAWER_CENTERS.every((y) => y + 0.11 < DESK_TABLETOP_TOP), "drawer fronts stay below tabletop");
 assert.ok(SHOP_CATALOG.includes("chair") && SHOP_CATALOG.includes("photo-string"));
 for (const kind of SHOP_CATALOG) {
-  assert.ok(read("apps/mobile/src/room/ShopMiniature.tsx").includes(kind === "wall-frame" || kind === "photo-string" ? `"${kind}"` : `${kind}:`), `${kind} local miniature metadata`);
+  assert.ok(read("apps/mobile/src/room/ShopMiniature.tsx").includes(kind.includes("-") ? `"${kind}"` : `${kind}:`), `${kind} local miniature metadata`);
   const o = spawnRoomObject(starter.objects, kind);
   if (isWallObject(kind)) assert.equal(o.z, ROOM_BOX.backZ + 0.12);
   else assert.equal(o.y, furnitureGroundY(kind));
 }
-const objects = [...starter.objects, ...["desk", "case", "chair", "archive"].map((k) => defaultRoomObject(k as "desk" | "case" | "chair" | "archive"))];
+const objects = [...starter.objects.filter(o => o.kind !== "desk"), ...["desk", "case", "chair", "archive"].map((k) => defaultRoomObject(k as "desk" | "case" | "chair" | "archive"))];
 const surfaces = nativeRoomSurfaces(roomId, objects);
 const normal = ["album", "photocard", "lightstick", "plushie", "figure", "ticket", "memorabilia", "vinyl", "book", "apparel", "disc-case", "generic"] as const;
 for (const form of normal) {
@@ -114,7 +114,7 @@ assert.ok(add.indexOf("setRoomLayout(next)") < add.indexOf("await persistLayout(
 assert.ok(add.includes("objectsBefore: beforeObjects") && add.includes("objectsAfter:"), "Add history supports Undo/Redo");
 assert.ok(!add.includes("acquireRoomObject") && !add.includes("setHeldObjectId"), "no invalid ghost placement session");
 assert.ok(screen.includes("opacity: helperOpacity") && screen.includes("lifetime - duration") && screen.includes("350"), "helper fades within original lifetime");
-assert.ok(screen.includes("copy.openBinder") && read("apps/mobile/src/room/NativeOpenBinder.tsx").includes("group.current.visible = open || progress.current > 0"), "Binder intentional access without closed prop");
+assert.ok(screen.includes("copy.openBinder") && read("apps/mobile/src/room/NativeOpenBinder.tsx").includes("group.current.visible = true"), "permanent physical Binder access");
 const renderer = read("apps/mobile/src/room/NativeRoomRenderer.tsx");
 assert.equal((renderer.match(/<Canvas\b/g) ?? []).length, 1);
 assert.ok(!/physics|rapier|cannon|Vision|EffectComposer|WebView/.test(renderer));

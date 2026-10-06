@@ -1,6 +1,6 @@
 -- Slice 7D Repair 04: basic Room object instances + first-room-edit completion.
 -- Empty {} is legacy furnished Room with first Room edit already complete.
--- New rooms insert an authored starter document (Shelf + Lamp only).
+-- New rooms insert an authored starter document (Shelf + Lamp + Desk/Binder).
 -- Owner RLS is unchanged. Public visitors receive only visual layout.
 
 alter table public.rooms
@@ -12,7 +12,7 @@ comment on column public.rooms.layout is
 -- Repair 08: amended BEFORE application. No ownership or media is stored here.
 create or replace function public.room_layout_is_valid(p jsonb)
 returns boolean language plpgsql immutable set search_path = pg_catalog as $$
-declare obj jsonb; config jsonb; slots jsonb; slot jsonb; ids text[]; object_ids text[] := array[]::text[];
+declare obj jsonb; config jsonb; slots jsonb; slot jsonb; ids text[]; parent_obj jsonb; parent_ref jsonb; object_ids text[] := array[]::text[];
 begin
   if jsonb_typeof(p) is distinct from 'object' then return false; end if;
   if p = '{}'::jsonb then return true; end if;
@@ -20,16 +20,34 @@ begin
     or jsonb_typeof(p->'objects') is distinct from 'array'
     or coalesce(p->>'firstRoomEditCompleted', 'false') not in ('true', 'false')
     or p ?| array['price','sku','currency','purchase'] then return false; end if;
+  if (select count(*) from jsonb_array_elements(p->'objects') o where o->'binderDesk' = 'true'::jsonb) > 1 then return false; end if;
   for obj in select value from jsonb_array_elements(p->'objects') loop
     if jsonb_typeof(obj) is distinct from 'object'
       or coalesce(btrim(obj->>'id'), '') = ''
       or obj->>'id' <> btrim(obj->>'id')
-      or coalesce(obj->>'kind', '') not in ('shelf', 'desk', 'case', 'chair', 'lamp', 'plant', 'rug', 'archive', 'wall-frame', 'photo-string')
+      or coalesce(obj->>'kind', '') not in ('shelf', 'desk', 'case', 'chair', 'lamp', 'table-lamp', 'plant', 'large-plant', 'rug', 'archive', 'wall-frame', 'photo-string')
       or jsonb_typeof(obj->'id') is distinct from 'string'
       or char_length(obj->>'id') > 80
       or (obj->>'id') = any(object_ids)
       or coalesce(obj->>'rotateY', '0') not in ('0','30','60','90','120','150','180','210','240','270','300','330') then return false; end if;
     object_ids := array_append(object_ids, obj->>'id');
+    if obj ? 'binderDesk' and (obj->>'kind' <> 'desk' or obj->'binderDesk' is distinct from 'true'::jsonb) then return false; end if;
+    if obj ? 'parent' then
+      parent_ref := obj->'parent';
+      if obj->>'kind' not in ('plant','table-lamp') or jsonb_typeof(parent_ref) is distinct from 'object' then return false; end if;
+      if (select count(*) from jsonb_object_keys(parent_ref)) <> 2
+        or jsonb_typeof(parent_ref->'objectId') is distinct from 'string'
+        or jsonb_typeof(parent_ref->'surfaceId') is distinct from 'string' then return false; end if;
+      select o into parent_obj from jsonb_array_elements(p->'objects') o where o->>'id' = parent_ref->>'objectId' limit 1;
+      if parent_obj is null or parent_obj ? 'parent' or parent_obj->>'id' = obj->>'id' then return false; end if;
+      if not coalesce(case parent_obj->>'kind'
+        when 'desk' then parent_ref->>'surfaceId' = 'desk'
+        when 'shelf' then parent_ref->>'surfaceId' in ('shelf-bay-0','shelf-bay-1','shelf-bay-2','shelf-bay-3')
+        when 'case' then parent_ref->>'surfaceId' in ('display-case-shelf','display-case-lower','display-case-top','display-case-crown')
+        when 'chair' then parent_ref->>'surfaceId' = 'chair-seat'
+        when 'archive' then parent_ref->>'surfaceId' = 'archive'
+        else false end, false) then return false; end if;
+    end if;
     if obj ? 'photoString' then
       if obj->>'kind' <> 'photo-string' then return false; end if;
       config := obj->'photoString';
@@ -83,7 +101,8 @@ returns jsonb language sql immutable set search_path = pg_catalog as $$
     'version', 1, 'firstRoomEditCompleted', true,
     'objects', coalesce((select jsonb_agg(jsonb_build_object(
       'id', obj->'id', 'kind', obj->'kind', 'x', obj->'x', 'y', obj->'y', 'z', obj->'z', 'rotateY', obj->'rotateY'
-    )) from jsonb_array_elements(coalesce(p->'objects', '[]'::jsonb)) obj), '[]'::jsonb)
+    ) || case when obj ? 'binderDesk' then jsonb_build_object('binderDesk', obj->'binderDesk') else '{}'::jsonb end
+      || case when jsonb_typeof(obj->'parent'->'objectId') = 'string' and jsonb_typeof(obj->'parent'->'surfaceId') = 'string' then jsonb_build_object('parent', jsonb_build_object('objectId', obj->'parent'->'objectId', 'surfaceId', obj->'parent'->'surfaceId')) else '{}'::jsonb end) from jsonb_array_elements(coalesce(p->'objects', '[]'::jsonb)) obj), '[]'::jsonb)
   ) end;
 $$;
 
@@ -105,7 +124,7 @@ as $$
     ),
     'room', case when p.collection_public then jsonb_build_object(
       'id', r.id,
-      'style', coalesce(r.style, '{"wall":"plum","floor":"walnut","furniture":"walnut","rug":"rose","light":"warm","brightness":"normal"}'::jsonb),
+      'style', coalesce(r.style, '{"wall":"plum","floor":"walnut","furniture":"walnut","rug":"rose","light":"warm","brightness":"normal","binder":"cream"}'::jsonb),
        'layout', public.public_room_visual_layout(coalesce(r.layout, '{}'::jsonb)),
       -- Safe catalog identity only. Personal crops/storage paths are intentionally absent.
       'photoStringCards', coalesce((

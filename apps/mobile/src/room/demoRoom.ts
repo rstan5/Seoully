@@ -1,5 +1,5 @@
 import { configuredPhotoString } from "./photoString";
-import { cloneRoomObjects } from "./roomObjects";
+import { cloneRoomObjects, normalizeBinderDesk } from "./roomObjects";
 import {
   GROUP_BY_ID,
   MEMBER_BY_ID,
@@ -158,10 +158,11 @@ export function resetDemoRoomToStarter(ownerId: string) {
 }
 
 export function saveDemoRoomLayout(ownerId: string, layout: RoomLayoutState) {
+  serializeRoomLayout(layout);
   for (const object of layout.objects) if (object.photoString) configuredPhotoString(object, object.photoString.slots, nativeHoldingsFor(ownerId));
   const next = {
     source: "authored" as const,
-    objects: cloneRoomObjects(layout.objects),
+    objects: normalizeBinderDesk(cloneRoomObjects(layout.objects)),
     firstRoomEditCompleted: layout.firstRoomEditCompleted,
   };
   layoutSession.set(ownerId, next);

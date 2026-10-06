@@ -594,7 +594,7 @@ assertNotContains(read("apps/mobile/src/room/NativeOpenBinder.tsx"), "held ? 1.8
 assertNotContains(worldScreen, "onInspectCollectible && !readOnly", "public inspect can view collectible");
 
 const starter = starterRoomLayout();
-assert.deepEqual(starter.objects.map((item) => item.kind).sort(), ["lamp", "shelf"]);
+assert.deepEqual(starter.objects.map((item) => item.kind).sort(), ["desk", "lamp", "shelf"]);
 assert.equal(starter.firstRoomEditCompleted, false);
 assert.equal(shouldAutoEnterFirstRoomEdit(starter, false), true);
 assert.equal(shouldAutoEnterFirstRoomEdit(starter, true), false);
@@ -616,7 +616,7 @@ const carried = translateChildren([{
 }], "room-1", starterShelf, { x: 0.5, y: 0, z: 0 });
 assert.ok(Math.abs(carried[0]!.position.x - (layoutX(-3.15) + 0.5)) < 1e-6, "shelf children follow parent delta");
 assert.equal(childrenOnObject(carried, "room-1", { ...starterShelf, x: starterShelf.x + 0.5 }).length, 1);
-assert.equal(deskBinderWorld(starter.objects), null);
+assert.ok(deskBinderWorld(starter.objects));
 assert.ok(deskBinderWorld(legacy.objects));
 const movedSurfaces = nativeRoomSurfaces("room-1", [{ ...starterShelf, x: starterShelf.x + 1 }]);
 const defaultBay = nativeRoomSurfaces("room-1").find((surface) => surface.id.endsWith("shelf-bay-0"))!;

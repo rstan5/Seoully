@@ -4,7 +4,7 @@ import { layoutX, layoutZ } from "./roomLayout";
 import type { NativeRoomSurface, NativeRoomVector } from "./model";
 
 /** Basic V1 Room Shop catalog — one canonical version of each object. */
-import { ROOM_OBJECT_KINDS, validPhotoStringConfig, type PhotoStringConfig, type RoomObjectKind, type RoomYaw, ROOM_TURN_DEGREES, normalizeRoomYaw } from "seoully-domain/room-object-schema";
+import { ROOM_OBJECT_KINDS, validPhotoStringConfig, type PhotoStringConfig, type RoomObjectKind, type RoomYaw, ROOM_TURN_DEGREES, normalizeRoomYaw, ROOM_CARRIER_SURFACES, validRoomObjectRelationships, type RoomObjectParent } from "seoully-domain/room-object-schema";
 import { furnitureGroundY, DESK_TABLETOP_TOP, CHAIR_SEAT_TOP, SHELF_ROOF_TOP, CASE_ROOF_TOP } from "./roomGrounding";
 export { ROOM_OBJECT_KINDS } from "seoully-domain/room-object-schema";
 export type { RoomObjectKind } from "seoully-domain/room-object-schema";
@@ -18,6 +18,8 @@ export type RoomObjectInstance = {
   z: number;
   rotateY: RoomYaw;
   photoString?: PhotoStringConfig;
+  parent?: RoomObjectParent;
+  binderDesk?: true;
 };
 
 export type RoomLayoutSource = "legacy" | "authored";
@@ -46,11 +48,13 @@ export const CARRIER_ROOM_OBJECT_KINDS = new Set<RoomObjectKind>(["shelf", "desk
 export const SHOP_CATALOG: readonly RoomObjectKind[] = [
   "shelf",
   "desk",
-  "chair",
   "case",
+  "chair",
   "rug",
   "lamp",
+  "table-lamp",
   "plant",
+  "large-plant",
   "archive",
   "wall-frame",
   "photo-string",
@@ -61,6 +65,8 @@ export const ROOM_OBJECT_DEFAULTS: Record<RoomObjectKind, NativeRoomVector> = {
   desk: { x: layoutX(1.45), y: furnitureGroundY("desk"), z: layoutZ(-2.85) },
   case: { x: Math.min(layoutX(3.65), ROOM_BOX.wallX - 0.78 - 0.16), y: furnitureGroundY("case"), z: layoutZ(-3.78) },
   lamp: { x: layoutX(-3.72), y: furnitureGroundY("lamp"), z: layoutZ(-0.58) },
+  "table-lamp": { x: 0, y: furnitureGroundY("table-lamp"), z: -0.5 },
+  "large-plant": { x: 2.3, y: furnitureGroundY("large-plant"), z: -1.3 },
   plant: { x: layoutX(3.42), y: furnitureGroundY("plant"), z: layoutZ(-1.62) },
   rug: { x: layoutX(0.22), y: furnitureGroundY("rug"), z: layoutZ(-1.15) },
   archive: { x: layoutX(-1.2), y: furnitureGroundY("archive"), z: layoutZ(-0.65) },
@@ -74,7 +80,9 @@ const FOOTPRINT: Record<RoomObjectKind, { halfX: number; halfZ: number; halfY?: 
   desk: { halfX: 1.68, halfZ: 0.88 },
   case: { halfX: 0.78, halfZ: 0.46 },
   lamp: { halfX: 0.28, halfZ: 0.28 },
-  plant: { halfX: 0.26, halfZ: 0.22 },
+  plant: { halfX: 0.18, halfZ: 0.18 },
+  "table-lamp": { halfX: 0.18, halfZ: 0.18 },
+  "large-plant": { halfX: 1.02, halfZ: 1.02 },
   rug: { halfX: 1.18, halfZ: 0.76 },
   archive: { halfX: 0.92, halfZ: 0.62 },
   chair: { halfX: 0.76, halfZ: 0.70 },
@@ -121,11 +129,11 @@ export function defaultRoomObject(kind: RoomObjectKind, id: string = kind): Room
 }
 
 export function legacyRoomObjects(): RoomObjectInstance[] {
-  return ROOM_OBJECT_KINDS.filter((kind) => kind !== "chair" && kind !== "photo-string").map((kind) => kind === "archive" ? spawnRoomObject([], kind, kind) : defaultRoomObject(kind));
+  return normalizeBinderDesk(ROOM_OBJECT_KINDS.filter((kind) => kind !== "chair" && kind !== "photo-string" && kind !== "table-lamp" && kind !== "large-plant").map((kind) => kind === "archive" ? spawnRoomObject([], kind, kind) : defaultRoomObject(kind)));
 }
 
 export function starterRoomObjects(): RoomObjectInstance[] {
-  return [defaultRoomObject("shelf"), defaultRoomObject("lamp")];
+  return [defaultRoomObject("shelf"), defaultRoomObject("lamp"), { ...defaultRoomObject("desk"), binderDesk: true }];
 }
 
 export function starterRoomLayout(): RoomLayoutState {
@@ -163,13 +171,16 @@ export function parseRoomLayout(value: unknown): RoomLayoutState {
       y: finite(row.y, ROOM_OBJECT_DEFAULTS[kind].y),
       z: finite(row.z, ROOM_OBJECT_DEFAULTS[kind].z),
       rotateY: normalizeRoomYaw(row.rotateY),
+      ...(row.parent !== undefined ? { parent: row.parent as RoomObjectParent } : {}),
+      ...(row.binderDesk !== undefined ? { binderDesk: row.binderDesk as true } : {}),
       ...(row.photoString ? { photoString: { slots: [...(row.photoString as PhotoStringConfig).slots] } } : {}),
     }));
   }
+  if (!validRoomObjectRelationships(objects)) throw new Error("room_object_parent_invalid");
   if (!objects.length && raw.objects.length) return legacyRoomLayout();
   return {
     source: "authored",
-    objects,
+    objects: normalizeBinderDesk(objects.map(o => o.parent ? clampDecorOnParent(o, objects) : o)),
     firstRoomEditCompleted: raw.firstRoomEditCompleted === true,
   };
 }
@@ -179,6 +190,7 @@ export function serializeRoomLayout(state: RoomLayoutState): RoomLayoutDocument 
     return {};
   }
   if (new Set(state.objects.map((object) => object.id)).size !== state.objects.length || state.objects.some((object) => !object.id.trim() || object.id !== object.id.trim() || object.id.length > 80 || normalizeRoomYaw(object.rotateY) !== object.rotateY)) throw new Error("room_object_invalid");
+  if (!validRoomObjectRelationships(state.objects)) throw new Error("room_object_parent_invalid");
   if (state.objects.some((object) => object.photoString && (object.kind !== "photo-string" || !validPhotoStringConfig(object.photoString)))) throw new Error("photo_string_invalid");
   return {
     version: 1,
@@ -200,7 +212,7 @@ export function cloneRoomObjects(objects: RoomObjectInstance[]) {
 }
 
 export function cloneRoomObject(object: RoomObjectInstance): RoomObjectInstance {
-  return { ...object, ...(object.photoString ? { photoString: { slots: [...object.photoString.slots] } } : {}) };
+  return { ...object, ...(object.parent ? { parent: { ...object.parent } } : {}), ...(object.photoString ? { photoString: { slots: [...object.photoString.slots] } } : {}) };
 }
 
 export function objectsMatchDefaults(objects: RoomObjectInstance[], expected: RoomObjectInstance[]) {
@@ -253,7 +265,7 @@ export function spawnRoomObject(objects: RoomObjectInstance[], kind: RoomObjectK
     : [drafted, ...[-0.8, 0.1, 0.9, -1.6, -2.5].flatMap((z) => [-1.8, 0, 1.8].map((x) => ({ ...drafted, x, z })))];
   const available = candidates.map(clampRoomObject);
   const safe = available.find((candidate) => objects.every((other) => {
-    if (isWallObject(kind) !== isWallObject(other.kind) || other.kind === "rug" || kind === "rug") return true;
+    if (other.parent || isWallObject(kind) !== isWallObject(other.kind) || other.kind === "rug" || kind === "rug") return true;
     const a = rotatedRoomObjectFootprint(candidate), b = rotatedRoomObjectFootprint(other);
     return Math.abs(candidate.x - other.x) >= a.halfX + b.halfX + 0.08
       || (isWallObject(kind) ? Math.abs(candidate.y - other.y) >= (a.halfY ?? 0) + (b.halfY ?? 0) + 0.08
@@ -263,7 +275,7 @@ export function spawnRoomObject(objects: RoomObjectInstance[], kind: RoomObjectK
   // A crowded room may require overlap, but choose the least occupied visible
   // starter position rather than repeatedly piling copies on one coordinate.
   const crowding = (candidate: RoomObjectInstance) => objects.reduce((score, other) => {
-    if (isWallObject(kind) !== isWallObject(other.kind)) return score;
+    if (other.parent || isWallObject(kind) !== isWallObject(other.kind)) return score;
     const a = rotatedRoomObjectFootprint(candidate), b = rotatedRoomObjectFootprint(other);
     const overlapX = Math.max(0, a.halfX + b.halfX + 0.08 - Math.abs(candidate.x - other.x));
     const overlapOther = Math.max(0, (isWallObject(kind) ? (a.halfY ?? 0) + (b.halfY ?? 0) : a.halfZ + b.halfZ) + 0.08 - Math.abs(isWallObject(kind) ? candidate.y - other.y : candidate.z - other.z));
@@ -280,13 +292,14 @@ export function removeRoomObject(objects: RoomObjectInstance[], objectId: string
   return objects.filter((item) => item.id !== objectId);
 }
 
-export function turnRoomObject(object: RoomObjectInstance): RoomObjectInstance {
+export function turnRoomObject(object: RoomObjectInstance, objects: RoomObjectInstance[] = []): RoomObjectInstance {
   if (!TURNABLE_ROOM_OBJECT_KINDS.has(object.kind)) return object;
   const rotateY = ((object.rotateY + ROOM_TURN_DEGREES) % 360) as RoomObjectInstance["rotateY"];
-  return clampRoomObject({ ...object, rotateY });
+  return object.parent ? clampDecorOnParent({ ...object, rotateY }, objects) : clampRoomObject({ ...object, rotateY });
 }
 
 export function clampRoomObject(object: RoomObjectInstance): RoomObjectInstance {
+  if (object.parent) return { ...object, y: 0.002 };
   if (isWallObject(object.kind)) {
     const foot = FOOTPRINT[object.kind];
     const lowerY = foot.lowerY ?? -(foot.halfY ?? 0);
@@ -399,6 +412,7 @@ export function applyObjectSurfaces(roomId: string, defaults: NativeRoomSurface[
         rotateY: object.rotateY,
         width: local.width,
         depth: local.depth,
+        ...(object.binderDesk && local.suffix === "desk" ? { reserved: { halfX: 0.66, halfZ: 0.42 } } : {}),
       });
     }
   }
@@ -491,4 +505,58 @@ export function liveDeskBinderYaw(objects: RoomObjectInstance[], preview?: RoomO
 
 export function childrenOnInstance<T extends { placement?: { surfaceId?: string | null } }>(items: T[], roomId: string, objects: RoomObjectInstance[], instanceId: string): T[] {
   return items.filter((item) => surfaceOwner(roomId, objects, item.placement?.surfaceId)?.id === instanceId);
+}
+
+/** Persisted anchor is a property of one stable Desk instance, never a render-order choice. */
+export function normalizeBinderDesk(objects: RoomObjectInstance[]): RoomObjectInstance[] {
+  const anchor = objects.find(o => o.binderDesk)?.id ?? objects.find(o => o.id === "desk" && o.kind === "desk")?.id ?? objects.filter(o => o.kind === "desk").map(o => o.id).sort()[0];
+  return objects.map(o => { const { binderDesk: _old, ...rest } = cloneRoomObject(o); return o.id === anchor ? { ...rest, binderDesk: true } : rest; });
+}
+export function primaryBinderDeskId(objects: RoomObjectInstance[]) { return objects.find(o => o.binderDesk === true)?.id; }
+export function decorSurface(parent: RoomObjectInstance, surfaceId: string) { return (SURFACE_LOCAL[parent.kind as keyof typeof SURFACE_LOCAL] ?? []).find(s => s.suffix === surfaceId); }
+export function resolveRoomObjectTransform(object: RoomObjectInstance, objects: RoomObjectInstance[], preview?: RoomObjectInstance | null): RoomObjectInstance {
+  if (preview?.id === object.id) return preview;
+  if (!object.parent) return object;
+  const parent = objects.find(o => o.id === object.parent!.objectId);
+  if (!parent) throw new Error("room_object_parent_missing");
+  const live = preview?.id === parent.id ? preview : parent;
+  const surface = decorSurface(parent, object.parent.surfaceId);
+  if (!surface) throw new Error("room_object_surface_missing");
+  const at = offsetFromObject(live, { x: surface.lx + object.x, y: surface.ly + object.y, z: surface.lz + object.z });
+  return { ...object, ...at, rotateY: normalizeRoomYaw(live.rotateY + object.rotateY) };
+}
+export function clampDecorOnParent(object: RoomObjectInstance, objects: RoomObjectInstance[]): RoomObjectInstance {
+  const parent = objects.find(o => o.id === object.parent?.objectId);
+  const surface = parent && decorSurface(parent, object.parent!.surfaceId);
+  if (!parent || !surface) throw new Error("room_object_parent_invalid");
+  const footprint = rotatedRoomObjectFootprint(object);
+  if (footprint.halfX > surface.width / 2 || footprint.halfZ > surface.depth / 2) throw new Error("room_object_surface_too_small");
+  let x = clamp(object.x, -surface.width / 2 + footprint.halfX, surface.width / 2 - footprint.halfX);
+  let z = clamp(object.z, -surface.depth / 2 + footprint.halfZ, surface.depth / 2 - footprint.halfZ);
+  if (parent.binderDesk && Math.abs(x) < 0.66 + footprint.halfX && Math.abs(z) < 0.42 + footprint.halfZ) {
+    x = (x < 0 ? -1 : 1) * (0.66 + footprint.halfX + 0.002);
+  }
+  return { ...object, x, y: 0.002, z };
+}
+export function attachRoomDecor(world: RoomObjectInstance, parent: RoomObjectInstance, surfaceId: string, objects: RoomObjectInstance[]) {
+  if (world.kind !== "plant" && world.kind !== "table-lamp") throw new Error("room_object_floor_only");
+  const surface = decorSurface(parent, surfaceId);
+  if (!surface || !ROOM_CARRIER_SURFACES[parent.kind]?.includes(surfaceId)) throw new Error("room_object_parent_invalid");
+  const local = rotateYaw({ x: world.x-parent.x, y: world.y-parent.y, z: world.z-parent.z }, -parent.rotateY);
+  return clampDecorOnParent({ ...world, x: local.x-surface.lx, y: 0.002, z: local.z-surface.lz, rotateY: normalizeRoomYaw(world.rotateY-parent.rotateY), parent: { objectId: parent.id, surfaceId } }, objects);
+}
+export function detachRoomDecor(world: RoomObjectInstance) { const { parent: _parent, ...rest } = world; return clampRoomObject(rest); }
+export function removeFurnitureSafely(objects: RoomObjectInstance[], id: string) {
+  const removed = objects.find(o => o.id === id);
+  if (removed?.binderDesk && !objects.some(o => o.kind === "desk" && o.id !== id)) throw new Error("binder_needs_desk");
+  let next = objects.filter(o => o.id !== id && o.parent?.objectId !== id);
+  for (const child of objects.filter(o => o.parent?.objectId === id)) {
+    const world = resolveRoomObjectTransform(child, objects);
+    const spawn = spawnRoomObject(next, child.kind, child.id);
+    next.push({ ...detachRoomDecor(world), x: spawn.x, z: spawn.z });
+  }
+  return normalizeBinderDesk(next);
+}
+export function authoredSurfaceIdFor(roomId: string, object: RoomObjectInstance, runtimeId: string) {
+  return (SURFACE_LOCAL[object.kind as keyof typeof SURFACE_LOCAL] ?? []).find(s => surfaceIdFor(roomId, object, s.suffix) === runtimeId)?.suffix;
 }

@@ -203,8 +203,8 @@ assertContains(read("apps/mobile/src/room/roomRendererQuality.ts"), "ROOM_SHADOW
 assert.equal(ROOM_SHADOW_MAP_SIZE, 1024, "Repair 05 1024 shadow remains");
 assert.equal(ROOM_TEXTURE_MAX_EDGE, 512, "Repair 05 texture ceiling remains");
 const starter = starterRoomLayout();
-assert.equal(starter.objects.length, 2);
-assert.equal(starter.objects.some((item) => item.kind === "desk"), false);
+assert.equal(starter.objects.length, 3);
+assert.equal(starter.objects.some((item) => item.kind === "desk" && item.binderDesk), true);
 assert.equal(shouldAutoEnterFirstRoomEdit(parseRoomLayout({}), false), false);
 assert.equal(shopHasNoCommerce(), true);
 assert.equal(UNIQUE_ROOM_OBJECT_KINDS.has("rug"), false);
@@ -225,17 +225,17 @@ console.log("check:slice7d passed");
 
 // Repair 07: placement truth, a clean starter, and persistent spatial Binder.
 const clean = starterRoomLayout();
-assert.deepEqual(clean.objects.map((object) => object.kind), ["shelf", "lamp"]);
+assert.deepEqual(clean.objects.map((object) => object.kind), ["shelf", "lamp", "desk"]);
 assert.equal(clean.firstRoomEditCompleted, false);
-assert.equal(deskBinderWorld(clean.objects), null);
+assert.ok(deskBinderWorld(clean.objects));
 const desk07 = spawnRoomObject(clean.objects, "desk");
-const withDesk07 = [...clean.objects, desk07];
+const withDesk07 = [...clean.objects.filter(o => o.kind !== "desk"), desk07];
 const anchor07 = deskBinderWorld(withDesk07)!;
 const moved07 = { ...desk07, x: desk07.x + 0.7, z: desk07.z + 0.4 };
 const movedAnchor07 = liveDeskBinderWorld(withDesk07, moved07)!;
 assert.ok(Math.abs(movedAnchor07.x - anchor07.x - 0.7) < 1e-9);
 assert.ok(Math.abs(movedAnchor07.z - anchor07.z - 0.4) < 1e-9);
-assert.ok(Math.abs(movedAnchor07.x - deskBinderWorld([...clean.objects, moved07])!.x) < 1e-9);
+assert.ok(Math.abs(movedAnchor07.x - deskBinderWorld([...clean.objects.filter(o => o.kind !== "desk"), moved07])!.x) < 1e-9);
 assert.equal(openBinderWorldAt(movedAnchor07).x, movedAnchor07.x);
 const archive07 = spawnRoomObject(withDesk07, "archive");
 assert.ok(Math.hypot(archive07.x - anchor07.x, archive07.z - anchor07.z) > 2);
@@ -283,3 +283,5 @@ import "./check-room-repair08";
 import "./check-room-interaction-polish";
 
 import "./check-room-builder-completeness";
+
+import "./check-room-content";

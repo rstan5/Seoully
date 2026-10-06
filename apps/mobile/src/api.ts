@@ -793,6 +793,7 @@ export type NativeRoomStyle = {
   rug: "rose" | "cream" | "ink" | "sage";
   light: "warm" | "day" | "soft" | "night";
   brightness: "dim" | "normal" | "bright";
+  binder?: "cream" | "blush" | "lavender" | "sage" | "sky" | "cocoa" | "charcoal";
 };
 export type NativeRoom = { id: string; ownerUserId: string; themeId: NativeRoomThemeId; style?: NativeRoomStyle; layout?: Record<string, unknown> };
 export type NativeRoomPlacement = {

@@ -1,8 +1,9 @@
+import { resolveRoomObjectTransform } from "./roomObjects";
 import { DESK_DRAWER_CENTERS, SHELF_BOARD_Y, CASE_BOARD_Y } from "./roomGrounding";
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
 import { useEffect, useMemo, useRef, type MutableRefObject, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber/native";
-import { Group } from "three";
+import { Group, BufferGeometry, Float32BufferAttribute, DoubleSide } from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { mixHex } from "../ui/profileContrast";
 import { ROOM_BOX, WORLD_ENVELOPE } from "./envelope";
@@ -128,6 +129,7 @@ export function RoomFurniture({
       <FurniturePose
         key={object.id}
         object={object}
+        objects={objects}
         held={heldObjectId === object.id}
         previewRef={objectPreviewRef}
         editing={editing}
@@ -145,6 +147,8 @@ export function RoomFurniture({
         {object.kind === "archive" ? <ArchiveCrate theme={theme} maps={maps} /> : null}
         {object.kind === "rug" ? <Rug theme={theme} maps={maps} /> : null}
         {object.kind === "lamp" ? <FloorLamp theme={theme} /> : null}
+        {object.kind === "table-lamp" ? <TableLamp theme={theme} /> : null}
+        {object.kind === "large-plant" ? <LargePlant theme={theme} /> : null}
         {object.kind === "plant" ? <Plant theme={theme} maps={maps} /> : null}
         {object.kind === "photo-string" ? photoStringVisuals?.(object) : null}
         {object.kind === "wall-frame" ? <WallFrame theme={theme} maps={maps} /> : null}
@@ -157,6 +161,7 @@ export function RoomFurniture({
 
 function FurniturePose({
   object,
+  objects,
   held,
   previewRef,
   editing,
@@ -169,6 +174,7 @@ function FurniturePose({
   children,
 }: {
   object: RoomObjectInstance;
+  objects: RoomObjectInstance[];
   held: boolean;
   previewRef?: MutableRefObject<RoomObjectInstance | null>;
   editing: boolean;
@@ -184,14 +190,15 @@ function FurniturePose({
   useFrame(() => {
     const mesh = group.current;
     if (!mesh) return;
-    const live = held && previewRef?.current?.id === object.id ? previewRef.current : object;
+    const live = resolveRoomObjectTransform(object, objects, previewRef?.current);
     mesh.position.set(live.x, live.y, live.z);
     mesh.rotation.set(0, (live.rotateY * Math.PI) / 180, 0);
   });
+  const world = resolveRoomObjectTransform(object, objects);
   return <group
     ref={group}
-    position={[object.x, object.y, object.z]}
-    rotation={[0, (object.rotateY * Math.PI) / 180, 0]}
+    position={[world.x, world.y, world.z]}
+    rotation={[0, (world.rotateY * Math.PI) / 180, 0]}
     onPointerDown={(event) => {
       if (!editing) return;
       event.stopPropagation();
@@ -360,11 +367,52 @@ function WallFrame({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
 
 function Plant({ theme, maps }: { theme: RoomLook; maps: RoomMaps }) {
   return <group>
-    <mesh position={[0, 0.12, 0]} castShadow><cylinderGeometry args={[0.14, 0.12, 0.24, 10]} /><meshStandardMaterial color={theme.furniture} map={maps.woodFine} roughness={0.72} /></mesh>
-    <mesh position={[0, 0.38, 0]}><sphereGeometry args={[0.22, 12, 10]} /><meshStandardMaterial color="#4a6a52" roughness={0.9} /></mesh>
-    <mesh position={[0.12, 0.52, 0.04]}><sphereGeometry args={[0.14, 10, 8]} /><meshStandardMaterial color="#5a7a60" roughness={0.88} /></mesh>
-    <mesh position={[-0.1, 0.48, -0.06]}><sphereGeometry args={[0.12, 10, 8]} /><meshStandardMaterial color="#3e5a46" roughness={0.92} /></mesh>
-    <ContactShadow width={0.38} depth={0.36} opacity={0.14} />
+    <mesh position={[0, 0.1, 0]} castShadow><cylinderGeometry args={[0.13, 0.1, 0.2, 12]} /><meshStandardMaterial color="#fff7ef" roughness={0.42} /></mesh>
+    <mesh position={[0, 0.199, 0]} rotation={[-Math.PI/2,0,0]}><circleGeometry args={[0.115,12]} /><meshStandardMaterial color="#674e3d" roughness={1} /></mesh>
+    {[[0,0.43,0],[-0.09,0.36,0.04],[0.09,0.39,-0.03],[-0.04,0.4,-0.08],[0.06,0.34,0.08]].map(([x,y,z],i)=><group key={i}>
+      <mesh position={[x,(y+0.2)/2,z]}><cylinderGeometry args={[0.007,0.009,y-0.2,5]} /><meshStandardMaterial color="#5a7860" roughness={0.9} /></mesh>
+      <mesh position={[x+0.025,0.26,z]} scale={[0.045,0.012,0.025]} rotation={[0,0,-0.4]}><sphereGeometry args={[1,6,4]} /><meshStandardMaterial color="#668a68" /></mesh>
+      <group position={[x,y,z]}>{[0,1,2,3,4].map(petal=><mesh key={petal} position={[Math.cos(petal*Math.PI*2/5)*0.025,Math.sin(petal*Math.PI*2/5)*0.025,0]}><sphereGeometry args={[0.032,6,4]} /><meshStandardMaterial color={i%2 ? "#e6bac7" : "#f1cbd5"} roughness={0.82} /></mesh>)}<mesh position={[0,0,0.025]}><sphereGeometry args={[0.014,6,4]} /><meshStandardMaterial color="#e7c985" /></mesh></group>
+    </group>)}
+  </group>;
+}
+
+function TableLamp({ theme }: { theme: RoomLook }) {
+  return <group>
+    <mesh position={[0,0.025,0]} castShadow><cylinderGeometry args={[0.12,0.14,0.05,12]} /><meshStandardMaterial color={theme.edge} roughness={0.5} /></mesh>
+    <mesh position={[0,0.17,0]}><cylinderGeometry args={[0.024,0.035,0.25,8]} /><meshStandardMaterial color={theme.metal} metalness={0.3} roughness={0.4} /></mesh>
+    <mesh position={[0,0.35,0]} castShadow><cylinderGeometry args={[0.12,0.18,0.22,12]} /><meshStandardMaterial color={theme.paper} roughness={0.85} /></mesh>
+    <mesh position={[0,0.25,0]}><sphereGeometry args={[0.065,8,6]} /><meshStandardMaterial color={theme.light} emissive={theme.light} emissiveIntensity={0.18} /></mesh>
+  </group>;
+}
+
+/** Static arching fronds with paired narrow leaflets and visible gaps. */
+function LargePlant({ theme }: { theme: RoomLook }) {
+  const geometry = useMemo(() => {
+    const points = [[0,0.4],[0.08,1.05],[0.28,1.55],[0.52,1.85],[0.76,1.7]];
+    const stems: number[] = [], leaves: number[] = [];
+    for (let i=1;i<points.length;i++) {
+      const [x,y]=points[i], [px,py]=points[i-1];
+      stems.push(px,py,0,x,y,0);
+      if(i===1) continue;
+      for(const side of [-1,1]) for(const t of [0.35,0.75]) {
+        const cx=px+(x-px)*t, cy=py+(y-py)*t;
+        // Tapered paired leaflets, two triangles each, authored static negative space.
+        const root=[cx,cy,0], left=[cx+0.06,cy+0.025,side*0.12], tip=[cx+0.24,cy-0.03,side*0.28], right=[cx+0.1,cy-0.025,side*0.12];
+        leaves.push(...root,...left,...tip,...root,...tip,...right);
+      }
+    }
+    const stem = new BufferGeometry().setAttribute("position",new Float32BufferAttribute(stems,3));
+    const leaf = new BufferGeometry().setAttribute("position",new Float32BufferAttribute(leaves,3));leaf.computeVertexNormals();
+    return { stem, leaf };
+  }, []);
+  useEffect(() => () => { geometry.stem.dispose(); geometry.leaf.dispose(); }, [geometry]);
+  return <group>
+    <mesh position={[0,0.2,0]} castShadow><cylinderGeometry args={[0.25,0.2,0.4,12]} /><meshStandardMaterial color={theme.paper} roughness={0.62} /></mesh>
+    {[0,0.8,1.7,2.5,3.4,4.3,5.2,5.9].map((yaw,frond)=><group key={frond} rotation={[0,yaw,0]} scale={[1,frond%3===0?1.16:frond%3===1?0.92:1,1]}>
+      <lineSegments><primitive attach="geometry" object={geometry.stem} /><lineBasicMaterial color="#587451" /></lineSegments>
+      <mesh><primitive attach="geometry" object={geometry.leaf} /><meshStandardMaterial side={DoubleSide} color={frond%2?"#5d8058":"#6d9264"} roughness={0.94} /></mesh>
+    </group>)}
   </group>;
 }
 

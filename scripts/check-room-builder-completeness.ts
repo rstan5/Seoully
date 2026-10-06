@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { SHOP_CATALOG, CARRIER_ROOM_OBJECT_KINDS, canAddRoomObject, clampRoomObject, spawnRoomObject, turnRoomObject, defaultRoomObject, surfacesOwnedBy, surfaceOwner, childrenOnInstance, rotatedRoomObjectFootprint, cloneRoomObjects, serializeRoomLayout, parseRoomLayout, deskBinderWorld, liveDeskBinderYaw, storageTakeoutFor, objectPointFromAuthored } from "../apps/mobile/src/room/roomObjects";
+import { SHOP_CATALOG, CARRIER_ROOM_OBJECT_KINDS, canAddRoomObject, normalizeBinderDesk, clampRoomObject, spawnRoomObject, turnRoomObject, defaultRoomObject, surfacesOwnedBy, surfaceOwner, childrenOnInstance, rotatedRoomObjectFootprint, cloneRoomObjects, serializeRoomLayout, parseRoomLayout, deskBinderWorld, liveDeskBinderYaw, storageTakeoutFor, objectPointFromAuthored } from "../apps/mobile/src/room/roomObjects";
 import { nativeRoomSurfaces, settleRoomRenderable, surfaceWorldPoint, type RoomRenderable } from "../apps/mobile/src/room/model";
 import { resolveRoomWorldTransform, asAuthoredRenderable, inspectItemAtWorld, liveZoneDock } from "../apps/mobile/src/room/roomWorldTransform";
 import { intersectSurface } from "../apps/mobile/src/room/touchEdit";
@@ -29,7 +29,7 @@ for(const kind of SHOP_CATALOG){
   pushPlacementHistory(undo,redo,{before:{storedHoldingId:b.id},after:{storedHoldingId:b.id},objectsBefore:before,objectsAfter:after,childrenBefore:[],childrenAfter:[]});
   const entry=undo.pop()!;redo.push(entry);assert.deepEqual(entry.objectsBefore,remaining);assert.deepEqual(redo.pop()!.objectsAfter,objects);
 }
-assert.equal(new Set(objects.map(o=>o.id)).size,20);
+assert.equal(new Set(objects.map(o=>o.id)).size,SHOP_CATALOG.length*2);
 for(const kind of CARRIER_ROOM_OBJECT_KINDS){
   const [a,b]=objects.filter(o=>o.kind===kind); const idsA=surfacesOwnedBy(roomId,a), idsB=surfacesOwnedBy(roomId,b);
   assert.ok(idsA.length>0);assert.ok(idsA.every(id=>!idsB.includes(id)));
@@ -73,6 +73,7 @@ const strings=objects.filter(o=>o.kind==='photo-string');strings[0].photoString!
 const copy=cloneRoomObjects(strings);copy[0].photoString!.slots[0]=null;assert.equal(strings[0].photoString!.slots[0],'11111111-1111-4111-8111-111111111111');assert.equal(copy[1].photoString!.slots[1],strings[1].photoString!.slots[1]);
 for(let i=0;i<40;i++)objects.push(spawnRoomObject(objects,SHOP_CATALOG[i%SHOP_CATALOG.length]));
 objects=objects.map((o,i)=>clampRoomObject({...o,rotateY:o.kind==='wall-frame'||o.kind==='photo-string'?0:ROOM_YAWS[i%12]}));
+objects=normalizeBinderDesk(objects);
 const state={source:'authored' as const,firstRoomEditCompleted:true,objects}; const serialized=serializeRoomLayout(state);assert.deepEqual(parseRoomLayout(serialized).objects,objects);
 assert.throws(()=>serializeRoomLayout({...state,objects:[objects[0],objects[0]]}),/invalid/);
 assert.equal(parseRoomLayout({version:1,objects:[]}).objects.length,0);

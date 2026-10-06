@@ -72,6 +72,8 @@ export function NativeOpenBinder({
   onTurnEdge: (dir: 1 | -1) => void;
 }) {
   const group = useRef<Group>(null);
+  const closedRef = useRef<Group>(null);
+  const readingRef = useRef<Group>(null);
   const leftRef = useRef<Group>(null);
   const rightRef = useRef<Group>(null);
   const progress = useRef(0);
@@ -97,27 +99,29 @@ export function NativeOpenBinder({
     const rest = liveDeskBinderWorld(objects, objectPreviewRef?.current, deskInstanceId) ?? binderAt;
     const lifted = openBinderWorldAt(rest);
     if (group.current) {
-      group.current.visible = open || progress.current > 0;
+      group.current.visible = true;
+      if (closedRef.current) closedRef.current.visible = ease < 0.06;
+      if (readingRef.current) readingRef.current.visible = ease >= 0.06;
       group.current.position.set(
         rest.x + (lifted.x - rest.x) * ease,
         rest.y + (lifted.y - rest.y) * ease,
         rest.z + (lifted.z - rest.z) * ease,
       );
-      const rotation = composeParentYaw({ x: -Math.PI / 2 + (Math.PI / 2 - 0.08) * ease, y: -0.22 * (1 - ease), z: 0 }, liveDeskBinderYaw(objects, objectPreviewRef?.current, deskInstanceId) * (1 - ease));
+      const rotation = composeParentYaw({ x: -0.08 * ease, y: 0, z: 0 }, liveDeskBinderYaw(objects, objectPreviewRef?.current, deskInstanceId) * (1 - ease));
       group.current.rotation.set(rotation.x, rotation.y, rotation.z);
       group.current.scale.setScalar(0.62 + 0.38 * ease);
     }
     const spreadAmount = Math.max(0, Math.min(1, (ease - 0.28) / 0.72));
-    if (leftRef.current) leftRef.current.rotation.y = Math.PI * (1 - spreadAmount) + V_ANGLE * spreadAmount;
-    if (rightRef.current) rightRef.current.rotation.y = -V_ANGLE * spreadAmount;
+    if (leftRef.current) leftRef.current.rotation.y = 0.38 * (1 - spreadAmount) + V_ANGLE * spreadAmount;
+    if (rightRef.current) rightRef.current.rotation.y = -0.38 * (1 - spreadAmount) - V_ANGLE * spreadAmount;
   });
 
   const rest = binderAt;
-  const restRotation = composeParentYaw({ x: -Math.PI / 2, y: -0.22, z: 0 }, liveDeskBinderYaw(objects, undefined, deskInstanceId));
+  const restRotation = composeParentYaw({ x: 0, y: 0, z: 0 }, liveDeskBinderYaw(objects, undefined, deskInstanceId));
   return <>
     <group
       ref={group}
-      visible={open}
+      visible
       position={[rest.x, rest.y, rest.z]}
       rotation={[restRotation.x, restRotation.y, restRotation.z]}
       scale={0.62}
@@ -126,7 +130,8 @@ export function NativeOpenBinder({
         if (!open) onOpen?.();
       }}
     >
-      <group>
+      <group ref={closedRef} visible><StandingBinder cover={cover} paper={paper} /></group>
+      <group ref={readingRef} visible={false}>
         <mesh position={[0, 0, -0.06]}><boxGeometry args={[BINDER_SPINE_W, BINDER_PAGE_H + 0.08, 0.08]} /><meshStandardMaterial color={cover} roughness={0.55} /></mesh>
         {left ? <BinderLeaf page={left} side="left" leafRef={leftRef} heldHoldingId={heldHoldingId} paper={paper} cover={cover} interactive={open} onHold={open ? onHold : () => onOpen?.()} onTurnEdge={() => onTurnEdge(-1)} /> : null}
         {right ? <BinderLeaf page={right} side="right" leafRef={rightRef} heldHoldingId={heldHoldingId} paper={paper} cover={cover} interactive={open} onHold={open ? onHold : () => onOpen?.()} onTurnEdge={() => onTurnEdge(1)} /> : null}
@@ -145,6 +150,22 @@ export function NativeOpenBinder({
       onHome={() => setKeepFlight(false)}
     /> : null}
   </>;
+}
+
+/** Recognizable inactive portal: two covers, layered sheets, spine and three rings. */
+export function StandingBinder({ cover, paper }: { cover: string; paper: string }) {
+  return <group>
+    <mesh position={[0,-0.635,0]}><boxGeometry args={[0.16,0.03,0.16]} /><meshStandardMaterial color={cover} roughness={0.6} /></mesh>
+    <group position={[0,-0.62,0]} rotation={[-0.16,0,0]}>
+      <mesh position={[0,0.62,0]}><boxGeometry args={[0.13,1.24,0.1]} /><meshStandardMaterial color={cover} roughness={0.62} /></mesh>
+      {[-1,1].map(side=><group key={side} position={[side*0.065,0,0]} rotation={[0,side===-1?0.38:-0.38,0]}>
+        <mesh position={[side*0.49,0.62,-0.035]}><boxGeometry args={[0.98,1.24,0.055]} /><meshStandardMaterial color={cover} roughness={0.64} /></mesh>
+        {[0,1,2,3].map(sheet=><mesh key={sheet} position={[side*0.48,0.62,0.004+sheet*0.013]}><boxGeometry args={[0.92-sheet*0.008,1.16,0.009]} /><meshStandardMaterial color={paper} roughness={0.88} /></mesh>)}
+        <mesh position={[side*0.48,0.62,0.055]}><boxGeometry args={[0.82,1.05,0.004]} /><meshStandardMaterial color={paper} roughness={0.9} /></mesh>
+      </group>)}
+      {[0.24,0.62,1].map(y=><mesh key={y} position={[0,y,0.075]} rotation={[0,Math.PI/2,0]}><torusGeometry args={[0.055,0.009,5,10]} /><meshStandardMaterial color="#b5b0a6" metalness={0.65} roughness={0.32} /></mesh>)}
+    </group>
+  </group>;
 }
 
 function BinderLeaf({

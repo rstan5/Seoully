@@ -1,5 +1,7 @@
+import { ROOM_BINDER_COLORS, type RoomBinderColor } from "seoully-domain/room-object-schema";
 /** Curated Room style — not raw renderer knobs. Independent of the unapplied theme_id preset. */
 
+export const ROOM_BINDER_IDS = Object.keys(ROOM_BINDER_COLORS) as RoomBinderColor[];
 export const ROOM_WALL_IDS = ["plum", "cream", "ink", "blush", "sage"] as const;
 export const ROOM_FLOOR_IDS = ["walnut", "oak", "charcoal", "blush-wood"] as const;
 export const ROOM_FURNITURE_IDS = ["walnut", "oak", "ink", "blush"] as const;
@@ -21,9 +23,11 @@ export type NativeRoomStyle = {
   rug: RoomRugId;
   light: RoomLightId;
   brightness: RoomBrightnessId;
+  binder?: RoomBinderColor;
 };
 
 export const DEFAULT_ROOM_STYLE: NativeRoomStyle = {
+  binder: "cream",
   wall: "plum",
   floor: "walnut",
   furniture: "walnut",
@@ -34,8 +38,8 @@ export const DEFAULT_ROOM_STYLE: NativeRoomStyle = {
 
 export const STYLE_BY_THEME = {
   hearth: DEFAULT_ROOM_STYLE,
-  blossom: { wall: "blush", floor: "blush-wood", furniture: "blush", rug: "rose", light: "day", brightness: "bright" },
-  midnight: { wall: "ink", floor: "charcoal", furniture: "ink", rug: "ink", light: "night", brightness: "dim" },
+  blossom: { binder: "cream", wall: "blush", floor: "blush-wood", furniture: "blush", rug: "rose", light: "day", brightness: "bright" },
+  midnight: { binder: "cream", wall: "ink", floor: "charcoal", furniture: "ink", rug: "ink", light: "night", brightness: "dim" },
 } as const satisfies Record<string, NativeRoomStyle>;
 
 const WALLS: Record<RoomWallId, { wall: string; wallAccent: string; sideWall: string; void: string }> = {
@@ -108,6 +112,7 @@ export function parseRoomStyle(value: unknown, fallback: NativeRoomStyle = DEFAU
   if (!value || typeof value !== "object") return { ...fallback };
   const raw = value as Record<string, unknown>;
   return {
+    binder: pick(ROOM_BINDER_IDS, raw.binder, fallback.binder ?? "cream"),
     wall: pick(ROOM_WALL_IDS, raw.wall, fallback.wall),
     floor: pick(ROOM_FLOOR_IDS, raw.floor, fallback.floor),
     furniture: pick(ROOM_FURNITURE_IDS, raw.furniture, fallback.furniture),
@@ -138,12 +143,13 @@ export function resolveRoomLook(style: NativeRoomStyle): RoomLook {
     fill: lamp.fill,
     ink: cream ? "#2c2e4c" : "#f4efe8",
     paper: cream ? "#f7efe4" : "#efe8da",
-    binder: style.furniture === "blush" ? "#8f3558" : style.furniture === "ink" ? "#3a1c38" : "#4a1c2c",
+    binder: ROOM_BINDER_COLORS[style.binder ?? "cream"],
     brightness: BRIGHTNESS[style.brightness],
   };
 }
 
 export function styleSwatch(kind: keyof NativeRoomStyle, id: string) {
+  if (kind === "binder") return ROOM_BINDER_COLORS[id as RoomBinderColor] ?? ROOM_BINDER_COLORS.cream;
   if (kind === "wall") return WALLS[id as RoomWallId]?.wall ?? "#888";
   if (kind === "floor") return FLOORS[id as RoomFloorId]?.floor ?? "#888";
   if (kind === "furniture") return FURNITURE[id as RoomFurnitureId]?.furniture ?? "#888";

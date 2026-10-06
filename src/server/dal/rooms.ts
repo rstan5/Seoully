@@ -1,5 +1,5 @@
 import "server-only";
-import { ROOM_OBJECT_KINDS, ROOM_YAWS, validPhotoStringConfig } from "@/domain/room-object-schema";
+import { ROOM_OBJECT_KINDS, ROOM_YAWS, validRoomObjectRelationships, validPhotoStringConfig } from "@/domain/room-object-schema";
 
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -38,6 +38,7 @@ const roomStyleSchema = z.object({
     rug: z.enum(["rose", "cream", "ink", "sage"]),
     light: z.enum(["warm", "day", "soft", "night"]),
     brightness: z.enum(["dim", "normal", "bright"]),
+    binder: z.enum(["cream", "blush", "lavender", "sage", "sky", "cocoa", "charcoal"]).optional(),
   }).strict(),
 }).strict();
 
@@ -54,8 +55,10 @@ const roomLayoutSchema = z.object({
       y: coordinate(-20, 20),
       z: coordinate(-20, 20),
       rotateY: z.number().refine((value) => (ROOM_YAWS as readonly number[]).includes(value), "room_yaw_invalid"),
+      parent: z.object({ objectId: z.string().min(1).max(80), surfaceId: z.string().min(1).max(80) }).strict().optional(),
+      binderDesk: z.literal(true).optional(),
       photoString: z.object({ slots: z.array(uuid.nullable()).length(5) }).strict().optional(),
-    }).strict().refine((obj) => !obj.photoString || (obj.kind === "photo-string" && validPhotoStringConfig(obj.photoString)), "photo_string_invalid")).refine((objects) => new Set(objects.map((object) => object.id)).size === objects.length, "room_object_id_duplicate"),
+    }).strict().refine((obj) => !obj.photoString || (obj.kind === "photo-string" && validPhotoStringConfig(obj.photoString)), "photo_string_invalid")).refine((objects) => new Set(objects.map((object) => object.id)).size === objects.length, "room_object_id_duplicate").refine(validRoomObjectRelationships, "room_object_parent_invalid"),
   }).strict(),
 }).strict();
 

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { BACK_WALL, ROOM_BOX } from "../apps/mobile/src/room/envelope";
 import { ROOM_LAYOUT } from "../apps/mobile/src/room/roomLayout";
 import { FLOOR_Y, furnitureGroundY } from "../apps/mobile/src/room/roomGrounding";
-import { SHOP_CATALOG, TURNABLE_ROOM_OBJECT_KINDS, CARRIER_ROOM_OBJECT_KINDS, defaultRoomObject, spawnRoomObject, turnRoomObject, rotatedRoomObjectFootprint, cloneRoomObjects, serializeRoomLayout, parseRoomLayout, surfacesOwnedBy, clampRoomObject, deskBinderWorld, liveDeskBinderWorld, liveDeskBinderYaw, objectPointFromAuthored } from "../apps/mobile/src/room/roomObjects";
+import { SHOP_CATALOG, TURNABLE_ROOM_OBJECT_KINDS, CARRIER_ROOM_OBJECT_KINDS, defaultRoomObject, normalizeBinderDesk, spawnRoomObject, turnRoomObject, rotatedRoomObjectFootprint, cloneRoomObjects, serializeRoomLayout, parseRoomLayout, surfacesOwnedBy, clampRoomObject, deskBinderWorld, liveDeskBinderWorld, liveDeskBinderYaw, objectPointFromAuthored } from "../apps/mobile/src/room/roomObjects";
 import { resolveRoomWorldTransform, asAuthoredRenderable, liveZoneDock, inspectItemAtWorld } from "../apps/mobile/src/room/roomWorldTransform";
 import { nativeRoomSurfaces, surfaceAcceptsGeometry, surfaceWorldPoint, surfaceLocalPoint, type RoomRenderable } from "../apps/mobile/src/room/model";
 import { previewOnSurface, intersectSurface, projectTouchOntoSurfaces } from "../apps/mobile/src/room/touchEdit";
@@ -34,7 +34,7 @@ for (const kind of SHOP_CATALOG) {
   const centerTurn = turnRoomObject(center);
   near(centerTurn.x,center.x); near(centerTurn.z,center.z);
   const document = serializeRoomLayout({source:"authored",firstRoomEditCompleted:true,objects:[centerTurn]});
-  assert.deepEqual(parseRoomLayout(document).objects,[centerTurn]);
+  assert.deepEqual(parseRoomLayout(document).objects,normalizeBinderDesk([centerTurn]));
 }
 const roomId = "interaction-polish";
 for (const kind of CARRIER_ROOM_OBJECT_KINDS) {

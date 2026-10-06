@@ -10,11 +10,11 @@ async function main() {
 const { RoundedBoxGeometry } = await import("../apps/mobile/node_modules/three/examples/jsm/geometries/RoundedBoxGeometry.js");
 THREE = await import("../apps/mobile/node_modules/three/build/three.module.js");
 const source = fs.readFileSync("apps/mobile/src/room/roomEnvironment.tsx", "utf8");
-const names = { shelf: "ShelfUnit", desk: "DeskUnit", case: "CaseUnit", chair: "ChairUnit", archive: "ArchiveCrate", rug: "Rug", lamp: "FloorLamp", plant: "Plant" };
+const names = { shelf: "ShelfUnit", desk: "DeskUnit", case: "CaseUnit", chair: "ChairUnit", archive: "ArchiveCrate", rug: "Rug", lamp: "FloorLamp", plant: "Plant", "table-lamp": "TableLamp", "large-plant": "LargePlant" };
 const file = ts.createSourceFile("geometry.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const functions = file.statements.filter((node) => ts.isFunctionDeclaration(node) && [...Object.values(names), "ChairCushion"].includes(node.name?.text)).map((node) => node.getText(file)).join("\n");
 const jsx = (type, props) => ({ type, props: props ?? {} });
-const sandbox = { exports: {}, require: () => ({ jsx, jsxs: jsx, Fragment: "group" }), ContactShadow: () => null, EdgeLip: () => null, DESK_DRAWER_CENTERS, CHAIR_SEAT_TOP, SHELF_BOARD_Y, CASE_BOARD_Y, RoundedBoxGeometry, useMemo: (fn) => fn(), useEffect: () => {}, mixHex: () => "#ffffff" };
+const sandbox = { exports: {}, require: () => ({ jsx, jsxs: jsx, Fragment: "group" }), ContactShadow: () => null, EdgeLip: () => null, DESK_DRAWER_CENTERS, CHAIR_SEAT_TOP, SHELF_BOARD_Y, CASE_BOARD_Y, BufferGeometry: THREE.BufferGeometry, Float32BufferAttribute: THREE.Float32BufferAttribute, DoubleSide: THREE.DoubleSide, RoundedBoxGeometry, useMemo: (fn) => fn(), useEffect: () => {}, mixHex: () => "#ffffff" };
 vm.createContext(sandbox);
 vm.runInContext(ts.transpileModule(functions, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText, sandbox);
 const theme = new Proxy({}, { get: () => "#ffffff" });
@@ -30,7 +30,7 @@ function bounds(node, parent = new THREE.Matrix4(), result = new THREE.Box3()) {
     if (parts.some((part) => part.type?.endsWith("Material") && part.props.opacity === 0)) return result;
     const part = parts.find((part) => part.type?.endsWith("Geometry") || part.type === "primitive" && part.props.attach === "geometry");
     const args = part?.props.args ?? [];
-    const Geometry = { boxGeometry: THREE.BoxGeometry, cylinderGeometry: THREE.CylinderGeometry, sphereGeometry: THREE.SphereGeometry }[part?.type];
+    const Geometry = { boxGeometry: THREE.BoxGeometry, cylinderGeometry: THREE.CylinderGeometry, sphereGeometry: THREE.SphereGeometry, torusGeometry: THREE.TorusGeometry, circleGeometry: THREE.CircleGeometry, planeGeometry: THREE.PlaneGeometry }[part?.type];
     if (Geometry || part?.props.object) {
       const geometry = part.props.object ?? new Geometry(...args);
       geometry.computeBoundingBox();
@@ -107,7 +107,7 @@ console.log("Micro-polish lounge geometry, feet and measured cushion landing che
 const miniatureSource = fs.readFileSync("apps/mobile/src/room/ShopMiniature.tsx", "utf8");
 const miniatureFile = ts.createSourceFile("miniature.tsx", miniatureSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const miniatureFunction = miniatureFile.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === "ShopMiniature");
-Object.assign(sandbox, { Svg: "svg", Rect: "rect", Path: "path", Circle: "circle", Ellipse: "ellipse", SHOP_MINIATURES: { chair: "upholstered-armchair" } });
+Object.assign(sandbox, { Svg: "svg", Rect: "rect", Path: "path", Circle: "circle", Ellipse: "ellipse", G: "group", SHOP_MINIATURES: { chair: "upholstered-armchair" } });
 const miniatureCode = ts.transpileModule(miniatureFunction.getText(miniatureFile), { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
 vm.runInContext(`(function () { ${miniatureCode} }).call(globalThis);`, sandbox);
 const miniatureParts = children(sandbox.exports.ShopMiniature({ kind: "chair" })).flatMap(children);
@@ -115,6 +115,22 @@ const paddedMiniArms = miniatureParts.filter((node) => node.type === "rect" && n
 assert.equal(paddedMiniArms.length, 2, "Shop miniature has two rounded padded arms");
 assert.ok(miniatureParts.some((node) => node.type === "rect" && node.props.width >= 30 && node.props.height >= 25 && node.props.rx >= 7), "Shop miniature has broad cushioned back");
 console.log("Micro-polish actual native Shop lounge silhouette checks passed");
+
+const binderSource = fs.readFileSync("apps/mobile/src/room/NativeOpenBinder.tsx", "utf8");
+const binderFile = ts.createSourceFile("binder.tsx",binderSource,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+const standingFunction=binderFile.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==="StandingBinder");
+const standingCode=ts.transpileModule(standingFunction.getText(binderFile),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+vm.runInContext(`(function () { ${standingCode} }).call(globalThis);`,sandbox);
+const standing=sandbox.exports.StandingBinder({cover:"#f3e8da",paper:"#efe8da"});
+const standingBounds=bounds(standing);
+const { CLOSED_BINDER_LOWER_BOUND, CLOSED_BINDER_SCALE }=require("../.tmp/build/apps/mobile/src/room/roomGrounding.js");
+assert.ok(Math.abs(standingBounds.min.y-CLOSED_BINDER_LOWER_BOUND)<1e-6,"standing Binder authored bound");
+const primary={...defaultRoomObject("desk"),binderDesk:true};const {deskBinderWorld}=require("../.tmp/build/apps/mobile/src/room/roomObjects.js");
+assert.ok(Math.abs(deskBinderWorld([primary],primary.id).y + standingBounds.min.y*CLOSED_BINDER_SCALE-primary.y-DESK_TABLETOP_TOP)<1e-6,"visible Binder contacts Desk");
+const palm=sandbox.LargePlant({theme});assert.equal(children(palm).filter(n=>n.type==="group").length,8,"eight separate arching fronds");
+const flowers=sandbox.Plant({theme,maps:{}});assert.equal(children(flowers).filter(n=>n.type==="group").length,5,"five authored blossoms with stems");
+console.log("Content actual Table Lamp/Flower Pot/palm bounds, distinct stems/fronds, and standing Binder Desk contact passed");
+
 const desk = sandbox.DeskUnit({ theme, maps: {} });
 for (const drawer of children(desk).filter((node) => node.type === "group" && node.props.position?.[0] === 0.82)) {
   assert.ok(bounds(drawer).max.y < DESK_TABLETOP_TOP, "actual drawer front/handle stays below tabletop");

@@ -123,7 +123,7 @@ export function NativeRoomRenderer({
   const focused = items.find((item) => item.holding.id === focusedId) ?? null;
   const theme = resolveRoomLook(style ?? defaultStyleForTheme(themeId));
   const layoutObjects = objects;
-  const binderAt = deskBinderWorld(layoutObjects, binderDeskId);
+  const binderAt = binderDeskId ? deskBinderWorld(layoutObjects, binderDeskId) : null;
   const textured = roomTextureIds(items, selectedId, focusedId);
   if (placingItem?.imageUrl) textured.add(placingItem.holding.id);
   const binderOpen = view.kind === "binder";

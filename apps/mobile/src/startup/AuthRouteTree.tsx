@@ -19,7 +19,7 @@ export function AuthRouteTree() {
   const screens = screensForDestination(boot.destination);
 
   if (boot.destination === "loading") {
-    return <SeoullyScreen edges={["top", "bottom"]}><SeoullyLoadingState label={t.brand} /></SeoullyScreen>;
+    return <SeoullyLoadingState fullScreen label={t.brand} />;
   }
 
   if (boot.destination === "error") {

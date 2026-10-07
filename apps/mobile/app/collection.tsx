@@ -1,7 +1,8 @@
+import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
 import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { useSocialRepository } from "../src/data";
 import { useReportAskSurface } from "../src/ask-surface";
 import { collectibleKindLabel } from "../src/i18n";
@@ -29,6 +30,7 @@ export default function CollectionScreen() {
   const [wishlist, setWishlist] = useState<NativeWishlistEntry[]>([]);
   const [tab, setTab] = useState<"collection" | "wishlist">("collection");
   const [loading, setLoading] = useState(true);
+  const [hydratedKind, setHydratedKind] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [tabReady, setTabReady] = useState(false);
@@ -46,6 +48,7 @@ export default function CollectionScreen() {
         social.loadMyWishlist(0, 100),
       ]);
       setHoldings(nextHoldings);
+      setHydratedKind(social.kind);
       setHasMore(nextHoldings.length === 100);
       setWishlist(nextWishlist);
       setHasMoreWishlist(nextWishlist.length === 100);
@@ -145,6 +148,8 @@ export default function CollectionScreen() {
     : wishlist.map((entry) => ({ kind: "wishlist", id: entry.id, entry }));
   const canPage = tab === "collection" ? hasMore : hasMoreWishlist;
 
+  if (social.kind !== "demo" && loading && hydratedKind !== social.kind && !error) return <SeoullyLoadingState fullScreen label={copy.collection} />;
+
   return (
     <SeoullyScreen>
       <FlatList
@@ -182,7 +187,7 @@ export default function CollectionScreen() {
                 ))}
               </View>
             ) : null}
-            {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
+            {loading && social.kind === "demo" ? <SeoullyLoadingState label={copy.collection} /> : null}
             {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
           </View>
         )}

@@ -1,9 +1,10 @@
+import { SeoullyLoadingState } from "../ui/SeoullyLoadingState";
 import { LiveRoomSync, liveRoomNeedsHydration } from "./liveRoomSync";
 import { PhotoStringSheet } from "./PhotoStringSheet";
 import { configuredPhotoString, type PublicPhotoStringCard } from "./photoString";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Stack, useFocusEffect } from "expo-router";
-import { AccessibilityInfo, ActivityIndicator, Animated, AppState, Easing, PanResponder, Pressable, StyleSheet, View, type GestureResponderEvent } from "react-native";
+import { AccessibilityInfo, Animated, AppState, Easing, PanResponder, Pressable, StyleSheet, View, type GestureResponderEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { loadCollectorProfile, loadCollectorRoom, loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomLayout, saveNativeRoomPlacement, saveNativeRoomStyle, type NativeHolding, type NativeRoomSnapshot } from "../api";
 import { binderSpreads, buildNativeBinderPages, spreadIndexForHolding } from "../binder/model";
@@ -1294,11 +1295,12 @@ export function RoomWorldScreen({
   };
 
   if (liveRoomNeedsHydration(demo, loading, snapshot !== null || privateRoom)) {
+    if (!error) return <SeoullyLoadingState fullScreen label={copy.enteringYourRoom} />;
     return <View style={[styles.world, immersiveRoomFill(roomTheme.void)]}>
       <Stack.Screen options={{ contentStyle: immersiveRoomFill(roomTheme.void) }} />
       <OverlayChrome copy={copy} chrome={overlayTheme} onBack={onLeave} style={overlayPad} />
       <View style={styles.empty}>
-        {error ? <SeoullyText variant="secondary">{error}</SeoullyText> : <ActivityIndicator accessibilityLabel={copy.enteringYourRoom} color={overlayTheme.color} />}
+        <SeoullyText variant="secondary">{error}</SeoullyText>
         {error ? <Pressable onPress={() => void refresh()}><SeoullyText variant="button">{copy.retry}</SeoullyText></Pressable> : null}
       </View>
     </View>;
@@ -1358,7 +1360,7 @@ export function RoomWorldScreen({
         clearPendingPress(); clearHeldVisual(); touchOwnerRef.current = null;
       }}
     >
-      <Suspense fallback={demo ? null : <ActivityIndicator accessibilityLabel={copy.enteringYourRoom} color={overlayTheme.color} style={StyleSheet.absoluteFill} />}>
+      <Suspense fallback={demo ? null : <SeoullyLoadingState fullScreen label={copy.enteringYourRoom} />}>
         <NativeRoomRenderer
           key={canvasEpoch}
           ownerName={ownerName}

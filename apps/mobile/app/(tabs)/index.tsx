@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeFeedPost } from "../../src/api";
@@ -31,31 +31,41 @@ export default function FeedScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hydratedKey, setHydratedKey] = useState<string | null>(null);
+  const requestVersion = useRef(0);
+  const feedKey = `${social.kind}:${mode}`;
 
   const refresh = useCallback(async (nextMode = mode) => {
+    const request = ++requestVersion.current;
     setLoading(true);
+    setError(null);
     try {
       const [page, people] = await Promise.all([social.loadFeed(nextMode), social.loadSuggested()]);
+      if (request !== requestVersion.current) return;
+      setHydratedKey(`${social.kind}:${nextMode}`);
       setPosts(page.items);
       setNextCursor(page.nextCursor);
       setSuggested(people);
       setError(null);
     } catch {
-      setError(copy.feedUnavailable);
+      if (request === requestVersion.current) setError(copy.feedUnavailable);
     } finally {
-      setLoading(false);
+      if (request === requestVersion.current) setLoading(false);
     }
   }, [copy.feedUnavailable, mode, social]);
 
   useFocusEffect(useCallback(() => {
     void refresh();
+    return () => { requestVersion.current++; };
   }, [refresh]));
 
   async function loadMore() {
     if (!nextCursor || loading || loadingMore) return;
+    const request = requestVersion.current;
     setLoadingMore(true);
     try {
       const page = await social.loadFeed(mode, nextCursor);
+      if (request !== requestVersion.current) return;
       setPosts((current) => [...current, ...page.items.filter((item) => !current.some((existing) => existing.id === item.id))]);
       setNextCursor(page.nextCursor);
     } catch {
@@ -67,7 +77,13 @@ export default function FeedScreen() {
 
   function changeMode(next: FeedMode) {
     setModes((current) => ({ ...current, [social.kind]: next }));
-    void refresh(next);
+    if (next === mode) return;
+    setLoading(true);
+    setError(null);
+  }
+
+  if (social.kind !== "demo" && hydratedKey !== feedKey && !error) {
+    return <SeoullyLoadingState fullScreen label={copy.feedLoading} />;
   }
 
   const empty = mode === "following" ? copy.feedFollowingEmpty : copy.feedEmptyDiscover;
@@ -76,7 +92,7 @@ export default function FeedScreen() {
     <SeoullyScreen>
       <KeyboardScreen>
         <SeoullyHeader languageLabel={copy.switchLanguage} onToggleLanguage={toggleLocale} />
-        {loading && posts.length === 0 && !error ? <SeoullyLoadingState label={copy.feedLoading} /> : null}
+        {social.kind === "demo" && loading && posts.length === 0 && !error ? <SeoullyLoadingState label={copy.feedLoading} /> : null}
         {error ? <View style={styles.notice}><RetryNotice message={error} retryLabel={copy.retry} onRetry={() => { void refresh(); }} /></View> : null}
         <FlatList
           data={posts}

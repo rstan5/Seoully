@@ -81,6 +81,8 @@ export default function EditProfileScreen() {
     }
   }
 
+  if (loading && !identity && !error) return <SeoullyLoadingState fullScreen label={copy.profileEdit} />;
+
   return (
     <SeoullyScreen>
       <KeyboardScreen>
@@ -99,7 +101,6 @@ export default function EditProfileScreen() {
           </View>
         </View>
 
-        {loading && !identity ? <SeoullyLoadingState label={copy.profileEdit} /> : null}
         {error ? <View style={styles.notice}><RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /></View> : null}
 
         {identity ? (

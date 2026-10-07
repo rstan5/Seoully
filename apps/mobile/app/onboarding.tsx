@@ -225,7 +225,7 @@ export default function OnboardingScreen() {
   }
 
   if (loading || phase === "collect") {
-    return <SeoullyScreen><SeoullyLoadingState label={t.brand} /></SeoullyScreen>;
+    return <SeoullyLoadingState fullScreen label={t.brand} />;
   }
 
   if (!state) {

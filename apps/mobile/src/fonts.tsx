@@ -6,8 +6,7 @@ import { NotoSansKR_600SemiBold } from "@expo-google-fonts/noto-sans-kr/600SemiB
 import { NotoSansKR_700Bold } from "@expo-google-fonts/noto-sans-kr/700Bold";
 import { useFonts } from "expo-font";
 import type { PropsWithChildren } from "react";
-import { View } from "react-native";
-import { colors } from "./theme";
+import { SeoullyLoadingState } from "./ui/SeoullyLoadingState";
 
 export function FontProvider({ children }: PropsWithChildren) {
   const [loaded, error] = useFonts({
@@ -20,7 +19,7 @@ export function FontProvider({ children }: PropsWithChildren) {
     NotoSansKR_700Bold,
   });
   if (!loaded && !error) {
-    return <View style={{ backgroundColor: colors.canvas, flex: 1 }} />;
+    return <SeoullyLoadingState label="Seoully" />;
   }
   return children;
 }

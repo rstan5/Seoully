@@ -1,0 +1,58 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
+const jsx=(type,props)=>({type,props});
+function load(file,mocks){const box={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,{module:box,exports:box.exports,require:n=>n==='react/jsx-runtime'?{jsx,jsxs:jsx}:mocks(n)});return box.exports;}
+function hooks(){const slots=[];let index=0;const effects=[];return {reset(){index=0},effects,react:{useState(initial){const i=index++;if(!(i in slots))slots[i]=typeof initial==='function'?initial():initial;return [slots[i],value=>{slots[i]=typeof value==='function'?value(slots[i]):value}]},useRef(initial){const i=index++;if(!(i in slots))slots[i]={current:initial};return slots[i]},createContext:value=>({Provider:"LoadingProvider",value}),useContext:context=>context.value,useMemo:fn=>fn(),useCallback:fn=>fn,useLayoutEffect:fn=>effects.push(fn),useEffect:fn=>effects.push(fn)}};}
+const native={View:'View',Image:'Image',Modal:'Modal',Pressable:'Pressable',FlatList:'FlatList',ScrollView:'ScrollView',StyleSheet:{create:x=>x}};
+const copy={feedLoading:'Loading',feedUnavailable:'Unavailable',feedDiscover:'Discover',feedFollowing:'Following',retry:'Retry',enteringYourRoom:'Room'};
+function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject};}
+const tick=()=>new Promise(r=>setImmediate(r));
+function feedHarness(){const h=hooks(),requests=[];let focus;const social={kind:'production',capabilities:{discoverFeed:true},loadFeed(){const d=deferred();requests.push(d);return d.promise},loadSuggested:async()=>[]};const components=new Proxy({},{get:(_,name)=>name});
+ const Screen=load('apps/mobile/app/(tabs)/index.tsx',name=>name==='react'?h.react:name==='react-native'?native:name==='expo-router'?{useRouter:()=>({push(){}}),useFocusEffect:fn=>{focus=fn}}:name.endsWith('/data')?{useSocialRepository:()=>social}:name.endsWith('/locale')?{useCopy:()=>copy,useLocale:()=>({locale:'en',toggleLocale(){}})}:name.endsWith('/theme')?{colors:{},elevation:{}}:name.endsWith('/ask-surface')?{useReportAskSurface(){}}:components).default;
+ return {render(){h.reset();return Screen()},refresh(){return focus()},requests};}
+function contains(tree,type){if(!tree||typeof tree!=='object')return false;if(tree.type===type)return true;return Object.values(tree.props??{}).some(x=>Array.isArray(x)?x.some(y=>contains(y,type)):contains(x,type));}
+test('blocking Feed hydration hides header, tabs and content; success reveals ready destination',async()=>{
+ const f=feedHarness();const initial=f.render();assert.equal(initial.type,'SeoullyLoadingState');assert.equal(initial.props.fullScreen,true);assert.equal(contains(initial,'SeoullyHeader'),false);assert.equal(contains(initial,'FlatList'),false);
+ f.refresh();assert.equal(f.render().type,'SeoullyLoadingState');f.requests[0].resolve({items:[],nextCursor:null});await tick();const ready=f.render();assert.equal(ready.type,'SeoullyScreen');assert.equal(contains(ready,'SeoullyHeader'),true);assert.equal(contains(ready,'FlatList'),true);
+ // Even a confirmed empty Feed remains interactive during background refresh.
+ f.refresh();assert.equal(f.render().type,'SeoullyScreen');f.requests[1].resolve({items:[],nextCursor:null});await tick();
+});
+test('Feed hydration failure releases loader and exposes Retry',async()=>{const f=feedHarness();f.render();f.refresh();f.requests[0].reject(Error('offline'));await tick();const failed=f.render();assert.equal(failed.type,'SeoullyScreen');assert.equal(contains(failed,'RetryNotice'),true);});
+test('Following/Discover switch schedules one focus-owned request and hides stale mode UI',async()=>{
+ const f=feedHarness();f.render();f.refresh();f.requests[0].resolve({items:[],nextCursor:null});await tick();const ready=f.render();const list=ready.props.children.props.children.find(x=>x?.type==='FlatList');const controls=list.props.ListHeaderComponent.props.children[1].props.children;
+ controls[0].props.onPress();assert.equal(f.requests.length,1,'tap must not issue a duplicate fetch');assert.equal(f.render().type,'SeoullyLoadingState');f.refresh();assert.equal(f.requests.length,2);f.requests[1].resolve({items:[],nextCursor:null});await tick();assert.equal(f.render().type,'SeoullyScreen');
+});
+function heart(reduce){const h=hooks(),events=[];class Value{setValue(v){events.push(['value',v])}stopAnimation(){events.push(['stopValue'])}interpolate(config){return config}}
+ const animated={Value,View:'AnimatedView',timing:(value,config)=>({config}),sequence:steps=>({steps}),loop:sequence=>({start(){events.push(['start',sequence])},stop(){events.push(['stop'])}})};
+ const Component=load('apps/mobile/src/ui/SeoullyLoadingState.tsx',name=>name==='react'?h.react:name==='react-native'?{...native,Animated:animated,Easing:{sin:'sin',inOut:x=>x}}:name==='../theme'?{colors:{canvas:'canonical'}}:name==='./motion'?{useReduceMotion:initial=>{assert.equal(initial,true);return reduce}}:1).SeoullyLoadingState;
+ h.reset();const element=Component({label:'Loading'});h.reset();const tree=element.type(element.props);const cleanup=h.effects.at(-1)();return {tree,events,cleanup};}
+test('shared full-screen loader uses canonical canvas and heart, with no spinner or visible text',()=>{const h=heart(false);const surface=h.tree;assert.equal(surface.props.style.backgroundColor,'canonical');assert.equal(surface.props.accessibilityState.busy,true);assert.equal(contains(surface,'ActivityIndicator'),false);assert.equal(contains(surface,'SeoullyText'),false);assert.equal(contains(surface,'Image'),true);h.cleanup();});
+test('heart gently floats six pixels every 3.6 seconds on native driver and stops on unmount',()=>{const h=heart(false);const steps=h.events.find(x=>x[0]==='start')[1].steps;assert.equal(steps.length,2);for(const step of steps){assert.equal(step.config.duration,1800);assert.equal(step.config.useNativeDriver,true);assert.equal(step.config.isInteraction,false)}const transform=h.tree.props.children.props.style.transform[0];assert.deepEqual(Array.from(transform.translateY.outputRange),[3,-3]);h.cleanup();assert.ok(h.events.some(x=>x[0]==='stop'));});
+test('reduced-motion loader is static and starts no animation',()=>{const h=heart(true);assert.equal(h.events.some(x=>x[0]==='start'),false);assert.equal(h.tree.props.children.props.style.transform[0].translateY,0);});
+test('actual Live Room hydration boundary hides world until ready and keeps failure reachable',()=>{
+ const screen=fs.readFileSync('apps/mobile/src/room/RoomWorldScreen.tsx','utf8');const begin=screen.indexOf('  if (liveRoomNeedsHydration(');const end=screen.indexOf('  if (privateRoom && !loading)',begin);const box={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync('apps/mobile/src/room/liveRoomSync.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{module:box,exports:box.exports});
+ const context={exports:{},demo:false,loading:true,snapshot:null,privateRoom:false,error:null,copy,liveRoomNeedsHydration:box.exports.liveRoomNeedsHydration,SeoullyLoadingState:'SeoullyLoadingState',View:'View',Stack:{Screen:'StackScreen'},OverlayChrome:'OverlayChrome',SeoullyText:'SeoullyText',Pressable:'Pressable',styles:{},roomTheme:{},immersiveRoomFill:()=>({}),overlayTheme:{},overlayPad:{},onLeave(){},refresh(){},require:()=>({jsx,jsxs:jsx})};vm.createContext(context);vm.runInContext(ts.transpileModule('function boundary(){'+screen.slice(begin,end)+'return "saved-world";} this.boundary=boundary;', {compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText,context);
+ assert.equal(context.boundary().type,'SeoullyLoadingState');context.loading=false;assert.equal(context.boundary().type,'SeoullyLoadingState','no starter world without a snapshot');context.snapshot={room:{layout:'saved'}};assert.equal(context.boundary(),'saved-world');context.snapshot=null;context.error='offline';const failure=context.boundary();assert.equal(failure.type,'View');assert.equal(contains(failure,'Pressable'),true);
+});
+test('single root loading host covers all chrome, survives overlapping boundaries, releases after last load',()=>{
+ const h=hooks();let context;
+ h.react.createContext=value=>(context={Provider:'Provider',value});h.react.useContext=()=>context.value;
+ const {SeoullyLoadingHost,SeoullyLoadingState}=load('apps/mobile/src/ui/SeoullyLoadingState.tsx',name=>name==='react'?h.react:name==='react-native'?native:name==='../theme'?{colors:{canvas:'canonical'}}:{});
+ const render=()=>{h.reset();return SeoullyLoadingHost({children:'destination-and-chrome'})};
+ let tree=render();context.value=tree.props.value;
+ SeoullyLoadingState({label:'Feed',fullScreen:true});const releaseFeed=h.effects.at(-1)();
+ tree=render();let root=tree.props.children;assert.equal(root.props.children[0].props.pointerEvents,'none');assert.equal(root.props.children[0].props.accessibilityElementsHidden,true);assert.equal(root.props.children[1].props.children.props.label,'Feed');
+ const releaseRoom=context.value.show('Room');releaseFeed();tree=render();root=tree.props.children;assert.equal(root.props.children[1].props.children.props.label,'Room');
+ releaseRoom();tree=render();root=tree.props.children;assert.equal(root.props.children[0].props.pointerEvents,'auto');assert.equal(root.props.children[1],null);
+});
+test('reduced-motion preference is conservative until read and responds to live settings changes',async()=>{
+ const h=hooks();let changed,removed=false;
+ const {useReduceMotion}=load('apps/mobile/src/ui/motion.ts',name=>name==='react'?h.react:name==='react-native'?{AccessibilityInfo:{isReduceMotionEnabled:async()=>false,addEventListener:(event,fn)=>{changed=fn;return {remove(){removed=true}}}}}:{motion:{pressOffset:1}});
+ h.reset();assert.equal(useReduceMotion(true),true);const cleanup=h.effects[0]();await tick();h.reset();assert.equal(useReduceMotion(true),false);changed(true);h.reset();assert.equal(useReduceMotion(true),true);cleanup();assert.equal(removed,true);
+});
+for (const file of ['apps/mobile/app/binder.tsx','apps/mobile/app/collection.tsx']) test(`${file}: blocking load covers chrome; confirmed empty state survives background refresh`,()=>{
+ const source=fs.readFileSync(file,'utf8');const line=source.split('\n').find(x=>x.includes('if (social.kind !== "demo" && loading && hydratedKind'));
+ const context={exports:{},social:{kind:'production'},loading:true,hydratedKind:null,error:null,SeoullyLoadingState:'SeoullyLoadingState',copy:{binder:'Binder',collection:'Collection'},require:()=>({jsx,jsxs:jsx})};vm.createContext(context);vm.runInContext(ts.transpileModule('function boundary(){'+line+'return "destination";} this.boundary=boundary;', {compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText,context);
+ assert.equal(context.boundary().type,'SeoullyLoadingState');context.hydratedKind='production';assert.equal(context.boundary(),'destination');context.hydratedKind=null;context.error='offline';assert.equal(context.boundary(),'destination');context.error=null;context.social.kind='demo';assert.equal(context.boundary(),'destination');
+});

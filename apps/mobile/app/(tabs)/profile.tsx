@@ -197,6 +197,8 @@ export default function ProfileScreen() {
   const palette = useMemo(() => identityPalette(theme), [theme]);
   usePublishProfileIdentity(palette);
 
+  if (loading && !identity && !error) return <SeoullyLoadingState fullScreen label={copy.profile} />;
+
   return (
     <SeoullyScreen backgroundColor={palette.mist}>
       <SeoullyRoomUnderlay theme={theme} />
@@ -205,7 +207,6 @@ export default function ProfileScreen() {
         <SeoullyProfileChrome>
       <SeoullyHeader languageLabel={copy.switchLanguage} onToggleLanguage={toggleLocale} />
       <SeoullyText variant="caption" style={styles.underlayHint}>{copy.profileUnderlayHint}</SeoullyText>
-      {loading && !identity ? <SeoullyLoadingState label={copy.profile} /> : null}
       {error ? <View style={styles.notice}><RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /></View> : null}
       {identity ? (
         <ScrollView contentContainerStyle={styles.container}>

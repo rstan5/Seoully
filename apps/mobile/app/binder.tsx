@@ -1,6 +1,7 @@
+import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { AccessibilityInfo, ActivityIndicator, Animated, Easing, FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { AccessibilityInfo, Animated, Easing, FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSocialRepository } from "../src/data";
@@ -28,6 +29,7 @@ export default function BinderScreen() {
   const [spreadIndex, setSpreadIndex] = useState(0);
   const [spreadReady, setSpreadReady] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [hydratedKind, setHydratedKind] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cover] = useState(() => new Animated.Value(0));
   const closing = useRef(false);
@@ -51,6 +53,7 @@ export default function BinderScreen() {
         if (page.length < 100) break;
       }
       setHoldings(items);
+      setHydratedKind(social.kind);
       setError(null);
     } catch {
       setError(copy.binderUnavailable);
@@ -111,15 +114,17 @@ export default function BinderScreen() {
     });
   };
 
+  if (social.kind !== "demo" && loading && hydratedKind !== social.kind && !error) return <SeoullyLoadingState fullScreen label={copy.binder} />;
+
   return <SafeAreaView edges={["top"]} style={styles.safe}><View style={styles.container}>
     <ScreenBack label={copy.closeBinder} onPress={closeBinder} />
     <Text style={styles.title}>{copy.binder}</Text>
     <Text style={styles.lead}>{copy.binderLead}</Text>
     {!loading && !photocards.length ? <Text style={styles.empty}>{copy.binderEmpty}</Text> : null}
     {sections.length > 1 ? <View><Text style={styles.sectionLabel}>{copy.jumpToSet}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sectionRow}>{sections.map((section) => <Pressable key={section.setId} accessibilityRole="button" accessibilityState={{ selected: spreads[visibleSpread]?.left.setId === section.setId }} onPress={() => listRef.current?.scrollToIndex({ index: section.spreadIndex, animated: true })} style={[styles.sectionChip, spreads[visibleSpread]?.left.setId === section.setId && styles.sectionChipSelected]}><Text style={[styles.sectionChipText, spreads[visibleSpread]?.left.setId === section.setId && styles.sectionChipTextSelected]}>{section.setName}</Text></Pressable>)}</ScrollView></View> : null}
-    {loading ? <ActivityIndicator color={colors.plum} style={styles.loading} /> : null}
+    {loading && social.kind === "demo" ? <SeoullyLoadingState label={copy.binder} /> : null}
     {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
-    {!loading ? <View style={styles.binderStage}>
+    {!loading || (social.kind !== "demo" && hydratedKind === social.kind) ? <View style={styles.binderStage}>
       <FlatList
       ref={listRef}
       data={spreads}

@@ -209,6 +209,8 @@ export default function CollectorScreen() {
   const palette = identityPalette(collector?.theme);
   usePublishProfileIdentity(palette);
 
+  if (loading && !collector && !error) return <SeoullyLoadingState fullScreen label={copy.profile} />;
+
   return (
     <SeoullyScreen backgroundColor={palette.mist}>
       <SeoullyRoomUnderlay theme={collector?.theme} />
@@ -221,7 +223,6 @@ export default function CollectorScreen() {
           <SeoullyText variant="button">{copy.switchLanguage}</SeoullyText>
         </Pressable>
       </View>
-      {loading && !collector ? <SeoullyLoadingState label={copy.profile} /> : null}
       {error ? <View style={styles.notice}><RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /></View> : null}
       {collector ? (
         <ScrollView contentContainerStyle={styles.container}>

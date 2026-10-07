@@ -3,6 +3,7 @@ import { View } from "react-native";
 import * as Linking from "expo-linking";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SeoullyLoadingHost } from "../src/ui/SeoullyLoadingState";
 import { FontProvider } from "../src/fonts";
 import { DataModeProvider } from "../src/data";
 import { LocaleProvider } from "../src/locale";
@@ -27,6 +28,7 @@ export default function RootLayout() {
   }, []);
   return (
     <SafeAreaProvider>
+      <SeoullyLoadingHost>
       <LocaleProvider>
         <DataModeProvider>
           <FontProvider>
@@ -40,6 +42,7 @@ export default function RootLayout() {
           </FontProvider>
         </DataModeProvider>
       </LocaleProvider>
+      </SeoullyLoadingHost>
     </SafeAreaProvider>
   );
 }

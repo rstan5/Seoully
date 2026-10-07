@@ -238,7 +238,7 @@ assertContains(read("apps/mobile/src/ui/shellLayout.ts"), "safe-area + gutter on
 const authTree = read("apps/mobile/src/startup/AuthRouteTree.tsx");
 assertContains(authTree, 'name="room" options={{ contentStyle: immersiveRoomFill(ROOM_THEMES.hearth.void), gestureEnabled: false, fullScreenGestureEnabled: false }}', "own Room disables swipe-back and paints the stack card");
 assertContains(authTree, 'name="collector-room" options={{ contentStyle: immersiveRoomFill(ROOM_THEMES.hearth.void), gestureEnabled: false, fullScreenGestureEnabled: false }}', "collector Room disables swipe-back and paints the stack card");
-assertContains(authTree, 'edges={["top", "bottom"]}', "loading uses the usable safe viewport");
+assertContains(authTree, '<SeoullyLoadingState fullScreen', "blocking startup uses the full-screen branded surface");
 assertContains(read("apps/mobile/app/room.tsx"), "gestureEnabled: false", "own Room route gesture off");
 assertContains(read("apps/mobile/app/collector-room.tsx"), "gestureEnabled: false", "collector Room route gesture off");
 assertNotContains(read("apps/mobile/app/collectible.tsx"), "gestureEnabled: false", "other stack routes keep swipe-back");

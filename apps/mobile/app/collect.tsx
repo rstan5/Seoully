@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ScrollView, StyleSheet, View } from "react-native";
-import { contributeCatalogItem, type NativeCatalogTemplate } from "../src/api";
+import { type NativeCatalogTemplate } from "../src/api";
+import { submitManualCatalog } from "../src/manualCatalog";
 import { useSocialRepository } from "../src/data";
 import { KeyboardScreen } from "../src/components/KeyboardScreen";
 import { ScreenBack } from "../src/components/ScreenBack";
@@ -35,6 +36,7 @@ export default function CollectScreen() {
   const [releaseName, setReleaseName] = useState("");
   const [versionName, setVersionName] = useState("");
   const [kind, setKind] = useState<(typeof COLLECTIBLE_KINDS)[number]>("photocard");
+  const submitting = useRef(false);
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -83,10 +85,12 @@ export default function CollectScreen() {
     if (social.kind === "demo") return setMessage(copy.demoWriteBlocked);
     if (!name.trim()) return setMessage(copy.collectibleNameRequired);
     if (!groupName.trim()) return setMessage(copy.groupNameRequired);
+    if (submitting.current) return;
+    submitting.current = true;
     setWorking(true);
     setMessage(null);
     try {
-      const result = await contributeCatalogItem({
+      const result = await submitManualCatalog({
         name: name.trim(),
         groupName: groupName.trim(),
         memberName: memberName.trim() || undefined,
@@ -98,6 +102,7 @@ export default function CollectScreen() {
     } catch {
       setMessage(copy.collectibleCreateFailed);
     } finally {
+      submitting.current = false;
       setWorking(false);
     }
   }

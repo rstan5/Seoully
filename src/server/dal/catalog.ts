@@ -15,6 +15,7 @@ export const catalogSearchSchema = z.object({
 }).strict();
 
 export const catalogContributionSchema = z.object({
+  submissionKey: z.string().uuid().optional(),
   name: z.string().trim().min(1).max(200),
   kind: z.enum(kindValues),
   groupName: z.string().trim().min(1).max(120),

@@ -265,7 +265,7 @@ export async function uploadCatalogReferencePhoto(templateId: string, uri: strin
   return response.json();
 }
 
-export async function contributeCatalogItem(input: { name: string; kind: string; groupName: string; memberName?: string; releaseName?: string; descriptor?: string }) {
+export async function contributeCatalogItem(input: { submissionKey: string; name: string; kind: string; groupName: string; memberName?: string; releaseName?: string; descriptor?: string }) {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
   if (!accessToken) throw new Error("unauthenticated");

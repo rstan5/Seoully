@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "incremental": false },
+  "include": ["src/server/dal/catalog.ts", "src/app/api/mobile/catalog/contributions/route.ts"],
+  "exclude": ["node_modules", "apps/mobile"]
+}

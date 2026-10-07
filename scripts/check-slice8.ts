@@ -69,7 +69,8 @@ assertNotContains(onboarding, "createHolding(", "onboarding does not duplicate H
 
 // I/J catalog + manual
 assertContains(collect, "social.searchCatalog", "catalog search");
-assertContains(collect, "contributeCatalogItem", "manual contribution");
+assertContains(collect, "submitManualCatalog", "manual contribution");
+assertContains(read("apps/mobile/src/manualCatalog.ts"), "contributeCatalogItem(input)", "manual submission uses canonical API");
 assertContains(collect, "addManuallyTitle", "manual add visible");
 
 // K/L/M/N media + crop + consent

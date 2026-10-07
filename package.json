@@ -18,6 +18,7 @@
     "check:slice7": "tsc --project tsconfig.check-slice7.json && node -r ./scripts/register-build-alias.cjs .tmp/build/scripts/check-slice7.js",
     "check:slice7c": "npm run check:slice7",
     "check:slice7d": "tsc --project tsconfig.check-slice7d.json && node -r ./scripts/register-build-alias.cjs .tmp/build/scripts/check-slice7d.js && node scripts/check-room-geometry.cjs && node scripts/check-room-instance-workflows.cjs && npm run check:room-persistence",
+    "check:room-live-sync": "node scripts/check-room-live-sync.cjs",
     "check:room-persistence": "tsc --project tsconfig.check-room-persistence.json && node scripts/check-room-persistence.cjs",
     "check:slice8": "tsc --project tsconfig.check-slice8.json && node -r ./scripts/register-build-alias.cjs .tmp/build/scripts/check-slice8.js",
     "check:startup": "tsc --project tsconfig.check-startup.json && node .tmp/build/scripts/check-startup.js",

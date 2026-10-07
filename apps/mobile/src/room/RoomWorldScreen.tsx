@@ -1,8 +1,9 @@
+import { LiveRoomSync, liveRoomNeedsHydration } from "./liveRoomSync";
 import { PhotoStringSheet } from "./PhotoStringSheet";
 import { configuredPhotoString, type PublicPhotoStringCard } from "./photoString";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Stack, useFocusEffect } from "expo-router";
-import { AccessibilityInfo, Animated, AppState, Easing, PanResponder, Pressable, StyleSheet, View, type GestureResponderEvent } from "react-native";
+import { AccessibilityInfo, ActivityIndicator, Animated, AppState, Easing, PanResponder, Pressable, StyleSheet, View, type GestureResponderEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { loadCollectorProfile, loadCollectorRoom, loadNativeRoom, removeNativeRoomPlacement, saveNativeRoomLayout, saveNativeRoomPlacement, saveNativeRoomStyle, type NativeHolding, type NativeRoomSnapshot } from "../api";
 import { binderSpreads, buildNativeBinderPages, spreadIndexForHolding } from "../binder/model";
@@ -154,6 +155,7 @@ export function RoomWorldScreen({
   const selectedRef = useRef(selectedId);
   const onOwnRoomRef = useRef(onOwnRoom);
   const snapshotRef = useRef(snapshot);
+  const liveSync = useRef(new LiveRoomSync()).current;
   const reducedMotionRef = useRef(reducedMotion);
   const exploreRef = useRef<ExploreOffset>({ ...IDENTITY_EXPLORE });
   const homeExploreRef = useRef<ExploreOffset>({ ...IDENTITY_EXPLORE });
@@ -204,6 +206,10 @@ export function RoomWorldScreen({
     gestureRef.current.lastDx = gestureRef.current.lastDy = 0;
     setSelectedObjectId(null);
     setSelectedId(null);
+    if (!demo) {
+      layoutStateRef.current = next;
+      latestObjects.current = next.objects;
+    }
     setRoomLayout(next);
     if (viewRef.current.kind === "edit") return;
     if (!shouldAutoEnterFirstRoomEdit(next, readOnlyRoom)) return;
@@ -247,6 +253,11 @@ export function RoomWorldScreen({
 
   const refresh = useCallback(async () => {
     setLoading(true);
+    const ticket = liveSync.beginLoad();
+    if (!demo) {
+      await liveSync.idle();
+      if (!liveSync.acceptsLoad(ticket)) return;
+    }
     try {
       if (demo) {
         if (!__DEV__) throw new Error("demo_world_forbidden");
@@ -277,6 +288,7 @@ export function RoomWorldScreen({
         }
       } else if (mode === "public" && userId) {
         const publicRoom = await loadCollectorRoom(userId);
+        if (!liveSync.acceptsLoad(ticket)) return;
         if (publicRoom.viewerUserId && publicRoom.viewerUserId === publicRoom.owner.userId) {
           onOwnRoomRef.current?.();
           return;
@@ -297,6 +309,8 @@ export function RoomWorldScreen({
       } else if (persistLive) {
         const next = await loadNativeRoom();
         const identity = await loadCollectorProfile(next.room.ownerUserId).catch(() => null);
+        if (!liveSync.acceptsLoad(ticket)) return;
+        liveSync.resetConfirmed();
         setOwnerName(identity?.profile.user.displayName ?? "");
         setSnapshot(next);
         setHoldings(next.holdings);
@@ -311,13 +325,13 @@ export function RoomWorldScreen({
       }
       setError(null);
     } catch {
-      setError(copy.roomUnavailable);
+      if (demo || liveSync.acceptsLoad(ticket)) setError(copy.roomUnavailable);
     } finally {
-      setLoading(false);
+      if (demo || liveSync.acceptsLoad(ticket)) setLoading(false);
     }
     // applyLoadedLayout is a local helper over refs/setters; including it retriggers Room fetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [copy.demoRoomUnavailable, copy.roomUnavailable, demo, mode, persistLive, userId]);
+  }, [copy.demoRoomUnavailable, copy.roomUnavailable, demo, mode, persistLive, userId, liveSync]);
 
   useFocusEffect(useCallback(() => {
     clearPendingPress();
@@ -333,8 +347,8 @@ export function RoomWorldScreen({
     activeTouchesRef.current = 0;
     gestureRef.current.pinching = false;
     void refresh();
-    return () => { clearPendingPress(); clearHeldVisual(); touchOwnerRef.current = null; };
-  }, [refresh]));
+    return () => { if (!demo) liveSync.cancelLoad(); clearPendingPress(); clearHeldVisual(); touchOwnerRef.current = null; };
+  }, [refresh, demo, liveSync]));
 
   const binderPages = useMemo(() => buildNativeBinderPages(holdings, copy.binderGeneral ?? "Your Photocards"), [copy.binderGeneral, holdings]);
   const spreads = useMemo(() => binderSpreads(binderPages), [binderPages]);
@@ -762,7 +776,7 @@ export function RoomWorldScreen({
           ...baseline.map((item) => persistPlacement(item, { silent: true })),
           ...[...currentIds].filter((id) => !baselineIds.has(id)).map((id) => demo
             ? Promise.resolve(loadDemoRoom().removeDemoPlacement(room.id, id))
-            : removeNativeRoomPlacement(room.id, id)),
+            : removeLivePlacement(room.id, id)),
         ]);
       } catch {
         setError(copy.roomSaveFailed);
@@ -784,7 +798,8 @@ export function RoomWorldScreen({
     if (!room || readOnly) return;
     try {
       if (demo) loadDemoRoom().saveDemoRoomStyle(room.ownerUserId, next);
-      else await saveNativeRoomStyle(room.id, next);
+      else await liveSync.save("style", next, parseRoomStyle(room.style), setRoomStyle,
+        () => saveNativeRoomStyle(room.id, next));
       setSnapshot((current) => current ? { ...current, room: { ...current.room, style: next } } : current);
     } catch {
       setError(copy.roomSaveFailed);
@@ -794,6 +809,17 @@ export function RoomWorldScreen({
   async function applyRoomStyle(next: NativeRoomStyle) {
     setRoomStyle(next);
     await persistRoomStyle(next);
+  }
+
+  async function removeLivePlacement(roomId: string, holdingId: string) {
+    const before = latestItems.current.find((item) => item.holding.id === holdingId);
+    try {
+      await liveSync.save(`placement:${holdingId}`, undefined as RoomRenderable | undefined, before, (value) => {
+        const all = latestItems.current.filter((item) => item.holding.id !== holdingId);
+        latestItems.current = value ? [...all, value] : all;
+        setItems(latestItems.current);
+      }, () => removeNativeRoomPlacement(roomId, holdingId));
+    } catch (err) { setError(copy.roomSaveFailed); throw err; }
   }
 
   async function persistPlacement(next: RoomRenderable, options?: { silent?: boolean; world?: boolean }) {
@@ -817,7 +843,17 @@ export function RoomWorldScreen({
       surfaceId: settled.surfaceId,
     };
     try {
-      const placement = demo ? loadDemoRoom().saveDemoPlacement(payload) : await saveNativeRoomPlacement(payload);
+      if (!demo) {
+        const before = latestItems.current.find((item) => item.holding.id === next.holding.id);
+        const stored = { ...authored, placement: { ...next.placement, ...payload, id: next.placement?.id ?? `pending-${next.holding.id}`, offset: null } };
+        await liveSync.save(`placement:${next.holding.id}`, stored as RoomRenderable | undefined, before, (value) => {
+          const all = latestItems.current.filter((item) => item.holding.id !== next.holding.id);
+          latestItems.current = value ? [...all, value] : all;
+          setItems(latestItems.current);
+        }, () => saveNativeRoomPlacement(payload));
+        return stored;
+      }
+      const placement = loadDemoRoom().saveDemoPlacement(payload);
       const stored = { ...authored, placement };
       setItems((all) => {
         const mapped = all.map((item) => item.holding.id === next.holding.id ? stored : item);
@@ -825,7 +861,7 @@ export function RoomWorldScreen({
       });
       return stored;
     } catch {
-      if (!options?.silent) setError(copy.roomSaveFailed);
+      if (!options?.silent || !demo) setError(copy.roomSaveFailed);
       return undefined;
     }
   }
@@ -836,6 +872,7 @@ export function RoomWorldScreen({
     if (!held || gestureRef.current.releasing) return;
     gestureRef.current.releasing = true;
     clearHeldVisual();
+    if (!demo) gestureRef.current.releasing = false;
     suppressTapRef.current = true;
     try {
       if (!room || !held.valid || !held.surfaceId || !isSupportedRoomPlacement(held.rest, room.id, latestObjects.current)) {
@@ -846,11 +883,13 @@ export function RoomWorldScreen({
       }
       const authoredRest = asAuthoredRenderable(held.rest, room.id, latestObjects.current);
       if (held.origin && placementsMatch(held.origin, authoredRest)) return;
-      const stored = await persistPlacement(held.rest, { world: true });
+      const pending = persistPlacement(held.rest, { world: true });
+      if (!demo) gestureRef.current.releasing = false;
+      const stored = await pending;
       if (stored) rememberPlacement(held.origin ?? { storedHoldingId: held.holdingId }, stored);
     } finally {
-      clearHeldVisual();
-      gestureRef.current.releasing = false;
+      if (demo) clearHeldVisual();
+      if (demo) gestureRef.current.releasing = false;
     }
   }
 
@@ -861,14 +900,23 @@ export function RoomWorldScreen({
     const document = serializeRoomLayout(next);
     try {
       if (demo) loadDemoRoom().saveDemoRoomLayout(room.ownerUserId, next);
-      else await saveNativeRoomLayout(room.id, document);
+      else {
+        const baseline = parseRoomLayout(room.layout);
+        await liveSync.save("layout", next, baseline, (value) => {
+          layoutStateRef.current = value;
+          latestObjects.current = value.objects;
+          setRoomLayout(value);
+        }, () => saveNativeRoomLayout(room.id, document));
+        setSnapshot((current) => current ? { ...current, room: { ...current.room, layout: document } } : current);
+        return true;
+      }
       setSnapshot((current) => current ? { ...current, room: { ...current.room, layout: document } } : current);
       setRoomLayout(next);
       layoutStateRef.current = next;
       latestObjects.current = next.objects;
       return true;
     } catch (err) {
-      if (!options?.silent) setError(err instanceof Error && err.message === "room_layout_unavailable" ? copy.roomLayoutUnavailable : copy.roomSaveFailed);
+      if (!options?.silent || !demo) setError(err instanceof Error && err.message === "room_layout_unavailable" ? copy.roomLayoutUnavailable : copy.roomSaveFailed);
       return false;
     }
   }
@@ -883,6 +931,7 @@ export function RoomWorldScreen({
     if (!held || gestureRef.current.releasing) return;
     gestureRef.current.releasing = true;
     clearHeldVisual();
+    if (!demo) gestureRef.current.releasing = false;
     suppressTapRef.current = true;
     try {
       if (!held.valid) {
@@ -899,7 +948,9 @@ export function RoomWorldScreen({
       const afterObjects = held.placing
         ? [...removeRoomObject(beforeObjects, held.objectId), held.current]
         : replaceRoomObject(beforeObjects, held.current);
-      if (!await persistLayout({ ...layoutStateRef.current, source: "authored", objects: afterObjects })) return;
+      const pending = persistLayout({ ...layoutStateRef.current, source: "authored", objects: afterObjects });
+      if (!demo) gestureRef.current.releasing = false;
+      if (!await pending) return;
       pushPlacementHistory(undoStack.current, redoStack.current, {
         before: { storedHoldingId: held.objectId },
         after: { storedHoldingId: held.objectId },
@@ -907,11 +958,13 @@ export function RoomWorldScreen({
         objectsAfter: cloneRoomObjects(afterObjects),
       });
       syncHistory();
-      setSelectedObjectId(held.objectId);
-      setSelectedId(null);
+      if (demo) {
+        setSelectedObjectId(held.objectId);
+        setSelectedId(null);
+      }
     } finally {
-      clearHeldVisual();
-      gestureRef.current.releasing = false;
+      if (demo) clearHeldVisual();
+      if (demo) gestureRef.current.releasing = false;
     }
   }
 
@@ -932,8 +985,8 @@ export function RoomWorldScreen({
       const room = snapshotRef.current?.room;
       if (!room) return;
       if (demo) loadDemoRoom().removeDemoPlacement(room.id, before.storedHoldingId);
-      else await removeNativeRoomPlacement(room.id, before.storedHoldingId);
-      setItems((current) => storeRenderable(current, before.storedHoldingId));
+      else await removeLivePlacement(room.id, before.storedHoldingId);
+      if (demo) setItems((current) => storeRenderable(current, before.storedHoldingId));
       return;
     }
     await persistPlacement(before);
@@ -956,8 +1009,8 @@ export function RoomWorldScreen({
       const room = snapshotRef.current?.room;
       if (!room) return;
       if (demo) loadDemoRoom().removeDemoPlacement(room.id, after.storedHoldingId);
-      else await removeNativeRoomPlacement(room.id, after.storedHoldingId);
-      setItems((current) => storeRenderable(current, after.storedHoldingId));
+      else await removeLivePlacement(room.id, after.storedHoldingId);
+      if (demo) setItems((current) => storeRenderable(current, after.storedHoldingId));
       return;
     }
     await persistPlacement(after);
@@ -976,10 +1029,13 @@ export function RoomWorldScreen({
       clearPendingPress();
       clearHeldVisual();
       await Promise.all([
-        ...items.map((item) => persistPlacement(item)),
+        ...items.map(async (item) => {
+          const saved = await persistPlacement(item);
+          if (!saved) throw new Error("room_placement_write_failed");
+        }),
         ...[...baselineIds].filter((id) => !currentIds.has(id)).map((id) => demo
           ? Promise.resolve(loadDemoRoom().removeDemoPlacement(room.id, id))
-          : removeNativeRoomPlacement(room.id, id)),
+          : removeLivePlacement(room.id, id)),
       ]);
       const completed = markFirstRoomEditComplete(layoutStateRef.current);
       if (!await persistLayout(completed)) return;
@@ -1067,8 +1123,8 @@ export function RoomWorldScreen({
     for (const item of source) {
       if (targetIds.has(item.holding.id)) continue;
       if (demo) loadDemoRoom().removeDemoPlacement(room.id, item.holding.id);
-      else await removeNativeRoomPlacement(room.id, item.holding.id);
-      setItems((items) => storeRenderable(items, item.holding.id));
+      else await removeLivePlacement(room.id, item.holding.id);
+      if (demo) setItems((items) => storeRenderable(items, item.holding.id));
     }
     for (const item of target) {
       if (!await persistPlacement(item, { silent: true })) throw new Error("room_child_restore_failed");
@@ -1125,13 +1181,16 @@ export function RoomWorldScreen({
     const next = replaceRoomObject(current, nextObject);
     const nextLayout = { ...beforeLayout, source: "authored" as const, objects: next };
     // Show the turn and coherent clamp immediately; failed Live saves restore the prior state.
-    shopSaving.current = true;
-    latestObjects.current = next;
-    layoutStateRef.current = nextLayout;
-    setRoomLayout(nextLayout);
+    if (demo) shopSaving.current = true;
+    if (demo) {
+      latestObjects.current = next;
+      layoutStateRef.current = nextLayout;
+      setRoomLayout(nextLayout);
+    }
     const saved = await persistLayout(nextLayout);
-    shopSaving.current = false;
+    if (demo) shopSaving.current = false;
     if (!saved) {
+      if (!demo) return;
       latestObjects.current = current;
       layoutStateRef.current = beforeLayout;
       setRoomLayout(beforeLayout);
@@ -1194,8 +1253,8 @@ export function RoomWorldScreen({
     clearHeldVisual();
     try {
       if (demo) loadDemoRoom().removeDemoPlacement(snapshot.room.id, selectedId);
-      else await removeNativeRoomPlacement(snapshot.room.id, selectedId);
-      setItems((current) => storeRenderable(current, selectedId));
+      else await removeLivePlacement(snapshot.room.id, selectedId);
+      if (demo) setItems((current) => storeRenderable(current, selectedId));
       if (stored) rememberPlacement(stored, { storedHoldingId: selectedId });
       setSelectedId(null);
     } catch {
@@ -1233,6 +1292,17 @@ export function RoomWorldScreen({
     paddingBottom: insets.bottom + chrome.companionClearance,
     paddingRight: chrome.companionSize + chrome.gutter + chrome.companionClearance,
   };
+
+  if (liveRoomNeedsHydration(demo, loading, snapshot !== null || privateRoom)) {
+    return <View style={[styles.world, immersiveRoomFill(roomTheme.void)]}>
+      <Stack.Screen options={{ contentStyle: immersiveRoomFill(roomTheme.void) }} />
+      <OverlayChrome copy={copy} chrome={overlayTheme} onBack={onLeave} style={overlayPad} />
+      <View style={styles.empty}>
+        {error ? <SeoullyText variant="secondary">{error}</SeoullyText> : <ActivityIndicator accessibilityLabel={copy.enteringYourRoom} color={overlayTheme.color} />}
+        {error ? <Pressable onPress={() => void refresh()}><SeoullyText variant="button">{copy.retry}</SeoullyText></Pressable> : null}
+      </View>
+    </View>;
+  }
 
   if (privateRoom && !loading) {
     return <View style={[styles.world, immersiveRoomFill(roomTheme.void)]}>
@@ -1288,7 +1358,7 @@ export function RoomWorldScreen({
         clearPendingPress(); clearHeldVisual(); touchOwnerRef.current = null;
       }}
     >
-      <Suspense fallback={null}>
+      <Suspense fallback={demo ? null : <ActivityIndicator accessibilityLabel={copy.enteringYourRoom} color={overlayTheme.color} style={StyleSheet.absoluteFill} />}>
         <NativeRoomRenderer
           key={canvasEpoch}
           ownerName={ownerName}

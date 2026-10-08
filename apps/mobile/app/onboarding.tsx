@@ -1,16 +1,15 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   loadMyHolding,
-  loadMyHoldings,
   loadNativeOnboarding,
   updateNativeOnboarding,
   type NativeHolding,
   type NativeOnboardingState,
 } from "../src/api";
 import { ScreenBack } from "../src/components/ScreenBack";
-import { useDataMode, useSocialRepository, type SocialSuggested } from "../src/data";
+import { useDataMode } from "../src/data";
 import { isBinderEligible } from "../src/data/ownership";
 import { useCopy, useLocale } from "../src/locale";
 import {
@@ -20,7 +19,7 @@ import {
 } from "../src/onboarding/journey";
 import { colors } from "../src/theme";
 import { BrandMark } from "../src/ui/BrandMark";
-import { SeoullyAvatar } from "../src/ui/SeoullyAvatar";
+import { readFirstCollectibleDraft } from "../src/onboarding/firstCollectibleStorage";
 import { SeoullyButton, SeoullyChoiceChip } from "../src/ui/SeoullyControls";
 import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
 import { useBootstrap } from "../src/startup/BootstrapProvider";
@@ -52,16 +51,16 @@ export default function OnboardingScreen() {
   const t = useCopy();
   const { locale, toggleLocale } = useLocale();
   const reduceMotion = useReduceMotion();
-  const social = useSocialRepository();
   const { setDemo } = useDataMode();
   const boot = useBootstrap();
+  const loadGeneration = useRef(0);
+  const savingIdentity = useRef(false);
   const [state, setState] = useState<NativeOnboardingState | null>(null);
   const [phase, setPhase] = useState<OnboardingPhase>("group");
   const [groupIds, setGroupIds] = useState<string[]>([]);
   const [biasIds, setBiasIds] = useState<string[]>([]);
   const [interests, setInterests] = useState<string[]>(["photocards"]);
   const [holding, setHolding] = useState<NativeHolding | null>(null);
-  const [people, setPeople] = useState<SocialSuggested[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,36 +68,42 @@ export default function OnboardingScreen() {
   const [revealOpacity] = useState(() => new Animated.Value(reduceMotion ? 1 : 0));
 
   async function load() {
+    const generation = ++loadGeneration.current;
     setLoading(true);
+    setState(null);
     setError(null);
     try {
       if (!editingTastes) setDemo(false);
       const next = await loadNativeOnboarding();
+      if (generation !== loadGeneration.current) return;
       if (next.step === "done" && !editingTastes) {
+        boot.enterApp();
         router.replace("/(tabs)");
         return;
       }
-      let holdings: NativeHolding[] = [];
-      let hinted: NativeHolding | null = null;
+      let confirmedHolding: NativeHolding | null = null;
       if (!editingTastes && next.step === "interest") {
-        try {
-          holdings = await loadMyHoldings(0, 20);
-        } catch {
-          holdings = [];
+        const pending = await readFirstCollectibleDraft();
+        if (generation !== loadGeneration.current) return;
+        if (pending) {
+          router.replace({ pathname: "/add", params: { templateId: pending.templateId, name: pending.templateInfo?.name ?? "", kind: pending.templateInfo?.kind ?? "", from: "onboarding", ...(pending.newTemplate ? { newTemplate: "true" } : {}) } });
+          return;
         }
-        if (typeof params.holdingId === "string" && params.holdingId) {
-          hinted = holdings.find((item) => item.id === params.holdingId) ?? await loadMyHolding(params.holdingId).catch(() => null);
+        if (next.firstHome?.holdingId) {
+          confirmedHolding = await loadMyHolding(next.firstHome.holdingId);
+          if (!confirmedHolding) throw new Error("first_holding_unavailable");
         }
       }
+      if (generation !== loadGeneration.current) return;
       const resolved = resolveOnboardingPhase({
         durableStep: next.step === "done" && editingTastes ? "done" : next.step,
         editingTastes,
-        holdingCount: holdings.length,
+        holdingCount: confirmedHolding ? 1 : 0,
         requestedPhase: typeof params.phase === "string" ? params.phase : null,
-        hasHoldingHint: Boolean(hinted || params.holdingId),
         interestsSaved: next.collectorInterests.length > 0,
       });
       if (resolved === "app") {
+        boot.enterApp();
         router.replace("/(tabs)");
         return;
       }
@@ -107,17 +112,17 @@ export default function OnboardingScreen() {
       setGroupIds(next.favoriteGroupIds);
       setBiasIds(next.biasMemberIds);
       if (next.collectorInterests.length > 0) setInterests(next.collectorInterests);
-      setHolding(hinted ?? holdings[0] ?? null);
+      setHolding(confirmedHolding);
     } catch {
-      setError(t.onboardingUnavailable);
+      if (generation === loadGeneration.current) setError(t.onboardingUnavailable);
     } finally {
-      setLoading(false);
+      if (generation === loadGeneration.current) setLoading(false);
     }
   }
 
   useFocusEffect(useCallback(() => {
-    const timer = setTimeout(() => { void load(); }, 0);
-    return () => clearTimeout(timer);
+    void load();
+    return () => { loadGeneration.current++; };
     // First-run identity is Live. Demo stays a post-arrival explorer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingTastes, params.phase, params.holdingId]));
@@ -141,32 +146,14 @@ export default function OnboardingScreen() {
     return () => anim.stop();
   }, [phase, reduceMotion, revealOpacity]);
 
-  useEffect(() => {
-    if (phase !== "reveal") return;
-    const timer = setTimeout(() => setPhase("room"), reduceMotion ? 1600 : 2200);
-    return () => clearTimeout(timer);
-  }, [phase, reduceMotion]);
-
-  useEffect(() => {
-    if (phase !== "meet" || social.kind !== "production") return;
-    let mounted = true;
-    void social.loadSuggested().then((items) => {
-      if (mounted) setPeople(items.slice(0, 3));
-    }).catch(() => {
-      if (mounted) setPeople([]);
-    });
-    return () => {
-      mounted = false;
-    };
-  }, [phase, social]);
-
   const members = useMemo(
     () => state?.members.filter((member) => groupIds.includes(member.groupId)) ?? [],
     [groupIds, state],
   );
 
   async function advanceIdentity() {
-    if (!state) return;
+    if (!state || savingIdentity.current) return;
+    savingIdentity.current = true;
     setSaving(true);
     setError(null);
     try {
@@ -189,6 +176,7 @@ export default function OnboardingScreen() {
     } catch {
       setError(t.onboardingSaveFailed);
     } finally {
+      savingIdentity.current = false;
       setSaving(false);
     }
   }
@@ -198,30 +186,9 @@ export default function OnboardingScreen() {
     else if (phase === "interest") setPhase("bias");
   }
 
-  async function finish() {
-    setSaving(true);
-    setError(null);
-    try {
-      await updateNativeOnboarding({ action: "complete" });
-      boot.enterApp();
-      router.replace("/(tabs)");
-    } catch {
-      setError(t.onboardingSaveFailed);
-      setSaving(false);
-    }
-  }
-
-  async function openCollector(userId: string) {
-    setSaving(true);
-    setError(null);
-    try {
-      await updateNativeOnboarding({ action: "complete" });
-      boot.enterApp();
-      router.replace({ pathname: "/collector", params: { userId } });
-    } catch {
-      setError(t.onboardingSaveFailed);
-      setSaving(false);
-    }
+  function finish() {
+    boot.enterApp();
+    router.replace("/(tabs)");
   }
 
   if (loading || phase === "collect") {
@@ -244,10 +211,11 @@ export default function OnboardingScreen() {
       <View style={styles.world}>
         <Suspense fallback={<SeoullyLoadingState label={t.room} />}>
           <OnboardingWorldIntro
-            holdingId={holding?.id ?? (typeof params.holdingId === "string" ? params.holdingId : undefined)}
+            holdingId={holding?.id}
             photocard={holding ? isBinderEligible(holding) : false}
             copy={t}
-            onContinue={() => setPhase("meet")}
+            onContinue={finish}
+            onBack={() => setPhase("reveal")}
           />
         </Suspense>
       </View>
@@ -286,51 +254,6 @@ export default function OnboardingScreen() {
             <SeoullyButton label={t.onboardOpenRoom} block onPress={() => setPhase("room")} />
           </View>
         </Animated.View>
-      </SeoullyScreen>
-    );
-  }
-
-  if (phase === "meet") {
-    return (
-      <SeoullyScreen>
-        <ScrollView contentContainerStyle={styles.container}>
-          <View style={styles.topline}>
-            <BrandMark />
-            <Pressable accessibilityRole="button" onPress={toggleLocale} style={styles.language}>
-              <SeoullyText variant="button">{t.switchLanguage}</SeoullyText>
-            </Pressable>
-          </View>
-          <Image accessibilityIgnoresInvertColors resizeMode="contain" source={HEART} style={styles.heart} />
-          <SeoullyText variant="title">{t.onboardMeetTitle}</SeoullyText>
-          <SeoullyText variant="secondary" style={styles.lead}>{t.onboardMeetLede}</SeoullyText>
-          <SeoullyText variant="caption" color={colors.plum} style={styles.ask}>{t.onboardAskHelp}</SeoullyText>
-          {people.length === 0 ? (
-            <SeoullyText variant="secondary" style={styles.lead}>{t.onboardMeetEmpty}</SeoullyText>
-          ) : people.map((person) => (
-            <Pressable
-              key={person.user.userId}
-              accessibilityRole="button"
-              onPress={() => { void openCollector(person.user.userId); }}
-              style={styles.person}
-            >
-              <SeoullyAvatar name={person.user.displayName} imageUrl={person.avatarUrl} />
-              <View style={styles.personCopy}>
-                <SeoullyText variant="body">{person.user.displayName}</SeoullyText>
-                <SeoullyText variant="caption">@{person.user.handle}</SeoullyText>
-                {person.subtitle ? <SeoullyText variant="caption" color={colors.plum}>{person.subtitle}</SeoullyText> : person.meta ? <SeoullyText variant="caption" color={colors.plum}>{person.meta}</SeoullyText> : null}
-              </View>
-            </Pressable>
-          ))}
-          <View style={styles.footer}>
-            <SeoullyButton
-              label={saving ? t.saving : t.onboardFindPeople}
-              disabled={saving}
-              block
-              onPress={() => { void finish(); }}
-            />
-            {error ? <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum}>{error}</SeoullyText> : null}
-          </View>
-        </ScrollView>
       </SeoullyScreen>
     );
   }

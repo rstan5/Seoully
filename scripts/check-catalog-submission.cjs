@@ -91,7 +91,7 @@ function manualHandler(overrides={}) {
   const source=fs.readFileSync('apps/mobile/app/collect.tsx','utf8');
   const start=source.indexOf('  async function submitManual()');
   const end=source.indexOf('\n  return (',start);
-  const scope={social:{kind:'live'},copy:{demoWriteBlocked:'demo',collectibleNameRequired:'name',groupNameRequired:'group',collectibleCreateFailed:'failed'},
+  const scope={social:{kind:'live'},fromOnboarding:false,copy:{demoWriteBlocked:'demo',collectibleNameRequired:'name',groupNameRequired:'group',collectibleCreateFailed:'failed'},
     name:'Card',groupName:'Group',memberName:'',releaseName:'',kind:'photocard',versionName:'',submitting:{current:false},
     setWorking:()=>{},setMessage:()=>{},...overrides};
   vm.runInNewContext(source.slice(start,end)+'\nthis.submit = submitManual;',scope);

@@ -97,6 +97,8 @@ export function RoomWorldScreen({
   onMessageCollectible,
   onOwnRoom,
   initialHoldingId,
+  onLiveSnapshotReady,
+  onLivePlacementConfirmed,
 }: {
   mode: RoomWorldMode;
   userId?: string;
@@ -109,7 +111,11 @@ export function RoomWorldScreen({
   onMessageCollectible?: (holding: NativeHolding) => void;
   onOwnRoom?: () => void;
   initialHoldingId?: string;
+  onLiveSnapshotReady?: (snapshot: NativeRoomSnapshot) => void;
+  onLivePlacementConfirmed?: (holdingId: string) => void;
 }) {
+  const onboardingEvents = useRef({ onLiveSnapshotReady, onLivePlacementConfirmed });
+  onboardingEvents.current = { onLiveSnapshotReady, onLivePlacementConfirmed };
   const [snapshot, setSnapshot] = useState<NativeRoomSnapshot | null>(null);
   const [items, setItems] = useState<RoomRenderable[]>([]);
   const [holdings, setHoldings] = useState<NativeHolding[]>([]);
@@ -319,6 +325,7 @@ export function RoomWorldScreen({
         setRoomStyle(parseRoomStyle(next.room.style, defaultStyleForTheme(next.room.themeId)));
         applyLoadedLayout(parseRoomLayout(next.room.layout), false, buildRoomRenderables(next.holdings, next.placements));
         setPrivateRoom(false);
+        onboardingEvents.current.onLiveSnapshotReady?.(next);
       } else {
         setError(copy.demoRoomUnavailable);
         setLoading(false);
@@ -852,6 +859,7 @@ export function RoomWorldScreen({
           latestItems.current = value ? [...all, value] : all;
           setItems(latestItems.current);
         }, () => saveNativeRoomPlacement(payload));
+        onboardingEvents.current.onLivePlacementConfirmed?.(next.holding.id);
         return stored;
       }
       const placement = loadDemoRoom().saveDemoPlacement(payload);

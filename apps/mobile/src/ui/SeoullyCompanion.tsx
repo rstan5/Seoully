@@ -44,7 +44,7 @@ function cardActionLabel(action: AskNavigationAction, copy: ReturnType<typeof us
 
 type ChatTurn = { role: "user" | "assistant"; content: string; cards?: NativeAskCard[] };
 
-export function SeoullyCompanion() {
+export function SeoullyCompanion({ guidance }: { guidance?: string } = {}) {
   const pathname = usePathname();
   const params = useGlobalSearchParams();
   const overlay = useAskSurfaceOverlay();
@@ -87,6 +87,12 @@ export function SeoullyCompanion() {
     return () => loop.stop();
   }, [bounce, reduceMotion]);
 
+  if (guidance) return <View style={{ alignItems: "center", flexDirection: "row", gap: 10 }}>
+    <Animated.View style={{ transform: [{ translateY: bounce.interpolate({ inputRange: [0, 1], outputRange: [0, -6] }) }] }}>
+      <Image accessibilityIgnoresInvertColors resizeMode="contain" source={HEART} style={{ width: 36, height: 36 }} />
+    </Animated.View>
+    <SeoullyText variant="secondary" style={{ flex: 1 }}>{guidance}</SeoullyText>
+  </View>;
   if (!boot.companionEligible) return null;
 
   const placement = companionPlacement({

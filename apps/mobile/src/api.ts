@@ -95,14 +95,14 @@ export async function searchCatalog(query: string): Promise<NativeCatalogTemplat
   return payload.results ?? [];
 }
 
-export async function createHolding(templateId: string): Promise<{ holding: NativeHolding }> {
+export async function createHolding(templateId: string, holdingId?: string): Promise<{ holding: NativeHolding }> {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
   if (!accessToken) throw new Error("unauthenticated");
   const response = await fetch(`${productApiBase()}/api/mobile/holdings`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ templateId }),
+    body: JSON.stringify({ templateId, ...(holdingId ? { holdingId } : {}) }),
   });
   if (!response.ok) throw new Error("holding_create_failed");
   const payload = await response.json() as { holding?: NativeHolding };
@@ -116,6 +116,7 @@ export type NativeHolding = {
   acquiredAt: string;
   tradeStatus: "not-for-trade" | "for-trade";
   personalMediaUrl?: string;
+  hasPersonalMedia?: boolean;
   template: NativeCatalogTemplate;
 };
 export type NativeWishlistEntry = {
@@ -398,6 +399,7 @@ export type NativeOnboardingMember = {
   nativeName: string;
 };
 export type NativeOnboardingState = {
+  firstHome: { identityReady: boolean; holdingId: string | null; roomId: string | null; placedHoldingId: string | null } | null;
   step: NativeOnboardingStep;
   favoriteGroupIds: string[];
   biasMemberIds: string[];

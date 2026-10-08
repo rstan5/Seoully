@@ -128,7 +128,7 @@ assertContains(api, "/api/mobile/media", "api.ts");
 assertContains(api, "JSON.stringify({ holdingId, tradeStatus })", "api.ts");
 
 const holdingsDal = read("src/server/dal/holdings.ts");
-assertContains(holdingsDal, "insert({ owner_user_id: identity.user.id, template_id: template.id })", "holdings.ts");
+assertContains(holdingsDal, "insert({ owner_user_id: identity.user.id, template_id: template.id, ...(holdingId ? { id: holdingId } : {}) })", "holdings.ts");
 assertContains(holdingsDal, "trade_status", "holdings.ts");
 const removeStart = holdingsDal.indexOf("export async function removeMyHolding");
 const hydrateStart = holdingsDal.indexOf("async function hydrateHoldings", removeStart);

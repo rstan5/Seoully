@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { type NativeCatalogTemplate } from "../src/api";
+import { queueFirstCollectible } from "../src/onboarding/firstCollectibleStorage";
 import { submitManualCatalog } from "../src/manualCatalog";
 import { useSocialRepository } from "../src/data";
 import { KeyboardScreen } from "../src/components/KeyboardScreen";
@@ -65,7 +66,8 @@ export default function CollectScreen() {
     }
   }
 
-  function openPhoto(template: NativeCatalogTemplate, extra?: { newTemplate?: string }) {
+  async function openPhoto(template: NativeCatalogTemplate, extra?: { newTemplate?: string }) {
+    if (fromOnboarding) await queueFirstCollectible(template.id, Boolean(extra?.newTemplate), template);
     router.push({
       pathname: "/add",
       params: {
@@ -97,8 +99,8 @@ export default function CollectScreen() {
         releaseName: releaseName.trim() || undefined,
         kind,
         ...(versionName.trim() ? { descriptor: versionName.trim() } : {}),
-      });
-      openPhoto(result.contribution.template, { newTemplate: "true" });
+      }, fromOnboarding ? async (accepted) => { await queueFirstCollectible(accepted.contribution.template.id, true, accepted.contribution.template); } : undefined);
+      await openPhoto(result.contribution.template, { newTemplate: "true" });
     } catch {
       setMessage(copy.collectibleCreateFailed);
     } finally {
@@ -148,7 +150,7 @@ export default function CollectScreen() {
                   key={template.id}
                   title={template.name}
                   meta={[template.groupName, template.memberName, template.releaseName, template.descriptor, collectibleKindLabel(template.kind, copy)].filter(Boolean).join(" · ")}
-                  onPress={() => openPhoto(template)}
+                  onPress={() => { void openPhoto(template).catch(() => setSearchError(copy.collectibleCreateFailed)); }}
                 />
               ))}
               {query.trim() && !searching && hits.length === 0 && !searchError ? (

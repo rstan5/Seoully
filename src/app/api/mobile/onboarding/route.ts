@@ -1,3 +1,5 @@
+import { firstHomeIsComplete } from "@/domain/first-home";
+import { readFirstHome } from "@/server/dal/first-home";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { GROUPS, MEMBERS } from "@/domain/fixtures/catalog";
@@ -47,6 +49,7 @@ async function currentState(
       favoriteGroupIds: string[];
       biasMemberIds: string[];
       collectorInterests: string[];
+      identityReady: boolean;
     }
   | NextResponse
 > {
@@ -56,7 +59,7 @@ async function currentState(
   if (!identity) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const { data, error } = await client
     .from("profiles")
-    .select("onboarding_step, favorite_group_ids, bias_member_ids, collector_interests")
+    .select("onboarding_step, favorite_group_ids, bias_member_ids, collector_interests, display_name, handle")
     .eq("user_id", identity.user.id)
     .maybeSingle();
   if (error || !data) {
@@ -73,6 +76,7 @@ async function currentState(
     favoriteGroupIds: data.favorite_group_ids ?? [],
     biasMemberIds: data.bias_member_ids ?? [],
     collectorInterests: data.collector_interests ?? [],
+    identityReady: Boolean(data.display_name?.trim() && data.handle?.trim() && data.collector_interests?.length),
   };
 }
 
@@ -82,6 +86,7 @@ export async function GET(request: Request) {
     if (state instanceof NextResponse) return state;
     return NextResponse.json({
       step: state.step,
+      firstHome: state.step === "interest" ? await readFirstHome(state.client, state.userId, state.identityReady) : null,
       favoriteGroupIds: state.favoriteGroupIds,
       biasMemberIds: state.biasMemberIds,
       collectorInterests: state.collectorInterests,
@@ -97,7 +102,7 @@ export async function GET(request: Request) {
         stageName,
         nativeName,
       })),
-    });
+    }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json({ error: "onboarding_unavailable" }, { status: 503 });
   }
@@ -138,15 +143,9 @@ export async function PATCH(request: Request) {
         ? "Collects everything"
         : "Collector";
     } else if (parsed.data.action === "complete" && state.step === "interest") {
-      const { count, error: countError } = await state.client
-        .from("holdings")
-        .select("id", { count: "exact", head: true })
-        .eq("owner_user_id", state.userId);
-      if (countError) {
-        return NextResponse.json({ error: "onboarding_unavailable" }, { status: 503 });
-      }
-      if (!count) {
-        return NextResponse.json({ error: "first_holding_required", step: state.step }, { status: 409 });
+      const firstHome = await readFirstHome(state.client, state.userId, state.identityReady);
+      if (!firstHomeIsComplete(firstHome)) {
+        return NextResponse.json({ error: firstHome.holdingId ? "first_placement_required" : "first_holding_required", step: state.step }, { status: 409 });
       }
       patch.onboarding_step = "done";
     } else {

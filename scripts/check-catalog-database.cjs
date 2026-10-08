@@ -48,7 +48,7 @@ async function main(){
     }
     sql('create extension pgtap');
     let tapCount=0;
-    for(const file of ['room_persistence.test.sql','catalog_idempotency.test.sql']){
+    for(const file of ['room_persistence.test.sql','catalog_idempotency.test.sql','first_home.test.sql']){
       const result=sql(fs.readFileSync(path.join('supabase/tests',file),'utf8'));
       const lines=result.split('\n');const failures=lines.filter(l=>/^not ok |^# Looks like/.test(l));
       assert.deepEqual(failures,[],`${file} pgTAP failures`);

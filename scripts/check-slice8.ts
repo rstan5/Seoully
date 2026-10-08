@@ -38,7 +38,7 @@ const onboarding = read("apps/mobile/app/onboarding.tsx");
 const add = read("apps/mobile/app/add.tsx");
 const collect = read("apps/mobile/app/collect.tsx");
 assertContains(onboarding, "setDemo(false)", "onboarding forces Live");
-assertContains(onboarding, 'social.kind !== "production"', "meet stays production-only");
+assertContains(read("apps/mobile/src/onboarding/OnboardingWorldIntro.tsx"), "demo={false}", "first home stays production-only");
 assertContains(add, "demoWriteBlocked", "add demo block");
 assertContains(collect, "demoWriteBlocked", "collect demo block");
 assertNotContains(onboarding, "MINJI", "onboarding");
@@ -97,30 +97,31 @@ assert.equal(resolveOnboardingPhase({
   holdingCount: 1,
   requestedPhase: "collect",
   interestsSaved: true,
-}), "reveal");
+}), "room");
 assert.equal(resumeAfterHoldingDoesNotCollect("reveal"), true);
 
 // T optional media failure
 assertContains(add, "photoFailed", "photo failure keeps holding");
 assertContains(onboarding, "onboardPhotoLater", "photo later copy");
 
-// U placement not required
+// U placement is required, through the existing Room
 assertNotContains(onboarding, "saveNativeRoomPlacement", "onboarding does not fake placement");
 
 // V social production
-assertContains(onboarding, "social.loadSuggested()", "production discovery");
+assertContains(read("apps/mobile/src/onboarding/OnboardingWorldIntro.tsx"), "onLivePlacementConfirmed", "production placement confirmation");
 
 // W/X completion + existing users
 assert.equal(nextDurableStep("interest", "complete"), "done");
 assert.equal(canCompleteOnboarding(0), false);
-assert.equal(canCompleteOnboarding(1), true);
+assert.equal(canCompleteOnboarding(1), false);
+assert.equal(canCompleteOnboarding(1, 1, true), true);
 assert.equal(resolveOnboardingPhase({ durableStep: "done", editingTastes: false, holdingCount: 0 }), "app");
 
 // Y locale does not alter progress
 assert.equal(resolveOnboardingPhase({ durableStep: "bias", editingTastes: false, holdingCount: 0 }), "bias");
 
 // Z reduced motion still completes
-assertContains(onboarding, "reduceMotion ? 1600 : 2200", "reduced motion reveal");
+assertNotContains(onboarding, "1600 : 2200", "no artificial reveal delay");
 assertContains(onboarding, "reduceMotion", "reduced motion");
 
 // AA GL startup
@@ -156,7 +157,7 @@ assert.deepEqual(walk.phases.slice(0, 4), ["group", "bias", "interest", "collect
 assert.equal(walk.holdingsCreated, 1);
 assert.ok(walk.phases.includes("reveal"));
 assert.ok(walk.phases.includes("room"));
-assert.ok(walk.phases.includes("meet"));
+assert.ok(!walk.phases.includes("meet"));
 assert.equal(walk.relaunch, "app");
 assert.equal(walk.durable.at(-1), "done");
 

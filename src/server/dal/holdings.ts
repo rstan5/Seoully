@@ -10,7 +10,7 @@ const pageSchema = z.object({
   offset: z.number().int().min(0).max(100_000).default(0),
 }).strict();
 
-const templateIdSchema = z.object({ templateId: z.string().uuid() }).strict();
+const templateIdSchema = z.object({ templateId: z.string().uuid(), holdingId: z.string().uuid().optional() }).strict();
 const holdingIdSchema = z.object({ holdingId: z.string().uuid() }).strict();
 const tradeStateSchema = z.object({
   holdingId: z.string().uuid(),
@@ -26,6 +26,7 @@ export interface HoldingDTO {
   createdAt: string;
   updatedAt: string;
   personalMediaUrl?: string;
+  hasPersonalMedia?: boolean;
   template: {
     id: string;
     name: string;
@@ -42,7 +43,7 @@ export interface HoldingDTO {
 }
 
 export async function createMyHolding(input: unknown, client?: SupabaseClient): Promise<HoldingDTO> {
-  const { templateId } = templateIdSchema.parse(input);
+  const { templateId, holdingId } = templateIdSchema.parse(input);
   const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
   const supabase = client ?? await createSupabaseServerClient();
@@ -56,11 +57,21 @@ export async function createMyHolding(input: unknown, client?: SupabaseClient): 
   if (!template) throw new Error("template_not_found");
   const { data: holding, error } = await supabase
     .from("holdings")
-    .insert({ owner_user_id: identity.user.id, template_id: template.id })
+    .insert({ owner_user_id: identity.user.id, template_id: template.id, ...(holdingId ? { id: holdingId } : {}) })
     .select("id,owner_user_id,template_id,acquired_at,created_at,updated_at,trade_status")
     .single();
-  if (error || !holding) throw new Error("holding_create_failed");
-  const [result] = await hydrateHoldings([holding], supabase);
+  // The existing primary key is the atomic operation boundary. A lost response
+  // can retry the same UUID; never deduplicate distinct copies by template.
+  let confirmed = holding;
+  if (error?.code === "23505" && holdingId) {
+    const existing = await supabase.from("holdings")
+      .select("id,owner_user_id,template_id,acquired_at,created_at,updated_at,trade_status")
+      .eq("id", holdingId).eq("owner_user_id", identity.user.id).maybeSingle();
+    if (existing.error || existing.data?.template_id !== templateId) throw new Error("holding_create_failed");
+    confirmed = existing.data;
+  } else if (error) throw new Error("holding_create_failed");
+  if (!confirmed) throw new Error("holding_create_failed");
+  const [result] = await hydrateHoldings([confirmed], supabase);
   if (!result) throw new Error("holding_create_failed");
   return result;
 }
@@ -153,9 +164,10 @@ async function hydrateHoldings(rows: Array<Record<string, unknown>>, supabase: A
   const releaseMap = new Map((releases.data ?? []).map((row) => [row.id, row.title]));
   const templateMap = new Map((templates ?? []).map((row) => [row.id, row]));
   const holdingIds = rows.map((row) => String(row.id));
-  const { data: mediaRows } = holdingIds.length
+  const { data: mediaRows, error: mediaError } = holdingIds.length
     ? await supabase.from("media_assets").select("holding_id,storage_bucket,storage_path").in("holding_id", holdingIds)
-    : { data: [] as Array<Record<string, unknown>> };
+    : { data: [] as Array<Record<string, unknown>>, error: null };
+  if (mediaError) throw new Error("holding_read_failed");
   const mediaUrls = new Map<string, string>();
   await Promise.all((mediaRows ?? []).map(async (media) => {
     const signed = await supabase.storage.from(String(media.storage_bucket)).createSignedUrl(String(media.storage_path), 3600);
@@ -167,6 +179,7 @@ async function hydrateHoldings(rows: Array<Record<string, unknown>>, supabase: A
     return [{
       id: String(row.id), ownerUserId: String(row.owner_user_id), templateId: String(row.template_id),
       acquiredAt: String(row.acquired_at), createdAt: String(row.created_at), updatedAt: String(row.updated_at),
+      hasPersonalMedia: (mediaRows ?? []).some(media => String(media.holding_id) === String(row.id)),
       ...(mediaUrls.get(String(row.id)) ? { personalMediaUrl: mediaUrls.get(String(row.id)) } : {}),
       tradeStatus: row.trade_status === "for-trade" ? "for-trade" : "not-for-trade",
       template: {

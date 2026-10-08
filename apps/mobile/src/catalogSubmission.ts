@@ -8,7 +8,7 @@ type Storage = { getItem(key: string): Promise<string | null>; setItem(key: stri
 export function createCatalogSubmitter<T>(storage: Storage, newKey: () => string,
   send: (collector: string, input: ManualCatalogDetails & { submissionKey: string }) => Promise<T>) {
   const flights = new Map<string, Promise<T>>();
-  return (collector: string, details: ManualCatalogDetails): Promise<T> => {
+  return (collector: string, details: ManualCatalogDetails, onConfirmed?: (result: T) => Promise<void>): Promise<T> => {
     // Fixed field order also makes a re-entered draft after relaunch resumable.
     const payload: ManualCatalogDetails = { name: details.name.trim(), kind: details.kind,
       groupName: details.groupName.trim(),
@@ -24,6 +24,7 @@ export function createCatalogSubmitter<T>(storage: Storage, newKey: () => string
       const submissionKey = await storage.getItem(slot) ?? newKey();
       await storage.setItem(slot, submissionKey); // Must be durable BEFORE sending.
       const result = await send(collector, { ...payload, submissionKey });
+      await onConfirmed?.(result); // Persist a downstream onboarding checkpoint before retiring the key.
       await storage.removeItem(slot); // A later intentional submission gets a new key.
       return result;
     })();

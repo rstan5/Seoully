@@ -10,8 +10,8 @@ const submit = createCatalogSubmitter(AsyncStorage, randomUUID, async (collector
   return contributeCatalogItem(input);
 });
 
-export async function submitManualCatalog(details: ManualCatalogDetails) {
+export async function submitManualCatalog(details: ManualCatalogDetails, onConfirmed?: (result: Awaited<ReturnType<typeof contributeCatalogItem>>) => Promise<void>) {
   const { data } = await supabase.auth.getSession();
   if (!data.session) throw new Error("unauthenticated");
-  return submit(data.session.user.id, details);
+  return submit(data.session.user.id, details, onConfirmed);
 }

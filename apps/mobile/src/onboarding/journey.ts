@@ -42,8 +42,8 @@ export function nextDurableStep(
   return null;
 }
 
-export function canCompleteOnboarding(holdingCount: number): boolean {
-  return holdingCount > 0;
+export function canCompleteOnboarding(holdingCount: number, confirmedPlacementCount = 0, identityReady = false): boolean {
+  return identityReady && holdingCount > 0 && confirmedPlacementCount > 0;
 }
 
 export function resolveOnboardingPhase(input: {
@@ -63,12 +63,11 @@ export function resolveOnboardingPhase(input: {
   if (input.durableStep === "group") return "group";
   if (input.durableStep === "bias") return "bias";
 
-  const owned = input.holdingCount > 0 || Boolean(input.hasHoldingHint);
+  const owned = input.holdingCount > 0;
   if (!owned) return input.interestsSaved ? "collect" : "interest";
   const requested = input.requestedPhase;
-  if (requested === "meet") return "meet";
-  if (requested === "room") return "room";
-  return "reveal";
+  if (requested === "reveal") return "reveal";
+  return "room";
 }
 
 export function returningUserBypassesOnboarding(step: DurableOnboardingStep): boolean {
@@ -136,6 +135,7 @@ export function walkFirstUserJourney(): {
     requestedPhase: "meet",
     interestsSaved: true,
   }));
+  if (!canCompleteOnboarding(holdings, 1, true)) throw new Error("first_home_incomplete");
   push(nextDurableStep(step, "complete")!);
   const relaunch = resolveOnboardingPhase({ durableStep: "done", editingTastes: false, holdingCount: holdings });
   return { phases, durable, holdingsCreated: holdings, relaunch };

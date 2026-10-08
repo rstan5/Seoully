@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
-import { createHolding, uploadCatalogReferencePhoto, uploadHoldingPhoto } from "../src/api";
+import { loadMyHolding, createHolding, uploadCatalogReferencePhoto, uploadHoldingPhoto } from "../src/api";
+import { confirmFirstCollectible, type FirstCollectibleDraft } from "../src/onboarding/firstCollectible";
+import { queueFirstCollectible, readFirstCollectibleDraft, saveFirstCollectibleDraft, clearFirstCollectibleDraft } from "../src/onboarding/firstCollectibleStorage";
+import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
 import { useSocialRepository } from "../src/data";
 import { catalogReferenceConsentDefault, shouldShareCatalogReference } from "../src/data/ownership";
 import { ScreenBack } from "../src/components/ScreenBack";
@@ -29,6 +32,10 @@ export default function AddCollectibleScreen() {
     newTemplate?: string;
     from?: string;
   }>();
+  const fromOnboarding = params.from === "onboarding";
+  const submitting = useRef(false);
+  const [draft, setDraft] = useState<FirstCollectibleDraft | null>(null);
+  const [hydrating, setHydrating] = useState(fromOnboarding);
   const [uri, setUri] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -36,6 +43,26 @@ export default function AddCollectibleScreen() {
   const [cropAsset, setCropAsset] = useState<{ uri: string; width: number; height: number } | null>(null);
   const photocard = params.kind === "photocard";
   const isNewTemplate = params.newTemplate === "true";
+
+  async function fetchDraft() {
+      const existing = await readFirstCollectibleDraft() ?? await queueFirstCollectible(params.templateId, isNewTemplate);
+      if (existing.templateId !== params.templateId) throw new Error("pending_first_collectible");
+      return existing;
+  }
+  function restoreDraft() {
+    return fetchDraft().then((existing) => {
+      setDraft(existing);
+      setUri(existing.photoUri);
+      setShareReference(existing.shareReference);
+      setMessage(null);
+    }).catch(() => { setMessage(copy.holdingCreateFailed); })
+      .finally(() => { setHydrating(false); });
+  }
+  useEffect(() => {
+    if (fromOnboarding) void restoreDraft();
+    // Only restore when entering this logical Add operation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromOnboarding, params.templateId]);
 
   async function choose(source: "camera" | "library") {
     setMessage(null);
@@ -50,7 +77,10 @@ export default function AddCollectibleScreen() {
     try {
       if (photocard && asset.width && asset.height) {
         setCropAsset({ uri: asset.uri, width: asset.width, height: asset.height });
-      } else setUri(asset.uri);
+      } else {
+        if (draft) await saveFirstCollectibleDraft({ ...draft, photoUri: asset.uri });
+        setUri(asset.uri);
+      }
     } catch {
       setMessage(copy.photoPrepareFailed);
     }
@@ -62,6 +92,7 @@ export default function AddCollectibleScreen() {
     setWorking(true);
     try {
       const cropped = await ImageManipulator.manipulateAsync(cropAsset.uri, [{ crop }], { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG });
+      if (draft) await saveFirstCollectibleDraft({ ...draft, photoUri: cropped.uri });
       setUri(cropped.uri);
       setCropAsset(null);
     } catch {
@@ -73,9 +104,22 @@ export default function AddCollectibleScreen() {
   async function add() {
     if (social.kind === "demo") { setMessage(copy.demoWriteBlocked); return; }
     if (!params.templateId) { setMessage(copy.chooseCatalogFirst); return; }
+    if (submitting.current) return;
+    submitting.current = true;
     setWorking(true);
     setMessage(null);
     try {
+      if (fromOnboarding) {
+        if (!draft) throw new Error("draft_unavailable");
+        const next = { ...draft, photoUri: uri, shareReference };
+        await saveFirstCollectibleDraft(next);
+        const holding = await confirmFirstCollectible(next, { read: loadMyHolding, create: createHolding,
+          photo: uploadHoldingPhoto, reference: uploadCatalogReferencePhoto, save: saveFirstCollectibleDraft });
+        if (!holding) throw new Error("holding_unavailable");
+        await clearFirstCollectibleDraft();
+        router.replace({ pathname: "/onboarding", params: { phase: "reveal", holdingId: holding.id } });
+        return;
+      }
       const { holding } = await createHolding(params.templateId);
       let photoFailed = false;
       if (uri) {
@@ -92,7 +136,6 @@ export default function AddCollectibleScreen() {
           }
         }
       }
-      const fromOnboarding = params.from === "onboarding";
       router.replace(fromOnboarding
         ? {
             pathname: "/onboarding",
@@ -103,10 +146,12 @@ export default function AddCollectibleScreen() {
             params: { holdingId: holding.id, ...(photoFailed ? { photoWarning: "1" } : {}) },
           });
       return;
-    } catch {
-      setMessage(copy.holdingCreateFailed);
+    } catch (error) {
+      setMessage(error instanceof Error && error.message.includes("media") ? copy.photoUpdateFailed : copy.holdingCreateFailed);
+    } finally {
+      submitting.current = false;
+      setWorking(false);
     }
-    setWorking(false);
   }
 
   const meta = [
@@ -116,6 +161,8 @@ export default function AddCollectibleScreen() {
     params.kind ? collectibleKindLabel(params.kind, copy) : "",
   ].filter(Boolean).join(" · ");
 
+  if (hydrating) return <SeoullyLoadingState fullScreen label={copy.brand} />;
+  if (fromOnboarding && !draft) return <SeoullyScreen><SeoullyText accessibilityRole="alert">{message}</SeoullyText><SeoullyButton label={copy.retry} onPress={() => { setHydrating(true); void restoreDraft(); }} /></SeoullyScreen>;
   return (
     <SeoullyScreen>
       <ScrollView contentContainerStyle={styles.container}>

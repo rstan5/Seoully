@@ -19,6 +19,7 @@
     "check:slice7c": "npm run check:slice7",
     "check:slice7d": "tsc --project tsconfig.check-slice7d.json && node -r ./scripts/register-build-alias.cjs .tmp/build/scripts/check-slice7d.js && node scripts/check-room-geometry.cjs && node scripts/check-room-instance-workflows.cjs && npm run check:room-persistence",
     "check:mobile-loading": "node scripts/check-mobile-loading.cjs",
+    "check:room-overlays": "node scripts/check-room-overlays.cjs",
     "check:room-live-sync": "node scripts/check-room-live-sync.cjs",
     "check:room-persistence": "tsc --project tsconfig.check-room-persistence.json && node scripts/check-room-persistence.cjs",
     "check:slice8": "tsc --project tsconfig.check-slice8.json && node -r ./scripts/register-build-alias.cjs .tmp/build/scripts/check-slice8.js && tsc --project tsconfig.check-catalog-contribution.json && node scripts/check-first-home.cjs && node scripts/check-onboarding-experience.cjs && node scripts/check-native-photo-upload.cjs && node scripts/check-first-home-destination.cjs && node scripts/check-slice8-cinematic.cjs && node scripts/check-slice8-qa-repairs.cjs",

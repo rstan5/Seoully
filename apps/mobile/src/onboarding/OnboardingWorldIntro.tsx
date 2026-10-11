@@ -1,7 +1,7 @@
 import { HeartFarewell } from "../ui/HeartFarewell";
 import { useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { RoomMessage, roomMessageStyles } from "../room/RoomMessage";
 import type { MobileCopy } from "../i18n";
 import { useSocialRepository } from "../data";
 import { updateNativeOnboarding } from "../api";
@@ -15,7 +15,6 @@ export default function OnboardingWorldIntro({ holdingId, photocard, copy, onCon
   holdingId?: string; photocard: boolean; copy: MobileCopy; onContinue: () => void; onBack: () => void;
 }) {
   const social = useSocialRepository();
-  const insets = useSafeAreaInsets();
   const completing = useRef(false);
   const confirmed = useRef<string | undefined>(undefined);
   const [ready, setReady] = useState(false);
@@ -43,7 +42,12 @@ export default function OnboardingWorldIntro({ holdingId, photocard, copy, onCon
     void finish(id);
   }
   return <View style={styles.wrap}>
-    <RoomWorldScreen onRoomAppearance={setPromptStyle} loadingCovered={!handoff} initialHoldingId={handoff && photocard && !complete ? holdingId : undefined} mode="own" demo={false} persistLive={social.capabilities.persistRoom} copy={copy}
+    <RoomWorldScreen roomGuidance={ready && handoff && (!dismissed || complete || error) ? <RoomMessage chrome={chrome}>
+        <SeoullyText variant="caption" style={roomMessageStyles.text} color={chrome.color}>{complete ? copy.onboardFirstHomeComplete : photocard ? copy.onboardBinderFirst : copy.onboardPlaceFirst}</SeoullyText>
+        {error ? <><SeoullyText accessibilityRole="alert" variant="caption" style={roomMessageStyles.text} color={chrome.color}>{copy.onboardingSaveFailed}</SeoullyText>
+          <Pressable accessibilityRole="button" onPress={() => { void finish(confirmed.current); }} style={styles.action}><SeoullyText variant="caption" style={roomMessageStyles.text} color={chrome.color}>{copy.retry}</SeoullyText></Pressable></> : null}
+        {complete ? <Pressable accessibilityRole="button" onPress={onContinue} style={[styles.action, { borderColor: chrome.border, borderWidth: 1 }]}><SeoullyText variant="caption" style={roomMessageStyles.text} color={chrome.color}>{copy.onboardFindPeople}</SeoullyText></Pressable> : !error ? <Pressable accessibilityRole="button" accessibilityLabel={copy.close} onPress={() => setDismissed(true)} style={styles.action}><SeoullyText variant="caption" style={roomMessageStyles.text} color={chrome.color}>{copy.close}</SeoullyText></Pressable> : null}
+      </RoomMessage> : null} onRoomAppearance={setPromptStyle} loadingCovered={!handoff} initialHoldingId={handoff && photocard && !complete ? holdingId : undefined} mode="own" demo={false} persistLive={social.capabilities.persistRoom} copy={copy}
       onLeave={() => { if (complete) onContinue(); else onBack(); }}
       onLiveSnapshotReady={(snapshot) => {
         setReady(true);
@@ -55,19 +59,10 @@ export default function OnboardingWorldIntro({ holdingId, photocard, copy, onCon
       onLiveBinderConfirmed={(ids) => { if (photocard && holdingId && ids.includes(holdingId)) destinationConfirmed(holdingId); }}
     />
     {!handoff ? <HeartFarewell ready={ready || roomFailed} text={copy.onboardOwnershipHandoff} onContinue={() => setHandoff(true)} /> : null}
-    {ready && handoff ? <>
-      <SeoullyCompanion onboardingActive />
-      {!dismissed || complete || error ? <View style={[styles.guide, { bottom: insets.bottom + 80, backgroundColor: chrome.background, borderColor: chrome.border }]}>
-        <SeoullyText variant="caption" color={chrome.color}>{complete ? copy.onboardFirstHomeComplete : photocard ? copy.onboardBinderFirst : copy.onboardPlaceFirst}</SeoullyText>
-        {error ? <><SeoullyText accessibilityRole="alert" variant="caption" color={chrome.color}>{copy.onboardingSaveFailed}</SeoullyText>
-          <Pressable accessibilityRole="button" onPress={() => { void finish(confirmed.current); }} style={styles.action}><SeoullyText variant="caption" color={chrome.color}>{copy.retry}</SeoullyText></Pressable></> : null}
-        {complete ? <Pressable accessibilityRole="button" onPress={onContinue} style={[styles.action, { borderColor: chrome.border, borderWidth: 1 }]}><SeoullyText variant="caption" color={chrome.color}>{copy.onboardFindPeople}</SeoullyText></Pressable> : !error ? <Pressable accessibilityRole="button" accessibilityLabel={copy.close} onPress={() => setDismissed(true)} style={styles.action}><SeoullyText variant="caption" color={chrome.color}>{copy.close}</SeoullyText></Pressable> : null}
-      </View> : null}
-    </> : null}
+    {ready && handoff ? <SeoullyCompanion onboardingActive /> : null}
   </View>;
 }
 const styles = StyleSheet.create({
   wrap: { flex: 1 },
-  guide: { position: "absolute", left: 16, right: 80, maxWidth: 250, padding: 12, gap: 8, borderRadius: 18, borderWidth: 1, shadowColor: "#000", shadowOpacity: 0.16, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
   action: { minHeight: 44, justifyContent: "center", alignSelf: "flex-start", paddingHorizontal: 10, borderRadius: 12 },
 });

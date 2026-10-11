@@ -1,3 +1,4 @@
+import { roomMessageStyles } from "./RoomMessage";
 import { roomChromeSurface, type RoomChrome } from "./theme";
 import { ShopMiniature } from "./ShopMiniature";
 import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
@@ -35,7 +36,7 @@ export function RoomShopSheet({
     <View style={styles.frame}>
       <Pressable accessibilityRole="button" onPress={onClose} style={styles.dismiss} />
       <View style={[styles.sheet, roomChromeSurface(roomChrome), { paddingBottom: bottomInset + chrome.companionSize + chrome.companionClearance }]}>
-        <View style={styles.header}>
+        <View style={[styles.header, roomMessageStyles.sheetHeader]}>
           <SeoullyText color={roomChrome.color} variant="handle" style={styles.title}>{copy.roomShop}</SeoullyText>
           <Pressable accessibilityRole="button" onPress={onClose} style={styles.close} hitSlop={8}>
             <SeoullyText variant="button" color={roomChrome.color}>{copy.close}</SeoullyText>
@@ -90,7 +91,7 @@ const styles = StyleSheet.create({
   close: { minHeight: 44, minWidth: 44, justifyContent: "center", alignItems: "center" },
   frame: { flex: 1, justifyContent: "flex-end" },
   dismiss: { flex: 1, backgroundColor: "rgba(18, 14, 18, 0.28)" },
-  sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderTopWidth: 1, maxHeight: "52%", paddingHorizontal: chrome.gutter, paddingTop: spacing.sm },
+  sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderTopWidth: 1, maxHeight: "52%", paddingHorizontal: chrome.gutter, paddingTop: spacing.md },
   header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginBottom: spacing.sm },
   title: { flex: 1, fontWeight: "700" },
   row: { alignItems: "center", borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: "row", minHeight: 56, paddingVertical: spacing.xs },

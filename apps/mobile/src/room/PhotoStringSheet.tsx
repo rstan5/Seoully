@@ -1,3 +1,4 @@
+import { roomMessageStyles } from "./RoomMessage";
 import { roomChromeSurface, type RoomChrome } from "./theme";
 import { useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
@@ -32,8 +33,8 @@ export function PhotoStringSheet({ roomChrome, object, holdings, copy, reducedMo
     <View style={styles.frame}>
       <Pressable style={styles.dismiss} onPress={onClose} accessibilityLabel={copy.close} />
       <View style={[styles.sheet, roomChromeSurface(roomChrome), { paddingBottom: bottomInset + chrome.companionSize + chrome.companionClearance }]}>
-        <View style={styles.header}>
-          <SeoullyText color={roomChrome.color} variant="handle">{copy.roomChoosePhotocards} · {count}/{PHOTO_STRING_CAPACITY}</SeoullyText>
+        <View style={[styles.header, roomMessageStyles.sheetHeader]}>
+          <SeoullyText style={{ flex: 1, minWidth: 0 }} color={roomChrome.color} variant="handle">{copy.roomChoosePhotocards} · {count}/{PHOTO_STRING_CAPACITY}</SeoullyText>
           <Pressable onPress={onClose} style={styles.close}><SeoullyText color={roomChrome.color}>{copy.close}</SeoullyText></Pressable>
         </View>
         <SeoullyText variant="caption" color={roomChrome.color}>{copy.roomPhotoStringHint}</SeoullyText>
@@ -53,7 +54,7 @@ export function PhotoStringSheet({ roomChrome, object, holdings, copy, reducedMo
   </Modal>;
 }
 const styles = StyleSheet.create({
-  close: { minHeight: 44, minWidth: 44, justifyContent: "center", alignItems: "center" },
+  close: { flexShrink: 0, minHeight: 44, minWidth: 44, justifyContent: "center", alignItems: "center" },
   disabled: { opacity: 0.85 },
   frame: { flex: 1, justifyContent: "flex-end" }, dismiss: { flex: 1, backgroundColor: "rgba(18,14,18,0.28)" },
   sheet: { maxHeight: "65%", padding: spacing.md, borderTopLeftRadius: 20, borderTopRightRadius: 20 },

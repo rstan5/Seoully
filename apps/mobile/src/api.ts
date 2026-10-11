@@ -1,3 +1,6 @@
+import { fetch as expoFetch } from "expo/fetch";
+import { personalPhotoForm, photoMultipart } from "./media/photoUpload";
+import { apiFailure, apiTransportFailure } from "./apiFailure";
 import { isProductApiConfigured } from "./config-rules";
 import { supabase } from "./supabase";
 import type { AskSurfaceContext } from "seoully-domain/ask-context";
@@ -103,8 +106,8 @@ export async function createHolding(templateId: string, holdingId?: string): Pro
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({ templateId, ...(holdingId ? { holdingId } : {}) }),
-  });
-  if (!response.ok) throw new Error("holding_create_failed");
+  }).catch(() => apiTransportFailure("holding_create"));
+  if (!response.ok) return apiFailure(response, "holding_create");
   const payload = await response.json() as { holding?: NativeHolding };
   if (!payload.holding?.id) throw new Error("holding_create_failed");
   return { holding: payload.holding };
@@ -139,8 +142,8 @@ export async function loadMyHolding(holdingId: string): Promise<NativeHolding | 
   const accessToken = await mobileAccessToken();
   const response = await fetch(`${productApiBase()}/api/mobile/holdings?holdingId=${encodeURIComponent(holdingId)}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!response.ok) throw new Error("holding_read_failed");
+  }).catch(() => apiTransportFailure("holding_read"));
+  if (!response.ok) return apiFailure(response, "holding_read");
   const payload = await response.json() as { holding?: NativeHolding | null };
   return payload.holding ?? null;
 }
@@ -241,27 +244,22 @@ export async function setWishlistTemplate(templateId: string, wanted: boolean) {
   if (!response.ok) throw new Error("wishlist_update_failed");
 }
 
-export async function uploadHoldingPhoto(holdingId: string, uri: string, mimeType = "image/jpeg") {
+export async function uploadHoldingPhoto(holdingId: string, uri: string) {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
   if (!accessToken) throw new Error("unauthenticated");
-  const body = new FormData();
-  body.append("holdingId", holdingId);
-  body.append("file", { uri, name: "collectible.jpg", type: mimeType } as unknown as Blob);
-  const response = await fetch(`${productApiBase()}/api/mobile/media`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body });
-  if (!response.ok) throw new Error("media_upload_failed");
+  const body = await personalPhotoForm(holdingId, uri);
+  const response = await expoFetch(`${productApiBase()}/api/mobile/media`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body }).catch(() => apiTransportFailure("media_upload"));
+  if (!response.ok) return apiFailure(response, "media_upload");
   return response.json();
 }
 
-export async function uploadCatalogReferencePhoto(templateId: string, uri: string, mimeType = "image/jpeg") {
+export async function uploadCatalogReferencePhoto(templateId: string, uri: string) {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
   if (!accessToken) throw new Error("unauthenticated");
-  const body = new FormData();
-  body.append("templateId", templateId);
-  body.append("sourceKey", uri.slice(-160));
-  body.append("file", { uri, name: "catalog-reference.jpg", type: mimeType } as unknown as Blob);
-  const response = await fetch(`${productApiBase()}/api/mobile/catalog/reference-images`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body });
+  const body = await photoMultipart({ templateId, sourceKey: uri.slice(-160) }, uri);
+  const response = await expoFetch(`${productApiBase()}/api/mobile/catalog/reference-images`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body });
   if (!response.ok) throw new Error("catalog_reference_upload_failed");
   return response.json();
 }
@@ -445,6 +443,14 @@ export async function askSeoullyNative(input: {
   if (response.status === 401) throw new Error("unauthenticated");
   if (!response.ok) throw new Error("assistant_unavailable");
   return response.json() as Promise<{ reply?: string; cards?: NativeAskCard[]; navigation?: NativeAskCard["action"] }>;
+}
+
+export async function searchCollectorGroups(query: string, signal?: AbortSignal): Promise<NativeOnboardingState["groups"]> {
+  const token = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/catalog/groups?q=${encodeURIComponent(query)}`, { headers: { Authorization: `Bearer ${token}` }, signal });
+  if (!response.ok) throw new Error("groups_unavailable");
+  const body = await response.json() as { groups: NativeOnboardingState["groups"] };
+  return body.groups;
 }
 
 export async function loadNativeOnboarding(signal?: AbortSignal): Promise<NativeOnboardingState> {

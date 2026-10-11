@@ -1,3 +1,4 @@
+import { reportOperationFailure } from "@/server/dal/safe-diagnostic";
 import { NextResponse } from "next/server";
 import { createMyHolding, getMyHolding, listMyHoldings, removeMyHolding, setMyHoldingTradeStatus } from "@/server/dal/holdings";
 import { createSupabaseBearerClient } from "@/server/supabase/bearer";
@@ -9,6 +10,7 @@ export async function POST(request: Request) {
     const holding = await createMyHolding(await request.json(), client);
     return NextResponse.json({ holding }, { status: 201 });
   } catch (error) {
+    reportOperationFailure("holding", error);
     const reason = error instanceof Error ? error.message : "holding_create_failed";
     return NextResponse.json({ error: reason }, { status: reason === "unauthenticated" ? 401 : 400 });
   }
@@ -30,6 +32,7 @@ export async function GET(request: Request) {
     }, client);
     return NextResponse.json({ holdings }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
+    reportOperationFailure("holding", error);
     const reason = error instanceof Error ? error.message : "holding_read_failed";
     return NextResponse.json({ error: reason }, { status: reason === "unauthenticated" ? 401 : 400 });
   }
@@ -42,6 +45,7 @@ export async function PATCH(request: Request) {
     const holding = await setMyHoldingTradeStatus(await request.json(), client);
     return NextResponse.json({ holding }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
+    reportOperationFailure("holding", error);
     const reason = error instanceof Error ? error.message : "holding_trade_update_failed";
     return NextResponse.json({ error: reason }, { status: reason === "unauthenticated" ? 401 : 400 });
   }
@@ -57,6 +61,7 @@ export async function DELETE(request: Request) {
       ? NextResponse.json(result, { headers: { "Cache-Control": "no-store" } })
       : NextResponse.json({ error: "not_found" }, { status: 404 });
   } catch (error) {
+    reportOperationFailure("holding", error);
     const reason = error instanceof Error ? error.message : "holding_delete_failed";
     return NextResponse.json({ error: reason }, { status: reason === "unauthenticated" ? 401 : 400 });
   }

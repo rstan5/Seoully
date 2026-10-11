@@ -1,3 +1,4 @@
+import { heartMotion } from "./heartMotion";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { Animated, Easing, Image, StyleSheet, View } from "react-native";
 import { colors } from "../theme";
@@ -38,15 +39,15 @@ function HeartLoadingSurface({ label }: { label: string }) {
     float.setValue(0);
     if (reduceMotion) return;
     const hover = Animated.loop(Animated.sequence([
-      Animated.timing(float, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true, isInteraction: false }),
-      Animated.timing(float, { toValue: 0, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true, isInteraction: false }),
+      Animated.timing(float, { toValue: 1, duration: heartMotion.halfCycleMs, easing: Easing.inOut(Easing.sin), useNativeDriver: true, isInteraction: false }),
+      Animated.timing(float, { toValue: 0, duration: heartMotion.halfCycleMs, easing: Easing.inOut(Easing.sin), useNativeDriver: true, isInteraction: false }),
     ]));
     hover.start();
     return () => { hover.stop(); float.stopAnimation(); };
   }, [float, reduceMotion]);
 
   return <View accessibilityRole="progressbar" accessibilityLabel={label} accessibilityState={{ busy: true }} style={styles.wrap}>
-    <Animated.View style={{ transform: [{ translateY: reduceMotion ? 0 : float.interpolate({ inputRange: [0, 1], outputRange: [3, -3] }) }] }}>
+    <Animated.View style={{ transform: [{ translateY: reduceMotion ? 0 : float.interpolate({ inputRange: [0, 1], outputRange: [heartMotion.travel / 2, -heartMotion.travel / 2] }) }] }}>
       <Image accessibilityIgnoresInvertColors accessible={false} resizeMode="contain" source={require("../../assets/brand/seoully-heart-mark.png")} style={styles.heart} />
     </Animated.View>
   </View>;

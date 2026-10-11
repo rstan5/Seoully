@@ -84,18 +84,22 @@ export async function GET(request: Request) {
   try {
     const state = await currentState(request);
     if (state instanceof NextResponse) return state;
+    const { data: catalogGroups, error: catalogError } = await state.client.from("catalog_groups")
+      .select("id,name").neq("status", "restricted").order("name").limit(500);
+    if (catalogError) throw new Error("groups_unavailable");
+    const knownNames = new Set(GROUPS.map(group => group.name.toLocaleLowerCase()));
     return NextResponse.json({
       step: state.step,
       firstHome: state.step === "interest" ? await readFirstHome(state.client, state.userId, state.identityReady) : null,
       favoriteGroupIds: state.favoriteGroupIds,
       biasMemberIds: state.biasMemberIds,
       collectorInterests: state.collectorInterests,
-      groups: GROUPS.map(({ id, name, nativeName, memberIds }) => ({
+      groups: [...GROUPS.map(({ id, name, nativeName, memberIds }) => ({
         id,
         name,
         nativeName,
         memberIds,
-      })),
+      })), ...(catalogGroups ?? []).filter(group => !knownNames.has(group.name.toLocaleLowerCase())).map(group => ({ id: group.id, name: group.name, nativeName: group.name, memberIds: [] }))],
       members: MEMBERS.map(({ id, groupId, stageName, nativeName }) => ({
         id,
         groupId,
@@ -121,7 +125,9 @@ export async function PATCH(request: Request) {
     const editingComplete = state.step === "done";
     const identityOpen = state.step === "group" || state.step === "bias" || state.step === "interest";
     if (parsed.data.action === "groups" && (identityOpen || editingComplete)) {
-      if (parsed.data.favoriteGroupIds.some((id) => !groupIds.has(id))) {
+      const additionalIds = parsed.data.favoriteGroupIds.filter(id => !groupIds.has(id));
+      const catalog = additionalIds.length ? await state.client.from("catalog_groups").select("id").in("id", additionalIds).neq("status", "restricted") : { data: [], error: null };
+      if (catalog.error || additionalIds.some(id => !(catalog.data ?? []).some(group => group.id === id))) {
         return NextResponse.json({ error: "invalid_input" }, { status: 400 });
       }
       patch.favorite_group_ids = parsed.data.favoriteGroupIds;

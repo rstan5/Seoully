@@ -1,3 +1,4 @@
+import { reportOperationFailure } from "./safe-diagnostic";
 import "server-only";
 
 import { z } from "zod";
@@ -69,7 +70,7 @@ export async function createMyHolding(input: unknown, client?: SupabaseClient): 
       .eq("id", holdingId).eq("owner_user_id", identity.user.id).maybeSingle();
     if (existing.error || existing.data?.template_id !== templateId) throw new Error("holding_create_failed");
     confirmed = existing.data;
-  } else if (error) throw new Error("holding_create_failed");
+  } else if (error) { reportOperationFailure("holding_insert", error); throw new Error("holding_create_failed"); }
   if (!confirmed) throw new Error("holding_create_failed");
   const [result] = await hydrateHoldings([confirmed], supabase);
   if (!result) throw new Error("holding_create_failed");

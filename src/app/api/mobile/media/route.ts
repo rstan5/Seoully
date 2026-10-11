@@ -1,3 +1,4 @@
+import { reportOperationFailure } from "@/server/dal/safe-diagnostic";
 import { NextResponse } from "next/server";
 import { uploadHoldingMedia } from "@/server/dal/media";
 import { createSupabaseBearerClient } from "@/server/supabase/bearer";
@@ -12,6 +13,7 @@ export async function POST(request: Request) {
     const asset = await uploadHoldingMedia({ holdingId: formData.get("holdingId"), file }, client);
     return NextResponse.json({ asset }, { status: 201 });
   } catch (error) {
+    reportOperationFailure("personal_media", error);
     const reason = error instanceof Error ? error.message : "media_upload_failed";
     return NextResponse.json({ error: reason }, { status: reason === "unauthenticated" ? 401 : 400 });
   }

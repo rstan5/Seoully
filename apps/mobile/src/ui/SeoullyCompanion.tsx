@@ -1,3 +1,4 @@
+import { heartMotion } from "./heartMotion";
 import { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -78,9 +79,8 @@ export function SeoullyCompanion({ guidance }: { guidance?: string } = {}) {
     }
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(bounce, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        Animated.timing(bounce, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        Animated.delay(3600),
+        Animated.timing(bounce, { toValue: 1, duration: heartMotion.halfCycleMs, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(bounce, { toValue: 0, duration: heartMotion.halfCycleMs, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
       ]),
     );
     loop.start();
@@ -88,7 +88,7 @@ export function SeoullyCompanion({ guidance }: { guidance?: string } = {}) {
   }, [bounce, reduceMotion]);
 
   if (guidance) return <View style={{ alignItems: "center", flexDirection: "row", gap: 10 }}>
-    <Animated.View style={{ transform: [{ translateY: bounce.interpolate({ inputRange: [0, 1], outputRange: [0, -6] }) }] }}>
+    <Animated.View style={{ transform: [{ translateY: bounce.interpolate({ inputRange: [0, 1], outputRange: [0, -heartMotion.travel] }) }] }}>
       <Image accessibilityIgnoresInvertColors resizeMode="contain" source={HEART} style={{ width: 36, height: 36 }} />
     </Animated.View>
     <SeoullyText variant="secondary" style={{ flex: 1 }}>{guidance}</SeoullyText>
@@ -172,7 +172,7 @@ export function SeoullyCompanion({ guidance }: { guidance?: string } = {}) {
           onPress={() => setOpen(true)}
           style={({ pressed }) => [styles.heartWrap, { bottom: placement.bottom, right: placement.right }, pressShift(pressed, reduceMotion)]}
         >
-          <Animated.View style={{ transform: [{ translateY: bounce.interpolate({ inputRange: [0, 1], outputRange: [0, -6] }) }] }}>
+          <Animated.View style={{ transform: [{ translateY: bounce.interpolate({ inputRange: [0, 1], outputRange: [0, -heartMotion.travel] }) }] }}>
             <Image accessibilityIgnoresInvertColors resizeMode="contain" source={HEART} style={styles.heart} />
           </Animated.View>
         </Pressable>

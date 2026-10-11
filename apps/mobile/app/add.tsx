@@ -53,7 +53,7 @@ export default function AddCollectibleScreen() {
     return fetchDraft().then((existing) => {
       setDraft(existing);
       setUri(existing.photoUri);
-      setShareReference(existing.shareReference);
+      setShareReference(fromOnboarding ? false : existing.shareReference);
       setMessage(null);
     }).catch(() => { setMessage(copy.holdingCreateFailed); })
       .finally(() => { setHydrating(false); });
@@ -111,7 +111,7 @@ export default function AddCollectibleScreen() {
     try {
       if (fromOnboarding) {
         if (!draft) throw new Error("draft_unavailable");
-        const next = { ...draft, photoUri: uri, shareReference };
+        const next = { ...draft, photoUri: uri, shareReference: false };
         await saveFirstCollectibleDraft(next);
         const holding = await confirmFirstCollectible(next, { read: loadMyHolding, create: createHolding,
           photo: uploadHoldingPhoto, reference: uploadCatalogReferencePhoto, save: saveFirstCollectibleDraft });
@@ -147,7 +147,10 @@ export default function AddCollectibleScreen() {
           });
       return;
     } catch (error) {
-      setMessage(error instanceof Error && error.message.includes("media") ? copy.photoUpdateFailed : copy.holdingCreateFailed);
+      const diagnostic = error instanceof Error && /^(holding_read|holding_create|media_upload):[0-9]{3}:[a-z_]+$/.test(error.message) ? error.message
+        : error instanceof Error && ["media_local_file_unreadable", "media_too_large", "unsupported_media_type"].includes(error.message) ? `media_prepare:000:${error.message}` : null;
+      const friendly = error instanceof Error && error.message.includes("media") ? copy.photoUpdateFailed : copy.holdingCreateFailed;
+      setMessage(__DEV__ && diagnostic ? `${friendly} (${diagnostic})` : friendly);
     } finally {
       submitting.current = false;
       setWorking(false);
@@ -167,10 +170,10 @@ export default function AddCollectibleScreen() {
     <SeoullyScreen>
       <ScrollView contentContainerStyle={styles.container}>
         <ScreenBack label={copy.back} onPress={() => router.back()} />
-        <SeoullyText variant="title" style={styles.headline}>{copy.myCopyTitle}</SeoullyText>
+        <SeoullyText variant="title" style={styles.headline}>{copy.addPhotoTitle}</SeoullyText>
         <SeoullyText variant="handle" color={colors.plum}>{params.name ?? copy.catalogItemFallback}</SeoullyText>
         {meta ? <SeoullyText variant="caption" style={styles.meta}>{meta}</SeoullyText> : null}
-        <SeoullyText variant="secondary" style={styles.lede}>{copy.myCopyLede}</SeoullyText>
+        <SeoullyText variant="secondary" style={styles.lede}>{copy.onboardPhotoLead}</SeoullyText>
         {uri ? (
           <Image
             accessibilityLabel={copy.personalPreview}
@@ -187,7 +190,7 @@ export default function AddCollectibleScreen() {
           <SeoullyButton label={copy.takePhoto} variant="ghost" fill onPress={() => { void choose("camera"); }} />
           <SeoullyButton label={copy.chooseFromLibrary} variant="ghost" fill onPress={() => { void choose("library"); }} />
         </View>
-        {isNewTemplate ? (
+        {isNewTemplate && !fromOnboarding ? (
           <Pressable
             accessibilityRole="checkbox"
             accessibilityState={{ checked: shareReference }}

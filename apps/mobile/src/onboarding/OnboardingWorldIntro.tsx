@@ -1,3 +1,4 @@
+import { HeartFarewell } from "../ui/HeartFarewell";
 import { useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -39,12 +40,12 @@ export default function OnboardingWorldIntro({ holdingId, copy, onContinue, onBa
       }}
       onLivePlacementConfirmed={(id) => { void finish(id); }}
     />
-    {ready ? <View pointerEvents="box-none" style={[styles.guide, { top: insets.top + 98 }]}>
-      <SeoullyCompanion guidance={complete ? copy.onboardFirstHomeComplete : copy.onboardPlaceFirst} />
+    {ready && !complete ? <View pointerEvents="box-none" style={[styles.guide, { top: insets.top + 98 }]}>
+      <SeoullyCompanion guidance={copy.onboardPlaceFirst} />
       {error ? <><SeoullyText accessibilityRole="alert" variant="caption">{copy.onboardingSaveFailed}</SeoullyText>
         <SeoullyButton label={copy.retry} variant="ghost" onPress={() => { void finish(holdingId); }} /></> : null}
-      {complete ? <SeoullyButton label={copy.onboardFindPeople} variant="ghost" onPress={onContinue} /> : null}
     </View> : null}
+    {complete ? <HeartFarewell text={`${copy.onboardFirstHomeComplete}\n${copy.companionAlways}`} label={copy.onboardFindPeople} onContinue={onContinue} /> : null}
   </View>;
 }
 const styles = StyleSheet.create({

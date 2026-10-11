@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "incremental": false },
-  "include": ["src/server/dal/catalog.ts", "src/app/api/mobile/catalog/contributions/route.ts", "src/app/api/mobile/onboarding/route.ts", "src/server/dal/holdings.ts", "src/server/dal/first-home.ts"],
+  "include": ["src/server/dal/catalog.ts", "src/app/api/mobile/catalog/contributions/route.ts", "src/app/api/mobile/onboarding/route.ts", "src/app/api/mobile/catalog/groups/route.ts", "src/app/api/mobile/holdings/route.ts", "src/app/api/mobile/media/route.ts", "src/server/dal/holdings.ts", "src/server/dal/first-home.ts"],
   "exclude": ["node_modules", "apps/mobile"]
 }

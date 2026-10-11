@@ -1,9 +1,11 @@
+import { HeartGreeting } from "../src/ui/HeartGreeting";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Animated, Easing, Image, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   loadMyHolding,
   loadNativeOnboarding,
+  searchCollectorGroups,
   updateNativeOnboarding,
   type NativeHolding,
   type NativeOnboardingState,
@@ -27,7 +29,6 @@ import { useReduceMotion } from "../src/ui/motion";
 import { SeoullyScreen } from "../src/ui/SeoullyScreen";
 import { SeoullyText } from "../src/ui/SeoullyText";
 
-const HEART = require("../assets/brand/seoully-heart-mark.png");
 const OnboardingWorldIntro = lazy(() => import("../src/onboarding/OnboardingWorldIntro"));
 
 function toggle(list: string[], id: string) {
@@ -57,6 +58,11 @@ export default function OnboardingScreen() {
   const savingIdentity = useRef(false);
   const [state, setState] = useState<NativeOnboardingState | null>(null);
   const [phase, setPhase] = useState<OnboardingPhase>("group");
+  const [greeted, setGreeted] = useState<Set<OnboardingPhase>>(() => new Set());
+  const [groupQuery, setGroupQuery] = useState("");
+  const [searchedGroups, setSearchedGroups] = useState<NativeOnboardingState["groups"]>([]);
+  const [groupSearchError, setGroupSearchError] = useState(false);
+  const [groupSearchAttempt, setGroupSearchAttempt] = useState(0);
   const [groupIds, setGroupIds] = useState<string[]>([]);
   const [biasIds, setBiasIds] = useState<string[]>([]);
   const [interests, setInterests] = useState<string[]>(["photocards"]);
@@ -126,6 +132,17 @@ export default function OnboardingScreen() {
     // First-run identity is Live. Demo stays a post-arrival explorer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingTastes, params.phase, params.holdingId]));
+
+  useEffect(() => {
+    if (phase !== "group" || !groupQuery.trim()) return;
+    const controller = new AbortController();
+    void searchCollectorGroups(groupQuery, controller.signal).then(groups => {
+      if (controller.signal.aborted) return;
+      setSearchedGroups(previous => [...new Map([...previous, ...groups].map(group => [group.id, group])).values()]);
+      setGroupSearchError(false);
+    }).catch(() => { if (!controller.signal.aborted) setGroupSearchError(true); });
+    return () => controller.abort();
+  }, [phase, groupQuery, groupSearchAttempt]);
 
   useEffect(() => {
     if (phase !== "collect" || editingTastes) return;
@@ -233,8 +250,7 @@ export default function OnboardingScreen() {
               <SeoullyText variant="button">{t.switchLanguage}</SeoullyText>
             </Pressable>
           </View>
-          <Image accessibilityIgnoresInvertColors resizeMode="contain" source={HEART} style={styles.heart} />
-          <SeoullyText variant="title">{t.onboardRevealTitle}</SeoullyText>
+          <HeartGreeting text={t.onboardRevealTitle} />
           <SeoullyText variant="secondary" style={styles.lead}>{t.onboardRevealLede}</SeoullyText>
           {preview ? (
             <Image
@@ -258,6 +274,7 @@ export default function OnboardingScreen() {
     );
   }
 
+  const allGroups = [...new Map([...state.groups, ...searchedGroups].map(group => [group.id, group])).values()];
   const title = phase === "group"
     ? t.onboardingGroupTitle
     : phase === "bias"
@@ -268,6 +285,13 @@ export default function OnboardingScreen() {
     : phase === "bias"
       ? t.onboardingBiasLead
       : t.onboardingInterestLead;
+
+  if (!editingTastes && !greeted.has(phase)) return <SeoullyScreen edges={["top", "bottom"]}>
+    <View style={{ flex: 1, paddingHorizontal: 24 }}>
+      <View style={{ flex: 1, justifyContent: "center" }}><HeartGreeting text={title} onContinue={() => setGreeted(previous => new Set(previous).add(phase))} /></View>
+      <SeoullyButton label={t.continue} block onPress={() => setGreeted(previous => new Set(previous).add(phase))} />
+    </View>
+  </SeoullyScreen>;
 
   return (
     <SeoullyScreen>
@@ -284,8 +308,12 @@ export default function OnboardingScreen() {
         <SeoullyText variant="title" style={styles.headline}>{title}</SeoullyText>
         <SeoullyText variant="secondary" style={styles.lead}>{lead}</SeoullyText>
 
+        {phase === "group" ? <TextInput accessibilityLabel={t.groupSearch} placeholder={t.groupSearch} value={groupQuery} onChangeText={setGroupQuery} autoCorrect={false} style={{ padding: 14, marginVertical: 16, backgroundColor: colors.surface, borderRadius: 16, color: colors.ink }} /> : null}
+        {phase === "group" && !allGroups.some(group => `${group.name} ${group.nativeName}`.toLocaleLowerCase().includes(groupQuery.trim().toLocaleLowerCase())) ? <SeoullyText variant="secondary">{t.groupMissing}</SeoullyText> : null}
+        {phase === "group" && groupSearchError ? <SeoullyText accessibilityRole="alert" color={colors.plum}>{t.onboardingUnavailable}</SeoullyText> : null}
+        {phase === "group" && groupSearchError ? <SeoullyButton label={t.retry} variant="ghost" onPress={() => setGroupSearchAttempt(attempt => attempt + 1)} /> : null}
         <View style={styles.chips}>
-          {phase === "group" && state.groups.map((group) => (
+          {phase === "group" && allGroups.filter(group => groupIds.includes(group.id) || `${group.name} ${group.nativeName}`.toLocaleLowerCase().includes(groupQuery.trim().toLocaleLowerCase())).map((group) => (
             <SeoullyChoiceChip
               key={group.id}
               role="checkbox"

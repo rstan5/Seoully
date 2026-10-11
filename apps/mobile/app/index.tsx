@@ -1,5 +1,6 @@
+import { HeartGreeting } from "../src/ui/HeartGreeting";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { mobileConfig } from "../src/config";
 import { KeyboardScreen } from "../src/components/KeyboardScreen";
 import { useCopy, useLocale } from "../src/locale";
@@ -50,21 +51,18 @@ export default function Index() {
   }
 
   return (
-    <SeoullyScreen>
+    <SeoullyScreen edges={["top", "bottom"]}>
       <KeyboardScreen>
         <View style={styles.container}>
-          <View style={styles.topline}>
+          {gate !== "welcome" ? <View style={styles.topline}>
             <BrandMark />
             <Pressable accessibilityRole="button" onPress={toggleLocale} style={styles.language}>
               <SeoullyText variant="button">{t.switchLanguage}</SeoullyText>
             </Pressable>
-          </View>
+          </View> : null}
           {gate === "welcome" ? (
             <View style={styles.welcome}>
-              <SeoullyText variant="title" style={styles.welcomeTitle}>
-                {t.welcomeLine1}{"\n"}{t.welcomeLine2}
-              </SeoullyText>
-              <SeoullyText variant="secondary" style={styles.tagline}>{t.welcomeLede}</SeoullyText>
+              <View style={styles.hero}><HeartGreeting large text={`${t.welcomeLine1}\n${t.welcomeLine2}`} /></View>
               <SeoullyButton label={t.welcomeCreate} block onPress={() => { setGate("create"); setCreateMode(true); }} />
               <Pressable accessibilityRole="button" onPress={() => { setGate("signin"); setCreateMode(false); }} style={styles.secondary}>
                 <SeoullyText variant="button" color={colors.plum}>{t.welcomeSignin}</SeoullyText>
@@ -89,12 +87,11 @@ export default function Index() {
                 <TextInput autoCapitalize="none" autoCorrect={false} keyboardType="email-address" placeholder={t.email} placeholderTextColor={colors.muted} value={email} onChangeText={setEmail} style={styles.input} />
                 <TextInput secureTextEntry placeholder={t.password} placeholderTextColor={colors.muted} value={password} onChangeText={setPassword} style={styles.input} />
                 <SeoullyButton
-                  label={createMode ? t.createAccount : t.signIn}
+                  label={submitting ? t.saving : createMode ? t.createAccount : t.signIn}
                   disabled={submitting || !mobileConfig.authConfigured}
                   block
                   onPress={() => { void submit(); }}
                 />
-                {submitting ? <ActivityIndicator color={colors.plum} /> : null}
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => {
@@ -126,7 +123,8 @@ const styles = StyleSheet.create({
   topline: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   language: { justifyContent: "center", minHeight: 44, paddingHorizontal: 4 },
   centered: { flex: 1, gap: 16, justifyContent: "center", paddingHorizontal: 16 },
-  welcome: { gap: 16, marginTop: 28 },
+  welcome: { flex: 1, gap: 12, paddingBottom: 12 },
+  hero: { flex: 1, justifyContent: "center", paddingBottom: 32 },
   welcomeTitle: { letterSpacing: -0.8, lineHeight: 36 },
   tagline: { marginTop: 8, lineHeight: 22 },
   warning: { backgroundColor: colors.lilacSoft, borderRadius: 14, marginTop: 16, padding: 14 },

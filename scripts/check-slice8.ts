@@ -49,7 +49,7 @@ assert.equal(nextDurableStep("group", "groups", 1), "bias");
 assert.equal(nextDurableStep("bias", "bias"), "interest");
 assert.equal(nextDurableStep("interest", "interests"), "interest");
 assert.deepEqual([...ONBOARDING_INTERESTS], ["photocards", "albums", "merch", "vinyl", "posters", "lightsticks", "everything"]);
-assertContains(onboarding, "state.groups.map", "live groups");
+assertContains(onboarding, "allGroups.filter", "live groups");
 assertContains(onboarding, "groupIds.includes(member.groupId)", "bias scoped to groups");
 assertContains(onboarding, 'action: "interests"', "interest persist");
 

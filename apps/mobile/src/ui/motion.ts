@@ -22,3 +22,15 @@ export function pressShift(pressed: boolean, reduceMotion: boolean) {
   if (reduceMotion || !pressed) return null;
   return { transform: [{ translateY: motion.pressOffset }] };
 }
+
+/** null reserves layout while the accessibility preference is being read. */
+export function useMotionPreference() {
+  const [reduced, setReduced] = useState<boolean | null>(null);
+  useEffect(() => {
+    let active = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then(value => { if (active) setReduced(value); });
+    const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", setReduced);
+    return () => { active = false; subscription.remove(); };
+  }, []);
+  return reduced;
+}

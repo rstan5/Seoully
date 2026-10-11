@@ -1,3 +1,4 @@
+import { PHOTOCARD } from "../src/media/photocard";
 import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
@@ -261,7 +262,7 @@ const styles = StyleSheet.create({
   spine: { backgroundColor: "#4a2130", borderRadius: 4, marginHorizontal: 3, width: 10 },
   setName: { color: "#fff4f6", fontSize: 10, fontWeight: "700", height: 17, textAlign: "center" },
   pockets: { flexDirection: "row", flexWrap: "wrap", gap: 5, justifyContent: "center" },
-  pocket: { aspectRatio: 55 / 85, backgroundColor: "rgba(255,255,255,0.16)", borderColor: "rgba(255,255,255,0.35)", borderRadius: 4, borderWidth: 1, overflow: "hidden", width: "29%" },
+  pocket: { aspectRatio: PHOTOCARD.aspect, backgroundColor: "rgba(255,255,255,0.16)", borderColor: "rgba(255,255,255,0.35)", borderRadius: 4, borderWidth: 1, overflow: "hidden", width: "29%" },
   pocketFocused: { borderColor: "#fff4f6", borderWidth: 2, transform: [{ translateY: -6 }] },
   cardImage: { height: "100%", width: "100%" },
   cardFallback: { alignItems: "center", backgroundColor: colors.blush, height: "100%", justifyContent: "center", padding: 2, width: "100%" },
@@ -273,8 +274,8 @@ const styles = StyleSheet.create({
   pageButtonText: { color: colors.plum, fontSize: 12, fontWeight: "700", textAlign: "center" },
   modalBackdrop: { alignItems: "center", backgroundColor: "rgba(35,17,24,0.72)", flex: 1, justifyContent: "center", padding: spacing.xl },
   inspection: { alignItems: "center", backgroundColor: colors.surface, borderRadius: 20, maxWidth: 420, padding: spacing.lg, width: "100%" },
-  inspectImage: { aspectRatio: 55 / 85, maxHeight: 480, width: "82%" },
-  inspectFallback: { alignItems: "center", aspectRatio: 55 / 85, backgroundColor: colors.blush, borderRadius: 12, justifyContent: "center", padding: spacing.md, width: "82%" },
+  inspectImage: { aspectRatio: PHOTOCARD.aspect, maxHeight: 480, width: "82%" },
+  inspectFallback: { alignItems: "center", aspectRatio: PHOTOCARD.aspect, backgroundColor: colors.blush, borderRadius: 12, justifyContent: "center", padding: spacing.md, width: "82%" },
   inspectFallbackText: { color: colors.ink, fontSize: 18, fontWeight: "700", textAlign: "center" },
   inspectTitle: { color: colors.ink, fontSize: 20, fontWeight: "700", marginTop: spacing.md, textAlign: "center" },
   inspectMeta: { color: colors.muted, marginTop: spacing.xs, textAlign: "center" },

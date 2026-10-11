@@ -1,3 +1,4 @@
+import { PHOTOCARD } from "../src/media/photocard";
 import { useEffect, useRef, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -230,7 +231,7 @@ const styles = StyleSheet.create({
   meta: { marginTop: 2 },
   lede: { lineHeight: 21 },
   preview: { alignSelf: "center", borderRadius: 14, height: 240, width: 180 },
-  cardPreview: { alignSelf: "center", aspectRatio: 55 / 85, borderRadius: 10, width: "58%" },
+  cardPreview: { alignSelf: "center", aspectRatio: PHOTOCARD.aspect, borderRadius: 10, width: "58%" },
   empty: {
     alignItems: "center",
     backgroundColor: colors.mist,

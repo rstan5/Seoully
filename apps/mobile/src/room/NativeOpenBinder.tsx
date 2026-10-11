@@ -2,7 +2,7 @@ import { BinderOwnerLabel } from "./BinderOwnerLabel";
 import { BINDER_DISPLAY_TILT, BINDER_DISPLAY_CENTER_Y, BINDER_CLOSED_CENTER_Z, binderTravel } from "./binderPresentation";
 import { composeParentYaw } from "./roomWorldTransform";
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
-import { Suspense, useMemo, useRef, useState, type MutableRefObject } from "react";
+import { Suspense, createContext, useContext, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { useFrame, useLoader, useThree } from "@react-three/fiber/native";
 import { DoubleSide, Euler, Group, Quaternion, TextureLoader, Vector3 } from "three";
 import type { NativeHolding } from "../api";
@@ -10,6 +10,7 @@ import { useCachedSignedMedia } from "../media/cachedMedia";
 import type { NativeBinderPage, NativeBinderSpread } from "../binder/model";
 import { BINDER_POCKETS_PER_PAGE } from "../binder/model";
 import { cameraLerpAlpha, DESK_BINDER_AT } from "./camera";
+import { photocardCoverUV } from "../media/photocard";
 import { prepCollectibleTexture } from "./roomMaterials";
 import { liveDeskBinderYaw, liveDeskBinderWorld, type RoomObjectInstance } from "./roomObjects";
 import {
@@ -23,8 +24,9 @@ import {
   openBinderWorldAt,
   pageLocalX,
   pocketLocalPosition,
-  pocketWorldPosition,
 } from "./composition";
+
+const BinderCardMotion = createContext({ heldHoldingId: undefined as string | undefined, reducedMotion: false, paused: false, binderAt: DESK_BINDER_AT });
 
 export const BINDER_PAGE_W = COMP_PAGE_W;
 export const BINDER_PAGE_H = COMP_PAGE_H;
@@ -98,12 +100,6 @@ export function NativeOpenBinder({
   const right = turnDir === 1 && turningTo ? turningTo.right : visibleSpread?.right;
   const leaf = turnDir === 1 ? spread?.right : turnDir === -1 ? spread?.left : undefined;
   const leafBack = turnDir === 1 ? turningTo?.left : turningTo?.right;
-  const liveHeld = findHeldCard(spread, turningTo, heldHoldingId, binderAt);
-  const [flight, setFlight] = useState<typeof liveHeld>(null);
-  const [keepFlight, setKeepFlight] = useState(false);
-  if (liveHeld && flight?.holding.id !== liveHeld.holding.id) setFlight(liveHeld);
-  if (heldHoldingId && !keepFlight) setKeepFlight(true);
-  const shown = liveHeld ?? (keepFlight ? flight : null);
 
   useFrame((_, delta) => {
     if (paused) return;
@@ -161,7 +157,7 @@ export function NativeOpenBinder({
     .multiply(new Quaternion().setFromEuler(new Euler(BINDER_DISPLAY_TILT-Math.PI/2,0,0)))
     .multiply(new Quaternion().setFromEuler(new Euler(0,-Math.PI/2,0))));
   const [initialPosition]=useState<[number,number,number]>(()=>[rest.x,rest.y+BINDER_DISPLAY_CENTER_Y*0.62,rest.z]);
-  return <>
+  return <BinderCardMotion.Provider value={{ heldHoldingId, reducedMotion, paused, binderAt }}>
     <group ref={stand} position={[rest.x,rest.y,rest.z]} rotation={[0,restRotation.y,0]} scale={0.62}><BinderDisplayStand /></group>
     <group ref={group} position={initialPosition} quaternion={initialQuaternion} scale={0.62}
       onClick={(event)=>{event.stopPropagation();if (!open && progress.current===0) onOpen?.();}}>
@@ -171,18 +167,7 @@ export function NativeOpenBinder({
         {open && leaf && turnDir !== 0 ? <TurningLeaf page={leaf} back={leafBack} dir={turnDir} reducedMotion={reducedMotion} paused={paused} paper={paper} cover={cover} heldHoldingId={heldHoldingId} onHold={onHold} onComplete={onTurnComplete} /> : null}
       </group>
     </group>
-    {open && shown ? <InspectedBinderCard
-      holding={shown.holding}
-      rest={shown.rest}
-      binderAt={binderAt}
-      active={Boolean(heldHoldingId)}
-      reducedMotion={reducedMotion}
-      paused={paused}
-      paper={paper}
-      onHold={onHold}
-      onHome={() => setKeepFlight(false)}
-    /> : null}
-  </>;
+  </BinderCardMotion.Provider>;
 }
 
 /** Small permanent support; never participates in object picking. */
@@ -330,124 +315,95 @@ function PagePockets({
           <planeGeometry args={[CARD_W + 0.02, CARD_H + 0.02]} />
           <meshStandardMaterial color="#d8cfc0" roughness={0.5} transparent opacity={held ? 0.18 : 0.42} />
         </mesh>
-        {pocket.holding && !held ? <PocketCard holding={pocket.holding} paper={paper} onHold={onHold} /> : null}
+        {pocket.holding ? <PocketCard holding={pocket.holding} paper={paper} onHold={onHold} /> : null}
       </group>;
     })}
   </>;
 }
 
-function InspectedBinderCard({
-  holding,
-  rest,
-  binderAt,
-  active,
-  reducedMotion,
-  paused,
-  paper,
-  onHold,
-  onHome,
-}: {
-  holding: NativeHolding;
-  rest: { x: number; y: number; z: number };
-  binderAt: { x: number; y: number; z: number };
-  active: boolean;
-  reducedMotion: boolean;
-  paused: boolean;
-  paper: string;
-  onHold: (holding: NativeHolding | null) => void;
-  onHome: () => void;
-}) {
-  const group = useRef<Group>(null);
-  const { size } = useThree();
-  const targetPos = useMemo(() => new Vector3(rest.x, rest.y, rest.z), [rest.x, rest.y, rest.z]);
-  const targetQuat = useMemo(() => new Quaternion(), []);
-  const targetEuler = useMemo(() => new Euler(), []);
-  const seeded = useRef(false);
-  useFrame((_, delta) => {
-    const mesh = group.current;
-    if (!mesh || paused) return;
-    if (!seeded.current) {
-      mesh.position.set(rest.x, rest.y, rest.z);
-      seeded.current = true;
-    }
-    const aspect = size.width / Math.max(1, size.height);
-    const presented = binderCardInspectionWorld(aspect, binderAt);
-    const dest = active ? presented.position : rest;
-    const destRot = active ? presented.rotation : { x: 0, y: 0, z: 0 };
-    const destScale = active ? presented.scale : 1;
-    targetPos.set(dest.x, dest.y, dest.z);
-    targetEuler.set(destRot.x, destRot.y, destRot.z);
-    targetQuat.setFromEuler(targetEuler);
-    const alpha = cameraLerpAlpha(delta, reducedMotion);
-    mesh.position.lerp(targetPos, alpha);
-    mesh.quaternion.slerp(targetQuat, alpha);
-    mesh.scale.setScalar(mesh.scale.x + (destScale - mesh.scale.x) * alpha);
-    if (!active && mesh.position.distanceTo(targetPos) < 0.03) onHome();
-  });
-  return <group
-    ref={group}
-    position={[rest.x, rest.y, rest.z]}
-    onClick={(event) => { event.stopPropagation(); onHold(null); }}
-  >
-    <PocketCard holding={holding} paper={paper} lifted onHold={onHold} />
-  </group>;
-}
-
 function PocketCard({
   holding,
   paper,
-  lifted,
   onHold,
 }: {
   holding: NativeHolding;
   paper: string;
-  lifted?: boolean;
   onHold: (holding: NativeHolding | null) => void;
 }) {
   const [failed, setFailed] = useState(false);
+  const [textureReady, setTextureReady] = useState(false);
+  const group = useRef<Group>(null);
+  const motion = useContext(BinderCardMotion);
+  const { size } = useThree();
+  const active = motion.heldHoldingId === holding.id;
+  const returning = useRef(false);
+  const returned = useRef(false);
+  const targetPosition = useMemo(() => new Vector3(), []);
+  const targetQuaternion = useMemo(() => new Quaternion(), []);
+  const parentQuaternion = useMemo(() => new Quaternion(), []);
+  const parentScale = useMemo(() => new Vector3(), []);
+  useFrame((_, delta) => {
+    const card = group.current;
+    if (!card || !card.parent || motion.paused) return;
+    if (!active) { returning.current = false; returned.current = false; }
+    let scale = 1;
+    targetPosition.set(0, 0, 0);
+    targetQuaternion.identity();
+    if (active && !returning.current) {
+      const presented = binderCardInspectionWorld(size.width / Math.max(1, size.height), motion.binderAt);
+      card.parent.updateWorldMatrix(true, false);
+      targetPosition.set(presented.position.x, presented.position.y, presented.position.z);
+      card.parent.worldToLocal(targetPosition);
+      card.parent.getWorldQuaternion(parentQuaternion);
+      targetQuaternion.setFromEuler(new Euler(presented.rotation.x, presented.rotation.y, presented.rotation.z));
+      targetQuaternion.premultiply(parentQuaternion.invert());
+      card.parent.getWorldScale(parentScale);
+      scale = presented.scale / parentScale.x;
+    }
+    const alpha = motion.reducedMotion ? 1 : cameraLerpAlpha(delta, false);
+    card.position.lerp(targetPosition, alpha);
+    card.quaternion.slerp(targetQuaternion, alpha);
+    card.scale.setScalar(card.scale.x + (scale - card.scale.x) * alpha);
+    if ((!active || returning.current) && card.position.length() < 0.0001 && card.quaternion.angleTo(targetQuaternion) < 0.0001 && Math.abs(card.scale.x - 1) < 0.0001) {
+      card.position.set(0, 0, 0); card.quaternion.identity(); card.scale.setScalar(1);
+      if (active && !returned.current) { returned.current = true; onHold(null); }
+    }
+  });
   const imageUrl = !failed ? (holding.personalMediaUrl ?? holding.template.imageUrl) : undefined;
-  return <group onClick={(event) => { event.stopPropagation(); onHold(lifted ? null : holding); }}>
+  return <group ref={group} onClick={(event) => { event.stopPropagation(); if (active) returning.current = true; else if (!motion.heldHoldingId && (!imageUrl || textureReady)) onHold(holding); }}>
     <mesh>
       <boxGeometry args={[CARD_W, CARD_H, 0.012]} />
       <meshStandardMaterial color={paper} roughness={0.45} />
     </mesh>
     {imageUrl
-      ? <CachedCardFace cacheKey={holding.id} url={imageUrl} onError={() => setFailed(true)} />
+      ? <CachedCardFace cacheKey={holding.id} url={imageUrl} onError={() => setFailed(true)} onReady={() => setTextureReady(true)} />
       : <mesh position={[0, 0, 0.008]}><planeGeometry args={[CARD_W * 0.92, CARD_H * 0.92]} /><meshStandardMaterial color="#e6c9d0" roughness={0.5} /></mesh>}
   </group>;
 }
 
-function CachedCardFace({ cacheKey, url, onError }: { cacheKey: string; url: string; onError: () => void }) {
+function CachedCardFace({ cacheKey, url, onError, onReady }: { cacheKey: string; url: string; onError: () => void; onReady: () => void }) {
   const localUri = useCachedSignedMedia(cacheKey, url);
   if (!localUri) return <mesh position={[0, 0, 0.008]}><planeGeometry args={[CARD_W * 0.92, CARD_H * 0.92]} /><meshStandardMaterial color="#e6c9d0" roughness={0.5} /></mesh>;
   return <Suspense fallback={<mesh position={[0, 0, 0.008]}><planeGeometry args={[CARD_W * 0.92, CARD_H * 0.92]} /><meshStandardMaterial color="#e6c9d0" roughness={0.5} /></mesh>}>
-    <CardFace uri={localUri} onError={onError} />
+    <CardFace uri={localUri} onError={onError} onReady={onReady} />
   </Suspense>;
 }
 
-function CardFace({ uri, onError }: { uri: string; onError: () => void }) {
+function CardFace({ uri, onError, onReady }: { uri: string; onError: () => void; onReady: () => void }) {
   const texture = useLoader(TextureLoader, uri);
-  const map = useMemo(() => prepCollectibleTexture(texture), [texture]);
+  const map = useMemo(() => {
+    const owned = prepCollectibleTexture(texture.clone());
+    const image = texture.image as { width?: number; height?: number };
+    const uv = photocardCoverUV(image?.width ?? 0, image?.height ?? 0);
+    owned.repeat.set(uv.repeatX, uv.repeatY);
+    owned.offset.set(uv.offsetX, uv.offsetY);
+    return owned;
+  }, [texture]);
+  useEffect(() => { onReady(); }, [map, onReady]);
+  useEffect(() => () => map.dispose(), [map]);
   void onError;
   return <mesh position={[0, 0, 0.008]}>
     <planeGeometry args={[CARD_W * 0.92, CARD_H * 0.92]} />
     <meshBasicMaterial map={map} toneMapped={false} />
   </mesh>;
-}
-
-function findHeldCard(
-  spread: NativeBinderSpread | undefined,
-  turningTo: NativeBinderSpread | undefined,
-  heldHoldingId?: string,
-  binderAt: { x: number; y: number; z: number } = DESK_BINDER_AT,
-) {
-  if (!heldHoldingId) return null;
-  for (const page of [spread?.left, spread?.right, turningTo?.left, turningTo?.right]) {
-    if (!page) continue;
-    const pocket = page.pockets.find((entry) => entry.holding?.id === heldHoldingId);
-    if (!pocket?.holding) continue;
-    const side = page === spread?.left || page === turningTo?.left ? "left" : "right";
-    return { holding: pocket.holding, rest: pocketWorldPosition(side, pocket.index % BINDER_POCKETS_PER_PAGE, binderAt) };
-  }
-  return null;
 }

@@ -1,3 +1,4 @@
+import { PHOTOCARD } from "../media/photocard";
 import type { NativeHolding } from "../api";
 
 export type NativeRepresentationKind =
@@ -69,7 +70,7 @@ export function representationKindForHolding(holding: NativeHolding): NativeRepr
 
 export function extentsForGeometry(geometry: NativeRepresentationKind) {
   switch (geometry) {
-    case "photocard": return { x: 0.55, y: 0.85, z: 0.018 };
+    case "photocard": return { x: 0.55, y: 0.55 / PHOTOCARD.aspect, z: 0.018 };
     case "poster": return { x: 1.05, y: 1.48, z: 0.02 };
     case "album": return { x: 0.16, y: 0.88, z: 0.88 };
     case "vinyl": return { x: 0.96, y: 0.96, z: 0.07 };

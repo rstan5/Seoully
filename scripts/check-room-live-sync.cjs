@@ -91,7 +91,7 @@ test('actual Live hydration applies only the newest response, never a starter sn
   const start=source.indexOf('async () => {',source.indexOf('const refresh ='));
   const body=source.slice(start,source.indexOf('    // applyLoadedLayout',start))+'\n};';
   const requests=[],snapshots=[],layouts=[],loading=[];
-  const context={demo:false,mode:'own',persistLive:true,liveSync:new LiveRoomSync(),copy:{roomUnavailable:'failed'},setLoading:x=>loading.push(x),loadNativeRoom:()=>{const d=deferred();requests.push(d);return d.promise},loadCollectorProfile:async()=>null,setSnapshot:x=>snapshots.push(x),setHoldings:()=>{},setItems:()=>{},setRoomStyle:()=>{},setOwnerName:()=>{},setPrivateRoom:()=>{},setError:()=>{},parseRoomStyle:x=>x,defaultStyleForTheme:()=>({}),parseRoomLayout:x=>x,applyLoadedLayout:x=>layouts.push(x),buildRoomRenderables:()=>[]};
+  const context={onboardingEvents:{current:{}},demo:false,mode:'own',persistLive:true,liveSync:new LiveRoomSync(),copy:{roomUnavailable:'failed'},setLoading:x=>loading.push(x),loadNativeRoom:()=>{const d=deferred();requests.push(d);return d.promise},loadCollectorProfile:async()=>null,setSnapshot:x=>snapshots.push(x),setHoldings:()=>{},setItems:()=>{},setRoomStyle:()=>{},setOwnerName:()=>{},setPrivateRoom:()=>{},setError:()=>{},parseRoomStyle:x=>x,defaultStyleForTheme:()=>({}),parseRoomLayout:x=>x,applyLoadedLayout:x=>layouts.push(x),buildRoomRenderables:()=>[]};
   vm.createContext(context);vm.runInContext(ts.transpileModule('this.refresh='+body,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,context);
   const first=context.refresh();await tick();assert.equal(snapshots.length,0);assert.equal(layouts.length,0);
   const second=context.refresh();await tick();

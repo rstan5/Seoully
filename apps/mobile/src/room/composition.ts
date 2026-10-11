@@ -1,3 +1,4 @@
+import { PHOTOCARD } from "../media/photocard";
 import {
   CAMERA_FOV_DEG,
   DESK_BINDER_AT,
@@ -44,8 +45,8 @@ export const BINDER_CARD_FILL = 0.52;
 export const BINDER_PAGE_W = 1.02;
 export const BINDER_PAGE_H = 1.22;
 export const BINDER_SPINE_W = 0.15;
-export const BINDER_CARD_W = 0.24;
-export const BINDER_CARD_H = 0.37;
+export const BINDER_CARD_W = PHOTOCARD.width;
+export const BINDER_CARD_H = PHOTOCARD.height;
 export const BINDER_V_ANGLE = 0.12;
 
 export function frontFaceAxis(geometry: NativeRepresentationKind): FrontFaceAxis {

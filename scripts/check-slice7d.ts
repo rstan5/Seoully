@@ -59,7 +59,7 @@ assertContains(environment, "Plant", "plant dressing exists");
 assertContains(environment, "StorageBoxes", "storage boxes exist");
 assertContains(environment, "0.22, 0.03, 0.03", "desk drawer handles exist");
 assertContains(renderer, "inspectionPresentation", "inspection repair remains");
-assertContains(binder, "InspectedBinderCard", "binder card lift remains");
+assertContains(binder, "card.parent.worldToLocal(targetPosition)", "binder card lift remains");
 assertContains(read("apps/mobile/src/room/camera.ts"), "homeDollyMax: 1.16", "immersive home dolly");
 assert.ok(EXPLORE_LIMITS.homeDollyMax <= 1.22, "max dolly stays a modest step-back");
 assert.ok(HOME_POSE.position.z < 8, "HOME stands inside the bedroom, not outside a dollhouse");

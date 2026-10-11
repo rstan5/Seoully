@@ -19,6 +19,7 @@ export default function OnboardingWorldIntro({ holdingId, photocard, copy, onCon
   const completing = useRef(false);
   const confirmed = useRef<string | undefined>(undefined);
   const [ready, setReady] = useState(false);
+  const [roomFailed, setRoomFailed] = useState(false);
   const [handoff, setHandoff] = useState(false);
   const [complete, setComplete] = useState(false);
   const [error, setError] = useState(false);
@@ -39,16 +40,18 @@ export default function OnboardingWorldIntro({ holdingId, photocard, copy, onCon
     void finish(id);
   }
   return <View style={styles.wrap}>
-    <RoomWorldScreen initialHoldingId={handoff && photocard && !complete ? holdingId : undefined} mode="own" demo={false} persistLive={social.capabilities.persistRoom} copy={copy}
+    <RoomWorldScreen loadingCovered={!handoff} initialHoldingId={handoff && photocard && !complete ? holdingId : undefined} mode="own" demo={false} persistLive={social.capabilities.persistRoom} copy={copy}
       onLeave={() => { if (complete) onContinue(); else onBack(); }}
       onLiveSnapshotReady={(snapshot) => {
         setReady(true);
+        setRoomFailed(false);
         if (!photocard && snapshot.placements.some(placement => placement.holdingId === holdingId)) destinationConfirmed(holdingId);
       }}
+      onLiveSnapshotFailed={() => setRoomFailed(true)}
       onLivePlacementConfirmed={(id) => { if (!photocard) destinationConfirmed(id); }}
       onLiveBinderConfirmed={(ids) => { if (photocard && holdingId && ids.includes(holdingId)) destinationConfirmed(holdingId); }}
     />
-    {ready && !handoff ? <HeartFarewell text={copy.onboardOwnershipHandoff} onContinue={() => setHandoff(true)} /> : null}
+    {!handoff ? <HeartFarewell ready={ready || roomFailed} text={copy.onboardOwnershipHandoff} onContinue={() => setHandoff(true)} /> : null}
     {ready && handoff ? <>
       <SeoullyCompanion onboardingActive />
       <View pointerEvents="box-none" style={[styles.guide, { top: insets.top + 98 }]}>

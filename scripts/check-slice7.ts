@@ -581,7 +581,7 @@ assert.ok(cardInspect.position.z > binderAt.z + 1.2, "photocard lifts toward the
 assert.ok(cardInspect.distance < binderDepth - 1, "inspected card sits in front of the Binder");
 assert.equal(CAMERA_FOV_DEG, 46);
 assertContains(read("apps/mobile/src/room/NativeRoomRenderer.tsx"), "inspectionPresentation", "room inspect uses front-face presentation");
-assertContains(read("apps/mobile/src/room/NativeOpenBinder.tsx"), "InspectedBinderCard", "binder card lifts out of pocket");
+assertContains(read("apps/mobile/src/room/NativeOpenBinder.tsx"), "card.parent.worldToLocal(targetPosition)", "binder card lifts out of pocket");
 assertContains(read("apps/mobile/src/room/NativeOpenBinder.tsx"), "holding.personalMediaUrl ?? holding.template.imageUrl", "binder card image priority");
 assertContains(worldScreen, "InspectionTray", "shared compact inspect chrome");
 assertContains(worldScreen, "copy.viewCollectible", "View collectible on inspect");

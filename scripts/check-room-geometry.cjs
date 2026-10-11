@@ -149,7 +149,7 @@ assert.ok(Math.abs(deskBinderWorld([primary],primary.id).y + standingBounds.min.
 sandbox.DisplayBinder=sandbox.exports.DisplayBinder; sandbox.BinderDisplayStand=sandbox.exports.BinderDisplayStand;
 const motionFunction=binderFile.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='NativeOpenBinder');
 vm.runInContext(`(function () { ${ts.transpileModule(motionFunction.getText(binderFile),{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText} }).call(globalThis);`,sandbox);
-Object.assign(sandbox,{Quaternion:THREE.Quaternion,Euler:THREE.Euler,Vector3:THREE.Vector3,Group:THREE.Group,composeParentYaw,findHeldCard:()=>null,
+Object.assign(sandbox,{BinderCardMotion:{Provider:"Provider"},Quaternion:THREE.Quaternion,Euler:THREE.Euler,Vector3:THREE.Vector3,Group:THREE.Group,composeParentYaw,findHeldCard:()=>null,
  BINDER_TRAVEL_RATE:4.3,BINDER_TRAVEL_RATE_REDUCED:14,DESK_BINDER_AT:{x:0,y:0,z:0},
  ...require('../.tmp/build/apps/mobile/src/room/roomObjects.js')});
 for(const yaw of [0,30,60,150,270,330]) for(const reducedMotion of [false,true]) {

@@ -1,3 +1,4 @@
+import { PHOTOCARD, centeredPhotocardCrop } from "./photocard";
 /* eslint-disable react-hooks/refs -- Gesture refs are read and written only inside PanResponder callbacks. */
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Image, Modal, PanResponder, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
@@ -5,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, spacing } from "../theme";
 import { SeoullyText } from "../ui/SeoullyText";
 
-const CARD_RATIO = 660 / 1020;
+const CARD_RATIO = PHOTOCARD.aspect;
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 3;
 
@@ -44,7 +45,7 @@ export function PhotocardCropper({
 
   const constrain = useCallback((next: Transform) => {
     if (!asset) return next;
-    const baseScale = Math.max(viewportWidth / asset.width, viewportHeight / asset.height);
+    const baseScale = viewportWidth / centeredPhotocardCrop(asset.width, asset.height).width;
     const displayWidth = asset.width * baseScale * next.zoom;
     const displayHeight = asset.height * baseScale * next.zoom;
     const maxX = Math.max(0, (displayWidth - viewportWidth) / 2);
@@ -76,7 +77,7 @@ export function PhotocardCropper({
   }), [constrain, transform]);
 
   if (!asset) return null;
-  const baseScale = Math.max(viewportWidth / asset.width, viewportHeight / asset.height);
+  const baseScale = viewportWidth / centeredPhotocardCrop(asset.width, asset.height).width;
   const displayWidth = asset.width * baseScale * transform.zoom;
   const displayHeight = asset.height * baseScale * transform.zoom;
   const adjustZoom = (delta: number) => setTransform((current) => constrain({ ...current, zoom: clamp(current.zoom + delta, MIN_ZOOM, MAX_ZOOM) }));

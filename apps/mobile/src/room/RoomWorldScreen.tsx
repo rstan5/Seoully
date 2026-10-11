@@ -100,6 +100,8 @@ export function RoomWorldScreen({
   onLiveSnapshotReady,
   onLivePlacementConfirmed,
   onLiveBinderConfirmed,
+  onLiveSnapshotFailed,
+  loadingCovered = false,
 }: {
   mode: RoomWorldMode;
   userId?: string;
@@ -115,9 +117,11 @@ export function RoomWorldScreen({
   onLiveSnapshotReady?: (snapshot: NativeRoomSnapshot) => void;
   onLivePlacementConfirmed?: (holdingId: string) => void;
   onLiveBinderConfirmed?: (holdingIds: string[]) => void;
+  onLiveSnapshotFailed?: () => void;
+  loadingCovered?: boolean;
 }) {
-  const onboardingEvents = useRef({ onLiveSnapshotReady, onLivePlacementConfirmed, onLiveBinderConfirmed });
-  onboardingEvents.current = { onLiveSnapshotReady, onLivePlacementConfirmed, onLiveBinderConfirmed };
+  const onboardingEvents = useRef({ onLiveSnapshotReady, onLivePlacementConfirmed, onLiveBinderConfirmed, onLiveSnapshotFailed });
+  onboardingEvents.current = { onLiveSnapshotReady, onLivePlacementConfirmed, onLiveBinderConfirmed, onLiveSnapshotFailed };
   const [snapshot, setSnapshot] = useState<NativeRoomSnapshot | null>(null);
   const [items, setItems] = useState<RoomRenderable[]>([]);
   const [holdings, setHoldings] = useState<NativeHolding[]>([]);
@@ -336,7 +340,10 @@ export function RoomWorldScreen({
       }
       setError(null);
     } catch {
-      if (demo || liveSync.acceptsLoad(ticket)) setError(copy.roomUnavailable);
+      if (demo || liveSync.acceptsLoad(ticket)) {
+        setError(copy.roomUnavailable);
+        if (!demo) onboardingEvents.current.onLiveSnapshotFailed?.();
+      }
     } finally {
       if (demo || liveSync.acceptsLoad(ticket)) setLoading(false);
     }
@@ -1311,7 +1318,7 @@ export function RoomWorldScreen({
   };
 
   if (liveRoomNeedsHydration(demo, loading, snapshot !== null || privateRoom)) {
-    if (!error) return <SeoullyLoadingState fullScreen label={copy.enteringYourRoom} />;
+    if (!error) return loadingCovered ? <View style={{ flex: 1 }} /> : <SeoullyLoadingState fullScreen label={copy.enteringYourRoom} />;
     return <View style={[styles.world, immersiveRoomFill(roomTheme.void)]}>
       <Stack.Screen options={{ contentStyle: immersiveRoomFill(roomTheme.void) }} />
       <OverlayChrome copy={copy} chrome={overlayTheme} onBack={onLeave} style={overlayPad} />
@@ -1376,7 +1383,7 @@ export function RoomWorldScreen({
         clearPendingPress(); clearHeldVisual(); touchOwnerRef.current = null;
       }}
     >
-      <Suspense fallback={demo ? null : <SeoullyLoadingState fullScreen label={copy.enteringYourRoom} />}>
+      <Suspense fallback={demo || loadingCovered ? null : <SeoullyLoadingState fullScreen label={copy.enteringYourRoom} />}>
         <NativeRoomRenderer
           key={canvasEpoch}
           ownerName={ownerName}
@@ -1441,6 +1448,7 @@ export function RoomWorldScreen({
             setView({ kind: "binder", spread: view.spread, ...(holding ? { heldHoldingId: holding.id } : {}) });
           }}
           onTurnEdge={(dir) => {
+            if (view.kind === "binder" && view.heldHoldingId) return;
             setBinderHintSeen(true);
             const to = binderSpreadIndex + dir;
             if (to < 0 || to >= spreads.length || turnDir !== 0) return;

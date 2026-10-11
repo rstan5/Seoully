@@ -116,9 +116,11 @@ export const DEFAULT_PROFILE_THEME: ProfileThemeTokens = {
   like: "#e56d90",
 };
 
+export type ProfileRoomAppearance = Pick<Room, "theme" | "aesthetic">;
+
 export function resolveProfileTheme(
   choice: ProfileThemeChoice | undefined,
-  room: Room | undefined,
+  room: ProfileRoomAppearance | undefined,
 ): ProfileThemeTokens {
   const mode = choice?.mode ?? "default";
   if (mode === "custom") return tokensFromCustom(choice);
@@ -189,7 +191,7 @@ function accentFamily(id: ProfileAccentPreset, scheme: ProfileScheme) {
  * Room → social identity. Dark rooms stay dark. Pastel rooms stay soft.
  * Never dumps the wall color across the whole profile.
  */
-function deriveFromRoom(room: Room | undefined): ProfileThemeTokens {
+function deriveFromRoom(room: ProfileRoomAppearance | undefined): ProfileThemeTokens {
   if (!room) return { ...DEFAULT_PROFILE_THEME, mode: "room-sync" };
   const wall = readHsl(room.theme.wall);
   const fill = readHsl(room.theme.light.fill);
@@ -254,7 +256,7 @@ function deriveFromRoom(room: Room | undefined): ProfileThemeTokens {
   };
 }
 
-function isDarkRoom(room: Room, wall: Hsl | null): boolean {
+function isDarkRoom(room: ProfileRoomAppearance, wall: Hsl | null): boolean {
   if (room.aesthetic === "nocturne") return true;
   if (room.aesthetic === "maximalist") return false;
   const floor = readHsl(room.theme.floor);

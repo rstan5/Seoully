@@ -1,4 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { resolveRoomLook } from "../../src/room/roomStyle";
+import { useProfileRoom } from "../../src/room/useProfileRoom";
+import { nativeProfileTheme } from "../../src/room/profileRoom";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
@@ -76,13 +79,16 @@ export default function ProfileScreen() {
   const [error, setError] = useState<string | null>(null);
   const live = social.kind === "production";
 
+  const refreshGeneration = useRef(0);
   const refresh = useCallback(async () => {
+    const generation = ++refreshGeneration.current;
     setLoading(true);
     try {
       const nextIdentity = await social.loadIdentity();
       if (!nextIdentity?.user.id) throw new Error("identity_unavailable");
       if (social.kind === "demo") {
         const collector = await social.loadCollector(nextIdentity.user.id);
+        if (generation !== refreshGeneration.current) return;
         setIdentity(nextIdentity);
         setAvatarUrl(collector.avatarUrl);
         setFollowers(collector.follow.followers);
@@ -103,6 +109,7 @@ export default function ProfileScreen() {
           social.loadMyWishlist(),
           loadNativeOnboarding().catch(() => null),
         ]);
+        if (generation !== refreshGeneration.current) return;
         setIdentity(nextIdentity);
         setAvatarUrl(undefined);
         setFollowers(counts.followers);
@@ -118,14 +125,16 @@ export default function ProfileScreen() {
       }
       setError(null);
     } catch {
+      if (generation !== refreshGeneration.current) return;
       setError(copy.profileUnavailable);
     } finally {
-      setLoading(false);
+      if (generation === refreshGeneration.current) setLoading(false);
     }
   }, [copy.profileUnavailable, social]);
 
   useFocusEffect(useCallback(() => {
     void refresh();
+    return () => { refreshGeneration.current++; };
   }, [refresh]));
 
   const groups = useMemo(() => {
@@ -194,19 +203,22 @@ export default function ProfileScreen() {
     router.push("/room");
   }
 
-  const palette = useMemo(() => identityPalette(theme), [theme]);
+  const room = useProfileRoom(identity?.user.id, true, !live, holdings);
+  const effectiveTheme = useMemo(() => live ? nativeProfileTheme(identity?.profile.appearance, room.preview?.style) : theme, [live, identity?.profile, room.preview?.style, theme]);
+  const palette = useMemo(() => identityPalette(effectiveTheme, room.preview ? resolveRoomLook(room.preview.style).void : undefined), [effectiveTheme, room.preview]);
   usePublishProfileIdentity(palette);
 
-  if (loading && !identity && !error) return <SeoullyLoadingState fullScreen label={copy.profile} />;
+  if (!error && ((loading && !identity) || !room.ready)) return <SeoullyLoadingState fullScreen label={copy.profile} />;
 
   return (
     <SeoullyScreen backgroundColor={palette.mist}>
-      <SeoullyRoomUnderlay theme={theme} />
+      <SeoullyRoomUnderlay room={room.preview} ownerName={identity?.user.displayName} />
       <SeoullyProfileVeil theme={theme} mist={palette.mist} />
       <ProfileIdentityProvider palette={palette}>
         <SeoullyProfileChrome>
       <SeoullyHeader languageLabel={copy.switchLanguage} onToggleLanguage={toggleLocale} />
       <SeoullyText variant="caption" style={styles.underlayHint}>{copy.profileUnderlayHint}</SeoullyText>
+      {room.failed ? <View style={styles.notice}><RetryNotice message={copy.roomUnavailable} retryLabel={copy.retry} onRetry={room.retry} /></View> : null}
       {error ? <View style={styles.notice}><RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /></View> : null}
       {identity ? (
         <ScrollView contentContainerStyle={styles.container}>

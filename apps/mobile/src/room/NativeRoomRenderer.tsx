@@ -5,15 +5,15 @@ import { BACK_WALL } from "./envelope";
 import { eligiblePhotocards, photoStringSlot, publicPhotoStringHolding, type PublicPhotoStringCard } from "./photoString";
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
 import "./threeFiberCompat";
-import { useFocusEffect } from "expo-router";
-import { Suspense, useCallback, useMemo, useRef, type MutableRefObject } from "react";
+import { useFocusEffect, useNavigation } from "expo-router";
+import { Suspense, useCallback, useMemo, useRef, useSyncExternalStore, type MutableRefObject } from "react";
 import { StyleSheet } from "react-native";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber/native";
 import { CatmullRomCurve3, Color, Euler, Group, MeshBasicMaterial, PCFShadowMap, Quaternion, TextureLoader, Vector3 } from "three";
 import type { NativeBinderSpread } from "../binder/model";
 import type { NativeHolding } from "../api";
 import { useCachedSignedMedia } from "../media/cachedMedia";
-import { applyExploreOffset, cameraLerpAlpha, DESK_BINDER_AT, exploreAllowedForView, IDENTITY_EXPLORE, poseForView, type ExploreOffset } from "./camera";
+import { HOME_POSE, applyExploreOffset, cameraLerpAlpha, DESK_BINDER_AT, exploreAllowedForView, IDENTITY_EXPLORE, poseForView, type ExploreOffset } from "./camera";
 import { binderCameraForViewport, inspectionPresentation } from "./composition";
 import { NativeOpenBinder } from "./NativeOpenBinder";
 import { representationForHolding, boundsForGeometry, extentsForGeometry } from "./representation";
@@ -39,6 +39,7 @@ const ZONE_HOTSPOTS: Record<CanonicalZoneKind, { position: [number, number, numb
 
 export function NativeRoomRenderer({
   ownerName = "",
+  presentation,
   items,
   photoStringHoldings = [],
   publicStringCards = [],
@@ -84,6 +85,8 @@ export function NativeRoomRenderer({
   placingItem = null,
 }: {
   ownerName?: string;
+  /** Read-only, demand-rendered Profile overview. */
+  presentation?: "profile";
   items: RoomRenderable[];
   photoStringHoldings?: NativeHolding[];
   publicStringCards?: PublicPhotoStringCard[];
@@ -128,6 +131,13 @@ export function NativeRoomRenderer({
   onOpenStorage?: (objectId?: string) => void;
   placingItem?: RoomRenderable | null;
 }) {
+  const navigation = useNavigation();
+  const subscribeFocus = useCallback((listener: () => void) => {
+    const focus = navigation.addListener("focus", listener);
+    const blur = navigation.addListener("blur", listener);
+    return () => { focus(); blur(); };
+  }, [navigation]);
+  const isFocused = useSyncExternalStore(subscribeFocus, () => navigation.isFocused(), () => false);
   const focused = items.find((item) => item.holding.id === focusedId) ?? null;
   const theme = resolveRoomLook(style ?? defaultStyleForTheme(themeId));
   const layoutObjects = objects;
@@ -142,14 +152,16 @@ export function NativeRoomRenderer({
   const worldItems = placingItem && !placedItems.some((item) => item.holding.id === placingItem.holding.id)
     ? [...placedItems, placingItem]
     : placedItems;
+  // Native-stack keeps background screens mounted: release their GL surface.
+  if (!isFocused) return null;
   return <Canvas
-    frameloop={paused ? "never" : "always"}
+    frameloop={paused ? "never" : presentation === "profile" ? "demand" : "always"}
     shadows
     style={StyleSheet.absoluteFill}
-    camera={{ position: [0.68, 1.58, 5.72], fov: 46 }}
+    camera={{ position: [HOME_POSE.position.x, HOME_POSE.position.y, HOME_POSE.position.z], fov: 46 }}
     onPointerMissed={onClearSelection}
     onCreated={({ camera, scene, gl }) => {
-      camera.lookAt(-0.18, 0.06, -2.38);
+      camera.lookAt(HOME_POSE.lookAt.x, HOME_POSE.lookAt.y, HOME_POSE.lookAt.z);
       scene.background = new Color(theme.void);
       gl.shadowMap.enabled = true;
       gl.shadowMap.type = PCFShadowMap;

@@ -22,12 +22,9 @@ export function formatCollectingSince(iso: string, locale: "en" | "ko") {
  *   <SeoullyProfileVeil />    // 80% mist (`PROFILE_VEIL`) over the Room
  *   identity / actions / shelves  // fully opaque children
  */
-export function SeoullyRoomUnderlay({ theme, themeId }: { theme?: SocialTheme; themeId?: import("../api").NativeRoomThemeId }) {
-  return (
-    <View pointerEvents="none" style={styles.worldLayer}>
-      <RoomWorldGlimpse themeId={themeId ?? (theme?.scheme === "dark" ? "midnight" : "hearth")} />
-    </View>
-  );
+export function SeoullyRoomUnderlay({ room, ownerName }: { room?: import("../room/profileRoom").ProfileRoomPreview | null; ownerName?: string }) {
+  if (!room) return null;
+  return <View pointerEvents="none" style={styles.worldLayer}><RoomWorldGlimpse room={room} ownerName={ownerName} /></View>;
 }
 
 export function SeoullyProfileVeil({ theme, mist }: { theme?: SocialTheme; mist?: string }) {

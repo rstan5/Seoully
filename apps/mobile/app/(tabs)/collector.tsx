@@ -1,5 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { resolveRoomLook } from "../../src/room/roomStyle";
+import { useProfileRoom } from "../../src/room/useProfileRoom";
+import { nativeProfileTheme } from "../../src/room/profileRoom";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeFeedPost } from "../../src/api";
 import { useSocialRepository, type SocialCollector, type SocialCompatibility } from "../../src/data";
@@ -89,7 +92,10 @@ export default function CollectorScreen() {
   const viewerId = social.viewerId();
   const isSelf = Boolean(viewerId && viewerId === userId);
 
+  const refreshGeneration = useRef(0);
   const refresh = useCallback(async () => {
+    const generation = ++refreshGeneration.current;
+    setCollector(current => current?.user.id === userId ? current : null);
     if (viewerId && userId === viewerId) {
       router.replace("/(tabs)/profile");
       return;
@@ -100,6 +106,7 @@ export default function CollectorScreen() {
         social.loadCollector(userId),
         social.loadCollectorPosts(userId),
       ]);
+      if (generation !== refreshGeneration.current) return;
       setCollector(next);
       setFollowing(next.follow.following);
       setFollowers(next.follow.followers);
@@ -110,16 +117,14 @@ export default function CollectorScreen() {
       setPostsError(null);
       setNotice(null);
     } catch {
+      if (generation !== refreshGeneration.current) return;
       setError(copy.collectorUnavailable);
     } finally {
-      setLoading(false);
+      if (generation === refreshGeneration.current) setLoading(false);
     }
   }, [copy.collectorUnavailable, router, social, userId, viewerId]);
 
-  useEffect(() => {
-    const task = setTimeout(() => { void refresh(); }, 0);
-    return () => clearTimeout(task);
-  }, [refresh]);
+  useFocusEffect(useCallback(() => { void refresh(); return () => { refreshGeneration.current++; }; }, [refresh]));
 
   const highlights = useMemo(() => (collector ? highlightsFromCollector(collector, social.kind === "demo") : []), [collector, social.kind]);
 
@@ -206,14 +211,16 @@ export default function CollectorScreen() {
     router.push({ pathname: "/collector-room", params: { userId } });
   }
 
-  const palette = identityPalette(collector?.theme);
+  const room = useProfileRoom(userId, false, social.kind === "demo", []);
+  const effectiveTheme = useMemo(() => social.kind === "demo" ? collector?.theme : nativeProfileTheme(collector?.profile.appearance, room.preview?.style), [social.kind, collector?.theme, collector?.profile, room.preview?.style]);
+  const palette = useMemo(() => identityPalette(effectiveTheme, room.preview ? resolveRoomLook(room.preview.style).void : undefined), [effectiveTheme, room.preview]);
   usePublishProfileIdentity(palette);
 
-  if (loading && !collector && !error) return <SeoullyLoadingState fullScreen label={copy.profile} />;
+  if (!error && ((loading && !collector) || collector?.user.id !== userId || !room.ready)) return <SeoullyLoadingState fullScreen label={copy.profile} />;
 
   return (
     <SeoullyScreen backgroundColor={palette.mist}>
-      <SeoullyRoomUnderlay theme={collector?.theme} />
+      <SeoullyRoomUnderlay room={room.preview} ownerName={collector?.user.displayName} />
       <SeoullyProfileVeil theme={collector?.theme} mist={palette.mist} />
       <ProfileIdentityProvider palette={palette}>
         <SeoullyProfileChrome>
@@ -223,6 +230,7 @@ export default function CollectorScreen() {
           <SeoullyText variant="button">{copy.switchLanguage}</SeoullyText>
         </Pressable>
       </View>
+      {room.failed ? <View style={styles.notice}><RetryNotice message={copy.roomUnavailable} retryLabel={copy.retry} onRetry={room.retry} /></View> : null}
       {error ? <View style={styles.notice}><RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /></View> : null}
       {collector ? (
         <ScrollView contentContainerStyle={styles.container}>

@@ -1,3 +1,7 @@
+import type { ProfileThemeChoice } from "seoully-domain/types";
+import { ProfileAppearanceEditor } from "../src/ui/ProfileAppearanceEditor";
+import { readOwnerProfileRoom } from "../src/room/useProfileRoom";
+import { parseRoomStyle, type NativeRoomStyle } from "../src/room/roomStyle";
 import { useCallback, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
@@ -19,6 +23,8 @@ export default function EditProfileScreen() {
   const copy = useCopy();
   const { toggleLocale } = useLocale();
   const [identity, setIdentity] = useState<NativeIdentity | null>(null);
+  const [appearance, setAppearance] = useState<ProfileThemeChoice>({ mode: "default" });
+  const [roomStyle, setRoomStyle] = useState<NativeRoomStyle>();
   const [displayName, setDisplayName] = useState("");
   const [tagline, setTagline] = useState("");
   const [bio, setBio] = useState("");
@@ -34,7 +40,10 @@ export default function EditProfileScreen() {
     try {
       const next = await social.loadIdentity();
       if (!next?.user.id) throw new Error("identity_unavailable");
+      const room = social.kind === "production" ? await readOwnerProfileRoom(next.user.id).catch(() => { setMessage(copy.roomUnavailable); return null; }) : null;
+      setRoomStyle(room ? parseRoomStyle(room.style) : undefined);
       setIdentity(next);
+      setAppearance(next.profile.appearance ?? { mode: "default" });
       setDisplayName(next.user.displayName);
       setTagline(next.profile.tagline ?? "");
       setBio(next.profile.bio ?? "");
@@ -45,7 +54,7 @@ export default function EditProfileScreen() {
     } finally {
       setLoading(false);
     }
-  }, [copy.profileUnavailable, social]);
+  }, [copy.profileUnavailable, copy.roomUnavailable, social]);
 
   useFocusEffect(useCallback(() => {
     void refresh();
@@ -57,12 +66,16 @@ export default function EditProfileScreen() {
     setBusy(true);
     setMessage(null);
     try {
-      await updateNativeProfile({
+      const saved = await updateNativeProfile({
         displayName: displayName.trim(),
         tagline: tagline.trim(),
         bio: bio.trim(),
         location: location.trim(),
+        appearance,
       });
+      if (!saved.identity?.profile.appearance) throw new Error("profile_save_unconfirmed");
+      setIdentity(saved.identity);
+      setAppearance(saved.identity.profile.appearance);
       router.back();
     } catch {
       setMessage(copy.profileSaveFailed);
@@ -140,6 +153,8 @@ export default function EditProfileScreen() {
               onChangeText={setLocation}
               placeholder={copy.profileLocationPlaceholder}
             />
+
+            <ProfileAppearanceEditor value={appearance} onChange={setAppearance} roomStyle={roomStyle} disabled={busy || social.kind === "demo"} />
 
             <View style={styles.section}>
               <SeoullyText variant="section">{copy.editCollectorTastes}</SeoullyText>

@@ -19,6 +19,7 @@
     "check:slice7c": "npm run check:slice7",
     "check:slice7d": "tsc --project tsconfig.check-slice7d.json && node -r ./scripts/register-build-alias.cjs .tmp/build/scripts/check-slice7d.js && node scripts/check-room-geometry.cjs && node scripts/check-room-instance-workflows.cjs && npm run check:room-persistence",
     "check:mobile-loading": "node scripts/check-mobile-loading.cjs",
+    "check:profile-room": "node scripts/check-profile-room.cjs",
     "check:profile-appearance": "tsc --project tsconfig.check-profile-appearance.json && node scripts/check-profile-appearance.cjs",
     "check:room-overlays": "node scripts/check-room-overlays.cjs",
     "check:room-live-sync": "node scripts/check-room-live-sync.cjs",

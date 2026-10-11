@@ -21,7 +21,7 @@
     "check:mobile-loading": "node scripts/check-mobile-loading.cjs",
     "check:room-live-sync": "node scripts/check-room-live-sync.cjs",
     "check:room-persistence": "tsc --project tsconfig.check-room-persistence.json && node scripts/check-room-persistence.cjs",
-    "check:slice8": "tsc --project tsconfig.check-slice8.json && node -r ./scripts/register-build-alias.cjs .tmp/build/scripts/check-slice8.js && tsc --project tsconfig.check-catalog-contribution.json && node scripts/check-first-home.cjs && node scripts/check-onboarding-experience.cjs && node scripts/check-native-photo-upload.cjs",
+    "check:slice8": "tsc --project tsconfig.check-slice8.json && node -r ./scripts/register-build-alias.cjs .tmp/build/scripts/check-slice8.js && tsc --project tsconfig.check-catalog-contribution.json && node scripts/check-first-home.cjs && node scripts/check-onboarding-experience.cjs && node scripts/check-native-photo-upload.cjs && node scripts/check-first-home-destination.cjs",
     "check:startup": "tsc --project tsconfig.check-startup.json && node .tmp/build/scripts/check-startup.js",
     "check:physical-qa": "tsc --project tsconfig.check-physical-qa.json && node .tmp/build/scripts/check-physical-qa.js",
     "mobile:verify": "node scripts/mobile-verify.cjs",

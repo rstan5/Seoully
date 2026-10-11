@@ -1,4 +1,5 @@
 import "server-only";
+import { reportOperationFailure } from "./safe-diagnostic";
 import { ROOM_OBJECT_KINDS, ROOM_YAWS, validRoomObjectRelationships, validPhotoStringConfig } from "@/domain/room-object-schema";
 
 import { z } from "zod";
@@ -179,17 +180,32 @@ export async function listMyRoomPlacements(input: unknown, client?: SupabaseClie
   return { room, placements: (data ?? []).map(mapPlacement) };
 }
 
-export async function upsertMyRoomPlacement(input: unknown, client?: SupabaseClient): Promise<RoomPlacementDTO> {
-  const payload = placementSchema.parse(input);
+export async function upsertMyRoomPlacement(input: unknown, client?: SupabaseClient, options: { nativeDestinations?: boolean } = {}): Promise<RoomPlacementDTO> {
+  const parsed = placementSchema.safeParse(input);
+  if (!parsed.success) {
+    reportOperationFailure("room_placement_validate", parsed.error);
+    throw new Error("room_placement_invalid");
+  }
+  const payload = parsed.data;
   const room = await ensureMyRoom(client);
   if (room.id !== payload.roomId) throw new Error("room_not_found");
   const supabase = client ?? await createSupabaseServerClient();
+  if (options.nativeDestinations) {
+    const holding = await supabase.from("holdings").select("id,collectible_templates!inner(kind)")
+      .eq("id", payload.holdingId).eq("owner_user_id", room.ownerUserId).maybeSingle();
+    if (holding.error || !holding.data) throw new Error("room_placement_forbidden");
+    const template = holding.data.collectible_templates;
+    if ((Array.isArray(template) ? template[0] : template)?.kind === "photocard") throw new Error("photocard_binder_only");
+  }
   const { data, error } = await supabase.from("room_placements").upsert({
     room_id: payload.roomId, holding_id: payload.holdingId, zone_id: payload.zoneId,
     slot: payload.slot, spatial_offset: payload.offset ?? null, transform: payload.transform ?? null,
     surface_id: payload.surfaceId ?? null,
   }, { onConflict: "holding_id" }).select("id,room_id,holding_id,zone_id,slot,spatial_offset,transform,surface_id,created_at,updated_at").single();
-  if (error || !data) throw new Error(error?.code === "42501" ? "room_placement_forbidden" : "room_placement_write_failed");
+  if (error || !data) {
+    reportOperationFailure("room_placement_write", error);
+    throw new Error(error?.code === "42501" ? "room_placement_forbidden" : "room_placement_write_failed");
+  }
   return mapPlacement(data);
 }
 

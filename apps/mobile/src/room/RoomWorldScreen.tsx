@@ -99,6 +99,7 @@ export function RoomWorldScreen({
   initialHoldingId,
   onLiveSnapshotReady,
   onLivePlacementConfirmed,
+  onLiveBinderConfirmed,
 }: {
   mode: RoomWorldMode;
   userId?: string;
@@ -113,9 +114,10 @@ export function RoomWorldScreen({
   initialHoldingId?: string;
   onLiveSnapshotReady?: (snapshot: NativeRoomSnapshot) => void;
   onLivePlacementConfirmed?: (holdingId: string) => void;
+  onLiveBinderConfirmed?: (holdingIds: string[]) => void;
 }) {
-  const onboardingEvents = useRef({ onLiveSnapshotReady, onLivePlacementConfirmed });
-  onboardingEvents.current = { onLiveSnapshotReady, onLivePlacementConfirmed };
+  const onboardingEvents = useRef({ onLiveSnapshotReady, onLivePlacementConfirmed, onLiveBinderConfirmed });
+  onboardingEvents.current = { onLiveSnapshotReady, onLivePlacementConfirmed, onLiveBinderConfirmed };
   const [snapshot, setSnapshot] = useState<NativeRoomSnapshot | null>(null);
   const [items, setItems] = useState<RoomRenderable[]>([]);
   const [holdings, setHoldings] = useState<NativeHolding[]>([]);
@@ -303,11 +305,12 @@ export function RoomWorldScreen({
         setOwnerName(publicRoom.owner.displayName);
         setPrivateRoom(publicRoom.private || !publicRoom.room);
         const nextItems = publicRoom.room ? buildPublicRoomRenderables(publicRoom.room.id, publicRoom.room.placements) : [];
-        setItems(nextItems);
+        const worldItems = nextItems.filter(item => item.holding.template.kind !== "photocard");
+        setItems(worldItems);
         setHoldings(nextItems.map((item) => item.holding));
         setPublicStringCards(publicRoom.room?.photoStringCards ?? []);
         setRoomStyle(parseRoomStyle(publicRoom.room?.style, DEFAULT_ROOM_STYLE));
-        applyLoadedLayout(parseRoomLayout(publicRoom.room?.layout), true, nextItems);
+        applyLoadedLayout(parseRoomLayout(publicRoom.room?.layout), true, worldItems);
         setSnapshot(publicRoom.room ? {
           room: { id: publicRoom.room.id, ownerUserId: publicRoom.owner.userId, themeId: "hearth", style: parseRoomStyle(publicRoom.room.style), layout: publicRoom.room.layout },
           placements: [],
@@ -321,9 +324,9 @@ export function RoomWorldScreen({
         setOwnerName(identity?.profile.user.displayName ?? "");
         setSnapshot(next);
         setHoldings(next.holdings);
-        setItems(buildRoomRenderables(next.holdings, next.placements));
+        setItems(buildRoomRenderables(next.holdings.filter(h => h.template.kind !== "photocard"), next.placements));
         setRoomStyle(parseRoomStyle(next.room.style, defaultStyleForTheme(next.room.themeId)));
-        applyLoadedLayout(parseRoomLayout(next.room.layout), false, buildRoomRenderables(next.holdings, next.placements));
+        applyLoadedLayout(parseRoomLayout(next.room.layout), false, buildRoomRenderables(next.holdings.filter(h => h.template.kind !== "photocard"), next.placements));
         setPrivateRoom(false);
         onboardingEvents.current.onLiveSnapshotReady?.(next);
       } else {
@@ -371,9 +374,10 @@ export function RoomWorldScreen({
     const task = setTimeout(() => {
       binderReturnRef.current = { view: { kind: "home" }, explore: { ...exploreRef.current } };
       setView(openBinderView(index));
+      if (!demo && mode === "own") onboardingEvents.current.onLiveBinderConfirmed?.([initialHoldingId]);
     }, 0);
     return () => clearTimeout(task);
-  }, [initialHoldingId, spreads, roomLayout.objects]);
+  }, [initialHoldingId, spreads, roomLayout.objects, demo, mode]);
 
   function clearPendingPress() {
     if (pendingPressRef.current) clearTimeout(pendingPressRef.current.timer);
@@ -668,7 +672,7 @@ export function RoomWorldScreen({
         pendingPressRef.current = null;
         const queued = queuedStorageRef.current?.holdingId === holdingId ? queuedStorageRef.current : null;
         const item = latestItems.current.find((entry) => entry.holding.id === holdingId) ?? queued?.preview;
-        if (!item || viewRef.current.kind !== "edit" || touchOwnerRef.current !== owner || activeTouchesRef.current !== 1) return;
+        if (!item || (!demo && item.holding.template.kind === "photocard") || viewRef.current.kind !== "edit" || touchOwnerRef.current !== owner || activeTouchesRef.current !== 1) return;
         dragOwnerRef.current = owner;
         const room = snapshotRef.current?.room;
         const world = withResolvedWorld(item, room?.id, latestObjects.current);
@@ -711,6 +715,7 @@ export function RoomWorldScreen({
     setSelectedId(null);
     setStorageOpen(false);
     setView(openBinderView(Math.max(0, index)));
+    if (!demo && mode === "own") onboardingEvents.current.onLiveBinderConfirmed?.(binderPages.flatMap(page => page.pockets.flatMap(pocket => pocket.holding ? [pocket.holding.id] : [])));
   }
 
   async function wishlistHolding(holding: NativeHolding) {
@@ -832,7 +837,7 @@ export function RoomWorldScreen({
 
   async function persistPlacement(next: RoomRenderable, options?: { silent?: boolean; world?: boolean }) {
     const room = snapshotRef.current?.room ?? snapshot?.room;
-    if (!room) return;
+    if (!room || (!demo && next.holding.template.kind === "photocard")) return;
     const objects = latestObjects.current;
     const world = options?.world ? next : withResolvedWorld(next, room.id, objects);
     const settled = settleRoomRenderable(world, room.id, next.placement?.surfaceId ?? undefined, objects);
@@ -846,7 +851,7 @@ export function RoomWorldScreen({
       roomId: room.id,
       holdingId: next.holding.id,
       zoneId: zoneIdForNativeSurface(room.id, settled.surfaceId),
-      slot: next.placement?.slot ?? latestItems.current.findIndex((item) => item.holding.id === next.holding.id),
+      slot: next.placement?.slot ?? nextNativeSlot(latestItems.current.map(item => item.placement?.slot ?? 0)),
       transform: toPersistedTransform(authored),
       surfaceId: settled.surfaceId,
     };
@@ -869,8 +874,9 @@ export function RoomWorldScreen({
         return mapped.some((item) => item.holding.id === next.holding.id) ? mapped : [...mapped, stored];
       });
       return stored;
-    } catch {
-      if (!options?.silent || !demo) setError(copy.roomSaveFailed);
+    } catch (error) {
+      const diagnostic = error instanceof Error && /^room_placement:[0-9]{3}:[a-z_]+$/.test(error.message) ? error.message : null;
+      if (!options?.silent || !demo) setError(__DEV__ && diagnostic ? `${copy.roomSaveFailed} (${diagnostic})` : copy.roomSaveFailed);
       return undefined;
     }
   }
@@ -1062,7 +1068,9 @@ export function RoomWorldScreen({
   }
 
   function beginPlaceFromStorage(holding: NativeHolding) {
-    if (!snapshot || readOnly || viewRef.current.kind !== "edit") return;
+    if (!snapshot || readOnly) return;
+    if (!demo && holding.template.kind === "photocard") { openBinderFromWorld(holding.id); return; }
+    if (viewRef.current.kind !== "edit") return;
     const draft = createInitialRoomRenderable(holding, nextNativeSlot(items.map((item) => item.placement?.slot ?? 0)), snapshot.room.id);
     const held = acquirePlaceFromStorage(draft, reducedMotionRef.current, storageTakeoutFor(latestObjects.current, storageArchiveId));
     clearPendingPress();
@@ -1573,6 +1581,7 @@ export function RoomWorldScreen({
         onClose={() => { setStorageOpen(false); setStorageQuery(""); }}
         onInspect={onInspectCollectible}
         onPlace={beginPlaceFromStorage}
+        onBinder={demo ? undefined : (holding) => openBinderFromWorld(holding.id)}
         onEditToPlace={() => { beginEditing(); }}
       /> : null}
     </View>

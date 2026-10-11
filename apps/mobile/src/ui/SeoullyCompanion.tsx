@@ -45,7 +45,7 @@ function cardActionLabel(action: AskNavigationAction, copy: ReturnType<typeof us
 
 type ChatTurn = { role: "user" | "assistant"; content: string; cards?: NativeAskCard[] };
 
-export function SeoullyCompanion({ guidance }: { guidance?: string } = {}) {
+export function SeoullyCompanion({ guidance, onboardingActive = false }: { guidance?: string; onboardingActive?: boolean } = {}) {
   const pathname = usePathname();
   const params = useGlobalSearchParams();
   const overlay = useAskSurfaceOverlay();
@@ -93,7 +93,7 @@ export function SeoullyCompanion({ guidance }: { guidance?: string } = {}) {
     </Animated.View>
     <SeoullyText variant="secondary" style={{ flex: 1 }}>{guidance}</SeoullyText>
   </View>;
-  if (!boot.companionEligible) return null;
+  if (!boot.companionEligible && !onboardingActive) return null;
 
   const placement = companionPlacement({
     insets,

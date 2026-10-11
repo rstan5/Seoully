@@ -1,6 +1,6 @@
 /** Only allowlisted structural codes enter diagnostics; never log bodies or IDs. */
 export async function apiFailure(response: Response, operation: string): Promise<never> {
-  const allowed = new Set(['unauthenticated', 'holding_create_failed', 'holding_read_failed', 'holding_unavailable', 'template_not_found', 'invalid_media', 'unsupported_media_type', 'media_too_large', 'media_upload_failed', 'media_record_failed', 'media_delivery_failed']);
+  const allowed = new Set(['unauthenticated', 'holding_create_failed', 'holding_read_failed', 'holding_unavailable', 'template_not_found', 'invalid_media', 'unsupported_media_type', 'media_too_large', 'media_upload_failed', 'media_record_failed', 'media_delivery_failed', 'room_placement_invalid', 'room_placement_forbidden', 'room_placement_write_failed', 'photocard_binder_only', 'room_not_found']);
   let reason = 'request_failed';
   try { const body = await response.json(); if (allowed.has(body.error)) reason = body.error; } catch { /* Non-JSON errors remain structural. */ }
   console.warn('seoully_api_failure', { operation, status: response.status, reason });

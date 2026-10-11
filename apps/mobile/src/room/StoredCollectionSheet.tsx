@@ -22,6 +22,7 @@ export function StoredCollectionSheet({
   onClose,
   onInspect,
   onPlace,
+  onBinder,
   onEditToPlace,
 }: {
   roomChrome: RoomChrome;
@@ -36,6 +37,7 @@ export function StoredCollectionSheet({
   onClose: () => void;
   onInspect?: (holdingId: string) => void;
   onPlace?: (holding: NativeHolding) => void;
+  onBinder?: (holding: NativeHolding) => void;
   onEditToPlace?: () => void;
 }) {
   const matches = filterStoredHoldings(holdings, query);
@@ -75,8 +77,8 @@ export function StoredCollectionSheet({
               </SeoullyText>
               <View style={styles.actions}>
                 {onInspect ? <Pressable style={styles.close} onPress={() => onInspect(holding.id)}><SeoullyText variant="caption" color={roomChrome.color}>{copy.viewCollectible}</SeoullyText></Pressable> : null}
-                {editing && onPlace ? <Pressable style={styles.close} onPress={() => onPlace(holding)}><SeoullyText variant="caption" color={roomChrome.color}>{copy.placeInRoom}</SeoullyText></Pressable> : null}
-                {!editing && onEditToPlace ? <Pressable style={styles.close} onPress={onEditToPlace}><SeoullyText variant="caption" color={roomChrome.color}>{copy.editRoomToPlace}</SeoullyText></Pressable> : null}
+                {holding.template.kind === "photocard" && onBinder ? <Pressable style={styles.close} onPress={() => onBinder(holding)}><SeoullyText variant="caption" color={roomChrome.color}>{copy.openBinder}</SeoullyText></Pressable> : editing && onPlace ? <Pressable style={styles.close} onPress={() => onPlace(holding)}><SeoullyText variant="caption" color={roomChrome.color}>{onBinder ? holding.template.kind === "poster" ? copy.placeOnWall : copy.placeOnSurface : copy.placeInRoom}</SeoullyText></Pressable> : null}
+                {!editing && !(holding.template.kind === "photocard" && onBinder) && onEditToPlace ? <Pressable style={styles.close} onPress={onEditToPlace}><SeoullyText variant="caption" color={roomChrome.color}>{copy.editRoomToPlace}</SeoullyText></Pressable> : null}
               </View>
             </View>
           </View>;

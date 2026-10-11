@@ -102,7 +102,7 @@ assert.equal(resumeAfterHoldingDoesNotCollect("reveal"), true);
 
 // T optional media failure
 assertContains(add, "photoFailed", "photo failure keeps holding");
-assertContains(onboarding, "onboardPhotoLater", "photo later copy");
+assertNotContains(onboarding, "onboardOpenRoom", "ownership interstitial removed");
 
 // U placement is required, through the existing Room
 assertNotContains(onboarding, "saveNativeRoomPlacement", "onboarding does not fake placement");
@@ -122,7 +122,7 @@ assert.equal(resolveOnboardingPhase({ durableStep: "bias", editingTastes: false,
 
 // Z reduced motion still completes
 assertNotContains(onboarding, "1600 : 2200", "no artificial reveal delay");
-assertContains(onboarding, "reduceMotion", "reduced motion");
+assertContains(read("apps/mobile/src/ui/HeartFarewell.tsx"), "useMotionPreference", "reduced motion");
 
 // AA GL startup
 assertNotContains(read("apps/mobile/app/index.tsx"), "NativeRoomRenderer", "welcome/auth");
@@ -155,7 +155,7 @@ assertContains(i18n, "I couldn’t find that one in Seoully’s catalog yet ♡"
 const walk = walkFirstUserJourney();
 assert.deepEqual(walk.phases.slice(0, 4), ["group", "bias", "interest", "collect"]);
 assert.equal(walk.holdingsCreated, 1);
-assert.ok(walk.phases.includes("reveal"));
+assert.ok(!walk.phases.includes("reveal"));
 assert.ok(walk.phases.includes("room"));
 assert.ok(!walk.phases.includes("meet"));
 assert.equal(walk.relaunch, "app");

@@ -1,36 +1,50 @@
 import { useEffect, useRef, useState } from "react";
-import { Animated, Easing, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Animated, Easing, Image, StyleSheet, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HeartGreeting } from "./HeartGreeting";
-import { SeoullyButton } from "./SeoullyControls";
 import { companionPlacement, chrome } from "./shellLayout";
-import { useReduceMotion } from "./motion";
+import { useMotionPreference } from "./motion";
+import { heartMotion } from "./heartMotion";
 
-/** Runs only after persisted completion. Hands off to the existing corner companion. */
-export function HeartFarewell({ text, label, onContinue }: { text: string; label: string; onContinue: () => void }) {
+/** One companion travels from its corner, speaks, then returns. Never grants progress. */
+export function HeartFarewell({ text, onContinue }: { text: string; onContinue: () => void }) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const reduced = useReduceMotion(true);
-  const [travel] = useState(() => new Animated.Value(0));
-  const [contentHeight, setContentHeight] = useState(0);
+  const reduced = useMotionPreference();
+  const [travel] = useState(() => new Animated.Value(1));
+  const [hover] = useState(() => new Animated.Value(0));
   const departing = useRef(false);
-  useEffect(() => () => travel.stopAnimation(), [travel]);
-  const corner = companionPlacement({ insets, hasBottomNav: true });
-  const originY = height * 0.42;
+  const corner = companionPlacement({ insets, hasBottomNav: false });
+  const originY = height * 0.38;
+  useEffect(() => {
+    if (reduced === null) return;
+    if (reduced) { travel.setValue(0); return; }
+    const entrance = Animated.timing(travel, { toValue: 0, duration: 500, easing: Easing.inOut(Easing.cubic), useNativeDriver: true });
+    const floating = Animated.loop(Animated.sequence([
+      Animated.timing(hover, { toValue: 1, duration: heartMotion.halfCycleMs, easing: Easing.inOut(Easing.sin), useNativeDriver: true, isInteraction: false }),
+      Animated.timing(hover, { toValue: 0, duration: heartMotion.halfCycleMs, easing: Easing.inOut(Easing.sin), useNativeDriver: true, isInteraction: false }),
+    ]));
+    entrance.start(); floating.start();
+    return () => { entrance.stop(); floating.stop(); travel.stopAnimation(); hover.stopAnimation(); };
+  }, [hover, reduced, travel]);
   function leave() {
     if (departing.current) return;
     departing.current = true;
     if (reduced) { onContinue(); return; }
     Animated.timing(travel, { toValue: 1, duration: 500, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }).start(({ finished }) => { if (finished) onContinue(); });
   }
-  return <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-    <Animated.View onLayout={event => setContentHeight(event.nativeEvent.layout.height)} style={{ position: "absolute", top: originY, width: 280, left: width / 2 - 140, transform: [
-      { translateX: travel.interpolate({ inputRange: [0, 1], outputRange: [0, width / 2 - corner.right - chrome.companionSize / 2] }) },
-      { translateY: travel.interpolate({ inputRange: [0, 1], outputRange: [0, height - corner.bottom - chrome.companionSize / 2 - originY - contentHeight / 2 - (chrome.companionSize / 76) * (38 - contentHeight / 2)] }) },
-      { scale: travel.interpolate({ inputRange: [0, 1], outputRange: [1, chrome.companionSize / 76] }) },
-    ], opacity: travel.interpolate({ inputRange: [0, 0.9, 1], outputRange: [1, 1, 0] }) }}>
-      <HeartGreeting text={text} onContinue={leave} />
-      <SeoullyButton label={label} variant="ghost" onPress={leave} />
+  return <View style={[StyleSheet.absoluteFill, reduced === null && { opacity: 0 }]}>
+    <Animated.View pointerEvents="none" style={{ position: "absolute", top: originY, left: width / 2 - 38, transform: [
+      { translateX: reduced ? 0 : travel.interpolate({ inputRange: [0, 1], outputRange: [0, width / 2 - corner.right - (chrome.companionSize + 8) / 2] }) },
+      { translateY: reduced ? 0 : travel.interpolate({ inputRange: [0, 1], outputRange: [0, height - corner.bottom - chrome.companionSize / 2 - originY - 38] }) },
+      { scale: reduced ? 1 : travel.interpolate({ inputRange: [0, 1], outputRange: [1, chrome.companionSize / 76] }) },
+    ] }}>
+      <Animated.View style={{ transform: [{ translateY: reduced ? 0 : hover.interpolate({ inputRange: [0, 1], outputRange: [0, -heartMotion.travel] }) }] }}>
+        <Image accessible={false} source={require("../../assets/brand/seoully-heart-mark.png")} resizeMode="contain" style={{ width: 76, height: 76 }} />
+      </Animated.View>
+    </Animated.View>
+    <Animated.View style={{ position: "absolute", top: originY + 104, left: 32, right: 32, opacity: reduced ? 1 : travel.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }}>
+      <HeartGreeting showHeart={false} text={text} onContinue={leave} />
     </Animated.View>
   </View>;
 }

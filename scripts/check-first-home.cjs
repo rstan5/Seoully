@@ -7,7 +7,7 @@ const {readFirstHome}=load('src/server/dal/first-home.ts');
 const {confirmFirstCollectible}=load('apps/mobile/src/onboarding/firstCollectible.ts');
 const user='a8080000-0000-4000-8000-000000000001',hid='b8080000-0000-4000-8000-000000000001',rid='c8080000-0000-4000-8000-000000000001',tid='d8080000-0000-4000-8000-000000000001';
 function fakeClient({owned=true,room=true,placed=false,identity=true,step='interest',failure=null}={}){
- const tables={catalog_groups:[],profiles:[{user_id:user,onboarding_step:step,display_name:'Collector',handle:'collector',favorite_group_ids:['g'],bias_member_ids:[],collector_interests:identity?['photocards']:[]}],holdings:owned?[{id:hid,owner_user_id:user,created_at:'1'}]:[],rooms:room?[{id:rid,owner_user_id:user}]:[],room_placements:placed?[{holding_id:hid,room_id:rid,surface_id:rid+'-desk',transform:{x:0,y:0,z:0}}]:[]};
+ const tables={catalog_groups:[],profiles:[{user_id:user,onboarding_step:step,display_name:'Collector',handle:'collector',favorite_group_ids:['g'],bias_member_ids:[],collector_interests:identity?['photocards']:[]}],holdings:owned?[{id:hid,owner_user_id:user,created_at:'1',collectible_templates:{kind:'album',status:'approved'}}]:[],rooms:room?[{id:rid,owner_user_id:user}]:[],room_placements:placed?[{holding_id:hid,room_id:rid,surface_id:rid+'-desk',transform:{x:0,y:0,z:0}}]:[]};
  const writes=[];const client={tables,writes,from(table){const filters=[];let patch;
   const q={select(){return q},in(k,values){filters.push(r=>values.includes(r[k]));return q},eq(k,v){filters.push(r=>r[k]===v);return q},neq(k,v){filters.push(r=>r[k]!==v);return q},order(){return q},limit(){return q},then(resolve,reject){return Promise.resolve({data:(tables[table]??[]).filter(r=>filters.every(f=>f(r))),error:failure===table?{code:"offline"}:null}).then(resolve,reject)},update(p){patch=p;return q},
    async maybeSingle(){if(failure===table)return {error:{message:'offline'},data:null};const row=tables[table].find(r=>filters.every(f=>f(r)))??null;return {data:row,error:null}},
@@ -43,7 +43,7 @@ test('lost upload response reads committed media before deciding to retry',async
 test('failed media upload preserves ownership and exposes failure for retry',async()=>{const p=pipeline({failPhoto:true});await assert.rejects(confirmFirstCollectible(draft,p.deps));await assert.rejects(confirmFirstCollectible(draft,p.deps));assert.deepEqual(p.counts(),{creates:1,photos:2})});
 test('photo/crop URI is passed unchanged to the existing personal-media pipeline',async()=>{let seen;const p=pipeline();p.deps.photo=async(id,uri)=>{seen={id,uri}};await confirmFirstCollectible(draft,p.deps);assert.deepEqual(seen,{id:hid,uri:draft.photoUri})});
 test('Room events are emitted only after actual Live hydration/save; renderer and sync remain unchanged',()=>{const s=fs.readFileSync('apps/mobile/src/room/RoomWorldScreen.tsx','utf8');assert.ok(s.indexOf('await liveSync.save(`placement:${next.holding.id}`')<s.indexOf('onLivePlacementConfirmed?.(next.holding.id)'));assert.match(s,/isSupportedRoomPlacement\(held.rest/);assert.match(s,/liveRoomNeedsHydration/);assert.match(s,/onLiveSnapshotReady\?\.\(next\)/)});
-test('old Continue bypass is removed and completion requires server confirmation',()=>{const s=fs.readFileSync('apps/mobile/src/onboarding/OnboardingWorldIntro.tsx','utf8');assert.doesNotMatch(s,/label=\{copy.continue\}/);assert.match(s,/if \(result.step !== "done"\)/);assert.match(s,/complete \? <HeartFarewell/);assert.match(s,/demo=\{false\}/)});
+test('old Continue bypass is removed and completion requires server confirmation',()=>{const s=fs.readFileSync('apps/mobile/src/onboarding/OnboardingWorldIntro.tsx','utf8');assert.doesNotMatch(s,/label=\{copy.continue\}/);assert.match(s,/if \(result.step !== "done"\)/);assert.match(s,/ready && !handoff \? <HeartFarewell/);assert.match(s,/demo=\{false\}/)});
 test('blocking hydration uses approved heart surface and loader failures expose retry',()=>{for(const f of ['apps/mobile/app/onboarding.tsx','apps/mobile/app/add.tsx']){const s=fs.readFileSync(f,'utf8');assert.match(s,/SeoullyLoadingState fullScreen/);assert.match(s,/label=\{(?:t|copy).retry\}/);assert.doesNotMatch(s,/ActivityIndicator/)}});
 test('English/Korean completion copy and existing reduced-motion companion stay intact',()=>{const s=fs.readFileSync('apps/mobile/src/i18n.ts','utf8');assert.equal((s.match(/onboardFirstHomeComplete:/g)||[]).length,2);assert.match(s,/첫 아이템이 집에 도착/);assert.match(s,/Your first piece is home/);assert.match(fs.readFileSync('apps/mobile/src/ui/SeoullyCompanion.tsx','utf8'),/if \(reduceMotion\)/)});
 function ownershipClient(owner=user){const records=new Map();const templates=[{id:tid,status:'community',name:'Card',kind:'photocard',group_id:'group',member_id:null,release_id:null}];let failRead=false;
@@ -77,3 +77,30 @@ test('actual Room acknowledgement failure remains visible and does not fake comp
 
 test('production catalog artists are selectable alongside legacy suggestions and persist on Profile',async()=>{const c=fakeClient({step:'group',owned:false});c.tables.catalog_groups=[{id:tid,name:'BTS',status:'community'}];const r=route(c);const response=await r.GET(new Request('http://fixture.local/api/mobile/onboarding'));assert.equal(response.status,200);assert.ok((await response.json()).groups.some(g=>g.id===tid&&g.name==='BTS'));const saved=await r.PATCH(patch({action:'groups',favoriteGroupIds:[tid]}));assert.equal(saved.status,200);assert.deepEqual(c.tables.profiles[0].favorite_group_ids,[tid]);});
 test('unknown or restricted production group IDs cannot bypass selection authorization',async()=>{const c=fakeClient({step:'group'});c.tables.catalog_groups=[{id:tid,name:'Hidden',status:'restricted'}];assert.equal((await route(c).PATCH(patch({action:'groups',favoriteGroupIds:[tid]}))).status,400);assert.equal(c.writes.length,0);});
+
+test('photocard Binder membership derives from persisted ownership + real Room, without free placement writes',async()=>{
+ const c=fakeClient();c.tables.holdings[0].collectible_templates.kind='photocard';
+ const first=await readFirstHome(c,user,true),again=await readFirstHome(c,user,true);
+ assert.equal(first.binderHoldingId,hid);assert.equal(first.placedHoldingId,null);assert.equal(rules.firstHomeIsComplete(first),true);
+ assert.equal(again.binderHoldingId,hid);assert.equal(c.writes.length,0);assert.equal(c.tables.room_placements.length,0);
+ assert.equal((await route(c).PATCH(patch())).status,200);
+});
+test('card ownership alone without a real Room or required identity cannot complete',async()=>{
+ for(const options of [{room:false},{identity:false}]) {const c=fakeClient(options);c.tables.holdings[0].collectible_templates.kind='photocard';assert.equal((await route(c).PATCH(patch())).status,409);assert.equal(c.writes.length,0)}
+});
+test('Room without a Binder-bearing desk cannot substitute for Binder destination',async()=>{
+ const c=fakeClient();c.tables.holdings[0].collectible_templates.kind='photocard';c.tables.rooms[0].layout={version:1,objects:[{kind:'shelf'}]};
+ assert.equal((await route(c).PATCH(patch())).status,409);assert.equal(c.writes.length,0);
+});
+test('Binder proof read failure cannot fake completion',async()=>{
+ const c=fakeClient({failure:'holdings'});c.tables.holdings[0].collectible_templates.kind='photocard';assert.equal((await route(c).PATCH(patch())).status,503);assert.equal(c.writes.length,0);
+});
+test('real Binder pages retain personal crop, deterministic membership and no duplicate entries after relaunch',()=>{
+ const {buildNativeBinderPages}=load('apps/mobile/src/binder/model.ts');
+ const card={id:hid,personalMediaUrl:'fixture://cropped-personal',template:{id:tid,kind:'photocard',name:'Card'}};
+ for(let launch=0;launch<2;launch++) {const pages=buildNativeBinderPages([card,{id:'album',template:{kind:'album'}}],'General');const cards=pages.flatMap(p=>p.pockets.flatMap(p=>p.holding?[p.holding]:[]));assert.equal(cards.length,1);assert.equal(cards[0].id,hid);assert.equal(cards[0].personalMediaUrl,card.personalMediaUrl)}
+});
+test('ownership route hints cannot restore the removed reveal page',()=>{
+ assert.equal(journey.resolveOnboardingPhase({durableStep:'interest',editingTastes:false,holdingCount:1,requestedPhase:'reveal'}),'room');
+ const screen=fs.readFileSync('apps/mobile/app/onboarding.tsx','utf8');assert.doesNotMatch(screen,/phase === "reveal"|onboardOpenRoom|cardPreview\}/);
+});

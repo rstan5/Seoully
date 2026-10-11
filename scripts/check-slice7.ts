@@ -178,7 +178,8 @@ assert.equal(stepBack({ kind: "home" }), "leave");
 
 // R. Public binder
 assertContains(worldScreen, "onOpenBinder={deskPresent ? () => openBinderFromWorld() : undefined}", "Binder opens from the world object");
-assertContains(worldScreen, "if (!snapshot || readOnly || viewRef.current.kind !== \"edit\") return;", "public cannot place from storage");
+assertContains(worldScreen, "if (!snapshot || readOnly) return;", "public cannot place from storage");
+assertContains(worldScreen, 'if (viewRef.current.kind !== "edit") return;', "physical placement requires edit mode");
 
 // S. Demo/Live isolation
 assertContains(worldScreen, "loadDemoRoom", "demo require");

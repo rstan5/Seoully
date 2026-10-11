@@ -5,7 +5,7 @@ import { useMotionPreference } from "./motion";
 import { heartMotion } from "./heartMotion";
 
 /** Companion speech, never a loading delay. Tap reveals the whole sentence. */
-export function HeartGreeting({ text, large = false, onContinue }: { text: string; large?: boolean; onContinue?: () => void }) {
+export function HeartGreeting({ text, large = false, showHeart = true, onContinue }: { text: string; large?: boolean; showHeart?: boolean; onContinue?: () => void }) {
   const reduced = useMotionPreference();
   const [count, setCount] = useState(0);
   const [hover] = useState(() => new Animated.Value(0));
@@ -21,9 +21,9 @@ export function HeartGreeting({ text, large = false, onContinue }: { text: strin
   }, [hover, reduced, text]);
   const shown = reduced ? text.length : count;
   return <Pressable accessibilityRole="button" accessibilityLabel={text} onPress={() => { if (shown < text.length) setCount(text.length); else onContinue?.(); }} style={[styles.wrap, reduced === null && { opacity: 0 }]}>
-    <Animated.View style={{ transform: [{ translateY: reduced ? 0 : hover.interpolate({ inputRange: [0, 1], outputRange: [heartMotion.travel / 2, -heartMotion.travel / 2] }) }] }}>
+    {showHeart ? <Animated.View style={{ transform: [{ translateY: reduced ? 0 : hover.interpolate({ inputRange: [0, 1], outputRange: [heartMotion.travel / 2, -heartMotion.travel / 2] }) }] }}>
       <Image accessible={false} source={require("../../assets/brand/seoully-heart-mark.png")} resizeMode="contain" style={{ width: large ? 128 : 76, height: large ? 128 : 76 }} />
-    </Animated.View>
+    </Animated.View> : null}
     <SeoullyText variant="title" style={[styles.text, large && styles.large]}>{text.slice(0, shown)}<SeoullyText style={{ opacity: 0 }}>{text.slice(shown)}</SeoullyText></SeoullyText>
   </Pressable>;
 }

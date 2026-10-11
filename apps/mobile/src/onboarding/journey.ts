@@ -65,8 +65,6 @@ export function resolveOnboardingPhase(input: {
 
   const owned = input.holdingCount > 0;
   if (!owned) return input.interestsSaved ? "collect" : "interest";
-  const requested = input.requestedPhase;
-  if (requested === "reveal") return "reveal";
   return "room";
 }
 

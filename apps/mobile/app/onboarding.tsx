@@ -1,6 +1,6 @@
 import { HeartGreeting } from "../src/ui/HeartGreeting";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, Image, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   loadMyHolding,
@@ -25,7 +25,6 @@ import { readFirstCollectibleDraft } from "../src/onboarding/firstCollectibleSto
 import { SeoullyButton, SeoullyChoiceChip } from "../src/ui/SeoullyControls";
 import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
 import { useBootstrap } from "../src/startup/BootstrapProvider";
-import { useReduceMotion } from "../src/ui/motion";
 import { SeoullyScreen } from "../src/ui/SeoullyScreen";
 import { SeoullyText } from "../src/ui/SeoullyText";
 
@@ -51,7 +50,6 @@ export default function OnboardingScreen() {
   const editingTastes = params.edit === "1";
   const t = useCopy();
   const { locale, toggleLocale } = useLocale();
-  const reduceMotion = useReduceMotion();
   const { setDemo } = useDataMode();
   const boot = useBootstrap();
   const loadGeneration = useRef(0);
@@ -70,8 +68,6 @@ export default function OnboardingScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [photoWarning] = useState(params.photoWarning === "1");
-  const [revealOpacity] = useState(() => new Animated.Value(reduceMotion ? 1 : 0));
 
   async function load() {
     const generation = ++loadGeneration.current;
@@ -149,20 +145,6 @@ export default function OnboardingScreen() {
     router.replace({ pathname: "/collect", params: { from: "onboarding" } });
   }, [editingTastes, phase, router]);
 
-  useEffect(() => {
-    if (phase !== "reveal") return;
-    revealOpacity.setValue(reduceMotion ? 1 : 0);
-    if (reduceMotion) return;
-    const anim = Animated.timing(revealOpacity, {
-      toValue: 1,
-      duration: 420,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: true,
-    });
-    anim.start();
-    return () => anim.stop();
-  }, [phase, reduceMotion, revealOpacity]);
-
   const members = useMemo(
     () => state?.members.filter((member) => groupIds.includes(member.groupId)) ?? [],
     [groupIds, state],
@@ -185,7 +167,7 @@ export default function OnboardingScreen() {
         return;
       }
       if (action === "interests") {
-        setPhase("collect");
+        setPhase(holding ? "room" : "collect");
         return;
       }
       if (action === "groups") setPhase(groupIds.length > 0 ? "bias" : "interest");
@@ -232,45 +214,10 @@ export default function OnboardingScreen() {
             photocard={holding ? isBinderEligible(holding) : false}
             copy={t}
             onContinue={finish}
-            onBack={() => setPhase("reveal")}
+            onBack={() => setPhase("interest")}
           />
         </Suspense>
       </View>
-    );
-  }
-
-  if (phase === "reveal") {
-    const preview = holding?.personalMediaUrl;
-    return (
-      <SeoullyScreen>
-        <Animated.View style={[styles.container, { opacity: revealOpacity }]}>
-          <View style={styles.topline}>
-            <BrandMark />
-            <Pressable accessibilityRole="button" onPress={toggleLocale} style={styles.language}>
-              <SeoullyText variant="button">{t.switchLanguage}</SeoullyText>
-            </Pressable>
-          </View>
-          <HeartGreeting text={t.onboardRevealTitle} />
-          <SeoullyText variant="secondary" style={styles.lead}>{t.onboardRevealLede}</SeoullyText>
-          {preview ? (
-            <Image
-              accessibilityLabel={holding?.template.name ?? t.personalPreview}
-              resizeMode="contain"
-              source={{ uri: preview }}
-              style={holding?.template.kind === "photocard" ? styles.cardPreview : styles.preview}
-            />
-          ) : (
-            <View style={styles.object}>
-              <SeoullyText variant="handle" color={colors.plum}>{holding?.template.name ?? t.catalogItemFallback}</SeoullyText>
-              <SeoullyText variant="caption">{t.roomEligibleHint}</SeoullyText>
-            </View>
-          )}
-          {photoWarning ? <SeoullyText variant="caption" color={colors.plum}>{t.onboardPhotoLater}</SeoullyText> : null}
-          <View style={styles.footer}>
-            <SeoullyButton label={t.onboardOpenRoom} block onPress={() => setPhase("room")} />
-          </View>
-        </Animated.View>
-      </SeoullyScreen>
     );
   }
 

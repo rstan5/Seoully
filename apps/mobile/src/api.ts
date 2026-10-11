@@ -397,7 +397,7 @@ export type NativeOnboardingMember = {
   nativeName: string;
 };
 export type NativeOnboardingState = {
-  firstHome: { identityReady: boolean; holdingId: string | null; roomId: string | null; placedHoldingId: string | null } | null;
+  firstHome: { identityReady: boolean; holdingId: string | null; roomId: string | null; placedHoldingId: string | null; binderHoldingId?: string | null } | null;
   step: NativeOnboardingStep;
   favoriteGroupIds: string[];
   biasMemberIds: string[];
@@ -842,8 +842,8 @@ export async function saveNativeRoomPlacement(input: {
     method: "PUT",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify(input),
-  });
-  if (!response.ok) throw new Error("room_placement_write_failed");
+  }).catch(() => apiTransportFailure("room_placement"));
+  if (!response.ok) await apiFailure(response, "room_placement");
   const payload = await response.json() as { placement: NativeRoomPlacement };
   return payload.placement;
 }

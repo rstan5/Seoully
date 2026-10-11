@@ -34,10 +34,14 @@ a.onTouchStart(event(4));a.onObjectPressStart('desk',4);tick(edit.LONG_PRESS_MS)
 a.onTouchStart(event(5));a.onObjectPressStart('desk',5);a.onTouchCancel(event());tick(edit.LONG_PRESS_MS);assert.equal(s.heldObjectRef.current,null);assert.equal(s.dragOwnerRef.current,null);
 a.onTouchStart(event(6));a.onObjectPressStart('desk',6);tick(edit.LONG_PRESS_MS);a.onTouchStart(event(6,7));assert.equal(s.heldObjectRef.current,null);a.pan.onPanResponderGrant(event(6,7));a.pan.onPanResponderMove(event(6,7),{dx:10,dy:0});assert.equal(s.exploreRef.current.x,999);
 a.onTouchStart(event(8));a.onObjectPressStart('desk',8);tick(edit.LONG_PRESS_MS);a.pan.onPanResponderTerminate();assert.equal(s.heldObjectRef.current,null);assert.equal(s.touchOwnerRef.current,null);
-const storageItem={holding:{id:'stored'},geometry:'album',scale:1,position:{x:0,y:0,z:0},rotation:{x:0,y:0,z:0}};
+const storageItem={holding:{id:'stored',template:{kind:'album'}},geometry:'album',scale:1,position:{x:0,y:0,z:0},rotation:{x:0,y:0,z:0}};
 s.queuedStorageRef.current={holdingId:'stored',origin:null,preview:storageItem,rest:storageItem,valid:false};
 a.onTouchStart(event(10));a.pan.onPanResponderGrant(event(10));a.pan.onPanResponderMove(event(10),{dx:20,dy:0});assert.ok(s.queuedStorageRef.current);assert.equal(s.heldRef.current,null);a.onTouchEnd(event());
 a.onTouchStart(event(11));a.onCollectiblePressStart('stored',11);tick(edit.LONG_PRESS_MS);assert.equal(s.heldRef.current.holdingId,'stored');assert.equal(s.heldRef.current.origin,null);assert.equal(s.queuedStorageRef.current,null);a.onTouchCancel(event());
+// Live photocards cannot acquire the generic Room free-drag gesture.
+const cardItem={...storageItem,holding:{id:'card',template:{kind:'photocard'}},geometry:'photocard'};
+s.queuedStorageRef.current={holdingId:'card',origin:null,preview:cardItem,rest:cardItem,valid:false};
+a.onTouchStart(event(12));a.onCollectiblePressStart('card',12);tick(edit.LONG_PRESS_MS);assert.equal(s.heldRef.current,null);a.onTouchCancel(event());
 assert.ok(source.includes('gestureRef.current.lastDx = gestureRef.current.lastDy = 0;'),'loaded/first Room entry neutralizes touch');
 assert.ok(source.includes('gestureRef.current.pinching = false;\n    styleBaseline'),'Edit entry neutralizes touch');
 s.selectedObjectId='desk';s.selectedId='card';s.viewRef.current={kind:'edit'};a.focus();assert.equal(s.selectedObjectId,null);assert.equal(s.selectedId,null);assert.equal(s.viewRef.current.kind,'home');

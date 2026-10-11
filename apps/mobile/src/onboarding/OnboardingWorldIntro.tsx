@@ -11,13 +11,15 @@ import { SeoullyButton } from "../ui/SeoullyControls";
 import { SeoullyText } from "../ui/SeoullyText";
 import { colors } from "../theme";
 
-export default function OnboardingWorldIntro({ holdingId, copy, onContinue, onBack }: {
+export default function OnboardingWorldIntro({ holdingId, photocard, copy, onContinue, onBack }: {
   holdingId?: string; photocard: boolean; copy: MobileCopy; onContinue: () => void; onBack: () => void;
 }) {
   const social = useSocialRepository();
   const insets = useSafeAreaInsets();
   const completing = useRef(false);
+  const confirmed = useRef<string | undefined>(undefined);
   const [ready, setReady] = useState(false);
+  const [handoff, setHandoff] = useState(false);
   const [complete, setComplete] = useState(false);
   const [error, setError] = useState(false);
   async function finish(confirmedHoldingId?: string) {
@@ -31,21 +33,31 @@ export default function OnboardingWorldIntro({ holdingId, copy, onContinue, onBa
     } catch { setError(true); }
     finally { completing.current = false; }
   }
+  function destinationConfirmed(id?: string) {
+    if (!id || id !== holdingId) return;
+    confirmed.current = id;
+    void finish(id);
+  }
   return <View style={styles.wrap}>
-    <RoomWorldScreen mode="own" demo={false} persistLive={social.capabilities.persistRoom} copy={copy}
+    <RoomWorldScreen initialHoldingId={handoff && photocard && !complete ? holdingId : undefined} mode="own" demo={false} persistLive={social.capabilities.persistRoom} copy={copy}
       onLeave={() => { if (complete) onContinue(); else onBack(); }}
       onLiveSnapshotReady={(snapshot) => {
         setReady(true);
-        if (snapshot.placements.some(placement => placement.holdingId === holdingId)) void finish(holdingId);
+        if (!photocard && snapshot.placements.some(placement => placement.holdingId === holdingId)) destinationConfirmed(holdingId);
       }}
-      onLivePlacementConfirmed={(id) => { void finish(id); }}
+      onLivePlacementConfirmed={(id) => { if (!photocard) destinationConfirmed(id); }}
+      onLiveBinderConfirmed={(ids) => { if (photocard && holdingId && ids.includes(holdingId)) destinationConfirmed(holdingId); }}
     />
-    {ready && !complete ? <View pointerEvents="box-none" style={[styles.guide, { top: insets.top + 98 }]}>
-      <SeoullyCompanion guidance={copy.onboardPlaceFirst} />
-      {error ? <><SeoullyText accessibilityRole="alert" variant="caption">{copy.onboardingSaveFailed}</SeoullyText>
-        <SeoullyButton label={copy.retry} variant="ghost" onPress={() => { void finish(holdingId); }} /></> : null}
-    </View> : null}
-    {complete ? <HeartFarewell text={`${copy.onboardFirstHomeComplete}\n${copy.companionAlways}`} label={copy.onboardFindPeople} onContinue={onContinue} /> : null}
+    {ready && !handoff ? <HeartFarewell text={copy.onboardOwnershipHandoff} onContinue={() => setHandoff(true)} /> : null}
+    {ready && handoff ? <>
+      <SeoullyCompanion onboardingActive />
+      <View pointerEvents="box-none" style={[styles.guide, { top: insets.top + 98 }]}>
+        <SeoullyText variant="secondary">{complete ? copy.onboardFirstHomeComplete : photocard ? copy.onboardBinderFirst : copy.onboardPlaceFirst}</SeoullyText>
+        {error ? <><SeoullyText accessibilityRole="alert" variant="caption">{copy.onboardingSaveFailed}</SeoullyText>
+          <SeoullyButton label={copy.retry} variant="ghost" onPress={() => { void finish(confirmed.current); }} /></> : null}
+        {complete ? <SeoullyButton label={copy.onboardFindPeople} variant="ghost" onPress={onContinue} /> : null}
+      </View>
+    </> : null}
   </View>;
 }
 const styles = StyleSheet.create({

@@ -5,21 +5,31 @@ import type { FirstHomeState } from "@/domain/first-home";
 /** Reads only; never lazily creates a Room or infers success from UI hints. */
 export async function readFirstHome(client: SupabaseClient, userId: string, identityReady: boolean): Promise<FirstHomeState> {
   const [owned, room] = await Promise.all([
-    client.from("holdings").select("id,collectible_templates!inner(status)")
+    client.from("holdings").select("id,collectible_templates!inner(status,kind)")
       .eq("owner_user_id", userId).neq("collectible_templates.status", "restricted")
       .order("created_at", { ascending: true }).order("id", { ascending: true }).limit(1).maybeSingle(),
-    client.from("rooms").select("id").eq("owner_user_id", userId).maybeSingle(),
+    client.from("rooms").select("id,layout").eq("owner_user_id", userId).maybeSingle(),
   ]);
   if (owned.error || room.error) throw new Error("first_home_unavailable");
   const state: FirstHomeState = { identityReady, holdingId: owned.data?.id ?? null, roomId: room.data?.id ?? null, placedHoldingId: null };
   if (!state.holdingId || !state.roomId) return state;
+  const template = owned.data?.collectible_templates;
+  const kind = (Array.isArray(template) ? template[0] : template)?.kind;
+  // The existing Binder has no membership table: eligible owned cards are its
+  // authoritative contents, deterministically paginated by the native Binder.
+  if (kind === "photocard") {
+    const layout = room.data?.layout as { version?: number; objects?: { kind?: string }[] } | null;
+    const binderAvailable = layout?.version !== 1 || layout.objects?.some(object => object.kind === "desk");
+    if (binderAvailable) state.binderHoldingId = state.holdingId;
+    return state;
+  }
   const { data, error } = await client.from("room_placements")
     .select("holding_id,surface_id,transform")
     .eq("room_id", state.roomId).eq("holding_id", state.holdingId).maybeSingle();
   if (error) throw new Error("first_home_unavailable");
   // Existing native placement rules establish compatible surface/geometry at
-  // release. Require its committed, room-scoped placement record, not Binder
-  // eligibility or an optimistic object with a pending ID.
+  // release. Ordinary objects require their committed, room-scoped placement
+  // record, never an optimistic object with a pending ID.
   const transform = data?.transform as Record<string, unknown> | null;
   if (data?.surface_id?.startsWith(`${state.roomId}-`) && transform &&
       ["x", "y", "z"].every(key => typeof transform[key] === "number" && Number.isFinite(transform[key]) && Math.abs(transform[key] as number) <= 5000)) {

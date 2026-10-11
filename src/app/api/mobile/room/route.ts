@@ -24,10 +24,11 @@ export async function PUT(request: Request) {
   const client = createSupabaseBearerClient(request);
   if (!client) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   try {
-    const placement = await upsertMyRoomPlacement(await request.json(), client);
+    const placement = await upsertMyRoomPlacement(await request.json(), client, { nativeDestinations: true });
     return NextResponse.json({ placement }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    const reason = error instanceof Error ? error.message : "room_placement_write_failed";
+    const allowed = new Set(["unauthenticated", "room_placement_invalid", "room_placement_forbidden", "room_placement_write_failed", "photocard_binder_only", "room_not_found"]);
+    const reason = error instanceof Error && allowed.has(error.message) ? error.message : "room_placement_write_failed";
     return NextResponse.json({ error: reason }, { status: reason === "unauthenticated" ? 401 : 400 });
   }
 }

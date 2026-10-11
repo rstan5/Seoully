@@ -4,7 +4,9 @@ export type FirstHomeState = {
   holdingId: string | null;
   roomId: string | null;
   placedHoldingId: string | null;
+  /** Binder pages are derived from persisted eligible photocard Holdings. */
+  binderHoldingId?: string | null;
 };
 export function firstHomeIsComplete(state: FirstHomeState): boolean {
-  return state.identityReady && Boolean(state.holdingId && state.roomId && state.placedHoldingId === state.holdingId);
+  return state.identityReady && Boolean(state.holdingId && state.roomId && (state.placedHoldingId === state.holdingId || state.binderHoldingId === state.holdingId));
 }

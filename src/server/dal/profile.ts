@@ -1,6 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
+import { profileAppearanceSchema } from "@/domain/profile-appearance";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { IdentityProfileDTO } from "@/domain/identity";
 import type { CollectorInterest, Profile, UserId } from "@/domain/types";
@@ -12,6 +13,7 @@ const HANDLE_RE = /^[a-z][a-z0-9_]{2,15}$/;
 const interestValues = ["albums", "photocards", "merch", "vinyl", "posters", "lightsticks", "everything"] as const;
 
 export const currentProfilePatchSchema = z.object({
+  appearance: profileAppearanceSchema.optional(),
   handle: z.string().trim().min(3).max(32).transform(normalizeHandle).pipe(z.string().regex(HANDLE_RE)).optional(),
   displayName: z.string().trim().min(1).max(48).optional(),
   tagline: z.string().trim().max(100).optional(),
@@ -62,7 +64,7 @@ export async function getCurrentIdentityFromClient(supabase: SupabaseClient): Pr
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("user_id, handle, display_name, tagline, bio, location, favorite_group_ids, bias_member_ids, favorite_era_ids, collector_interests, collector_type")
+    .select("user_id, handle, display_name, tagline, bio, location, favorite_group_ids, bias_member_ids, favorite_era_ids, collector_interests, collector_type, appearance")
     .eq("user_id", userIdData)
     .maybeSingle();
   if (profileError || !profile) throw new Error("Current Seoully profile is unavailable.");
@@ -76,7 +78,7 @@ export async function getPublicProfile(userId: string, client?: SupabaseClient):
   const supabase = client ?? await createSupabaseServerClient();
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("user_id, handle, display_name, tagline, bio, location, favorite_group_ids, bias_member_ids, favorite_era_ids, collector_interests, collector_type, created_at, collection_public, wishlist_public")
+    .select("user_id, handle, display_name, tagline, bio, location, favorite_group_ids, bias_member_ids, favorite_era_ids, collector_interests, collector_type, appearance, created_at, collection_public, wishlist_public")
     .eq("user_id", parsedId.data)
     .maybeSingle();
   if (error || !profile) return null;
@@ -88,7 +90,7 @@ export async function getPublicProfileByHandle(handle: string): Promise<PublicPr
   if (!HANDLE_RE.test(normalized)) return null;
   const supabase = await createSupabaseServerClient();
   const { data: profile, error } = await supabase.from("profiles")
-    .select("user_id, handle, display_name, tagline, bio, location, favorite_group_ids, bias_member_ids, favorite_era_ids, collector_interests, collector_type, created_at, collection_public, wishlist_public")
+    .select("user_id, handle, display_name, tagline, bio, location, favorite_group_ids, bias_member_ids, favorite_era_ids, collector_interests, collector_type, appearance, created_at, collection_public, wishlist_public")
     .eq("handle", normalized).maybeSingle();
   if (error || !profile) return null;
   return await hydratePublicProfile(mapIdentity({ id: profile.user_id, created_at: profile.created_at }, profile), profile);
@@ -126,6 +128,7 @@ export async function updateCurrentProfile(input: unknown, client?: SupabaseClie
   if (!current) throw new Error("unauthenticated");
 
   const payload: Record<string, unknown> = {};
+  if (patch.appearance !== undefined) payload.appearance = patch.appearance;
   if (patch.handle !== undefined) payload.handle = patch.handle;
   if (patch.displayName !== undefined) payload.display_name = patch.displayName;
   if (patch.tagline !== undefined) payload.tagline = patch.tagline;
@@ -161,13 +164,15 @@ function mapIdentity(
     favorite_era_ids: string[];
     collector_interests: CollectorInterest[];
     collector_type: string;
+    appearance?: unknown;
     collection_public?: boolean;
     wishlist_public?: boolean;
   },
 ): IdentityProfileDTO {
   const userId = profile.user_id as UserId;
   const joinedAt = account.created_at.slice(0, 10);
-  const mappedProfile: Pick<Profile, "userId" | "tagline" | "bio" | "location" | "favoriteGroupIds" | "biasMemberIds" | "favoriteEraIds" | "collectorInterests" | "collectorType"> = {
+  const mappedProfile: Pick<Profile, "userId" | "tagline" | "bio" | "location" | "favoriteGroupIds" | "biasMemberIds" | "favoriteEraIds" | "collectorInterests" | "collectorType" | "appearance"> = {
+    appearance: profileAppearanceSchema.parse(profile.appearance ?? { mode: "default" }),
     userId,
     tagline: profile.tagline ?? "",
     bio: profile.bio ?? "",

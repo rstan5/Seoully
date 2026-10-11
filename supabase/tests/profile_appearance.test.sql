@@ -1,0 +1,46 @@
+begin;
+select plan(25);
+insert into auth.users(id,raw_user_meta_data) values
+ ('a8060000-0000-4000-8000-000000000001','{"handle":"appearance_a","display_name":"Appearance A"}'),
+ ('a8060000-0000-4000-8000-000000000002','{"handle":"appearance_b","display_name":"Appearance B"}');
+insert into public.rooms(owner_user_id) select user_id from public.profiles where handle='appearance_a';
+create temporary table appearance_room_before as select to_jsonb(r) as snapshot from public.rooms r;
+select is((select appearance from public.profiles where handle='appearance_a'), '{"mode":"default"}'::jsonb, 'new/legacy provisioning uses safe Default');
+select ok((select attnotnull from pg_attribute where attrelid='public.profiles'::regclass and attname='appearance'),'appearance cannot be null');
+select ok((select convalidated from pg_constraint where conrelid='public.profiles'::regclass and conname='profiles_appearance_valid'),'appearance CHECK is validated');
+select ok((select relrowsecurity from pg_class where oid='public.profiles'::regclass),'profile RLS stays enabled');
+set local role authenticated;
+select set_config('request.jwt.claim.sub','a8060000-0000-4000-8000-000000000001',true);
+update public.profiles set appearance='{"mode":"custom","background":"deep-navy","primary":"rose","secondary":"mint"}' where handle='appearance_a';
+select is((select appearance from public.profiles where handle='appearance_a'),'{"mode":"custom","background":"deep-navy","primary":"rose","secondary":"mint"}'::jsonb,'owner Custom choice persists');
+select is((select display_name from public.profiles where handle='appearance_a'),'Appearance A','appearance update preserves identity');
+update public.profiles set tagline='Existing patch' where handle='appearance_a';
+select is((select appearance->>'primary' from public.profiles where handle='appearance_a'),'rose','unrelated legacy patch preserves appearance');
+update public.profiles set appearance='{"mode":"room-sync"}' where handle='appearance_a';
+select is((select appearance from public.profiles where handle='appearance_a'),'{"mode":"room-sync"}'::jsonb,'Room Sync stores only choice');
+update public.profiles set appearance='{"mode":"default"}' where handle='appearance_a';
+select is((select appearance from public.profiles where handle='appearance_a'),'{"mode":"default"}'::jsonb,'can return to Default');
+update public.profiles set appearance='{"mode":"custom","tint":"soft-lilac"}' where handle='appearance_a';
+select is((select appearance->>'tint' from public.profiles where handle='appearance_a'),'soft-lilac','legacy tint preserved');
+select throws_ok($$update public.profiles set appearance='{"mode":"custom","primary":"#ff0000"}' where handle='appearance_a'$$,'23514',null,'arbitrary color rejected');
+select throws_ok($$update public.profiles set appearance='{"mode":"custom","background":"unknown"}' where handle='appearance_a'$$,'23514',null,'unknown background rejected');
+select throws_ok($$update public.profiles set appearance='{"mode":"other"}' where handle='appearance_a'$$,'23514',null,'unknown mode rejected');
+select throws_ok($$update public.profiles set appearance='{}' where handle='appearance_a'$$,'23514',null,'missing mode rejected');
+select throws_ok($$update public.profiles set appearance='[]' where handle='appearance_a'$$,'23514',null,'array rejected');
+select throws_ok($$update public.profiles set appearance='{"mode":"custom","primary":null}' where handle='appearance_a'$$,'23514',null,'null optional field rejected');
+select throws_ok($$update public.profiles set appearance='{"mode":"custom","primary":1}' where handle='appearance_a'$$,'23514',null,'wrong type rejected');
+select throws_ok($$update public.profiles set appearance='{"mode":"default","privatePath":"hidden"}' where handle='appearance_a'$$,'23514',null,'unknown/private metadata key rejected');
+select throws_ok($$update public.profiles set appearance=null where handle='appearance_a'$$,'23502',null,'SQL null rejected');
+select set_config('request.jwt.claim.sub','a8060000-0000-4000-8000-000000000002',true);
+with changed as (update public.profiles set appearance='{"mode":"room-sync"}' where handle='appearance_a' returning 1)
+select is((select count(*)::int from changed),0,'another owner cannot update A');
+select is((select appearance->>'tint' from public.profiles where handle='appearance_a'),'soft-lilac','cross-owner attempt preserves choice');
+reset role;
+select is((select to_jsonb(r) from public.rooms r),(select snapshot from appearance_room_before),'Room unchanged by appearance operations');
+set local role anon;
+select is((select appearance from public.profiles where handle='appearance_a'),'{"mode":"custom","tint":"soft-lilac"}'::jsonb,'public can read only safe appearance preference');
+select ok(not has_column_privilege('anon','public.profiles','appearance','update'),'anonymous has no appearance update grant');
+select throws_ok($$update public.profiles set appearance='{"mode":"room-sync"}' where handle='appearance_a'$$,'42501',null,'anonymous write denied');
+reset role;
+select * from finish();
+rollback;

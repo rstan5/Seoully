@@ -1,3 +1,4 @@
+import type { ProfileThemeChoice } from "seoully-domain/types";
 import { fetch as expoFetch } from "expo/fetch";
 import { personalPhotoForm, photoMultipart } from "./media/photoUpload";
 import { apiFailure, apiTransportFailure } from "./apiFailure";
@@ -373,10 +374,11 @@ export type NativeIdentity = {
     favoriteEraIds: string[];
     collectorInterests: string[];
     collectorType?: string;
+    appearance?: ProfileThemeChoice;
   };
 };
 
-export async function updateNativeProfile(input: { displayName?: string; bio?: string; tagline?: string; location?: string }) {
+export async function updateNativeProfile(input: { displayName?: string; bio?: string; tagline?: string; location?: string; appearance?: ProfileThemeChoice }) {
   const { data } = await supabase.auth.getSession(); const accessToken = data.session?.access_token;
   if (!accessToken) throw new Error("unauthenticated");
   const response = await fetch(`${productApiBase()}/api/mobile/profile`, { method: "PATCH", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify(input) });
@@ -686,6 +688,7 @@ export type NativeCollectorProfile = {
     location?: string;
     collectorInterests: string[];
     collectorType?: string;
+    appearance?: ProfileThemeChoice;
     favoriteGroupIds?: string[];
     biasMemberIds?: string[];
     favoriteEraIds?: string[];

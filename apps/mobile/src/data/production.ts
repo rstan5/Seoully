@@ -150,6 +150,7 @@ export const productionRepository: SocialRepository = {
         bio: result.profile.profile.bio,
         location: result.profile.profile.location,
         collectorType: result.profile.profile.collectorType,
+        appearance: result.profile.profile.appearance,
         collectorInterests: result.profile.profile.collectorInterests,
       },
       follow: result.follow,

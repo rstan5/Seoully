@@ -1,3 +1,4 @@
+import type { ProfileThemeChoice } from "seoully-domain/types";
 import type {
   NativeCatalogTemplate,
   NativeCollectibleSearchHit,
@@ -80,6 +81,7 @@ export type SocialCollector = {
     bio: string;
     location?: string;
     collectorType?: string;
+    appearance?: ProfileThemeChoice;
     collectorInterests: string[];
   };
   avatarUrl?: string;

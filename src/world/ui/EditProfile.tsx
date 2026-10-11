@@ -159,7 +159,7 @@ export function EditProfile({
     };
     if (session.kind === "auth") {
       if (session.userId !== userId) { setError("error.authUnavailable"); return; }
-      const result = await updateMySeoullyProfile(patch);
+      const result = await updateMySeoullyProfile({ ...patch, appearance: persistAppearance(appearance) });
       if (!result.ok) {
         const failure: Record<string, string> = {
           "handle-taken": "error.handleTaken",
@@ -175,9 +175,9 @@ export function EditProfile({
       }
       if (!("identity" in result)) { setError("error.authUnavailable"); return; }
       repository.adoptAuthenticatedIdentity(result.identity);
-      // Avatar bytes and appearance preferences intentionally remain in the
-      // prototype repository until the media/profile-preferences migration.
-      repository.updateProfile(userId, { avatarUrl, appearance: persistAppearance(appearance) });
+      // Avatar bytes remain local until the separate profile-media capability.
+      // Appearance above is adopted from the confirmed production response.
+      repository.updateProfile(userId, { avatarUrl });
     } else {
       repository.updateProfile(userId, {
         ...patch,

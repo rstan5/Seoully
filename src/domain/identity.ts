@@ -1,4 +1,4 @@
-import type { CollectorInterest, Profile, User } from "./types";
+import type { CollectorInterest, Profile, ProfileThemeChoice, User } from "./types";
 
 /** Safe account/profile projection returned by authenticated server operations. */
 export interface IdentityProfileDTO {
@@ -14,10 +14,12 @@ export interface IdentityProfileDTO {
     | "favoriteEraIds"
     | "collectorInterests"
     | "collectorType"
+    | "appearance"
   >;
 }
 
 export interface CurrentProfilePatch {
+  appearance?: ProfileThemeChoice;
   handle?: string;
   displayName?: string;
   tagline?: string;

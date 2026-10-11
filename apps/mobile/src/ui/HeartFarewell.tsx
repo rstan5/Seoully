@@ -9,13 +9,13 @@ import { heartMotion } from "./heartMotion";
 import { advanceHeartScene, heartSceneTiming, type HeartSceneState } from "./heartScene";
 
 /** Opaque character scene between stages; never completes production onboarding. */
-export function HeartFarewell({ text, ready = true, onContinue }: { text: string; ready?: boolean; onContinue: () => void }) {
+export function HeartFarewell({ text, ready = true, onContinue, destination = "corner" }: { text: string; ready?: boolean; onContinue: () => void; destination?: "corner" | "next" }) {
   const reduced = useMotionPreference();
   if (reduced === null) return <Pressable style={styles.cover} />;
-  return <HeartScene key={String(reduced)} text={text} ready={ready} onContinue={onContinue} reduced={reduced} />;
+  return <HeartScene key={String(reduced)} text={text} ready={ready} onContinue={onContinue} reduced={reduced} destination={destination} />;
 }
 
-function HeartScene({ text, ready, onContinue, reduced }: { text: string; ready: boolean; onContinue: () => void; reduced: boolean }) {
+function HeartScene({ text, ready, onContinue, reduced, destination = "corner" }: { text: string; ready: boolean; onContinue: () => void; reduced: boolean; destination?: "corner" | "next" }) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const chars = useMemo(() => Array.from(text), [text]);
@@ -76,9 +76,9 @@ function HeartScene({ text, ready, onContinue, reduced }: { text: string; ready:
   return <Pressable accessibilityRole="button" accessibilityLabel={text} onPress={() => send("tap")} style={styles.cover}>
     <Animated.View style={{ opacity: reduced === null ? 0 : 1, position: "absolute", top: originY, left: width / 2 - heartSize / 2, width: heartSize,
       transform: [
-        { translateX: reduced ? 0 : journey.interpolate({ inputRange: [-1, 0, 1], outputRange: [width, 0, width / 2 - corner.right - (chrome.companionSize + 8) / 2] }) },
-        { translateY: reduced ? 0 : journey.interpolate({ inputRange: [-1, -0.5, 0, 1], outputRange: [36, -12, 0, height - corner.bottom - chrome.companionSize / 2 - originY - heartSize / 2] }) },
-        { scale: reduced ? 1 : journey.interpolate({ inputRange: [-1, 0, 1], outputRange: [0.9, 1, chrome.companionSize / heartSize] }) },
+        { translateX: reduced ? 0 : journey.interpolate({ inputRange: [-1, 0, 1], outputRange: [width, 0, destination === "next" ? -width : width / 2 - corner.right - (chrome.companionSize + 8) / 2] }) },
+        { translateY: reduced ? 0 : journey.interpolate({ inputRange: [-1, -0.5, 0, 1], outputRange: [36, -12, 0, destination === "next" ? 0 : height - corner.bottom - chrome.companionSize / 2 - originY - heartSize / 2] }) },
+        { scale: reduced ? 1 : journey.interpolate({ inputRange: [-1, 0, 1], outputRange: [0.9, 1, destination === "next" ? 0.9 : chrome.companionSize / heartSize] }) },
       ] }}>
       <Animated.View style={{ transform: [{ translateY: reduced ? 0 : hover.interpolate({ inputRange: [0, 1], outputRange: [0, -heartMotion.travel] }) }] }}>
         <Image accessible={false} source={require("../../assets/brand/seoully-heart-mark.png")} resizeMode="contain" style={{ width: heartSize, height: heartSize }} />

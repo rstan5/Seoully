@@ -101,6 +101,7 @@ export function RoomWorldScreen({
   onLivePlacementConfirmed,
   onLiveBinderConfirmed,
   onLiveSnapshotFailed,
+  onRoomAppearance,
   loadingCovered = false,
 }: {
   mode: RoomWorldMode;
@@ -118,6 +119,7 @@ export function RoomWorldScreen({
   onLivePlacementConfirmed?: (holdingId: string) => void;
   onLiveBinderConfirmed?: (holdingIds: string[]) => void;
   onLiveSnapshotFailed?: () => void;
+  onRoomAppearance?: (style: NativeRoomStyle) => void;
   loadingCovered?: boolean;
 }) {
   const onboardingEvents = useRef({ onLiveSnapshotReady, onLivePlacementConfirmed, onLiveBinderConfirmed, onLiveSnapshotFailed });
@@ -587,6 +589,7 @@ export function RoomWorldScreen({
   });
   const entranceTone = entranceForeground(roomTheme.void);
   const overlayTheme = roomOverlayChrome(roomTheme);
+  useEffect(() => { onRoomAppearance?.(roomStyle); }, [onRoomAppearance, roomStyle]);
   const controlSurface = roomChromeSurface(overlayTheme);
 
   function goBack() {
@@ -1441,6 +1444,7 @@ export function RoomWorldScreen({
           onOpenBinder={deskPresent ? () => openBinderFromWorld() : undefined}
           onOpenStorage={readOnly ? undefined : (objectId) => { setStorageArchiveId(objectId ?? null); setStorageOpen(true); }}
           placingItem={placingItem}
+          onCardMediaError={() => setError(copy.roomMediaLoadFailed)}
           onHoldCard={(holding) => {
             if (view.kind !== "binder") return;
             setBinderHintSeen(true);

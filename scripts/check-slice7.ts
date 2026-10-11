@@ -156,7 +156,7 @@ assertContains(read("src/world/objects/binderGeometry.ts"), "if (pages.length % 
 // M. Binder image failure keeps geometry
 const binder3d = read("apps/mobile/src/room/NativeOpenBinder.tsx");
 assertContains(binder3d, "boxGeometry args={[CARD_W, CARD_H, 0.012]}", "card geometry");
-assertContains(binder3d, "onError={() => setFailed(true)}", "image failure");
+assertContains(binder3d, "onError={() => motion.onMediaError?.()}", "image failure is surfaced for refresh");
 
 // N. Binder content — photocards only
 assertContains(read("apps/mobile/src/binder/model.ts"), 'holding.template.kind === "photocard"', "photocards only");

@@ -67,6 +67,7 @@ export function NativeRoomRenderer({
   onClearSelection,
   onOpenBinder,
   onHoldCard,
+  onCardMediaError,
   onTurnEdge,
   onTurnComplete,
   exploreRef,
@@ -111,6 +112,7 @@ export function NativeRoomRenderer({
   onClearSelection: () => void;
   onOpenBinder?: () => void;
   onHoldCard?: (holding: NativeHolding | null) => void;
+  onCardMediaError?: () => void;
   onTurnEdge?: (dir: 1 | -1) => void;
   onTurnComplete?: () => void;
   exploreRef?: MutableRefObject<ExploreOffset>;
@@ -257,6 +259,7 @@ export function NativeRoomRenderer({
       objectPreviewRef={objectPreviewRef}
       onOpen={view.kind === "binder" || view.kind === "edit" || Boolean(heldId) || Boolean(heldObjectId) ? undefined : onOpenBinder}
       onHold={(holding) => onHoldCard?.(holding)}
+      onMediaError={onCardMediaError}
       onTurnComplete={() => onTurnComplete?.()}
       onTurnEdge={(dir) => onTurnEdge?.(dir)}
     /> : null}

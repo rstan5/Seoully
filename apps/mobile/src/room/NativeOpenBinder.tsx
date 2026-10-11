@@ -2,7 +2,7 @@ import { BinderOwnerLabel } from "./BinderOwnerLabel";
 import { BINDER_DISPLAY_TILT, BINDER_DISPLAY_CENTER_Y, BINDER_CLOSED_CENTER_Z, binderTravel } from "./binderPresentation";
 import { composeParentYaw } from "./roomWorldTransform";
 /* eslint-disable react/no-unknown-property -- React Three Fiber JSX uses Three.js properties. */
-import { Suspense, createContext, useContext, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
+import { Component, Suspense, createContext, useContext, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { useFrame, useLoader, useThree } from "@react-three/fiber/native";
 import { DoubleSide, Euler, Group, Quaternion, TextureLoader, Vector3 } from "three";
 import type { NativeHolding } from "../api";
@@ -10,8 +10,7 @@ import { useCachedSignedMedia } from "../media/cachedMedia";
 import type { NativeBinderPage, NativeBinderSpread } from "../binder/model";
 import { BINDER_POCKETS_PER_PAGE } from "../binder/model";
 import { cameraLerpAlpha, DESK_BINDER_AT } from "./camera";
-import { photocardCoverUV } from "../media/photocard";
-import { prepCollectibleTexture } from "./roomMaterials";
+import { nativeCardTexture } from "../media/nativeCardTexture";
 import { liveDeskBinderYaw, liveDeskBinderWorld, type RoomObjectInstance } from "./roomObjects";
 import {
   BINDER_CARD_H,
@@ -26,7 +25,7 @@ import {
   pocketLocalPosition,
 } from "./composition";
 
-const BinderCardMotion = createContext({ heldHoldingId: undefined as string | undefined, reducedMotion: false, paused: false, binderAt: DESK_BINDER_AT });
+const BinderCardMotion = createContext({ heldHoldingId: undefined as string | undefined, reducedMotion: false, paused: false, binderAt: DESK_BINDER_AT, onMediaError: undefined as (() => void) | undefined });
 
 export const BINDER_PAGE_W = COMP_PAGE_W;
 export const BINDER_PAGE_H = COMP_PAGE_H;
@@ -59,6 +58,7 @@ export function NativeOpenBinder({
   onHold,
   onTurnComplete,
   onTurnEdge,
+  onMediaError,
 }: {
   ownerName?: string;
   open: boolean;
@@ -80,6 +80,7 @@ export function NativeOpenBinder({
   onHold: (holding: NativeHolding | null) => void;
   onTurnComplete: () => void;
   onTurnEdge: (dir: 1 | -1) => void;
+  onMediaError?: () => void;
 }) {
   const group = useRef<Group>(null);
   const stand = useRef<Group>(null);
@@ -157,7 +158,7 @@ export function NativeOpenBinder({
     .multiply(new Quaternion().setFromEuler(new Euler(BINDER_DISPLAY_TILT-Math.PI/2,0,0)))
     .multiply(new Quaternion().setFromEuler(new Euler(0,-Math.PI/2,0))));
   const [initialPosition]=useState<[number,number,number]>(()=>[rest.x,rest.y+BINDER_DISPLAY_CENTER_Y*0.62,rest.z]);
-  return <BinderCardMotion.Provider value={{ heldHoldingId, reducedMotion, paused, binderAt }}>
+  return <BinderCardMotion.Provider value={{ heldHoldingId, reducedMotion, paused, binderAt, onMediaError }}>
     <group ref={stand} position={[rest.x,rest.y,rest.z]} rotation={[0,restRotation.y,0]} scale={0.62}><BinderDisplayStand /></group>
     <group ref={group} position={initialPosition} quaternion={initialQuaternion} scale={0.62}
       onClick={(event)=>{event.stopPropagation();if (!open && progress.current===0) onOpen?.();}}>
@@ -330,7 +331,6 @@ function PocketCard({
   paper: string;
   onHold: (holding: NativeHolding | null) => void;
 }) {
-  const [failed, setFailed] = useState(false);
   const [textureReady, setTextureReady] = useState(false);
   const group = useRef<Group>(null);
   const motion = useContext(BinderCardMotion);
@@ -369,36 +369,36 @@ function PocketCard({
       if (active && !returned.current) { returned.current = true; onHold(null); }
     }
   });
-  const imageUrl = !failed ? (holding.personalMediaUrl ?? holding.template.imageUrl) : undefined;
+  const imageUrl = holding.personalMediaUrl ?? holding.template.imageUrl;
   return <group ref={group} onClick={(event) => { event.stopPropagation(); if (active) returning.current = true; else if (!motion.heldHoldingId && (!imageUrl || textureReady)) onHold(holding); }}>
     <mesh>
       <boxGeometry args={[CARD_W, CARD_H, 0.012]} />
       <meshStandardMaterial color={paper} roughness={0.45} />
     </mesh>
     {imageUrl
-      ? <CachedCardFace cacheKey={holding.id} url={imageUrl} onError={() => setFailed(true)} onReady={() => setTextureReady(true)} />
+      ? <CachedCardFace cacheKey={holding.id} url={imageUrl} onError={() => motion.onMediaError?.()} onReady={() => setTextureReady(true)} />
       : <mesh position={[0, 0, 0.008]}><planeGeometry args={[CARD_W * 0.92, CARD_H * 0.92]} /><meshStandardMaterial color="#e6c9d0" roughness={0.5} /></mesh>}
   </group>;
 }
 
 function CachedCardFace({ cacheKey, url, onError, onReady }: { cacheKey: string; url: string; onError: () => void; onReady: () => void }) {
-  const localUri = useCachedSignedMedia(cacheKey, url);
+  const localUri = useCachedSignedMedia(cacheKey, url, onError);
   if (!localUri) return <mesh position={[0, 0, 0.008]}><planeGeometry args={[CARD_W * 0.92, CARD_H * 0.92]} /><meshStandardMaterial color="#e6c9d0" roughness={0.5} /></mesh>;
-  return <Suspense fallback={<mesh position={[0, 0, 0.008]}><planeGeometry args={[CARD_W * 0.92, CARD_H * 0.92]} /><meshStandardMaterial color="#e6c9d0" roughness={0.5} /></mesh>}>
+  return <CardImageBoundary key={localUri} onError={onError}><Suspense fallback={<mesh position={[0, 0, 0.008]}><planeGeometry args={[CARD_W * 0.92, CARD_H * 0.92]} /><meshStandardMaterial color="#e6c9d0" roughness={0.5} /></mesh>}>
     <CardFace uri={localUri} onError={onError} onReady={onReady} />
-  </Suspense>;
+  </Suspense></CardImageBoundary>;
+}
+
+class CardImageBoundary extends Component<{ children: React.ReactNode; onError: () => void }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch() { this.props.onError(); }
+  render() { return this.state.failed ? null : this.props.children; }
 }
 
 function CardFace({ uri, onError, onReady }: { uri: string; onError: () => void; onReady: () => void }) {
   const texture = useLoader(TextureLoader, uri);
-  const map = useMemo(() => {
-    const owned = prepCollectibleTexture(texture.clone());
-    const image = texture.image as { width?: number; height?: number };
-    const uv = photocardCoverUV(image?.width ?? 0, image?.height ?? 0);
-    owned.repeat.set(uv.repeatX, uv.repeatY);
-    owned.offset.set(uv.offsetX, uv.offsetY);
-    return owned;
-  }, [texture]);
+  const map = useMemo(() => nativeCardTexture(texture), [texture]);
   useEffect(() => { onReady(); }, [map, onReady]);
   useEffect(() => () => map.dispose(), [map]);
   void onError;

@@ -89,7 +89,7 @@ export default function AddCollectibleScreen() {
   }
 
   async function useCrop(crop: CropRect) {
-    if (!cropAsset) return;
+    if (!cropAsset || working) return;
     setWorking(true);
     try {
       const cropped = await ImageManipulator.manipulateAsync(cropAsset.uri, [{ crop }], { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG });
@@ -176,12 +176,13 @@ export default function AddCollectibleScreen() {
         {meta ? <SeoullyText variant="caption" style={styles.meta}>{meta}</SeoullyText> : null}
         <SeoullyText variant="secondary" style={styles.lede}>{copy.onboardPhotoLead}</SeoullyText>
         {uri ? (
+          <Pressable accessibilityRole="button" accessibilityLabel={copy.cropPhotocard} disabled={!photocard || working} onPress={() => { Image.getSize(uri, (width, height) => setCropAsset({ uri, width, height }), () => setMessage(copy.photoPrepareFailed)); }}>
           <Image
             accessibilityLabel={copy.personalPreview}
             resizeMode="contain"
             source={{ uri }}
             style={photocard ? styles.cardPreview : styles.preview}
-          />
+          /></Pressable>
         ) : (
           <View style={styles.empty}>
             <SeoullyText variant="secondary" style={styles.emptyText}>{copy.personalPhotoOptional}</SeoullyText>
@@ -210,8 +211,9 @@ export default function AddCollectibleScreen() {
         />
         {message ? <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum}>{message}</SeoullyText> : null}
       </ScrollView>
-      <PhotocardCropper
+      <PhotocardCropper key={cropAsset?.uri ?? "no-crop"}
         asset={cropAsset}
+        busy={working}
         title={copy.cropPhotocard}
         hint={copy.cropPhotocardHint}
         useLabel={copy.useCrop}

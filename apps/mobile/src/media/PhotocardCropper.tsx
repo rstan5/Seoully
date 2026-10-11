@@ -1,14 +1,13 @@
-import { PHOTOCARD, centeredPhotocardCrop } from "./photocard";
+import { PHOTOCARD } from "./photocard";
 /* eslint-disable react-hooks/refs -- Gesture refs are read and written only inside PanResponder callbacks. */
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Image, Modal, PanResponder, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Image, Modal, PanResponder, Pressable, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { constrainCrop, cropRectangle, pinchCrop, type CropTransform } from "./cropGeometry";
 import { colors, spacing } from "../theme";
 import { SeoullyText } from "../ui/SeoullyText";
 
 const CARD_RATIO = PHOTOCARD.aspect;
-const MIN_ZOOM = 1;
-const MAX_ZOOM = 3;
 
 export type CropRect = { originX: number; originY: number; width: number; height: number };
 type Asset = { uri: string; width: number; height: number };
@@ -24,6 +23,7 @@ export function PhotocardCropper({
   zoomOutLabel,
   onUse,
   onCancel,
+  busy = false,
 }: {
   asset: Asset | null;
   title: string;
@@ -34,72 +34,70 @@ export function PhotocardCropper({
   zoomOutLabel: string;
   onUse: (crop: CropRect) => void;
   onCancel: () => void;
+  busy?: boolean;
 }) {
-  const window = useWindowDimensions();
-  const viewportWidth = Math.max(210, Math.min(330, window.width - spacing.lg * 2, (window.height - 270) * CARD_RATIO));
+  const [area, setArea] = useState({ width: 1, height: 1 });
+  const viewportWidth = Math.max(1, Math.min(330, area.width, area.height * CARD_RATIO));
   const viewportHeight = viewportWidth / CARD_RATIO;
   const [transform, setTransform] = useState<Transform>({ x: 0, y: 0, zoom: 1 });
-  const origin = useRef<Transform>(transform);
-  const pinchDistance = useRef(0);
-  const pinchCenter = useRef({ x: 0, y: 0 });
-
-  const constrain = useCallback((next: Transform) => {
-    if (!asset) return next;
-    const baseScale = viewportWidth / centeredPhotocardCrop(asset.width, asset.height).width;
-    const displayWidth = asset.width * baseScale * next.zoom;
-    const displayHeight = asset.height * baseScale * next.zoom;
-    const maxX = Math.max(0, (displayWidth - viewportWidth) / 2);
-    const maxY = Math.max(0, (displayHeight - viewportHeight) / 2);
-    return { zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, next.zoom)), x: clamp(next.x, -maxX, maxX), y: clamp(next.y, -maxY, maxY) };
-  }, [asset, viewportHeight, viewportWidth]);
-
+  const current = useRef<CropTransform>({ x: 0, y: 0, zoom: 1 });
+  const session = useRef<{ count: number; origin: CropTransform; point: { x: number; y: number }; distance: number } | null>(null);
+  const frame = useRef<View>(null);
+  const frameOrigin = useRef({ x: 0, y: 0 });
+  const measureFrame = () => frame.current?.measureInWindow((x, y) => { frameOrigin.current = { x, y }; });
+  const commit = useCallback((next: CropTransform) => {
+    if (!asset) return;
+    const value = constrainCrop(next, asset.width, asset.height, viewportWidth);
+    current.current = value;
+    setTransform(value);
+  }, [asset, viewportWidth]);
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
+    onPanResponderTerminationRequest: () => false,
     onPanResponderGrant: (event) => {
-      origin.current = transform;
       const touches = event.nativeEvent.touches;
-      if (touches.length >= 2) {
-        pinchDistance.current = distance(touches[0]!, touches[1]!);
-        pinchCenter.current = midpoint(touches[0]!, touches[1]!);
-      }
+      if (!touches.length) { session.current = null; return; }
+      const point = touches.length > 1 ? midpoint(touches[0]!, touches[1]!) : { x: touches[0]!.pageX, y: touches[0]!.pageY };
+      session.current = { count: Math.min(2, touches.length), origin: current.current,
+        point: { x: point.x - frameOrigin.current.x - viewportWidth / 2, y: point.y - frameOrigin.current.y - viewportHeight / 2 },
+        distance: touches.length > 1 ? distance(touches[0]!, touches[1]!) : 0 };
     },
-    onPanResponderMove: (event, gesture) => {
+    onPanResponderMove: (event) => {
       const touches = event.nativeEvent.touches;
-      if (touches.length >= 2 && pinchDistance.current > 0) {
-        const center = midpoint(touches[0]!, touches[1]!);
-        const zoom = clamp(origin.current.zoom * distance(touches[0]!, touches[1]!) / pinchDistance.current, MIN_ZOOM, MAX_ZOOM);
-        setTransform(constrain({ zoom, x: origin.current.x + center.x - pinchCenter.current.x, y: origin.current.y + center.y - pinchCenter.current.y }));
-      } else {
-        setTransform(constrain({ ...origin.current, x: origin.current.x + gesture.dx, y: origin.current.y + gesture.dy }));
+      if (!touches.length) return;
+      const point = touches.length > 1 ? midpoint(touches[0]!, touches[1]!) : { x: touches[0]!.pageX, y: touches[0]!.pageY };
+      const relative = { x: point.x - frameOrigin.current.x - viewportWidth / 2, y: point.y - frameOrigin.current.y - viewportHeight / 2 };
+      const count = Math.min(2, touches.length);
+      const previous = session.current;
+      if (!previous || previous.count !== count) {
+        session.current = { count, origin: current.current, point: relative, distance: count === 2 ? distance(touches[0]!, touches[1]!) : 0 };
+        return;
       }
+      if (count === 2 && previous.distance > 0) commit(pinchCrop(previous.origin, distance(touches[0]!, touches[1]!) / previous.distance, previous.point, relative));
+      else commit({ ...previous.origin, x: previous.origin.x + relative.x - previous.point.x, y: previous.origin.y + relative.y - previous.point.y });
     },
-  }), [constrain, transform]);
+    onPanResponderRelease: () => { session.current = null; },
+    onPanResponderTerminate: () => { session.current = null; },
+  }), [commit, viewportHeight, viewportWidth]);
 
   if (!asset) return null;
-  const baseScale = viewportWidth / centeredPhotocardCrop(asset.width, asset.height).width;
-  const displayWidth = asset.width * baseScale * transform.zoom;
-  const displayHeight = asset.height * baseScale * transform.zoom;
-  const adjustZoom = (delta: number) => setTransform((current) => constrain({ ...current, zoom: clamp(current.zoom + delta, MIN_ZOOM, MAX_ZOOM) }));
-  const useCrop = () => {
-    const totalScale = baseScale * transform.zoom;
-    const originX = Math.max(0, Math.round((displayWidth / 2 - viewportWidth / 2 - transform.x) / totalScale));
-    const originY = Math.max(0, Math.round((displayHeight / 2 - viewportHeight / 2 - transform.y) / totalScale));
-    onUse({
-      originX,
-      originY,
-      width: Math.min(asset.width - originX, Math.round(viewportWidth / totalScale)),
-      height: Math.min(asset.height - originY, Math.round(viewportHeight / totalScale)),
-    });
-  };
+  const baseScale = Math.max(viewportWidth / asset.width, viewportHeight / asset.height);
+  const visible = constrainCrop(transform, asset.width, asset.height, viewportWidth);
+  const displayWidth = asset.width * baseScale * visible.zoom;
+  const displayHeight = asset.height * baseScale * visible.zoom;
+  const adjustZoom = (delta: number) => commit({ ...current.current, zoom: current.current.zoom + delta });
+  const useCrop = () => onUse(cropRectangle(current.current, asset.width, asset.height, viewportWidth));
 
-  return <Modal animationType="slide" visible onRequestClose={onCancel}>
-    <SafeAreaView edges={["top"]} style={styles.screen}>
+  return <Modal animationType="slide" visible onRequestClose={() => { if (!busy) onCancel(); }}>
+    <SafeAreaView edges={["top", "bottom"]} style={styles.screen}>
       <SeoullyText variant="title">{title}</SeoullyText>
       <SeoullyText variant="secondary" style={styles.hint}>{hint}</SeoullyText>
-      <View {...panResponder.panHandlers} style={[styles.viewport, { width: viewportWidth, height: viewportHeight }]}>
-        <Image source={{ uri: asset.uri }} style={{ position: "absolute", width: displayWidth, height: displayHeight, left: (viewportWidth - displayWidth) / 2 + transform.x, top: (viewportHeight - displayHeight) / 2 + transform.y }} />
+      <View style={styles.cropArea} onLayout={event => setArea(event.nativeEvent.layout)}>
+      <View ref={frame} onLayout={measureFrame} {...panResponder.panHandlers} style={[styles.viewport, { width: viewportWidth, height: viewportHeight }]}>
+        <View pointerEvents="none" style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}><Image source={{ uri: asset.uri }} style={{ position: "absolute", width: displayWidth, height: displayHeight, left: (viewportWidth - displayWidth) / 2 + visible.x, top: (viewportHeight - displayHeight) / 2 + visible.y }} /></View>
         <View pointerEvents="none" style={styles.frame} />
+      </View>
       </View>
       <View style={styles.zoomRow}>
         <Pressable accessibilityRole="button" accessibilityLabel={zoomOutLabel} onPress={() => adjustZoom(-0.2)} style={styles.zoomButton}>
@@ -110,10 +108,10 @@ export function PhotocardCropper({
           <SeoullyText variant="title" color={colors.plum}>+</SeoullyText>
         </Pressable>
       </View>
-      <Pressable accessibilityRole="button" onPress={useCrop} style={styles.primary}>
+      <Pressable accessibilityRole="button" disabled={busy} accessibilityState={{ disabled: busy }} onPress={useCrop} style={styles.primary}>
         <SeoullyText variant="button" color={colors.onPrimary}>{useLabel}</SeoullyText>
       </Pressable>
-      <Pressable accessibilityRole="button" onPress={onCancel} style={styles.back}>
+      <Pressable accessibilityRole="button" disabled={busy} onPress={onCancel} style={styles.back}>
         <SeoullyText variant="button" color={colors.muted}>{backLabel}</SeoullyText>
       </Pressable>
     </SafeAreaView>
@@ -126,13 +124,11 @@ function distance(a: { pageX: number; pageY: number }, b: { pageX: number; pageY
 function midpoint(a: { pageX: number; pageY: number }, b: { pageX: number; pageY: number }) {
   return { x: (a.pageX + b.pageX) / 2, y: (a.pageY + b.pageY) / 2 };
 }
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
 
 const styles = StyleSheet.create({
-  screen: { alignItems: "center", backgroundColor: colors.canvas, flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.xl },
+  screen: { alignItems: "center", backgroundColor: colors.canvas, flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.sm },
   hint: { marginBottom: spacing.lg, marginTop: spacing.xs, textAlign: "center" },
+  cropArea: { flex: 1, width: "100%", alignItems: "center", justifyContent: "center", marginVertical: spacing.sm },
   viewport: { backgroundColor: colors.ink, borderRadius: 18, overflow: "hidden" },
   frame: { borderColor: colors.surface, borderRadius: 18, borderWidth: 2, bottom: 0, left: 0, position: "absolute", right: 0, top: 0 },
   zoomRow: { alignItems: "center", flexDirection: "row", gap: spacing.md, marginTop: spacing.md },

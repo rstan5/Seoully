@@ -1,6 +1,6 @@
-import { HeartGreeting } from "../src/ui/HeartGreeting";
+import { HeartFarewell } from "../src/ui/HeartFarewell";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   loadMyHolding,
@@ -20,7 +20,6 @@ import {
   type OnboardingPhase,
 } from "../src/onboarding/journey";
 import { colors } from "../src/theme";
-import { BrandMark } from "../src/ui/BrandMark";
 import { readFirstCollectibleDraft } from "../src/onboarding/firstCollectibleStorage";
 import { SeoullyButton, SeoullyChoiceChip } from "../src/ui/SeoullyControls";
 import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
@@ -49,7 +48,7 @@ export default function OnboardingScreen() {
   const params = useLocalSearchParams<{ edit?: string; phase?: string; holdingId?: string; photoWarning?: string }>();
   const editingTastes = params.edit === "1";
   const t = useCopy();
-  const { locale, toggleLocale } = useLocale();
+  const { locale } = useLocale();
   const { setDemo } = useDataMode();
   const boot = useBootstrap();
   const loadGeneration = useRef(0);
@@ -59,6 +58,7 @@ export default function OnboardingScreen() {
   const [greeted, setGreeted] = useState<Set<OnboardingPhase>>(() => new Set());
   const [groupQuery, setGroupQuery] = useState("");
   const [searchedGroups, setSearchedGroups] = useState<NativeOnboardingState["groups"]>([]);
+  const [resolvedGroupQuery, setResolvedGroupQuery] = useState("");
   const [groupSearchError, setGroupSearchError] = useState(false);
   const [groupSearchAttempt, setGroupSearchAttempt] = useState(0);
   const [groupIds, setGroupIds] = useState<string[]>([]);
@@ -136,14 +136,15 @@ export default function OnboardingScreen() {
       if (controller.signal.aborted) return;
       setSearchedGroups(previous => [...new Map([...previous, ...groups].map(group => [group.id, group])).values()]);
       setGroupSearchError(false);
+      setResolvedGroupQuery(groupQuery.trim());
     }).catch(() => { if (!controller.signal.aborted) setGroupSearchError(true); });
     return () => controller.abort();
   }, [phase, groupQuery, groupSearchAttempt]);
 
   useEffect(() => {
-    if (phase !== "collect" || editingTastes) return;
+    if (phase !== "collect" || editingTastes || !greeted.has("collect")) return;
     router.replace({ pathname: "/collect", params: { from: "onboarding" } });
-  }, [editingTastes, phase, router]);
+  }, [editingTastes, greeted, phase, router]);
 
   const members = useMemo(
     () => state?.members.filter((member) => groupIds.includes(member.groupId)) ?? [],
@@ -190,7 +191,7 @@ export default function OnboardingScreen() {
     router.replace("/(tabs)");
   }
 
-  if (loading || phase === "collect") {
+  if (loading || (phase === "collect" && greeted.has("collect"))) {
     return <SeoullyLoadingState fullScreen label={t.brand} />;
   }
 
@@ -233,30 +234,23 @@ export default function OnboardingScreen() {
       ? t.onboardingBiasLead
       : t.onboardingInterestLead;
 
-  if (!editingTastes && !greeted.has(phase)) return <SeoullyScreen edges={["top", "bottom"]}>
-    <View style={{ flex: 1, paddingHorizontal: 24 }}>
-      <View style={{ flex: 1, justifyContent: "center" }}><HeartGreeting text={title} onContinue={() => setGreeted(previous => new Set(previous).add(phase))} /></View>
-      <SeoullyButton label={t.continue} block onPress={() => setGreeted(previous => new Set(previous).add(phase))} />
-    </View>
-  </SeoullyScreen>;
+  if (!editingTastes && !greeted.has(phase)) return <View style={styles.world}>
+    <HeartFarewell destination="next" text={phase === "collect" ? t.onboardCollectFirstTitle : title} onContinue={() => setGreeted(previous => new Set(previous).add(phase))} />
+  </View>;
 
   return (
-    <SeoullyScreen>
-      <ScrollView contentContainerStyle={styles.container}>
+    <SeoullyScreen edges={["top", "bottom"]}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={styles.container}>
         {editingTastes || phase === "bias" || phase === "interest" ? (
           <ScreenBack label={t.back} onPress={() => (editingTastes && phase === "group" ? router.back() : backIdentity())} />
         ) : null}
-        <View style={styles.topline}>
-          <BrandMark />
-          <Pressable accessibilityRole="button" onPress={toggleLocale} style={styles.language}>
-            <SeoullyText variant="button">{t.switchLanguage}</SeoullyText>
-          </Pressable>
-        </View>
         <SeoullyText variant="title" style={styles.headline}>{title}</SeoullyText>
         <SeoullyText variant="secondary" style={styles.lead}>{lead}</SeoullyText>
 
         {phase === "group" ? <TextInput accessibilityLabel={t.groupSearch} placeholder={t.groupSearch} value={groupQuery} onChangeText={setGroupQuery} autoCorrect={false} style={{ padding: 14, marginVertical: 16, backgroundColor: colors.surface, borderRadius: 16, color: colors.ink }} /> : null}
-        {phase === "group" && !allGroups.some(group => `${group.name} ${group.nativeName}`.toLocaleLowerCase().includes(groupQuery.trim().toLocaleLowerCase())) ? <SeoullyText variant="secondary">{t.groupMissing}</SeoullyText> : null}
+        {phase === "group" && resolvedGroupQuery === groupQuery.trim() && !groupSearchError && !allGroups.some(group => `${group.name} ${group.nativeName}`.toLocaleLowerCase().includes(groupQuery.trim().toLocaleLowerCase())) ? <SeoullyText variant="secondary">{t.groupMissingTitle}{"\n"}{t.groupMissing}</SeoullyText> : null}
+        {phase === "group" && groupQuery.trim() && resolvedGroupQuery !== groupQuery.trim() && !groupSearchError ? <SeoullyText variant="caption">{t.groupSearching}</SeoullyText> : null}
         {phase === "group" && groupSearchError ? <SeoullyText accessibilityRole="alert" color={colors.plum}>{t.onboardingUnavailable}</SeoullyText> : null}
         {phase === "group" && groupSearchError ? <SeoullyButton label={t.retry} variant="ghost" onPress={() => setGroupSearchAttempt(attempt => attempt + 1)} /> : null}
         <View style={styles.chips}>
@@ -303,18 +297,19 @@ export default function OnboardingScreen() {
           {error ? <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum}>{error}</SeoullyText> : null}
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SeoullyScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, paddingBottom: 40, paddingHorizontal: 16 },
+  container: { flexGrow: 1, paddingBottom: 16, paddingHorizontal: 24 },
   centered: { flex: 1, gap: 16, justifyContent: "center", paddingHorizontal: 16 },
   topline: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   language: { justifyContent: "center", minHeight: 44, paddingHorizontal: 4 },
-  headline: { marginTop: 24 },
+  headline: { marginTop: 32, fontSize: 32, lineHeight: 38 },
   lead: { marginTop: 6, maxWidth: 340 },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 24 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 20, paddingBottom: 24 },
   footer: { gap: 12, marginTop: "auto", paddingTop: 24 },
   heart: { height: 48, marginTop: 28, width: 48 },
   ask: { marginTop: 10 },

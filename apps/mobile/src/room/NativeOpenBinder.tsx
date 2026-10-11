@@ -377,14 +377,14 @@ function PocketCard({
     </mesh>
     {imageUrl
       ? <CachedCardFace cacheKey={holding.id} url={imageUrl} onError={() => motion.onMediaError?.()} onReady={() => setTextureReady(true)} />
-      : <mesh position={[0, 0, 0.008]}><planeGeometry args={[CARD_W * 0.92, CARD_H * 0.92]} /><meshStandardMaterial color="#e6c9d0" roughness={0.5} /></mesh>}
+      : <mesh position={[0, 0, 0.008]}><planeGeometry args={[CARD_W, CARD_H]} /><meshStandardMaterial color="#e6c9d0" roughness={0.5} /></mesh>}
   </group>;
 }
 
 function CachedCardFace({ cacheKey, url, onError, onReady }: { cacheKey: string; url: string; onError: () => void; onReady: () => void }) {
   const localUri = useCachedSignedMedia(cacheKey, url, onError);
-  if (!localUri) return <mesh position={[0, 0, 0.008]}><planeGeometry args={[CARD_W * 0.92, CARD_H * 0.92]} /><meshStandardMaterial color="#e6c9d0" roughness={0.5} /></mesh>;
-  return <CardImageBoundary key={localUri} onError={onError}><Suspense fallback={<mesh position={[0, 0, 0.008]}><planeGeometry args={[CARD_W * 0.92, CARD_H * 0.92]} /><meshStandardMaterial color="#e6c9d0" roughness={0.5} /></mesh>}>
+  if (!localUri) return <mesh position={[0, 0, 0.008]}><planeGeometry args={[CARD_W, CARD_H]} /><meshStandardMaterial color="#e6c9d0" roughness={0.5} /></mesh>;
+  return <CardImageBoundary key={localUri} onError={onError}><Suspense fallback={<mesh position={[0, 0, 0.008]}><planeGeometry args={[CARD_W, CARD_H]} /><meshStandardMaterial color="#e6c9d0" roughness={0.5} /></mesh>}>
     <CardFace uri={localUri} onError={onError} onReady={onReady} />
   </Suspense></CardImageBoundary>;
 }
@@ -403,7 +403,7 @@ function CardFace({ uri, onError, onReady }: { uri: string; onError: () => void;
   useEffect(() => () => map.dispose(), [map]);
   void onError;
   return <mesh position={[0, 0, 0.008]}>
-    <planeGeometry args={[CARD_W * 0.92, CARD_H * 0.92]} />
+    <planeGeometry args={[CARD_W, CARD_H]} />
     <meshBasicMaterial map={map} toneMapped={false} />
   </mesh>;
 }

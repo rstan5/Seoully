@@ -66,11 +66,25 @@ async function main(){
           rollback;`);
         assert.equal(preserved.split('\n').at(-1),'t','existing identity and appearance preserved by new capability');
       }
+      if(file==='20261008000000_profile_room_sync_default.sql') {
+        const preserved=sql(`begin;
+          insert into auth.users(id,raw_user_meta_data) values
+            ('a8080000-0000-4000-8000-000000000010','{"handle":"default_history","display_name":"Default"}'),
+            ('a8080000-0000-4000-8000-000000000011','{"handle":"custom_history","display_name":"Custom"}'),
+            ('a8080000-0000-4000-8000-000000000012','{"handle":"sync_history","display_name":"Sync"}');
+          update public.profiles set appearance='{"mode":"custom","background":"mint"}' where handle='custom_history';
+          update public.profiles set appearance='{"mode":"room-sync"}' where handle='sync_history';
+          create temporary table sync_history_before as select to_jsonb(p) snapshot from public.profiles p;
+          ${body}
+          select bool_and(to_jsonb(p)=h.snapshot) from public.profiles p join sync_history_before h on p.user_id=(h.snapshot->>'user_id')::uuid;
+          rollback;`);
+        assert.equal(preserved.split('\n').at(-1),'t','default change preserves all legacy profile values byte-for-byte');
+      }
       sql(`begin;\n${body}\ncommit;`);
     }
     sql('create extension pgtap');
     let tapCount=0;
-    for(const file of ['room_persistence.test.sql','catalog_idempotency.test.sql','first_home.test.sql','user_profile_rls.test.sql','profile_appearance.test.sql','profile_identity.test.sql']){
+    for(const file of ['room_persistence.test.sql','catalog_idempotency.test.sql','first_home.test.sql','user_profile_rls.test.sql','profile_appearance.test.sql','profile_identity.test.sql','profile_room_sync_default.test.sql']){
       const result=sql(fs.readFileSync(path.join('supabase/tests',file),'utf8'));
       const lines=result.split('\n');const failures=lines.filter(l=>/^not ok |^# Looks like/.test(l));
       assert.deepEqual(failures,[],`${file} pgTAP failures`);

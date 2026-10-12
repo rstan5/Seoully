@@ -89,6 +89,7 @@ export async function GET(request: Request) {
     if (catalogError) throw new Error("groups_unavailable");
     const knownNames = new Set(GROUPS.map(group => group.name.toLocaleLowerCase()));
     return NextResponse.json({
+      userId: state.userId,
       step: state.step,
       firstHome: state.step === "interest" ? await readFirstHome(state.client, state.userId, state.identityReady) : null,
       favoriteGroupIds: state.favoriteGroupIds,
@@ -132,13 +133,16 @@ export async function PATCH(request: Request) {
       }
       patch.favorite_group_ids = parsed.data.favoriteGroupIds;
       if (state.step === "group" && !editingComplete) {
-        patch.onboarding_step = parsed.data.favoriteGroupIds.length > 0 ? "bias" : "interest";
+        patch.onboarding_step = "bias";
       }
     } else if (parsed.data.action === "bias" && (state.step === "bias" || state.step === "interest" || editingComplete)) {
-      if (parsed.data.biasMemberIds.some((id) => {
-        const member = membersById.get(id);
-        return !member || !state.favoriteGroupIds.includes(member.groupId);
-      })) {
+      // Existing fixture IDs remain compatible. Catalog UUID members may belong
+      // to any accessible group; favorite groups rank search, not authorization.
+      const additionalIds = parsed.data.biasMemberIds.filter(id => !membersById.has(id));
+      const catalog = additionalIds.length ? await state.client.from("catalog_members")
+        .select("id,catalog_groups!inner(status)").in("id", additionalIds)
+        .neq("status", "restricted").neq("catalog_groups.status", "restricted") : { data: [], error: null };
+      if (catalog.error || additionalIds.some(id => !(catalog.data ?? []).some(member => member.id === id))) {
         return NextResponse.json({ error: "invalid_input" }, { status: 400 });
       }
       patch.bias_member_ids = parsed.data.biasMemberIds;

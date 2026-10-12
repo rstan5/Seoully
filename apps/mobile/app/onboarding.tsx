@@ -1,11 +1,14 @@
+import { readSelectedCatalogIdentity } from "../src/data/collectorIdentity";
+import { readOnboardingIdentityDraft, saveOnboardingIdentityDraft, clearOnboardingIdentityDraft } from "../src/onboarding/identityDraft";
+import { ProfileTastePicker, type TasteOption } from "../src/ui/ProfileTastePicker";
 import { HeartFarewell } from "../src/ui/HeartFarewell";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   loadMyHolding,
   loadNativeOnboarding,
-  searchCollectorGroups,
+  readProfileCapabilities,
   updateNativeOnboarding,
   type NativeHolding,
   type NativeOnboardingState,
@@ -13,7 +16,7 @@ import {
 import { ScreenBack } from "../src/components/ScreenBack";
 import { useDataMode } from "../src/data";
 import { isBinderEligible } from "../src/data/ownership";
-import { useCopy, useLocale } from "../src/locale";
+import { useCopy } from "../src/locale";
 import {
   ONBOARDING_INTERESTS,
   resolveOnboardingPhase,
@@ -49,7 +52,6 @@ export default function OnboardingScreen() {
   const params = useLocalSearchParams<{ edit?: string; phase?: string; holdingId?: string; photoWarning?: string }>();
   const editingTastes = params.edit === "1";
   const t = useCopy();
-  const { locale } = useLocale();
   const { setDemo } = useDataMode();
   const boot = useBootstrap();
   const loadGeneration = useRef(0);
@@ -57,11 +59,12 @@ export default function OnboardingScreen() {
   const [state, setState] = useState<NativeOnboardingState | null>(null);
   const [phase, setPhase] = useState<OnboardingPhase>("group");
   const [greeted, setGreeted] = useState<Set<OnboardingPhase>>(() => new Set());
-  const [groupQuery, setGroupQuery] = useState("");
-  const [searchedGroups, setSearchedGroups] = useState<NativeOnboardingState["groups"]>([]);
-  const [resolvedGroupQuery, setResolvedGroupQuery] = useState("");
-  const [groupSearchError, setGroupSearchError] = useState(false);
-  const [groupSearchAttempt, setGroupSearchAttempt] = useState(0);
+  const [identityUserId, setIdentityUserId] = useState("");
+  const [canContribute, setCanContribute] = useState(false);
+  const [groupOptions, setGroupOptions] = useState<TasteOption[]>([]);
+  const [biasOptions, setBiasOptions] = useState<TasteOption[]>([]);
+  const [tastePending, setTastePending] = useState(0);
+  const tasteBusyChanged = useCallback((active: boolean) => setTastePending(n => Math.max(0, n + (active ? 1 : -1))), []);
   const [groupIds, setGroupIds] = useState<string[]>([]);
   const [biasIds, setBiasIds] = useState<string[]>([]);
   const [interests, setInterests] = useState<string[]>(["photocards"]);
@@ -77,7 +80,11 @@ export default function OnboardingScreen() {
     setError(null);
     try {
       if (!editingTastes) setDemo(false);
-      const next = await loadNativeOnboarding();
+      const [next, capabilities] = await Promise.all([
+        loadNativeOnboarding(), readProfileCapabilities(),
+      ]);
+      const userId = next.userId;
+      if (!userId) throw new Error("unauthenticated");
       if (generation !== loadGeneration.current) return;
       if (next.step === "done" && !editingTastes) {
         boot.enterApp();
@@ -110,10 +117,20 @@ export default function OnboardingScreen() {
         router.replace("/(tabs)");
         return;
       }
+      const draft = !editingTastes && (resolved === "group" || resolved === "bias")
+        ? await readOnboardingIdentityDraft(userId) : null;
+      const restoredGroups = draft?.groupIds ?? next.favoriteGroupIds;
+      const restoredBiases = draft?.biasIds ?? next.biasMemberIds;
+      const selected = await readSelectedCatalogIdentity(restoredGroups, restoredBiases);
+      if (generation !== loadGeneration.current) return;
+      setIdentityUserId(userId);
+      setCanContribute(capabilities.catalogIdentityContributions);
+      setGroupOptions([...next.groups.map(g => ({ id: g.id, name: g.name })), ...selected.groups]);
+      setBiasOptions([...next.members.map(m => ({ id: m.id, name: m.stageName, groupId: m.groupId })), ...selected.members.map(m => ({ id: m.id, name: m.stageName, groupId: m.groupId, groupName: m.groupName }))]);
       setState(next);
       setPhase(resolved === "edit" ? "group" : resolved);
-      setGroupIds(next.favoriteGroupIds);
-      setBiasIds(next.biasMemberIds);
+      setGroupIds(restoredGroups);
+      setBiasIds(restoredBiases);
       if (next.collectorInterests.length > 0) setInterests(next.collectorInterests);
       setHolding(confirmedHolding);
     } catch {
@@ -131,37 +148,40 @@ export default function OnboardingScreen() {
   }, [editingTastes, params.phase, params.holdingId]));
 
   useEffect(() => {
-    if (phase !== "group" || !groupQuery.trim()) return;
-    const controller = new AbortController();
-    void searchCollectorGroups(groupQuery, controller.signal).then(groups => {
-      if (controller.signal.aborted) return;
-      setSearchedGroups(previous => [...new Map([...previous, ...groups].map(group => [group.id, group])).values()]);
-      setGroupSearchError(false);
-      setResolvedGroupQuery(groupQuery.trim());
-    }).catch(() => { if (!controller.signal.aborted) setGroupSearchError(true); });
-    return () => controller.abort();
-  }, [phase, groupQuery, groupSearchAttempt]);
-
-  useEffect(() => {
     if (phase !== "collect" || editingTastes || !greeted.has("collect")) return;
     router.replace({ pathname: "/collect", params: { from: "onboarding" } });
   }, [editingTastes, greeted, phase, router]);
 
-  const members = useMemo(
-    () => state?.members.filter((member) => groupIds.includes(member.groupId)) ?? [],
-    [groupIds, state],
-  );
+  function changeTastes(groups: string[], biases: string[]) {
+    setGroupIds(groups);
+    setBiasIds(biases);
+    return saveOnboardingIdentityDraft(identityUserId, { groupIds: groups, biasIds: biases })
+      .catch(error => { setError(t.onboardingSaveFailed); throw error; });
+  }
 
   async function advanceIdentity() {
-    if (!state || savingIdentity.current) return;
+    if (!state || savingIdentity.current || tastePending > 0) return;
     savingIdentity.current = true;
     setSaving(true);
     setError(null);
     try {
+      await saveOnboardingIdentityDraft(identityUserId, { groupIds, biasIds });
       const action = phase === "group" ? "groups" as const : phase === "bias" ? "bias" as const : "interests" as const;
-      if (action === "groups") await updateNativeOnboarding({ action: "groups", favoriteGroupIds: groupIds });
-      else if (action === "bias") await updateNativeOnboarding({ action: "bias", biasMemberIds: biasIds });
-      else await updateNativeOnboarding({ action: "interests", collectorInterests: interests });
+      if (action === "groups") {
+        await updateNativeOnboarding({ action: "groups", favoriteGroupIds: groupIds });
+        setState(previous => previous ? { ...previous, favoriteGroupIds: groupIds } : previous);
+      } else if (action === "bias") {
+        // Back/edit interruption can leave an unsaved group draft at the Biases
+        // checkpoint. Confirm it before saving members; never lose that choice.
+        if (JSON.stringify(groupIds) !== JSON.stringify(state.favoriteGroupIds)) {
+          await updateNativeOnboarding({ action: "groups", favoriteGroupIds: groupIds });
+          setState(previous => previous ? { ...previous, favoriteGroupIds: groupIds } : previous);
+        }
+        await updateNativeOnboarding({ action: "bias", biasMemberIds: biasIds });
+      } else {
+        await updateNativeOnboarding({ action: "interests", collectorInterests: interests });
+        await clearOnboardingIdentityDraft(identityUserId);
+      }
       if (editingTastes) {
         if (phase === "group") setPhase("bias");
         else if (phase === "bias") setPhase("interest");
@@ -172,7 +192,7 @@ export default function OnboardingScreen() {
         setPhase(holding ? "room" : "collect");
         return;
       }
-      if (action === "groups") setPhase(groupIds.length > 0 ? "bias" : "interest");
+      if (action === "groups") setPhase("bias");
       else setPhase("interest");
     } catch {
       setError(t.onboardingSaveFailed);
@@ -220,11 +240,10 @@ export default function OnboardingScreen() {
     );
   }
 
-  const allGroups = [...new Map([...state.groups, ...searchedGroups].map(group => [group.id, group])).values()];
   const title = phase === "group"
-    ? t.onboardingGroupTitle
+    ? t.profileFavoriteGroups
     : phase === "bias"
-      ? t.onboardingBiasTitle
+      ? t.profileBiases
       : t.onboardingInterestTitle;
   const lead = phase === "group"
     ? t.onboardingGroupLead
@@ -246,30 +265,13 @@ export default function OnboardingScreen() {
         <SeoullyText variant="title" style={styles.headline}>{title}</SeoullyText>
         <SeoullyText variant="secondary" style={styles.lead}>{lead}</SeoullyText>
 
-        {phase === "group" ? <TextInput accessibilityLabel={t.groupSearch} placeholder={t.groupSearch} value={groupQuery} onChangeText={setGroupQuery} autoCorrect={false} style={{ padding: 14, marginVertical: 16, backgroundColor: colors.surface, borderRadius: 16, color: colors.ink }} /> : null}
-        {phase === "group" && resolvedGroupQuery === groupQuery.trim() && !groupSearchError && !allGroups.some(group => `${group.name} ${group.nativeName}`.toLocaleLowerCase().includes(groupQuery.trim().toLocaleLowerCase())) ? <SeoullyText variant="secondary">{t.groupMissingTitle}{"\n"}{t.groupMissing}</SeoullyText> : null}
-        {phase === "group" && groupQuery.trim() && resolvedGroupQuery !== groupQuery.trim() && !groupSearchError ? <SeoullyText variant="caption">{t.groupSearching}</SeoullyText> : null}
-        {phase === "group" && groupSearchError ? <SeoullyText accessibilityRole="alert" color={colors.plum}>{t.onboardingUnavailable}</SeoullyText> : null}
-        {phase === "group" && groupSearchError ? <SeoullyButton label={t.retry} variant="ghost" onPress={() => setGroupSearchAttempt(attempt => attempt + 1)} /> : null}
+        {phase === "group" ? <ProfileTastePicker showHeading={false} kind="groups" selected={groupIds}
+          onChange={ids => changeTastes(ids, biasIds)} initialOptions={groupOptions}
+          canContribute={canContribute} userId={identityUserId} onBusyChange={tasteBusyChanged} disabled={saving} /> : null}
+        {phase === "bias" ? <ProfileTastePicker showHeading={false} kind="biases" selected={biasIds}
+          onChange={ids => changeTastes(groupIds, ids)} initialOptions={biasOptions} preferredGroups={groupIds}
+          canContribute={canContribute} userId={identityUserId} onBusyChange={tasteBusyChanged} disabled={saving} /> : null}
         <View style={styles.chips}>
-          {phase === "group" && allGroups.filter(group => groupIds.includes(group.id) || `${group.name} ${group.nativeName}`.toLocaleLowerCase().includes(groupQuery.trim().toLocaleLowerCase())).map((group) => (
-            <SeoullyChoiceChip
-              key={group.id}
-              role="checkbox"
-              selected={groupIds.includes(group.id)}
-              label={locale === "ko" ? group.nativeName : group.name}
-              onPress={() => setGroupIds((items) => toggle(items, group.id))}
-            />
-          ))}
-          {phase === "bias" && members.map((member) => (
-            <SeoullyChoiceChip
-              key={member.id}
-              role="checkbox"
-              selected={biasIds.includes(member.id)}
-              label={locale === "ko" ? member.nativeName : member.stageName}
-              onPress={() => setBiasIds((items) => toggle(items, member.id))}
-            />
-          ))}
           {phase === "interest" && ONBOARDING_INTERESTS.map((interest) => (
             <SeoullyChoiceChip
               key={interest}
@@ -288,7 +290,7 @@ export default function OnboardingScreen() {
               : ((phase === "group" && groupIds.length === 0) || (phase === "bias" && biasIds.length === 0)
                 ? t.skipForNow
                 : t.continue)}
-            disabled={saving || (phase === "interest" && interests.length === 0)}
+            disabled={saving || tastePending > 0 || (phase === "interest" && interests.length === 0)}
             block
             onPress={() => { void advanceIdentity(); }}
           />

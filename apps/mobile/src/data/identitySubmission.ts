@@ -18,3 +18,8 @@ export async function finishIdentitySubmission(userId: string, submission: Ident
   const stored = await AsyncStorage.getItem(key);
   if (stored && JSON.parse(stored).submissionId === submission.submissionId) await AsyncStorage.removeItem(key);
 }
+
+export async function readIdentitySubmission(userId: string, kind: IdentitySubmission["kind"]): Promise<IdentitySubmission | null> {
+  const raw = await AsyncStorage.getItem(`seoully:identity-submission:${userId}:${kind}`);
+  return raw ? JSON.parse(raw) as IdentitySubmission : null;
+}

@@ -46,7 +46,7 @@ export default function EditProfileScreen() {
   const [avatarChoices, setAvatarChoices] = useState(false);
   const [capabilities, setCapabilities] = useState<ProfileCapabilities>({ profileAvatar: false, catalogIdentityContributions: false });
   const [identity, setIdentity] = useState<NativeIdentity | null>(null);
-  const [appearance, setAppearance] = useState<ProfileThemeChoice>({ mode: "default" });
+  const [appearance, setAppearance] = useState<ProfileThemeChoice>({ mode: "room-sync" });
   const [roomStyle, setRoomStyle] = useState<NativeRoomStyle>();
   const [displayName, setDisplayName] = useState("");
   const [tagline, setTagline] = useState("");
@@ -78,7 +78,7 @@ export default function EditProfileScreen() {
       setGroupIds(next.profile.favoriteGroupIds);
       setBiasIds(next.profile.biasMemberIds);
       setIdentity(next);
-      setAppearance(next.profile.appearance ?? { mode: "default" });
+      setAppearance(next.profile.appearance ?? { mode: "room-sync" });
       setDisplayName(next.user.displayName);
       setTagline(next.profile.tagline ?? "");
       setBio(next.profile.bio ?? "");

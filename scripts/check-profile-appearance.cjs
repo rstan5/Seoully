@@ -39,9 +39,9 @@ for(const mode of ['default','custom','room-sync']) test(`${mode}: authenticated
   assert.ok(c.reads.every(x=>['users','profiles'].includes(x.table)));
   assert.ok(!c.rpcs.some(x=>x.includes('room')));
 });
-test('legacy omitted appearance reads Default and unrelated updates preserve Custom',async()=>{
+test('missing appearance reads Room Sync and unrelated updates preserve Custom',async()=>{
   const old=client();delete old.row.appearance;
-  assert.deepEqual(clean((await dal.getCurrentIdentityFromClient(old)).profile.appearance),{mode:'default'});
+  assert.deepEqual(clean((await dal.getCurrentIdentityFromClient(old)).profile.appearance),{mode:'room-sync'});
   const c=client({appearance:{mode:'custom',background:'mint'}});
   const result=await dal.updateCurrentProfile({bio:'Updated'},c);
   assert.deepEqual(c.writes,[{bio:'Updated'}]);assert.deepEqual(clean(result.profile.appearance),{mode:'custom',background:'mint'});

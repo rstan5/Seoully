@@ -9,6 +9,7 @@
     "src/server/auth/actions.ts",
     "src/server/dal/profile.ts",
     "src/app/api/mobile/profile/route.ts",
+    "src/app/api/mobile/onboarding/route.ts",
     "src/app/api/mobile/catalog/members/route.ts",
     "src/app/api/public/profiles/[handle]/route.ts",
     "src/app/api/mobile/profile/avatar/route.ts",

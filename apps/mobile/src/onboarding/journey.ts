@@ -24,11 +24,11 @@ export const ONBOARDING_INTERESTS = [
 export function nextDurableStep(
   current: DurableOnboardingStep,
   action: OnboardingPatchAction,
-  groupCount = 0,
+  _groupCount = 0,
 ): DurableOnboardingStep | null {
   if (current === "done") return "done";
   if (action === "groups") {
-    if (current === "group") return groupCount > 0 ? "bias" : "interest";
+    if (current === "group") return "bias";
     if (current === "bias" || current === "interest") return current;
     return null;
   }

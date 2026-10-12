@@ -640,7 +640,7 @@ function Check() {
 }
 
 function initialAppearance(saved?: ProfileThemeChoice): ProfileThemeChoice {
-  if (!saved) return { mode: "default" };
+  if (!saved) return { mode: "room-sync" };
   if (saved.mode !== "custom") return { mode: saved.mode };
   return {
     mode: "custom",

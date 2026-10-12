@@ -122,7 +122,7 @@ export function resolveProfileTheme(
   choice: ProfileThemeChoice | undefined,
   room: ProfileRoomAppearance | undefined,
 ): ProfileThemeTokens {
-  const mode = choice?.mode ?? "default";
+  const mode = choice?.mode ?? "room-sync";
   if (mode === "custom") return tokensFromCustom(choice);
   if (mode === "room-sync") return deriveFromRoom(room);
   return DEFAULT_PROFILE_THEME;

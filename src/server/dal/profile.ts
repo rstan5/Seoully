@@ -186,7 +186,7 @@ function mapIdentity(
   const userId = profile.user_id as UserId;
   const joinedAt = account.created_at.slice(0, 10);
   const mappedProfile: Pick<Profile, "userId" | "tagline" | "bio" | "location" | "favoriteGroupIds" | "biasMemberIds" | "favoriteEraIds" | "collectorInterests" | "collectorType" | "appearance"> = {
-    appearance: profileAppearanceSchema.parse(profile.appearance ?? { mode: "default" }),
+    appearance: profileAppearanceSchema.parse(profile.appearance ?? { mode: "room-sync" }),
     userId,
     tagline: profile.tagline ?? "",
     bio: profile.bio ?? "",

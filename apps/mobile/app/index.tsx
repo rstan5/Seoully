@@ -1,6 +1,6 @@
 import { HeartGreeting } from "../src/ui/HeartGreeting";
 import { useState } from "react";
-import { Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { mobileConfig } from "../src/config";
 import { KeyboardScreen } from "../src/components/KeyboardScreen";
 import { useCopy, useLocale } from "../src/locale";
@@ -54,7 +54,7 @@ export default function Index() {
     <SeoullyScreen edges={["top", "bottom"]}>
       <KeyboardScreen>
         <View style={styles.container}>
-          {gate !== "welcome" ? <View style={styles.topline}>
+          {gate === "signin" ? <View style={styles.topline}>
             <BrandMark />
             <Pressable accessibilityRole="button" onPress={toggleLocale} style={styles.language}>
               <SeoullyText variant="button">{t.switchLanguage}</SeoullyText>
@@ -70,8 +70,10 @@ export default function Index() {
             </View>
           ) : null}
           {gate !== "welcome" ? (
-            <>
-              <SeoullyText variant="secondary" style={styles.tagline}>{t.tagline}</SeoullyText>
+            <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={styles.account}>
+              {createMode ? <View style={styles.accountHeading}>
+                <HeartGreeting key="create" large showHeart={false} text={t.createWorldHeading} />
+              </View> : <SeoullyText variant="secondary" style={styles.tagline}>{t.tagline}</SeoullyText>}
               {!mobileConfig.authConfigured ? (
                 <SeoullyText variant="secondary" color={colors.plum} style={styles.warning}>{t.notConfigured}</SeoullyText>
               ) : !mobileConfig.productApiConfigured ? (
@@ -108,7 +110,7 @@ export default function Index() {
                 </Pressable>
                 {message ? <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum}>{message}</SeoullyText> : null}
               </View>
-            </>
+            </ScrollView>
           ) : message ? (
             <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum} style={styles.tagline}>{message}</SeoullyText>
           ) : null}
@@ -128,6 +130,8 @@ const styles = StyleSheet.create({
   welcomeTitle: { letterSpacing: -0.8, lineHeight: 36 },
   tagline: { marginTop: 8, lineHeight: 22 },
   warning: { backgroundColor: colors.lilacSoft, borderRadius: 14, marginTop: 16, padding: 14 },
+  account: { flexGrow: 1, paddingTop: 24, paddingBottom: 16 },
+  accountHeading: { flexGrow: 1, justifyContent: "center", paddingVertical: 32, minHeight: 200 },
   form: { gap: 10, marginTop: 24 },
   input: {
     backgroundColor: colors.surface,

@@ -1,4 +1,5 @@
-import { prepareIdentitySubmission, finishIdentitySubmission } from "../data/identitySubmission";
+import { readSelectedCatalogIdentity } from "../data/collectorIdentity";
+import { prepareIdentitySubmission, finishIdentitySubmission, readIdentitySubmission } from "../data/identitySubmission";
 import { SeoullyButton } from "./SeoullyControls";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -7,17 +8,18 @@ import { useCopy } from "../locale";
 import { RetryNotice } from "../components/RetryNotice";
 import { SeoullyField } from "./SeoullyField";
 import { SeoullyText } from "./SeoullyText";
-import { useProfileIdentity } from "./ProfileIdentity";
+import { IDENTITY_LIGHT, useProfileIdentity } from "./ProfileIdentity";
 import { toggleIdentitySelection, unselectedIdentityOptions } from "./collectorArchetypes";
 export type TasteOption = { id: string; name: string; groupId?: string; groupName?: string; catalogId?: string };
 
-export function ProfileTastePicker({ kind, selected, onChange, initialOptions, preferredGroups = [], disabled, live = true, canContribute = false, userId, onBusyChange }: {
-  kind: "groups" | "biases"; selected: string[]; onChange: (ids: string[]) => void;
+export function ProfileTastePicker({ kind, selected, onChange, initialOptions, preferredGroups = [], disabled, live = true, canContribute = false, userId, onBusyChange, showHeading = true }: {
+  showHeading?: boolean; kind: "groups" | "biases"; selected: string[]; onChange: (ids: string[]) => void | Promise<void>;
   initialOptions: TasteOption[]; preferredGroups?: string[]; disabled?: boolean; live?: boolean; canContribute?: boolean; userId: string; onBusyChange: (active: boolean) => void;
 }) {
   const copy = useCopy();
-  const palette = useProfileIdentity()!;
+  const palette = useProfileIdentity() ?? IDENTITY_LIGHT;
   const [query, setQuery] = useState("");
+  const queryEdited = useRef(false);
   const [results, setResults] = useState<TasteOption[]>([]);
   const [known, setKnown] = useState<TasteOption[]>([]);
   const [error, setError] = useState(false);
@@ -30,6 +32,20 @@ export function ProfileTastePicker({ kind, selected, onChange, initialOptions, p
   const [manualGroups, setManualGroups] = useState<{ id: string; name: string }[]>([]);
   const [manualGroup, setManualGroup] = useState<{ id: string; name: string } | null>(null);
   const [limit, setLimit] = useState(false);
+  useEffect(() => {
+    if (!live || !canContribute) return;
+    let active = true;
+    // Resume an ambiguous contribution with its exact name, group, and UUID.
+    void readIdentitySubmission(userId, kind === "groups" ? "group" : "member").then(async submission => {
+      if (!submission || !active) return;
+      const selectedGroup = submission.groupId
+        ? (await readSelectedCatalogIdentity([submission.groupId], [])).groups[0] : null;
+      if (!active || queryEdited.current) return;
+      setQuery(submission.name);
+      if (selectedGroup) { setManualGroup(selectedGroup); setManualGroupQuery(selectedGroup.name); }
+    }).catch(() => { if (active) setCreateError(true); });
+    return () => { active = false; };
+  }, [userId, kind, live, canContribute]);
   useEffect(() => {
     void attempt;
     if (!live) return;
@@ -68,7 +84,7 @@ export function ProfileTastePicker({ kind, selected, onChange, initialOptions, p
       const saved = await contributeCatalogIdentity(submission);
       const option = { id: saved.memberId ?? saved.groupId, name: saved.submittedName, ...(saved.memberId ? { groupId: saved.groupId, groupName: manualGroup!.name } : {}) };
       setKnown(previous => [...previous.filter(o => o.id !== option.id), option]);
-      if (!selected.includes(option.id)) toggle(option.id);
+      if (!selected.includes(option.id)) await toggle(option.id);
       await finishIdentitySubmission(userId, submission).catch(() => {});
       setQuery("");
     } catch { setCreateError(true); }
@@ -78,22 +94,22 @@ export function ProfileTastePicker({ kind, selected, onChange, initialOptions, p
   const ordered = unselectedIdentityOptions(results, selected).sort((a,b) => Number(preferredGroups.includes(b.groupId ?? "")) - Number(preferredGroups.includes(a.groupId ?? "")) || a.name.localeCompare(b.name));
   function toggle(id: string) {
     if (!selected.includes(id) && selected.length >= (kind === "groups" ? 24 : 48)) { setLimit(true); return; }
-    setLimit(false); onChange(toggleIdentitySelection(selected, id));
+    setLimit(false); return onChange(toggleIdentitySelection(selected, id));
   }
   function pick(option: TasteOption, isSelected: boolean) {
     return <Pressable key={option.id} disabled={disabled || creating} accessibilityRole="checkbox" accessibilityState={{ checked: isSelected, disabled }}
-      onPress={() => toggle(option.id)} style={[styles.option, { backgroundColor: isSelected ? palette.primarySoft : palette.paper, borderColor: isSelected ? palette.primary : palette.line }]}>
+      onPress={() => { void Promise.resolve(toggle(option.id)).catch(() => {}); }} style={[styles.option, { backgroundColor: isSelected ? palette.primarySoft : palette.paper, borderColor: isSelected ? palette.primary : palette.line }]}>
       <SeoullyText variant="body">{option.name}{isSelected ? "  ✓" : ""}</SeoullyText>
       {option.groupName ? <SeoullyText variant="caption">{option.groupName}</SeoullyText> : null}
     </Pressable>;
   }
   return <View style={styles.section}>
-    <SeoullyText variant="section">{kind === "groups" ? copy.profileFavoriteGroups : copy.profileBiases}</SeoullyText>
+    {showHeading ? <SeoullyText variant="section">{kind === "groups" ? copy.profileFavoriteGroups : copy.profileBiases}</SeoullyText> : null}
     {selected.length ? <>
       <SeoullyText variant="caption">{copy.profileSelected}</SeoullyText>
       <View style={styles.options}>{selected.map(id => pick(options.get(id) ?? { id, name: copy.profileSavedSelection }, true))}</View>
     </> : null}
-    <SeoullyField label={kind === "groups" ? copy.profileSearchGroups : copy.profileSearchBiases} value={query} onChangeText={setQuery} maxLength={120} editable={!disabled && !creating} autoCorrect={false} />
+    <SeoullyField label={kind === "groups" ? copy.profileSearchGroups : copy.profileSearchBiases} value={query} onChangeText={text => { queryEdited.current = true; setQuery(text); }} maxLength={120} editable={!disabled && !creating} autoCorrect={false} />
     {error ? <RetryNotice message={copy.profileCatalogFailure} retryLabel={copy.retry} onRetry={() => setAttempt(n => n + 1)} /> : null}
     {limit ? <SeoullyText variant="caption">{copy.profileSelectionLimit}</SeoullyText> : null}
     {!pending && !error && !results.length ? <View style={styles.empty}>

@@ -1,0 +1,22 @@
+begin;
+select plan(8);
+insert into auth.users(id,raw_user_meta_data) values
+ ('a8080000-0000-4000-8000-000000000080','{"handle":"new_sync","display_name":"New Sync"}');
+select is((select appearance from public.profiles where handle='new_sync'),'{"mode":"room-sync"}'::jsonb,'auth provisioning inherits Room Sync');
+select ok((select convalidated from pg_constraint where conname='profiles_appearance_valid'),'validation intact');
+select ok((select relrowsecurity from pg_class where oid='public.profiles'::regclass),'RLS intact');
+set local role authenticated;
+select set_config('request.jwt.claim.sub','a8080000-0000-4000-8000-000000000080',true);
+select lives_ok('select public.ensure_current_seoully_identity()','authenticated ensure remains compatible');
+update public.profiles set appearance='{"mode":"default"}' where handle='new_sync';
+select is((select appearance from public.profiles where handle='new_sync'),'{"mode":"default"}'::jsonb,'explicit Default remains available');
+update public.profiles set appearance='{"mode":"custom","background":"dark-plum"}' where handle='new_sync';
+update public.profiles set bio='Identity only' where handle='new_sync';
+select is((select appearance from public.profiles where handle='new_sync'),'{"mode":"custom","background":"dark-plum"}'::jsonb,'identity update preserves Custom');
+reset role;
+set local role anon;
+select ok(not has_column_privilege('anon','public.profiles','appearance','update'),'no new anonymous write');
+reset role;
+select is((select count(*)::int from public.rooms),0,'default does not create or modify Room');
+select * from finish();
+rollback;

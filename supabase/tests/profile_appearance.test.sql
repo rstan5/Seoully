@@ -5,7 +5,7 @@ insert into auth.users(id,raw_user_meta_data) values
  ('a8060000-0000-4000-8000-000000000002','{"handle":"appearance_b","display_name":"Appearance B"}');
 insert into public.rooms(owner_user_id) select user_id from public.profiles where handle='appearance_a';
 create temporary table appearance_room_before as select to_jsonb(r) as snapshot from public.rooms r;
-select is((select appearance from public.profiles where handle='appearance_a'), '{"mode":"default"}'::jsonb, 'new/legacy provisioning uses safe Default');
+select is((select appearance from public.profiles where handle='appearance_a'), '{"mode":"room-sync"}'::jsonb, 'new provisioning uses Room Sync');
 select ok((select attnotnull from pg_attribute where attrelid='public.profiles'::regclass and attname='appearance'),'appearance cannot be null');
 select ok((select convalidated from pg_constraint where conrelid='public.profiles'::regclass and conname='profiles_appearance_valid'),'appearance CHECK is validated');
 select ok((select relrowsecurity from pg_class where oid='public.profiles'::regclass),'profile RLS stays enabled');

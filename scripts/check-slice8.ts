@@ -49,8 +49,8 @@ assert.equal(nextDurableStep("group", "groups", 1), "bias");
 assert.equal(nextDurableStep("bias", "bias"), "interest");
 assert.equal(nextDurableStep("interest", "interests"), "interest");
 assert.deepEqual([...ONBOARDING_INTERESTS], ["photocards", "albums", "merch", "vinyl", "posters", "lightsticks", "everything"]);
-assertContains(onboarding, "allGroups.filter", "live groups");
-assertContains(onboarding, "groupIds.includes(member.groupId)", "bias scoped to groups");
+assertContains(onboarding, 'kind="groups"', "shared live group search/contribution");
+assertContains(onboarding, "preferredGroups={groupIds}", "bias search prioritizes favorites without hiding other groups");
 assertContains(onboarding, 'action: "interests"', "interest persist");
 
 // G. No Vision

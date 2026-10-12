@@ -14,6 +14,7 @@ const interestValues = ["albums", "photocards", "merch", "vinyl", "posters", "li
 
 export const currentProfilePatchSchema = z.object({
   appearance: profileAppearanceSchema.optional(),
+  avatarSubmissionId: z.string().uuid().nullable().optional(),
   handle: z.string().trim().min(3).max(32).transform(normalizeHandle).pipe(z.string().regex(HANDLE_RE)).optional(),
   displayName: z.string().trim().min(1).max(48).optional(),
   tagline: z.string().trim().max(100).optional(),
@@ -62,38 +63,44 @@ export async function getCurrentIdentityFromClient(supabase: SupabaseClient): Pr
     throw new Error("Current Seoully account is unavailable.");
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("user_id, handle, display_name, tagline, bio, location, favorite_group_ids, bias_member_ids, favorite_era_ids, collector_interests, collector_type, appearance")
-    .eq("user_id", userIdData)
-    .maybeSingle();
+  const { data: profile, error: profileError } = await readProfileRow(supabase, "user_id", userIdData);
   if (profileError || !profile) throw new Error("Current Seoully profile is unavailable.");
-
-  return mapIdentity(account, profile);
+  return withProfileAvatar(mapIdentity(account, profile), profile, supabase);
 }
 
 export async function getPublicProfile(userId: string, client?: SupabaseClient): Promise<PublicProfileDTO | null> {
   const parsedId = z.string().uuid().safeParse(userId);
   if (!parsedId.success) return null;
   const supabase = client ?? await createSupabaseServerClient();
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select("user_id, handle, display_name, tagline, bio, location, favorite_group_ids, bias_member_ids, favorite_era_ids, collector_interests, collector_type, appearance, created_at, collection_public, wishlist_public")
-    .eq("user_id", parsedId.data)
-    .maybeSingle();
+  const { data: profile, error } = await readProfileRow(supabase, "user_id", parsedId.data);
   if (error || !profile) return null;
-  return await hydratePublicProfile(mapIdentity({ id: profile.user_id, created_at: profile.created_at }, profile), profile, supabase);
+  return await hydratePublicProfile(await withProfileAvatar(mapIdentity({ id: profile.user_id, created_at: profile.created_at }, profile), profile, supabase), profile, supabase);
 }
 
 export async function getPublicProfileByHandle(handle: string): Promise<PublicProfileDTO | null> {
   const normalized = normalizeHandle(handle.replace(/^@/, ""));
   if (!HANDLE_RE.test(normalized)) return null;
   const supabase = await createSupabaseServerClient();
-  const { data: profile, error } = await supabase.from("profiles")
-    .select("user_id, handle, display_name, tagline, bio, location, favorite_group_ids, bias_member_ids, favorite_era_ids, collector_interests, collector_type, appearance, created_at, collection_public, wishlist_public")
-    .eq("handle", normalized).maybeSingle();
+  const { data: profile, error } = await readProfileRow(supabase, "handle", normalized);
   if (error || !profile) return null;
-  return await hydratePublicProfile(mapIdentity({ id: profile.user_id, created_at: profile.created_at }, profile), profile);
+  return await hydratePublicProfile(await withProfileAvatar(mapIdentity({ id: profile.user_id, created_at: profile.created_at }, profile), profile, supabase), profile, supabase);
+}
+
+/** Pre-rollout compatibility: existing production has no avatar column yet. */
+async function readProfileRow(client: SupabaseClient, field: "user_id" | "handle", value: string) {
+  const result = await client.from("profiles").select("user_id, handle, display_name, tagline, bio, location, favorite_group_ids, bias_member_ids, favorite_era_ids, collector_interests, collector_type, appearance, created_at, collection_public, wishlist_public, avatar_id").eq(field, value).maybeSingle();
+  if (result.error?.code === "42703" || result.error?.code === "PGRST204") {
+    return client.from("profiles").select("user_id, handle, display_name, tagline, bio, location, favorite_group_ids, bias_member_ids, favorite_era_ids, collector_interests, collector_type, appearance, created_at, collection_public, wishlist_public").eq(field, value).maybeSingle();
+  }
+  return result;
+}
+async function withProfileAvatar(identity: IdentityProfileDTO, row: Record<string, unknown>, client: SupabaseClient): Promise<IdentityProfileDTO> {
+  if (typeof row.avatar_id !== "string") return identity;
+  const parsed = z.string().uuid().safeParse(row.avatar_id);
+  if (!parsed.success) return identity;
+  const { data, error } = await client.storage.from("profile-avatars").createSignedUrl(`${identity.user.id}/${parsed.data}.jpg`, 900);
+  if (error || !data?.signedUrl) return identity;
+  return { ...identity, profile: { ...identity.profile, avatarUrl: data.signedUrl } };
 }
 
 async function hydratePublicProfile(identity: IdentityProfileDTO, row: Record<string, unknown>, client?: SupabaseClient): Promise<PublicProfileDTO> {
@@ -141,6 +148,13 @@ export async function updateCurrentProfile(input: unknown, client?: SupabaseClie
   if (patch.collectorType !== undefined) payload.collector_type = patch.collectorType;
 
   const supabase = client ?? await createSupabaseServerClient();
+  if (patch.avatarSubmissionId !== undefined) {
+    if (patch.avatarSubmissionId !== null) {
+      const { data, error } = await supabase.storage.from("profile-avatars").createSignedUrl(`${current.user.id}/${patch.avatarSubmissionId}.jpg`, 60);
+      if (error || !data?.signedUrl) throw new Error("profile_avatar_unavailable");
+    }
+    payload.avatar_id = patch.avatarSubmissionId;
+  }
   const { error } = await supabase.from("profiles").update(payload).eq("user_id", current.user.id);
   if (error?.code === "23505") throw new Error("handle_taken");
   if (error) throw new Error("profile_update_failed");

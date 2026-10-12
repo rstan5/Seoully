@@ -366,6 +366,7 @@ export async function createNativePost(uri: string, caption: string, mimeType = 
 export type NativeIdentity = {
   user: { id: string; handle: string; displayName: string; joinedAt: string };
   profile: {
+    avatarUrl?: string;
     tagline: string;
     bio: string;
     location?: string;
@@ -378,7 +379,7 @@ export type NativeIdentity = {
   };
 };
 
-export async function updateNativeProfile(input: { displayName?: string; bio?: string; tagline?: string; location?: string; appearance?: ProfileThemeChoice }) {
+export async function updateNativeProfile(input: { avatarSubmissionId?: string; displayName?: string; bio?: string; tagline?: string; location?: string; appearance?: ProfileThemeChoice; collectorType?: string; favoriteGroupIds?: string[]; biasMemberIds?: string[] }) {
   const { data } = await supabase.auth.getSession(); const accessToken = data.session?.access_token;
   if (!accessToken) throw new Error("unauthenticated");
   const response = await fetch(`${productApiBase()}/api/mobile/profile`, { method: "PATCH", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify(input) });
@@ -387,6 +388,7 @@ export async function updateNativeProfile(input: { displayName?: string; bio?: s
 
 export type NativeOnboardingStep = "group" | "bias" | "interest" | "done";
 export type NativeOnboardingGroup = {
+  catalogId?: string;
   id: string;
   name: string;
   nativeName: string;
@@ -453,6 +455,15 @@ export async function searchCollectorGroups(query: string, signal?: AbortSignal)
   if (!response.ok) throw new Error("groups_unavailable");
   const body = await response.json() as { groups: NativeOnboardingState["groups"] };
   return body.groups;
+}
+
+export type NativeCollectorMember = NativeOnboardingState["members"][number] & { groupName?: string };
+export async function searchCollectorMembers(query: string, signal?: AbortSignal): Promise<NativeCollectorMember[]> {
+  const token = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/catalog/members?q=${encodeURIComponent(query)}`, { headers: { Authorization: `Bearer ${token}` }, signal });
+  if (!response.ok) throw new Error("members_unavailable");
+  const body = await response.json() as { members: NativeCollectorMember[] };
+  return body.members;
 }
 
 export async function loadNativeOnboarding(signal?: AbortSignal): Promise<NativeOnboardingState> {
@@ -683,6 +694,7 @@ export async function markProductionNoticesRead(): Promise<void> {
 export type NativeCollectorProfile = {
   user: { id: string; handle: string; displayName: string; joinedAt: string };
   profile: {
+    avatarUrl?: string;
     tagline: string;
     bio: string;
     location?: string;
@@ -898,4 +910,29 @@ export async function removeNativeRoomPlacement(roomId: string, holdingId: strin
     body: JSON.stringify({ roomId, holdingId }),
   });
   if (!response.ok) throw new Error("room_placement_delete_failed");
+}
+
+export type ProfileCapabilities = { profileAvatar: boolean; catalogIdentityContributions: boolean };
+export async function readProfileCapabilities(): Promise<ProfileCapabilities> {
+  const token = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/profile/capabilities`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!response.ok) throw new Error("profile_capabilities_unavailable");
+  return response.json();
+}
+export async function uploadProfileAvatar(uri: string, submissionId: string): Promise<string> {
+  const token = await mobileAccessToken();
+  const body = await photoMultipart({ submissionId }, uri);
+  const response = await expoFetch(`${productApiBase()}/api/mobile/profile/avatar`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body });
+  if (!response.ok) throw new Error("avatar_upload_failed");
+  const saved = await response.json();
+  if (saved.avatarSubmissionId !== submissionId) throw new Error("avatar_upload_unconfirmed");
+  return submissionId;
+}
+export async function contributeCatalogIdentity(input: { submissionId: string; kind: "group" | "member"; name: string; groupId?: string }): Promise<{ id: string; groupId: string; memberId: string | null; submittedName: string }> {
+  const token = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/catalog/identity-contributions`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(input) });
+  if (!response.ok) throw new Error("identity_contribution_failed");
+  const { contribution } = await response.json();
+  if (!contribution?.id || !contribution.groupId || (input.kind === "member" && !contribution.memberId)) throw new Error("identity_contribution_unconfirmed");
+  return contribution;
 }

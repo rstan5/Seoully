@@ -13,6 +13,6 @@ export async function GET(request: Request) {
       .neq("status", "restricted").ilike("name", `%${query.replace(/[\\%_]/g, "")}%`).order("name").limit(50);
     if (error) throw new Error("groups_unavailable");
     const known = new Map(GROUPS.map(group => [group.name.normalize("NFKC").trim().toLocaleLowerCase(), group]));
-    return NextResponse.json({ groups: (data ?? []).map(group => known.get(group.name.normalize("NFKC").trim().toLocaleLowerCase()) ?? ({ id: group.id, name: group.name, nativeName: group.name, memberIds: [] })) }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ groups: (data ?? []).map(group => ({ ...(known.get(group.name.normalize("NFKC").trim().toLocaleLowerCase()) ?? { id: group.id, name: group.name, nativeName: group.name, memberIds: [] }), catalogId: group.id })) }, { headers: { "Cache-Control": "no-store" } });
   } catch { return NextResponse.json({ error: "groups_unavailable" }, { status: 503 }); }
 }

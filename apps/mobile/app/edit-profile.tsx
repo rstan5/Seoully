@@ -1,11 +1,22 @@
+import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
+import { randomUUID } from "expo-crypto";
+import { readSelectedCatalogIdentity } from "../src/data/collectorIdentity";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ProfileIdentityProvider } from "../src/ui/ProfileIdentity";
+import { identityPalette } from "../src/ui/profileContrast";
+import { nativeProfileTheme } from "../src/room/profileRoom";
+import { SeoullyButton } from "../src/ui/SeoullyControls";
+import { ProfileTastePicker, type TasteOption } from "../src/ui/ProfileTastePicker";
+import { COLLECTOR_ARCHETYPES, archetypeLabel } from "../src/ui/collectorArchetypes";
 import type { ProfileThemeChoice } from "seoully-domain/types";
 import { ProfileAppearanceEditor } from "../src/ui/ProfileAppearanceEditor";
 import { readOwnerProfileRoom } from "../src/room/useProfileRoom";
 import { parseRoomStyle, type NativeRoomStyle } from "../src/room/roomStyle";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { updateNativeProfile, type NativeIdentity } from "../src/api";
+import { loadNativeOnboarding, updateNativeProfile, readProfileCapabilities, uploadProfileAvatar, type NativeIdentity, type ProfileCapabilities } from "../src/api";
 import { useSocialRepository } from "../src/data";
 import { KeyboardScreen } from "../src/components/KeyboardScreen";
 import { RetryNotice } from "../src/components/RetryNotice";
@@ -22,6 +33,18 @@ export default function EditProfileScreen() {
   const router = useRouter();
   const copy = useCopy();
   const { toggleLocale } = useLocale();
+  const insets = useSafeAreaInsets();
+  const latestCopy = useRef(copy);
+  const refreshGeneration = useRef(0);
+  useEffect(() => { latestCopy.current = copy; }, [copy]);
+  const [collectorType, setCollectorType] = useState("Collector");
+  const [groupIds, setGroupIds] = useState<string[]>([]);
+  const [biasIds, setBiasIds] = useState<string[]>([]);
+  const [groupOptions, setGroupOptions] = useState<TasteOption[]>([]);
+  const [biasOptions, setBiasOptions] = useState<TasteOption[]>([]);
+  const [avatarDraft, setAvatarDraft] = useState<{ uri: string; submissionId: string } | null>(null);
+  const [avatarChoices, setAvatarChoices] = useState(false);
+  const [capabilities, setCapabilities] = useState<ProfileCapabilities>({ profileAvatar: false, catalogIdentityContributions: false });
   const [identity, setIdentity] = useState<NativeIdentity | null>(null);
   const [appearance, setAppearance] = useState<ProfileThemeChoice>({ mode: "default" });
   const [roomStyle, setRoomStyle] = useState<NativeRoomStyle>();
@@ -31,17 +54,29 @@ export default function EditProfileScreen() {
   const [location, setLocation] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [tastePending, setTastePending] = useState(0);
+  const tasteBusyChanged = useCallback((active: boolean) => setTastePending(n => Math.max(0, n + (active ? 1 : -1))), []);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const social = useSocialRepository();
 
   const refresh = useCallback(async () => {
+    const generation = ++refreshGeneration.current;
     setLoading(true);
     try {
       const next = await social.loadIdentity();
       if (!next?.user.id) throw new Error("identity_unavailable");
-      const room = social.kind === "production" ? await readOwnerProfileRoom(next.user.id).catch(() => { setMessage(copy.roomUnavailable); return null; }) : null;
+      const caps = social.kind === "production" ? await readProfileCapabilities() : { profileAvatar: false, catalogIdentityContributions: false };
+      const room = social.kind === "production" ? await readOwnerProfileRoom(next.user.id).catch(() => { setMessage(latestCopy.current.roomUnavailable); return null; }) : null;
+      const [tastes, selectedCatalog] = social.kind === "production" ? await Promise.all([loadNativeOnboarding().catch(() => null), readSelectedCatalogIdentity(next.profile.favoriteGroupIds, next.profile.biasMemberIds).catch(() => ({ groups: [], members: [] }))]) : [null, { groups: [], members: [] }];
+      if (generation !== refreshGeneration.current) return;
+      setCapabilities(caps);
       setRoomStyle(room ? parseRoomStyle(room.style) : undefined);
+      setGroupOptions([...(tastes?.groups ?? []).map(g => ({ id: g.id, name: g.name })), ...selectedCatalog.groups]);
+      setBiasOptions([...(tastes?.members ?? []).map(m => ({ id: m.id, name: m.stageName, groupId: m.groupId })), ...selectedCatalog.members.map(m => ({ id: m.id, name: m.stageName, groupId: m.groupId, groupName: m.groupName }))]);
+      setCollectorType(next.profile.collectorType ?? "Collector");
+      setGroupIds(next.profile.favoriteGroupIds);
+      setBiasIds(next.profile.biasMemberIds);
       setIdentity(next);
       setAppearance(next.profile.appearance ?? { mode: "default" });
       setDisplayName(next.user.displayName);
@@ -50,30 +85,37 @@ export default function EditProfileScreen() {
       setLocation(next.profile.location ?? "");
       setError(null);
     } catch {
-      setError(copy.profileUnavailable);
+      if (generation !== refreshGeneration.current) return;
+      setError(latestCopy.current.profileUnavailable);
     } finally {
-      setLoading(false);
+      if (generation === refreshGeneration.current) setLoading(false);
     }
-  }, [copy.profileUnavailable, copy.roomUnavailable, social]);
+  }, [social]);
 
   useFocusEffect(useCallback(() => {
     void refresh();
+    return () => { refreshGeneration.current++; };
   }, [refresh]));
 
   async function save() {
     if (social.kind === "demo") { setMessage(copy.demoWriteBlocked); return; }
-    if (busy || !displayName.trim()) return;
+    if (busy || tastePending > 0 || !displayName.trim()) return;
     setBusy(true);
     setMessage(null);
     try {
+      const avatarSubmissionId = avatarDraft ? await uploadProfileAvatar(avatarDraft.uri, avatarDraft.submissionId) : undefined;
       const saved = await updateNativeProfile({
+        ...(avatarSubmissionId ? { avatarSubmissionId } : {}),
         displayName: displayName.trim(),
         tagline: tagline.trim(),
         bio: bio.trim(),
         location: location.trim(),
         appearance,
+        collectorType,
+        favoriteGroupIds: [...new Set(groupIds)],
+        biasMemberIds: [...new Set(biasIds)],
       });
-      if (!saved.identity?.profile.appearance) throw new Error("profile_save_unconfirmed");
+      if (!saved.identity?.profile.appearance || (avatarSubmissionId && !saved.identity.profile.avatarUrl)) throw new Error("profile_save_unconfirmed");
       setIdentity(saved.identity);
       setAppearance(saved.identity.profile.appearance);
       router.back();
@@ -84,8 +126,22 @@ export default function EditProfileScreen() {
     }
   }
 
+  async function pickAvatar(camera: boolean) {
+    if (busy || !capabilities.profileAvatar) return;
+    try {
+      const permission = camera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) { setMessage(copy.profilePhotoPermission); return; }
+      const options: ImagePicker.ImagePickerOptions = { mediaTypes: ["images"], allowsEditing: true, aspect: [1, 1], quality: 1 };
+      const result = camera ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
+      if (result.canceled || !result.assets[0]) return;
+      const image = await ImageManipulator.manipulateAsync(result.assets[0].uri, [{ resize: { width: 768 } }], { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG });
+      setAvatarDraft({ uri: image.uri, submissionId: randomUUID() });
+      setAvatarChoices(false); setMessage(null);
+    } catch { setMessage(copy.profilePhotoFailed); }
+  }
+
   async function signOut() {
-    if (busy) return;
+    if (busy || tastePending > 0) return;
     setBusy(true);
     const { error: signOutError } = await supabase.auth.signOut();
     if (signOutError) {
@@ -94,23 +150,24 @@ export default function EditProfileScreen() {
     }
   }
 
+  const palette = useMemo(() => identityPalette(nativeProfileTheme(appearance, roomStyle)), [appearance, roomStyle]);
+
   if (loading && !identity && !error) return <SeoullyLoadingState fullScreen label={copy.profileEdit} />;
 
   return (
-    <SeoullyScreen>
+    <SeoullyScreen backgroundColor={palette.mist}>
+      <ProfileIdentityProvider palette={palette}>
       <KeyboardScreen>
         <View style={styles.top}>
-          <Pressable accessibilityRole="button" disabled={busy} onPress={() => router.back()} style={styles.topAction}>
+          <Pressable accessibilityRole="button" disabled={busy || tastePending > 0} onPress={() => router.back()} style={styles.topAction}>
             <SeoullyText variant="body">{copy.editCancel}</SeoullyText>
           </Pressable>
-          <SeoullyText variant="handle" style={styles.topTitle}>{copy.profileEdit}</SeoullyText>
+          <View pointerEvents="none" style={styles.titleCenter}><SeoullyText variant="handle">{copy.profileEdit}</SeoullyText></View>
           <View style={styles.topEnd}>
             <Pressable accessibilityRole="button" accessibilityLabel={copy.switchLanguage} onPress={toggleLocale} style={styles.topAction}>
               <SeoullyText variant="button">{copy.switchLanguage}</SeoullyText>
             </Pressable>
-            <Pressable accessibilityRole="button" disabled={busy} onPress={() => { void save(); }} style={styles.topAction}>
-              <SeoullyText variant="handle" color={colors.plum}>{busy ? copy.saving : copy.editSave}</SeoullyText>
-            </Pressable>
+
           </View>
         </View>
 
@@ -120,11 +177,17 @@ export default function EditProfileScreen() {
           <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
             <SeoullyText variant="section">{copy.editIdentity}</SeoullyText>
             <View style={styles.photo}>
-              <SeoullyAvatar name={displayName || identity.user.displayName} size={88} />
-              <SeoullyText variant="caption" style={styles.photoHint}>{copy.editPhotoHint}</SeoullyText>
+              <Pressable accessibilityRole="button" accessibilityLabel={copy.profileChangePhoto} disabled={busy || !capabilities.profileAvatar} onPress={() => setAvatarChoices(v => !v)}>
+                <SeoullyAvatar name={displayName || identity.user.displayName} imageUrl={avatarDraft?.uri ?? identity.profile.avatarUrl} size={88} />
+              </Pressable>
+              <SeoullyText variant="caption" style={styles.photoHint}>{capabilities.profileAvatar ? copy.profileChangePhoto : copy.profileAvatarBlocked}</SeoullyText>
+              {avatarChoices ? <View style={styles.archetypes}>
+                <SeoullyButton label={copy.profileTakePhoto} onPress={() => { void pickAvatar(true); }} />
+                <SeoullyButton label={copy.profileChoosePhoto} onPress={() => { void pickAvatar(false); }} />
+              </View> : null}
             </View>
-            {message ? <SeoullyText variant="caption" color={colors.plum} style={styles.message}>{message}</SeoullyText> : null}
             <SeoullyField
+              editable={!busy}
               appearance="mist"
               label={copy.profileDisplayName}
               value={displayName}
@@ -132,6 +195,7 @@ export default function EditProfileScreen() {
               autoCorrect={false}
             />
             <SeoullyField
+              editable={!busy}
               appearance="mist"
               label={copy.profileTagline}
               value={tagline}
@@ -139,6 +203,7 @@ export default function EditProfileScreen() {
               placeholder={copy.profileTaglinePlaceholder}
             />
             <SeoullyField
+              editable={!busy}
               appearance="mist"
               label={copy.profileBio}
               value={bio}
@@ -147,6 +212,7 @@ export default function EditProfileScreen() {
               multiline
             />
             <SeoullyField
+              editable={!busy}
               appearance="mist"
               label={copy.profileLocation}
               value={location}
@@ -154,33 +220,42 @@ export default function EditProfileScreen() {
               placeholder={copy.profileLocationPlaceholder}
             />
 
+            <View style={styles.section}>
+              <SeoullyText variant="section">{copy.profileArchetype}</SeoullyText>
+              <View accessibilityRole="radiogroup" accessibilityLabel={copy.profileArchetype} style={styles.archetypes}>
+                {!COLLECTOR_ARCHETYPES.includes(collectorType as typeof COLLECTOR_ARCHETYPES[number]) ? <SeoullyText>{collectorType}</SeoullyText> : null}
+                {COLLECTOR_ARCHETYPES.map((value, index) => <Pressable key={value} disabled={busy} accessibilityRole="radio" accessibilityState={{ checked: collectorType === value, disabled: busy }} onPress={() => setCollectorType(value)}
+                  style={[styles.archetype, { backgroundColor: collectorType === value ? palette.primarySoft : palette.paper, borderColor: collectorType === value ? palette.primary : palette.line }]}>
+                  <SeoullyText variant="handle">{archetypeLabel(value, copy)}{collectorType === value ? "  ✓" : ""}</SeoullyText>
+                  <SeoullyText variant="caption">{copy[`archetypeHint${index}` as "archetypeHint0"]}</SeoullyText>
+                </Pressable>)}
+              </View>
+            </View>
+            <ProfileTastePicker kind="groups" selected={groupIds} onChange={setGroupIds} initialOptions={groupOptions} live={social.kind === "production"} canContribute={capabilities.catalogIdentityContributions} userId={identity.user.id} onBusyChange={tasteBusyChanged} disabled={busy || social.kind === "demo"} />
+            <ProfileTastePicker kind="biases" selected={biasIds} onChange={setBiasIds} initialOptions={biasOptions} live={social.kind === "production"} canContribute={capabilities.catalogIdentityContributions} userId={identity.user.id} onBusyChange={tasteBusyChanged} preferredGroups={groupIds} disabled={busy || social.kind === "demo"} />
+
             <ProfileAppearanceEditor value={appearance} onChange={setAppearance} roomStyle={roomStyle} disabled={busy || social.kind === "demo"} />
 
-            <View style={styles.section}>
-              <SeoullyText variant="section">{copy.editCollectorTastes}</SeoullyText>
-              <SeoullyText variant="secondary" style={styles.hint}>
-                {[identity.profile.collectorType, ...(identity.profile.collectorInterests ?? [])].filter(Boolean).join(" · ") || copy.editCollectorTastes}
-              </SeoullyText>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push({ pathname: "/onboarding", params: { edit: "1" } })}
-                style={styles.link}
-              >
-                <SeoullyText variant="button" color={colors.plum}>{copy.editCollectorTastes}</SeoullyText>
-              </Pressable>
-            </View>
-
-            <Pressable accessibilityRole="button" disabled={busy} onPress={() => { void signOut(); }} style={styles.signOut}>
-              <SeoullyText variant="button" color={colors.plum}>{copy.signOut}</SeoullyText>
+            <Pressable accessibilityRole="button" disabled={busy || tastePending > 0} onPress={() => { void signOut(); }} style={styles.signOut}>
+              <SeoullyText variant="button" color={palette.primaryDeep}>{copy.signOut}</SeoullyText>
             </Pressable>
           </ScrollView>
         ) : null}
+        {identity ? <View style={[styles.saveBar, { paddingBottom: Math.max(insets.bottom, 12), backgroundColor: palette.paper, borderTopColor: palette.line }]}>
+          {message ? <SeoullyText variant="caption" accessibilityRole="alert">{message}</SeoullyText> : null}
+          <SeoullyButton label={busy ? copy.saving : copy.profileSaveChanges} disabled={busy || tastePending > 0 || !displayName.trim() || Boolean(error) || social.kind === "demo"} block onPress={() => { void save(); }} />
+        </View> : null}
       </KeyboardScreen>
+      </ProfileIdentityProvider>
     </SeoullyScreen>
   );
 }
 
 const styles = StyleSheet.create({
+  titleCenter: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center" },
+  saveBar: { paddingTop: 12, paddingHorizontal: 16, gap: 8, borderTopWidth: StyleSheet.hairlineWidth },
+  archetypes: { gap: 8, marginTop: 12 },
+  archetype: { minHeight: 56, gap: 5, padding: 14, borderWidth: 1, borderRadius: 16 },
   top: {
     alignItems: "center",
     borderBottomColor: colors.border,
@@ -191,7 +266,7 @@ const styles = StyleSheet.create({
   },
   topAction: { justifyContent: "center", minHeight: 44, paddingHorizontal: 8 },
   topTitle: { flex: 1, textAlign: "center" },
-  topEnd: { alignItems: "center", flexDirection: "row" },
+  topEnd: { alignItems: "center", flexDirection: "row", marginLeft: "auto" },
   body: { paddingBottom: 48, paddingHorizontal: 16, paddingTop: 18 },
   notice: { paddingHorizontal: 16, paddingTop: 12 },
   photo: { alignItems: "center", gap: 8, marginBottom: 18, marginTop: 14 },

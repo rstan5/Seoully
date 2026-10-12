@@ -87,7 +87,7 @@ export type SocialCollector = {
   avatarUrl?: string;
   follow: { following: boolean; followers: number; followingCount: number };
   groups: { id: string; name: string }[];
-  biases: { id: string; name: string }[];
+  biases: { id: string; name: string; groupName?: string }[];
   eras: { id: string; name: string }[];
   holdings: NativeHolding[];
   holdingCount: number;

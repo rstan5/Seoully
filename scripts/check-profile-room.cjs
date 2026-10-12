@@ -117,9 +117,9 @@ test('native authenticated transport sends appearance and reads confirmed prefer
 });
 for(const failed of [false,true]) test(`actual native Edit Profile save handler: ${failed?'failure preserves draft and stays open':'confirmed response adopted before back'}`,async()=>{
  const source=fs.readFileSync('apps/mobile/app/edit-profile.tsx','utf8');
- const saveSource=source.slice(source.indexOf('async function save()'),source.indexOf('  async function signOut()'));
+ const saveSource=source.slice(source.indexOf('async function save()'),source.indexOf('  async function pickAvatar('));
  const events=[];const choice={mode:'room-sync'};
- const save=vm.runInNewContext(`(${saveSource})`,{social:{kind:'production'},busy:false,displayName:' Collector ',tagline:'',bio:'',location:'',appearance:choice,
+ const save=vm.runInNewContext(`(${saveSource})`,{social:{kind:'production'},busy:false,tastePending:0,avatarDraft:null,displayName:' Collector ',tagline:'',bio:'',location:'',appearance:choice,collectorType:'Collector',groupIds:[],biasIds:[],
   copy:{profileSaveFailed:'retry',demoWriteBlocked:'demo'},setBusy:v=>events.push(['busy',v]),setMessage:v=>events.push(['message',v]),
   setIdentity:v=>events.push(['identity',v]),setAppearance:v=>events.push(['appearance',v]),router:{back:()=>events.push(['back'])},
   updateNativeProfile:async payload=>{assert.deepEqual(clean(payload.appearance),choice);if(failed)throw Error('offline');return {identity:{profile:{appearance:choice}}};}});

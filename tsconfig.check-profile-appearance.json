@@ -1,6 +1,23 @@
 {
   "extends": "./tsconfig.json",
-  "compilerOptions": { "incremental": false },
-  "include": ["src/domain/profile-appearance.ts", "src/domain/identity.ts", "src/server/auth/actions.ts", "src/server/dal/profile.ts", "src/app/api/mobile/profile/route.ts", "src/app/api/public/profiles/[handle]/route.ts"],
-  "exclude": ["node_modules", "apps/mobile"]
+  "compilerOptions": {
+    "incremental": false
+  },
+  "include": [
+    "src/domain/profile-appearance.ts",
+    "src/domain/identity.ts",
+    "src/server/auth/actions.ts",
+    "src/server/dal/profile.ts",
+    "src/app/api/mobile/profile/route.ts",
+    "src/app/api/mobile/catalog/members/route.ts",
+    "src/app/api/public/profiles/[handle]/route.ts",
+    "src/app/api/mobile/profile/avatar/route.ts",
+    "src/app/api/mobile/profile/capabilities/route.ts",
+    "src/app/api/mobile/catalog/identity-contributions/route.ts",
+    "src/app/api/mobile/catalog/groups/route.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "apps/mobile"
+  ]
 }

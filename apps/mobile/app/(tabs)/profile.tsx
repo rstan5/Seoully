@@ -1,3 +1,5 @@
+import { readSelectedCatalogIdentity } from "../../src/data/collectorIdentity";
+import { archetypeLabel } from "../../src/ui/collectorArchetypes";
 import { resolveRoomLook } from "../../src/room/roomStyle";
 import { useProfileRoom } from "../../src/room/useProfileRoom";
 import { nativeProfileTheme } from "../../src/room/profileRoom";
@@ -7,6 +9,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import {
   loadNativeOnboarding,
+  type NativeCollectorMember,
   type NativeFeedPost,
   type NativeHolding,
   type NativeIdentity,
@@ -68,6 +71,8 @@ export default function ProfileScreen() {
   const [posts, setPosts] = useState<NativeFeedPost[]>([]);
   const [holdings, setHoldings] = useState<NativeHolding[]>([]);
   const [wishlist, setWishlist] = useState<NativeWishlistEntry[]>([]);
+  const [catalogGroups, setCatalogGroups] = useState<{ id: string; name: string }[]>([]);
+  const [catalogMembers, setCatalogMembers] = useState<NativeCollectorMember[]>([]);
   const [onboarding, setOnboarding] = useState<NativeOnboardingState | null>(null);
   const [demoGroups, setDemoGroups] = useState<{ id: string; name: string }[]>([]);
   const [demoBiases, setDemoBiases] = useState<{ id: string; name: string }[]>([]);
@@ -102,16 +107,17 @@ export default function ProfileScreen() {
         setTheme(collector.theme);
         setOnboarding(null);
       } else {
-        const [counts, page, nextHoldings, nextWishlist, tastes] = await Promise.all([
+        const [counts, page, nextHoldings, nextWishlist, tastes, members] = await Promise.all([
           social.loadFollowCounts(),
           social.loadCollectorPosts(nextIdentity.user.id),
           social.loadMyHoldings(),
           social.loadMyWishlist(),
           loadNativeOnboarding().catch(() => null),
+          readSelectedCatalogIdentity(nextIdentity.profile.favoriteGroupIds, nextIdentity.profile.biasMemberIds).catch(() => ({ groups: [], members: [] })),
         ]);
         if (generation !== refreshGeneration.current) return;
         setIdentity(nextIdentity);
-        setAvatarUrl(undefined);
+        setAvatarUrl(nextIdentity.profile.avatarUrl);
         setFollowers(counts.followers);
         setFollowingCount(counts.followingCount);
         setHoldingCount(nextHoldings.length);
@@ -122,6 +128,8 @@ export default function ProfileScreen() {
         setDemoBiases([]);
         setTheme(undefined);
         setOnboarding(tastes);
+        setCatalogMembers(members.members);
+        setCatalogGroups(members.groups);
       }
       setError(null);
     } catch {
@@ -140,13 +148,13 @@ export default function ProfileScreen() {
   const groups = useMemo(() => {
     if (demoGroups.length) return demoGroups;
     const ids = identity?.profile.favoriteGroupIds ?? [];
-    return (onboarding?.groups ?? []).filter((group) => ids.includes(group.id)).map((group) => ({ id: group.id, name: group.name }));
-  }, [demoGroups, identity, onboarding]);
+    return [...new Map([...(onboarding?.groups ?? []), ...catalogGroups].map(group => [group.id, group])).values()].filter(group => ids.includes(group.id)).map(group => ({ id: group.id, name: group.name }));
+  }, [demoGroups, identity, onboarding, catalogGroups]);
   const biases = useMemo(() => {
     if (demoBiases.length) return demoBiases;
     const ids = identity?.profile.biasMemberIds ?? [];
-    return (onboarding?.members ?? []).filter((member) => ids.includes(member.id)).map((member) => ({ id: member.id, name: member.stageName }));
-  }, [demoBiases, identity, onboarding]);
+    return [...new Map([...(onboarding?.members ?? []), ...catalogMembers].map(member => [member.id, member])).values()].filter((member) => ids.includes(member.id)).map((member) => ({ id: member.id, name: [member.stageName, ("groupName" in member ? String(member.groupName) : onboarding?.groups.find(g => g.id === member.groupId)?.name)].filter(Boolean).join(" · ") }));
+  }, [demoBiases, identity, onboarding, catalogMembers]);
   const highlights = useMemo(() => highlightsFromHoldings(holdings), [holdings]);
 
   async function toggleTrade(holding: NativeHolding) {
@@ -239,7 +247,7 @@ export default function ProfileScreen() {
               bio={identity.profile.bio || identity.profile.tagline}
               location={identity.profile.location}
               since={identity.user.joinedAt ? copy.profileCollectingSince.replace("{date}", formatCollectingSince(identity.user.joinedAt, locale)) : undefined}
-              collectorType={identity.profile.collectorType}
+              collectorType={archetypeLabel(identity.profile.collectorType, copy)}
             />
             <View style={styles.actions}>
               <SeoullyButton label={copy.profileEdit} fill onPress={() => router.push("/edit-profile")} />
@@ -252,13 +260,12 @@ export default function ProfileScreen() {
             {notice ? <SeoullyText variant="secondary" style={styles.inlineNotice}>{notice}</SeoullyText> : null}
           </View>
 
-          {groups.length > 0 || biases.length > 0 || (identity.profile.collectorInterests?.length ?? 0) > 0 ? (
-            <View style={styles.chips}>
-              {groups.map((group) => <SeoullyChip key={group.id} label={group.name} />)}
-              {biases.map((member) => <SeoullyChip key={member.id} label={member.name} tone="bias" />)}
-              {(identity.profile.collectorInterests ?? []).map((interest) => <SeoullyChip key={interest} label={interest} />)}
-            </View>
-          ) : null}
+          {groups.length > 0 ? <SeoullyShelf title={copy.profileFavoriteGroups}>
+            <View style={styles.chips}>{groups.map(group => <SeoullyChip key={group.id} label={group.name} />)}</View>
+          </SeoullyShelf> : null}
+          {biases.length > 0 ? <SeoullyShelf title={copy.profileBiases}>
+            <View style={styles.chips}>{biases.map(member => <SeoullyChip key={member.id} label={member.name} tone="bias" />)}</View>
+          </SeoullyShelf> : null}
 
           {highlights.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlights}>
@@ -274,18 +281,6 @@ export default function ProfileScreen() {
             </ScrollView>
           ) : null}
 
-          <SeoullyShelf title={copy.profilePostsTitle} empty={posts.length === 0 ? copy.profileEmptyPostsSelf : undefined}>
-            {posts.map((post) => (
-              <SeoullyFeedPost
-                key={post.id}
-                item={post}
-                copy={copy}
-                locale={locale}
-                onChange={(next) => setPosts((current) => current.map((item) => item.id === next.id ? next : item))}
-              />
-            ))}
-          </SeoullyShelf>
-
           <SeoullyShelf
             title={copy.profileOwned}
             count={holdingCount}
@@ -293,6 +288,7 @@ export default function ProfileScreen() {
             onToggle={() => setOwnedExpanded((value) => !value)}
             empty={holdings.length === 0 ? copy.profileEmptyOwnedSelf : undefined}
           >
+            <View style={styles.chips}>{[...new Set(holdings.map(h => h.template.kind))].map(kind => <SeoullyChip key={kind} tone="type" label={`${collectibleKindLabel(kind, copy)} · ${holdings.filter(h => h.template.kind === kind).length}`} />)}</View>
             {holdings.map((holding) => (
               <SeoullyOwnedRow
                 key={holding.id}
@@ -341,6 +337,18 @@ export default function ProfileScreen() {
               </Pressable>
             ) : null}
           </SeoullyShelf>
+          <SeoullyShelf title={copy.profilePostsTitle} empty={posts.length === 0 ? copy.profileEmptyPostsSelf : undefined}>
+            {posts.map((post) => (
+              <SeoullyFeedPost
+                key={post.id}
+                item={post}
+                copy={copy}
+                locale={locale}
+                onChange={(next) => setPosts((current) => current.map((item) => item.id === next.id ? next : item))}
+              />
+            ))}
+          </SeoullyShelf>
+
         </ScrollView>
       ) : null}
         </SeoullyProfileChrome>

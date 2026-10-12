@@ -55,11 +55,22 @@ async function main(){
           rollback;`);
         assert.equal(history.split('\n').at(-1),'t','existing profiles unchanged except safe Default');
       }
+      if(file==='20261007000000_profile_identity_media_and_contributions.sql') {
+        const preserved=sql(`begin;
+          insert into auth.users(id,raw_user_meta_data) values('a8070000-0000-4000-8000-000000000010','{"handle":"identity_history","display_name":"History"}');
+          update public.profiles set bio='Preserved identity',appearance='{"mode":"room-sync"}' where handle='identity_history';
+          create temporary table identity_history as select to_jsonb(p) snapshot from public.profiles p;
+          ${body}
+          select bool_and(to_jsonb(p)-'avatar_id'=h.snapshot and p.avatar_id is null)
+            from public.profiles p join identity_history h on p.user_id=(h.snapshot->>'user_id')::uuid;
+          rollback;`);
+        assert.equal(preserved.split('\n').at(-1),'t','existing identity and appearance preserved by new capability');
+      }
       sql(`begin;\n${body}\ncommit;`);
     }
     sql('create extension pgtap');
     let tapCount=0;
-    for(const file of ['room_persistence.test.sql','catalog_idempotency.test.sql','first_home.test.sql','user_profile_rls.test.sql','profile_appearance.test.sql']){
+    for(const file of ['room_persistence.test.sql','catalog_idempotency.test.sql','first_home.test.sql','user_profile_rls.test.sql','profile_appearance.test.sql','profile_identity.test.sql']){
       const result=sql(fs.readFileSync(path.join('supabase/tests',file),'utf8'));
       const lines=result.split('\n');const failures=lines.filter(l=>/^not ok |^# Looks like/.test(l));
       assert.deepEqual(failures,[],`${file} pgTAP failures`);
@@ -86,6 +97,19 @@ async function main(){
     const retry=JSON.parse(sql(start+request+'commit;'));
     assert.deepEqual(retry,JSON.parse(a),'committed-but-lost-response retry resolves original');
     assert.equal(sql('select count(*) from public.catalog_contributions'),'1');
+    const identityRequest=`select public.contribute_catalog_identity('{"submissionId":"b8070000-0000-4000-8000-000000000020","kind":"group","name":"Concurrent Identity"}');`;
+    const identityFirst=session(); identityFirst.proc.stdin.write(start+identityRequest+'\n');
+    let identityHeld=false; for(let i=0;i<60;i++){if(Number(sql("select count(*) from pg_locks where locktype='advisory' and granted"))>0){identityHeld=true;break}await wait(50)}
+    assert.ok(identityHeld);
+    const identitySecond=session(); identitySecond.proc.stdin.end(start+identityRequest+'commit;\n');
+    let identityBlocked=false; for(let i=0;i<60;i++){if(Number(sql("select count(*) from pg_locks where locktype='advisory' and not granted"))>0){identityBlocked=true;break}await wait(50)}
+    assert.ok(identityBlocked);
+    identityFirst.proc.stdin.end('commit;\n');
+    const identityResults=await Promise.all([identityFirst.done,identitySecond.done]);
+    assert.deepEqual(JSON.parse(identityResults[0]),JSON.parse(identityResults[1]));
+    assert.deepEqual(JSON.parse(sql(start+identityRequest+'commit;')),JSON.parse(identityResults[0]));
+    assert.equal(sql('select count(*) from public.catalog_identity_contributions'),'1');
+    console.log('Identity contribution real concurrent retry and lost-response retry PASS.');
     console.log(`${migrations.length} migrations replayed; ${tapCount} pgTAP assertions passed; historical preservation, real two-session concurrency and lost-response retry PASS.`);
     console.log('Disposable database only; hosted Supabase untouched.');
   } finally {try{run(['rm','-f',container])}catch{}}

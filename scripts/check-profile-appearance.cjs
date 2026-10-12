@@ -114,3 +114,25 @@ test('existing PATCH endpoint rejects absent and expired authentication with 401
 test('existing PATCH endpoint rejects malformed appearance with 400 and no write',async()=>{
   const c=client();assert.equal((await apiRoute(c).PATCH(request({appearance:{mode:'custom',primary:'#ff0000'}}))).status,400);assert.equal(c.writes.length,0);
 });
+
+test('avatar update verifies own upload, returns public signed image, and preserves appearance/identity',async()=>{
+ const c=client({appearance:{mode:'room-sync'}});const id='b8070000-0000-4000-8000-000000000001';const signed=[];
+ c.storage={from:bucket=>({createSignedUrl:async(path,seconds)=>{assert.equal(bucket,'profile-avatars');signed.push({path,seconds});return {data:{signedUrl:'fixture-avatar'},error:null}}})};
+ const saved=await dal.updateCurrentProfile({avatarSubmissionId:id},c);
+ assert.equal(saved.profile.avatarUrl,'fixture-avatar');assert.deepEqual(c.writes,[{avatar_id:id}]);assert.deepEqual(clean(saved.profile.appearance),{mode:'room-sync'});
+ assert.ok(signed.every(s=>s.path===`${uid}/${id}.jpg`));
+ const publicResult=await dal.getPublicProfile(uid,c);assert.equal(publicResult.profile.avatarUrl,'fixture-avatar');assert.equal(publicResult.profile.avatar_id,undefined);assert.equal(publicResult.profile.private_path,undefined);
+});
+test('missing avatar upload rejects before identity mutation; unrelated patches preserve avatar',async()=>{
+ const c=client();c.storage={from:()=>({createSignedUrl:async()=>({data:null,error:{}})})};
+ await assert.rejects(dal.updateCurrentProfile({avatarSubmissionId:'b8070000-0000-4000-8000-000000000001'},c),/profile_avatar_unavailable/);assert.equal(c.writes.length,0);
+ c.row.avatar_id='b8070000-0000-4000-8000-000000000001';await dal.updateCurrentProfile({bio:'New bio'},c);assert.equal(c.row.avatar_id,'b8070000-0000-4000-8000-000000000001');
+});
+
+test('pre-avatar production column fallback preserves existing Profile reads',async()=>{
+ const c=client();const from=c.from.bind(c);let unavailable=0;
+ c.from=table=>{const q=from(table);const select=q.select.bind(q);const read=q.maybeSingle.bind(q);let legacy=false;
+ q.select=columns=>{legacy=columns.includes('avatar_id');select(columns);return q};
+ q.maybeSingle=async()=>legacy?(unavailable++,{data:null,error:{code:'42703'}}):read();return q;};
+ const identity=await dal.getCurrentIdentityFromClient(c);assert.equal(identity.user.id,uid);assert.equal(unavailable,1);assert.equal(identity.profile.avatarUrl,undefined);assert.deepEqual(clean(identity.profile.appearance),{mode:'default'});
+});

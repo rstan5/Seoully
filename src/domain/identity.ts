@@ -15,10 +15,12 @@ export interface IdentityProfileDTO {
     | "collectorInterests"
     | "collectorType"
     | "appearance"
+    | "avatarUrl"
   >;
 }
 
 export interface CurrentProfilePatch {
+  avatarSubmissionId?: string | null;
   appearance?: ProfileThemeChoice;
   handle?: string;
   displayName?: string;

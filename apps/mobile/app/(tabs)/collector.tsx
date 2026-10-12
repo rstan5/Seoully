@@ -1,3 +1,4 @@
+import { archetypeLabel } from "../../src/ui/collectorArchetypes";
 import { resolveRoomLook } from "../../src/room/roomStyle";
 import { useProfileRoom } from "../../src/room/useProfileRoom";
 import { nativeProfileTheme } from "../../src/room/profileRoom";
@@ -255,7 +256,7 @@ export default function CollectorScreen() {
               bio={collector.profile.bio || collector.profile.tagline}
               location={collector.profile.location}
               since={collector.user.joinedAt ? copy.profileCollectingSince.replace("{date}", formatCollectingSince(collector.user.joinedAt, locale)) : undefined}
-              collectorType={collector.profile.collectorType}
+              collectorType={archetypeLabel(collector.profile.collectorType, copy)}
             />
             {!isSelf ? (
               <View style={styles.actions}>
@@ -280,14 +281,12 @@ export default function CollectorScreen() {
             <SeoullyText variant="caption" style={styles.inlineNotice}>{copy.profileUnderlayHint}</SeoullyText>
           </View>
 
-          {collector.groups.length > 0 || collector.biases.length > 0 || collector.eras.length > 0 || (collector.profile.collectorInterests?.length ?? 0) > 0 ? (
-            <View style={styles.chips}>
-              {collector.groups.map((group) => <SeoullyChip key={group.id} label={group.name} />)}
-              {collector.biases.map((member) => <SeoullyChip key={member.id} label={member.name} tone="bias" />)}
-              {collector.eras.map((era) => <SeoullyChip key={era.id} label={era.name} />)}
-              {(collector.profile.collectorInterests ?? []).map((interest) => <SeoullyChip key={interest} label={interest} />)}
-            </View>
-          ) : null}
+          {collector.groups.length > 0 ? <SeoullyShelf title={copy.profileFavoriteGroups}>
+            <View style={styles.chips}>{collector.groups.map(group => <SeoullyChip key={group.id} label={group.name} />)}</View>
+          </SeoullyShelf> : null}
+          {collector.biases.length > 0 ? <SeoullyShelf title={copy.profileBiases}>
+            <View style={styles.chips}>{collector.biases.map(member => <SeoullyChip key={member.id} label={[member.name, member.groupName].filter(Boolean).join(" · ")} tone="bias" />)}</View>
+          </SeoullyShelf> : null}
 
           {highlights.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlights}>
@@ -323,23 +322,6 @@ export default function CollectorScreen() {
             </View>
           ) : null}
 
-          <SeoullyShelf title={copy.profilePostsTitle} empty={posts.length === 0 && !postsError ? copy.profileEmptyPosts : undefined}>
-            {postsError ? <RetryNotice message={postsError} retryLabel={copy.retry} onRetry={refresh} /> : null}
-            {posts.map((post) => (
-              <SeoullyFeedPost
-                key={post.id}
-                item={post}
-                copy={copy}
-                locale={locale}
-                onChange={(next) => setPosts((current) => current.map((item) => item.id === next.id ? next : item))}
-              />
-            ))}
-            {postCursor ? (
-              <Pressable accessibilityRole="button" disabled={loadingMore} onPress={() => { void loadMorePosts(); }} style={styles.more}>
-                <SeoullyText variant="button" color={palette.primaryDeep}>{loadingMore ? copy.saving : copy.loadMorePosts}</SeoullyText>
-              </Pressable>
-            ) : null}
-          </SeoullyShelf>
 
           <SeoullyShelf
             title={copy.profileOwned}
@@ -391,6 +373,23 @@ export default function CollectorScreen() {
           <SeoullyText variant="secondary" style={styles.connect}>
             {copy.profileConnect.replace("{name}", collector.user.displayName)}
           </SeoullyText>
+          <SeoullyShelf title={copy.profilePostsTitle} empty={posts.length === 0 && !postsError ? copy.profileEmptyPosts : undefined}>
+            {postsError ? <RetryNotice message={postsError} retryLabel={copy.retry} onRetry={refresh} /> : null}
+            {posts.map((post) => (
+              <SeoullyFeedPost
+                key={post.id}
+                item={post}
+                copy={copy}
+                locale={locale}
+                onChange={(next) => setPosts((current) => current.map((item) => item.id === next.id ? next : item))}
+              />
+            ))}
+            {postCursor ? (
+              <Pressable accessibilityRole="button" disabled={loadingMore} onPress={() => { void loadMorePosts(); }} style={styles.more}>
+                <SeoullyText variant="button" color={palette.primaryDeep}>{loadingMore ? copy.saving : copy.loadMorePosts}</SeoullyText>
+              </Pressable>
+            ) : null}
+          </SeoullyShelf>
         </ScrollView>
       ) : !loading && !error ? <SeoullyEmptyState align="start" body={copy.collectorUnavailable} /> : null}
         </SeoullyProfileChrome>

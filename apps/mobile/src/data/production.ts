@@ -1,3 +1,4 @@
+import { readSelectedCatalogIdentity } from "./collectorIdentity";
 import {
   addPostComment,
   askSeoullyNative,
@@ -135,6 +136,7 @@ export const productionRepository: SocialRepository = {
     ]);
     const groupIds = result.profile.profile.favoriteGroupIds ?? [];
     const biasIds = result.profile.profile.biasMemberIds ?? [];
+    const selectedCatalog = await readSelectedCatalogIdentity(groupIds, biasIds).catch(() => ({ groups: [], members: [] }));
     const holdings = collection.collectionPublic ? collection.holdings.map((holding) => ({
       id: holding.id,
       templateId: holding.templateId,
@@ -145,6 +147,7 @@ export const productionRepository: SocialRepository = {
     const wishlist = collection.wishlistPublic ? collection.wishlist : [];
     return {
       user: result.profile.user,
+      avatarUrl: result.profile.profile.avatarUrl,
       profile: {
         tagline: result.profile.profile.tagline,
         bio: result.profile.profile.bio,
@@ -154,8 +157,8 @@ export const productionRepository: SocialRepository = {
         collectorInterests: result.profile.profile.collectorInterests,
       },
       follow: result.follow,
-      groups: (tastes?.groups ?? []).filter((group) => groupIds.includes(group.id)).map((group) => ({ id: group.id, name: group.name })),
-      biases: (tastes?.members ?? []).filter((member) => biasIds.includes(member.id)).map((member) => ({ id: member.id, name: member.stageName })),
+      groups: [...new Map([...(tastes?.groups ?? []), ...selectedCatalog.groups].map(group => [group.id, group])).values()].filter(group => groupIds.includes(group.id)).map(group => ({ id: group.id, name: group.name })),
+      biases: [...new Map([...(tastes?.members ?? []), ...selectedCatalog.members].map(member => [member.id, member])).values()].filter((member) => biasIds.includes(member.id)).map((member) => ({ id: member.id, name: member.stageName, groupName: "groupName" in member ? String(member.groupName) : tastes?.groups.find(group => group.id === member.groupId)?.name })),
       eras: [],
       holdings,
       holdingCount: holdings.length,

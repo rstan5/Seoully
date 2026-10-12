@@ -92,7 +92,7 @@ export default function FeedScreen() {
     <SeoullyScreen>
       <KeyboardScreen>
         <SeoullyHeader languageLabel={copy.switchLanguage} onToggleLanguage={toggleLocale} />
-        {social.kind === "demo" && loading && posts.length === 0 && !error ? <SeoullyLoadingState label={copy.feedLoading} /> : null}
+        {social.kind === "demo" && loading && hydratedKey !== feedKey && !error ? <SeoullyLoadingState fullScreen label={copy.feedLoading} /> : null}
         {error ? <View style={styles.notice}><RetryNotice message={error} retryLabel={copy.retry} onRetry={() => { void refresh(); }} /></View> : null}
         <FlatList
           data={posts}

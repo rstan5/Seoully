@@ -8,8 +8,8 @@ import { RetryNotice } from "../components/RetryNotice";
 import { SeoullyField } from "./SeoullyField";
 import { SeoullyText } from "./SeoullyText";
 import { useProfileIdentity } from "./ProfileIdentity";
-import { toggleIdentitySelection } from "./collectorArchetypes";
-export type TasteOption = { id: string; name: string; groupId?: string; groupName?: string };
+import { toggleIdentitySelection, unselectedIdentityOptions } from "./collectorArchetypes";
+export type TasteOption = { id: string; name: string; groupId?: string; groupName?: string; catalogId?: string };
 
 export function ProfileTastePicker({ kind, selected, onChange, initialOptions, preferredGroups = [], disabled, live = true, canContribute = false, userId, onBusyChange }: {
   kind: "groups" | "biases"; selected: string[]; onChange: (ids: string[]) => void;
@@ -39,7 +39,7 @@ export function ProfileTastePicker({ kind, selected, onChange, initialOptions, p
       setPending(true); setError(false);
       try {
         const options = kind === "groups"
-          ? (await searchCollectorGroups(query, controller.signal)).map(g => ({ id: g.id, name: g.name }))
+          ? (await searchCollectorGroups(query, controller.signal)).map(g => ({ id: g.id, name: g.name, catalogId: g.catalogId }))
           : (await searchCollectorMembers(query, controller.signal)).map(m => ({ id: m.id, name: m.stageName, groupId: m.groupId, groupName: m.groupName }));
         if (!active) return;
         setResults(options);
@@ -75,7 +75,7 @@ export function ProfileTastePicker({ kind, selected, onChange, initialOptions, p
     finally { contributionLock.current = false; onBusyChange(false); setCreating(false); }
   }
   const options = new Map([...initialOptions, ...known].map(o => [o.id, o]));
-  const ordered = [...results].sort((a,b) => Number(preferredGroups.includes(b.groupId ?? "")) - Number(preferredGroups.includes(a.groupId ?? "")) || a.name.localeCompare(b.name));
+  const ordered = unselectedIdentityOptions(results, selected).sort((a,b) => Number(preferredGroups.includes(b.groupId ?? "")) - Number(preferredGroups.includes(a.groupId ?? "")) || a.name.localeCompare(b.name));
   function toggle(id: string) {
     if (!selected.includes(id) && selected.length >= (kind === "groups" ? 24 : 48)) { setLimit(true); return; }
     setLimit(false); onChange(toggleIdentitySelection(selected, id));

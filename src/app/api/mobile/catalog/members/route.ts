@@ -1,3 +1,4 @@
+import { CATALOG_QA_GROUP_FILTER } from "@/domain/catalog-fixtures";
 import { GROUPS, MEMBERS } from "@/domain/fixtures/catalog";
 import { NextResponse } from "next/server";
 import { createSupabaseBearerClient } from "@/server/supabase/bearer";
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
     if (authError || !auth.user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
     const { data, error } = await client.from("catalog_members")
       .select("id,group_id,stage_name,catalog_groups!inner(id,name,status)")
-      .neq("status", "restricted").neq("catalog_groups.status", "restricted")
+      .neq("status", "restricted").not("group_id", "in", CATALOG_QA_GROUP_FILTER).neq("catalog_groups.status", "restricted")
       .ilike("stage_name", `%${query.replace(/[\\%_]/g, "")}%`).order("stage_name").limit(500);
     if (error) throw new Error("members_unavailable");
     const normalize = (name: string) => name.normalize("NFKC").trim().toLocaleLowerCase();

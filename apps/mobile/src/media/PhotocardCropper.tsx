@@ -24,6 +24,8 @@ export function PhotocardCropper({
   onUse,
   onCancel,
   busy = false,
+  errorLabel,
+  retryLabel,
 }: {
   asset: Asset | null;
   title: string;
@@ -35,8 +37,13 @@ export function PhotocardCropper({
   onUse: (crop: CropRect) => void;
   onCancel: () => void;
   busy?: boolean;
+  errorLabel?: string;
+  retryLabel?: string;
 }) {
-  const [area, setArea] = useState({ width: 1, height: 1 });
+  const [area, setArea] = useState({ width: 0, height: 0 });
+  const [imageState, setImageState] = useState<"loading" | "ready" | "error">("loading");
+  const [decodeAttempt, setDecodeAttempt] = useState(0);
+  const measured = area.width > 0 && area.height > 0;
   const viewportWidth = Math.max(1, Math.min(330, area.width, area.height * CARD_RATIO));
   const viewportHeight = viewportWidth / CARD_RATIO;
   const [transform, setTransform] = useState<Transform>({ x: 0, y: 0, zoom: 1 });
@@ -84,10 +91,12 @@ export function PhotocardCropper({
   if (!asset) return null;
   const baseScale = Math.max(viewportWidth / asset.width, viewportHeight / asset.height);
   const visible = constrainCrop(transform, asset.width, asset.height, viewportWidth);
-  const displayWidth = asset.width * baseScale * visible.zoom;
-  const displayHeight = asset.height * baseScale * visible.zoom;
+  // Decode once at the maximum supported zoom. Gestures change transforms,
+  // never the native decode target; do not mount a one-point thumbnail first.
+  const displayWidth = asset.width * baseScale * 3;
+  const displayHeight = asset.height * baseScale * 3;
   const adjustZoom = (delta: number) => commit({ ...current.current, zoom: current.current.zoom + delta });
-  const useCrop = () => onUse(cropRectangle(current.current, asset.width, asset.height, viewportWidth));
+  const useCrop = () => { if (busy || imageState !== "ready" || !measured) return; onUse(cropRectangle(current.current, asset.width, asset.height, viewportWidth)); };
 
   return <Modal animationType="slide" visible onRequestClose={() => { if (!busy) onCancel(); }}>
     <SafeAreaView edges={["top", "bottom"]} style={styles.screen}>
@@ -95,10 +104,17 @@ export function PhotocardCropper({
       <SeoullyText variant="secondary" style={styles.hint}>{hint}</SeoullyText>
       <View style={styles.cropArea} onLayout={event => setArea(event.nativeEvent.layout)}>
       <View ref={frame} onLayout={measureFrame} {...panResponder.panHandlers} style={[styles.viewport, { width: viewportWidth, height: viewportHeight }]}>
-        <View pointerEvents="none" style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}><Image source={{ uri: asset.uri }} style={{ position: "absolute", width: displayWidth, height: displayHeight, left: (viewportWidth - displayWidth) / 2 + visible.x, top: (viewportHeight - displayHeight) / 2 + visible.y }} /></View>
+        <View pointerEvents="none" style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}>{measured ? <Image key={`${asset.uri}:${viewportWidth}:${decodeAttempt}`} source={{ uri: asset.uri }} resizeMode="contain"
+          onLoadStart={() => setImageState("loading")} onLoad={() => setImageState("ready")} onError={() => setImageState("error")}
+          style={{ position: "absolute", width: displayWidth, height: displayHeight, left: (viewportWidth - displayWidth) / 2, top: (viewportHeight - displayHeight) / 2,
+            transform: [{ translateX: visible.x }, { translateY: visible.y }, { scale: visible.zoom / 3 }] }} /> : null}</View>
         <View pointerEvents="none" style={styles.frame} />
       </View>
       </View>
+      {imageState === "error" ? <View>
+        <SeoullyText accessibilityRole="alert">{errorLabel}</SeoullyText>
+        <Pressable accessibilityRole="button" onPress={() => { setImageState("loading"); setDecodeAttempt(n => n + 1); }} style={styles.back}><SeoullyText>{retryLabel}</SeoullyText></Pressable>
+      </View> : null}
       <View style={styles.zoomRow}>
         <Pressable accessibilityRole="button" accessibilityLabel={zoomOutLabel} onPress={() => adjustZoom(-0.2)} style={styles.zoomButton}>
           <SeoullyText variant="title" color={colors.plum}>−</SeoullyText>
@@ -108,7 +124,7 @@ export function PhotocardCropper({
           <SeoullyText variant="title" color={colors.plum}>+</SeoullyText>
         </Pressable>
       </View>
-      <Pressable accessibilityRole="button" disabled={busy} accessibilityState={{ disabled: busy }} onPress={useCrop} style={styles.primary}>
+      <Pressable accessibilityRole="button" disabled={busy || imageState !== "ready" || !measured} accessibilityState={{ disabled: busy || imageState !== "ready" || !measured }} onPress={useCrop} style={styles.primary}>
         <SeoullyText variant="button" color={colors.onPrimary}>{useLabel}</SeoullyText>
       </Pressable>
       <Pressable accessibilityRole="button" disabled={busy} onPress={onCancel} style={styles.back}>

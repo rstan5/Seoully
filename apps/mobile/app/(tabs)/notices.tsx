@@ -34,6 +34,7 @@ export default function NoticesScreen() {
   const [items, setItems] = useState<SocialNotice[]>([]);
   const [persisted, setPersisted] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [hydratedKind, setHydratedKind] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -44,6 +45,7 @@ export default function NoticesScreen() {
       if (page.persisted) await social.markNoticesRead();
     } finally {
       setLoading(false);
+      setHydratedKind(social.kind);
     }
   }, [social]);
 
@@ -61,13 +63,14 @@ export default function NoticesScreen() {
     router.push({ pathname: destination.pathname, params: destination.params });
   }
 
+  if (loading && hydratedKind !== social.kind) return <SeoullyLoadingState fullScreen label={copy.notices} />;
+
   return (
     <SeoullyScreen>
       <SeoullyHeader languageLabel={copy.switchLanguage} onToggleLanguage={toggleLocale} />
       <View style={styles.intro}>
         <SeoullyText variant="title">{copy.notices}</SeoullyText>
       </View>
-      {loading && items.length === 0 ? <SeoullyLoadingState label={copy.notices} /> : null}
       {!persisted ? (
         <View style={styles.notice}>
           <SeoullyText variant="secondary">{copy.noticesUnavailable}</SeoullyText>

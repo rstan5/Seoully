@@ -99,11 +99,12 @@ export default function PublicCollectibleScreen() {
     });
   }
 
+  if (loading && !template && !error) return <SeoullyLoadingState fullScreen label={copy.viewCollectible} />;
+
   return (
     <SeoullyScreen>
       <ScrollView contentContainerStyle={styles.container}>
         <ScreenBack label={copy.back} onPress={() => router.back()} />
-        {loading ? <SeoullyLoadingState label={copy.viewCollectible} /> : null}
         {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
         {template ? (
           <>

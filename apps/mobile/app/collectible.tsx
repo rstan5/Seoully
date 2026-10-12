@@ -129,11 +129,12 @@ export default function CollectibleDetailScreen() {
     }
   }
 
+  if (loading && !holding && !error) return <SeoullyLoadingState fullScreen label={copy.viewCollectible} />;
+
   return (
     <SeoullyScreen>
       <ScrollView contentContainerStyle={styles.container}>
         <ScreenBack label={copy.back} onPress={() => router.back()} />
-        {loading ? <SeoullyLoadingState label={copy.viewCollectible} /> : null}
         {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
         {holding ? (
           <>
@@ -209,7 +210,9 @@ export default function CollectibleDetailScreen() {
           </>
         ) : null}
       </ScrollView>
-      <PhotocardCropper
+      <PhotocardCropper key={cropAsset?.uri ?? "no-crop"}
+        errorLabel={copy.photoPrepareFailed}
+        retryLabel={copy.retry}
         asset={cropAsset}
         title={copy.cropPhotocard}
         hint={copy.cropPhotocardHint}

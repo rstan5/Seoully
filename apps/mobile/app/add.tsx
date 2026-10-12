@@ -212,6 +212,8 @@ export default function AddCollectibleScreen() {
         {message ? <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum}>{message}</SeoullyText> : null}
       </ScrollView>
       <PhotocardCropper key={cropAsset?.uri ?? "no-crop"}
+        errorLabel={copy.photoPrepareFailed}
+        retryLabel={copy.retry}
         asset={cropAsset}
         busy={working}
         title={copy.cropPhotocard}

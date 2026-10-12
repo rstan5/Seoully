@@ -123,7 +123,7 @@ export default function BinderScreen() {
     <Text style={styles.lead}>{copy.binderLead}</Text>
     {!loading && !photocards.length ? <Text style={styles.empty}>{copy.binderEmpty}</Text> : null}
     {sections.length > 1 ? <View><Text style={styles.sectionLabel}>{copy.jumpToSet}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sectionRow}>{sections.map((section) => <Pressable key={section.setId} accessibilityRole="button" accessibilityState={{ selected: spreads[visibleSpread]?.left.setId === section.setId }} onPress={() => listRef.current?.scrollToIndex({ index: section.spreadIndex, animated: true })} style={[styles.sectionChip, spreads[visibleSpread]?.left.setId === section.setId && styles.sectionChipSelected]}><Text style={[styles.sectionChipText, spreads[visibleSpread]?.left.setId === section.setId && styles.sectionChipTextSelected]}>{section.setName}</Text></Pressable>)}</ScrollView></View> : null}
-    {loading && social.kind === "demo" ? <SeoullyLoadingState label={copy.binder} /> : null}
+    {loading && social.kind === "demo" && hydratedKind !== social.kind ? <SeoullyLoadingState fullScreen label={copy.binder} /> : null}
     {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
     {!loading || (social.kind !== "demo" && hydratedKind === social.kind) ? <View style={styles.binderStage}>
       <FlatList

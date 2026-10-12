@@ -19,7 +19,7 @@ export function FontProvider({ children }: PropsWithChildren) {
     NotoSansKR_700Bold,
   });
   if (!loaded && !error) {
-    return <SeoullyLoadingState label="Seoully" />;
+    return <SeoullyLoadingState fullScreen label="Seoully" />;
   }
   return children;
 }

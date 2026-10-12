@@ -187,7 +187,7 @@ export default function CollectionScreen() {
                 ))}
               </View>
             ) : null}
-            {loading && social.kind === "demo" ? <SeoullyLoadingState label={copy.collection} /> : null}
+            {loading && social.kind === "demo" && hydratedKind !== social.kind ? <SeoullyLoadingState fullScreen label={copy.collection} /> : null}
             {error ? <RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /> : null}
           </View>
         )}

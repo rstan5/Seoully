@@ -22,7 +22,6 @@ import { SeoullyAvatar } from "../../src/ui/SeoullyAvatar";
 import { SeoullyEmptyState } from "../../src/ui/SeoullyEmptyState";
 import { SeoullyFeedPost } from "../../src/ui/SeoullyFeedPost";
 import { SeoullyHeader } from "../../src/ui/SeoullyHeader";
-import { SeoullyLoadingState } from "../../src/ui/SeoullyLoadingState";
 import { SeoullyScreen } from "../../src/ui/SeoullyScreen";
 import {
   SeoullyCollectibleMark,
@@ -284,7 +283,7 @@ export default function SearchScreen() {
               </View>
 
               {!activeQuery ? <SeoullyEmptyState align="start" body={copy.searchNeedQuery} /> : null}
-              {activeQuery && loading ? <SeoullyLoadingState label={copy.search} /> : null}
+              {activeQuery && loading ? <SeoullyText variant="caption" accessibilityRole="progressbar">{copy.profileCatalogSearching}</SeoullyText> : null}
               {error ? (
                 <RetryNotice
                   message={error}

@@ -11,3 +11,8 @@ export function archetypeLabel(value: string | undefined, copy: MobileCopy) {
 export function toggleIdentitySelection(ids: string[], id: string) {
   return ids.includes(id) ? ids.filter(value => value !== id) : [...new Set([...ids, id])];
 }
+
+/** Selected aliases and actual catalog UUIDs both identify the same saved choice. */
+export function unselectedIdentityOptions<T extends { id: string; catalogId?: string }>(options: T[], selected: string[]): T[] {
+  return [...new Map(options.map(option => [option.id, option])).values()].filter(option => !selected.includes(option.id) && !(option.catalogId && selected.includes(option.catalogId)));
+}

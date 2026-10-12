@@ -209,7 +209,7 @@ export default function OnboardingScreen() {
   if (phase === "room") {
     return (
       <View style={styles.world}>
-        <Suspense fallback={<SeoullyLoadingState label={t.room} />}>
+        <Suspense fallback={<SeoullyLoadingState fullScreen label={t.room} />}>
           <OnboardingWorldIntro
             holdingId={holding?.id}
             photocard={holding ? isBinderEligible(holding) : false}

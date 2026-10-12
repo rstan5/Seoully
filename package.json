@@ -31,7 +31,8 @@
     "mobile:verify": "node scripts/mobile-verify.cjs",
     "check:catalog-idempotency": "tsc --project tsconfig.check-catalog-contribution.json && node scripts/check-catalog-submission.cjs",
     "check:physical-profile-qa": "node scripts/check-physical-profile-qa.cjs",
-    "check:binder-flow": "node scripts/check-binder-flow.cjs"
+    "check:binder-flow": "node scripts/check-binder-flow.cjs",
+    "check:add-paper-recovery": "node scripts/check-add-paper-recovery.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

@@ -228,7 +228,7 @@ function BinderLeaf({
   const angle = side === "left" ? Math.PI/2 : -Math.PI/2;
   return <group ref={leafRef} onClick={(event) => {
     event.stopPropagation();
-    if (interactive && !heldHoldingId && event.delta <= 8) onTurnEdge();
+    if (interactive && !heldHoldingId && event.delta <= 10) onTurnEdge();
   }} position={[side === "left" ? -BINDER_SPINE_W / 2 : BINDER_SPINE_W / 2, 0, 0]} rotation={[0, angle, 0]}>
     <group position={[x - (side === "left" ? -BINDER_SPINE_W / 2 : BINDER_SPINE_W / 2), 0, 0]}>
     <mesh position={[side === "left" ? -0.04 : 0.04, 0, -0.025]}>
@@ -237,12 +237,13 @@ function BinderLeaf({
     </mesh>
     <mesh position={[0, 0, 0.002]} onClick={(event) => {
       event.stopPropagation();
-      if (interactive && !heldHoldingId && event.delta <= 8) onTurnEdge();
+      if (interactive && !heldHoldingId && event.delta <= 10) onTurnEdge();
     }}>
       <planeGeometry args={[BINDER_PAGE_W, BINDER_PAGE_H]} />
       <meshStandardMaterial color={paper} roughness={0.82} side={DoubleSide} />
     </mesh>
-    <mesh position={[0,0,-0.008]}><boxGeometry args={[BINDER_PAGE_W,BINDER_PAGE_H,0.025]} /><meshStandardMaterial color={paper} roughness={0.88} /></mesh>
+    {/* Decorative thickness is slightly ahead of the paper; only paper owns blank-area picking. */}
+    <mesh raycast={() => {}} position={[0,0,-0.008]}><boxGeometry args={[BINDER_PAGE_W,BINDER_PAGE_H,0.025]} /><meshStandardMaterial color={paper} roughness={0.88} /></mesh>
     {side === "right" ? <BinderOwnerLabel ownerName={ownerName ?? ""} cover={cover} /> : null}
     {page ? <PagePockets page={page} heldHoldingId={heldHoldingId} paper={paper} onHold={onHold} /> : null}
     </group>

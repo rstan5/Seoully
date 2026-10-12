@@ -21,6 +21,12 @@ export function buildNativeBinderPages(holdings: NativeHolding[], generalName: s
     const last = pages.at(-1)!;
     pages.push(blankPage(last.setId, last.setName, last.pageInSet + 1));
   }
+  // One finite blank spread after the collection: turn paper even with one
+  // populated page, without reserving slots between cards or growing on taps.
+  if (photocards.length) {
+    const last = pages.at(-1)!;
+    pages.push(blankPage(last.setId, last.setName, last.pageInSet + 1), blankPage(last.setId, last.setName, last.pageInSet + 2));
+  }
   return pages;
 }
 

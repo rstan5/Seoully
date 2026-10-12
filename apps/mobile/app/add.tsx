@@ -6,7 +6,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import { loadMyHolding, createHolding, uploadCatalogReferencePhoto, uploadHoldingPhoto } from "../src/api";
 import { confirmFirstCollectible, type FirstCollectibleDraft } from "../src/onboarding/firstCollectible";
-import { queueFirstCollectible, readFirstCollectibleDraft, saveFirstCollectibleDraft, clearFirstCollectibleDraft } from "../src/onboarding/firstCollectibleStorage";
+import { prepareAddCollectibleDraft, saveFirstCollectibleDraft, clearFirstCollectibleDraft } from "../src/onboarding/firstCollectibleStorage";
 import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
 import { useSocialRepository } from "../src/data";
 import { catalogReferenceConsentDefault, shouldShareCatalogReference } from "../src/data/ownership";
@@ -35,6 +35,9 @@ export default function AddCollectibleScreen() {
   }>();
   const fromOnboarding = params.from === "onboarding";
   const submitting = useRef(false);
+  const draftScope = useRef<string | undefined>(undefined);
+  const photoTemplate = useRef(params.templateId);
+  const [pendingDraft, setPendingDraft] = useState<FirstCollectibleDraft | null>(null);
   const [draft, setDraft] = useState<FirstCollectibleDraft | null>(null);
   const [hydrating, setHydrating] = useState(true);
   const [uri, setUri] = useState<string | null>(null);
@@ -46,18 +49,32 @@ export default function AddCollectibleScreen() {
   const photocard = params.kind === "photocard";
   const isNewTemplate = params.newTemplate === "true";
 
-  async function fetchDraft() {
-      const existing = await readFirstCollectibleDraft() ?? await queueFirstCollectible(params.templateId, isNewTemplate);
-      if (existing.templateId !== params.templateId) throw new Error("pending_first_collectible");
-      return existing;
+  function persistDraft(next: FirstCollectibleDraft) { return saveFirstCollectibleDraft(next, draftScope.current); }
+  function fetchDraft() {
+    return prepareAddCollectibleDraft(params.templateId, isNewTemplate, fromOnboarding, {
+      name: params.name ?? "", kind: params.kind ?? "", groupName: params.groupName, memberName: params.memberName, releaseName: params.releaseName,
+    }).then(prepared => {
+      draftScope.current = prepared.scope;
+      if (prepared.draft.templateId !== params.templateId) {
+        setPendingDraft(prepared.draft);
+        throw new Error("pending_first_collectible");
+      }
+      return prepared.draft;
+    });
   }
   function restoreDraft() {
     return fetchDraft().then((existing) => {
       setDraft(existing);
-      setUri(existing.photoUri);
+      const samePhotoOperation = photoTemplate.current === existing.templateId;
+      photoTemplate.current = existing.templateId;
+      setUri(current => samePhotoOperation ? current ?? existing.photoUri : existing.photoUri);
+      setPendingDraft(null);
       setShareReference(fromOnboarding ? false : existing.shareReference);
       setMessage(null);
-    }).catch(() => { setMessage(copy.holdingCreateFailed); })
+    }).catch(error => {
+      const reason = error instanceof Error && ["pending_first_collectible", "add_template_missing", "unauthenticated", "invalid_first_collectible_draft"].includes(error.message) ? error.message : "draft_storage_failed";
+      setMessage(__DEV__ ? `${copy.addDraftFailed} (add_draft:000:${reason})` : copy.addDraftFailed);
+    })
       .finally(() => { setHydrating(false); });
   }
   useEffect(() => {
@@ -80,7 +97,7 @@ export default function AddCollectibleScreen() {
       if (photocard && asset.width && asset.height) {
         setCropAsset({ uri: asset.uri, width: asset.width, height: asset.height });
       } else {
-        if (draft) await saveFirstCollectibleDraft({ ...draft, photoUri: asset.uri });
+        if (draft) await persistDraft({ ...draft, photoUri: asset.uri });
         setUri(asset.uri);
       }
     } catch {
@@ -94,7 +111,7 @@ export default function AddCollectibleScreen() {
     setWorking(true);
     try {
       const cropped = await ImageManipulator.manipulateAsync(cropAsset.uri, [{ crop }], { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG });
-      if (draft) await saveFirstCollectibleDraft({ ...draft, photoUri: cropped.uri });
+      if (draft) await persistDraft({ ...draft, photoUri: cropped.uri });
       setUri(cropped.uri);
       setCropAsset(null);
     } catch {
@@ -110,21 +127,23 @@ export default function AddCollectibleScreen() {
     submitting.current = true;
     setWorking(true);
     setMessage(null);
+    let ownershipConfirmed = false;
     try {
-      if (!draft) throw new Error("draft_unavailable");
+      if (!draft || draft.templateId !== params.templateId) throw new Error("draft_unavailable");
       const next = { ...draft, photoUri: uri, shareReference: fromOnboarding ? false : shouldShareCatalogReference({ consent: shareReference, isNewTemplate, hasPersonalMedia: Boolean(uri) }) };
-      await saveFirstCollectibleDraft(next);
+      await persistDraft(next);
       const holding = await confirmFirstCollectible(next, { read: loadMyHolding, create: createHolding,
-        photo: uploadHoldingPhoto, reference: uploadCatalogReferencePhoto, save: saveFirstCollectibleDraft });
+        photo: uploadHoldingPhoto, reference: uploadCatalogReferencePhoto, save: persistDraft });
       if (!holding) throw new Error("holding_unavailable");
-      await clearFirstCollectibleDraft();
+      ownershipConfirmed = true;
+      setSavedHoldingId(holding.id);
+      await clearFirstCollectibleDraft(draftScope.current);
       if (fromOnboarding) router.replace({ pathname: "/onboarding", params: { phase: "reveal", holdingId: holding.id } });
-      else setSavedHoldingId(holding.id);
       return;
     } catch (error) {
       const diagnostic = error instanceof Error && /^(holding_read|holding_create|media_upload):[0-9]{3}:[a-z_]+$/.test(error.message) ? error.message
         : error instanceof Error && ["media_local_file_unreadable", "media_too_large", "unsupported_media_type"].includes(error.message) ? `media_prepare:000:${error.message}` : null;
-      const friendly = error instanceof Error && error.message.includes("media") ? copy.photoUpdateFailed : copy.holdingCreateFailed;
+      const friendly = ownershipConfirmed ? copy.addConfirmationFailed : error instanceof Error && error.message.includes("media") ? copy.photoUpdateFailed : copy.holdingCreateFailed;
       setMessage(__DEV__ && diagnostic ? `${friendly} (${diagnostic})` : friendly);
     } finally {
       submitting.current = false;
@@ -140,12 +159,11 @@ export default function AddCollectibleScreen() {
   ].filter(Boolean).join(" · ");
 
   if (hydrating && social.kind !== "demo") return <SeoullyLoadingState fullScreen label={copy.brand} />;
-  if (!draft && social.kind !== "demo") return <SeoullyScreen><SeoullyText accessibilityRole="alert">{message}</SeoullyText><SeoullyButton label={copy.retry} onPress={() => { setHydrating(true); void restoreDraft(); }} /></SeoullyScreen>;
   if (savedHoldingId) return <SeoullyScreen>
     <View style={styles.container}>
       <SeoullyText variant="title">{copy.collectibleSaved}</SeoullyText>
       {message ? <SeoullyText accessibilityRole="alert">{message}</SeoullyText> : null}
-      <SeoullyButton label={copy.viewInRoom} block onPress={() => router.replace({ pathname: "/room", params: { holdingId: savedHoldingId } })} />
+      <SeoullyButton label={copy.viewInRoom} block onPress={() => { try { router.replace(fromOnboarding ? { pathname: "/onboarding", params: { phase: "reveal", holdingId: savedHoldingId } } : { pathname: "/room", params: { holdingId: savedHoldingId } }); } catch { setMessage(copy.addConfirmationFailed); } }} />
     </View>
   </SeoullyScreen>;
   return (
@@ -186,11 +204,13 @@ export default function AddCollectibleScreen() {
         ) : null}
         <SeoullyButton
           label={working ? copy.saving : copy.saveCollectible}
-          disabled={working}
+          disabled={working || ((!draft || draft.templateId !== params.templateId) && social.kind !== "demo")}
           block
           onPress={() => { void add(); }}
         />
         {message ? <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum}>{message}</SeoullyText> : null}
+        {!draft && social.kind !== "demo" ? <SeoullyButton label={copy.retry} onPress={() => { setHydrating(true); void restoreDraft(); }} /> : null}
+        {pendingDraft ? <SeoullyButton label={copy.resumeSavedAdd} onPress={() => router.replace({ pathname: "/add", params: { templateId: pendingDraft.templateId, name: pendingDraft.templateInfo?.name ?? "", kind: pendingDraft.templateInfo?.kind ?? "", from: "onboarding", ...(pendingDraft.newTemplate ? { newTemplate: "true" } : {}) } })} /> : null}
       </ScrollView>
       <PhotocardCropper key={cropAsset?.uri ?? "no-crop"}
         errorLabel={copy.photoPrepareFailed}

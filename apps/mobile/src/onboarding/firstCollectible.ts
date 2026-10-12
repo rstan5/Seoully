@@ -8,7 +8,15 @@ export async function confirmFirstCollectible(draft: FirstCollectibleDraft, deps
   save(draft: FirstCollectibleDraft): Promise<void>;
 }) {
   let holding = await deps.read(draft.holdingId);
-  if (!holding) holding = (await deps.create(draft.templateId, draft.holdingId)).holding;
+  if (!holding) {
+    try { holding = (await deps.create(draft.templateId, draft.holdingId)).holding; }
+    catch (error) {
+      // Creation/hydration may have committed before its response was lost.
+      holding = await deps.read(draft.holdingId);
+      if (!holding) throw error;
+    }
+  }
+  if (holding.id !== draft.holdingId) throw new Error("holding_identity_mismatch");
   if (draft.photoUri && !holding.hasPersonalMedia && !holding.personalMediaUrl) {
     try { await deps.photo(holding.id, draft.photoUri); }
     catch (error) {

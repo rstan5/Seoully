@@ -16,6 +16,7 @@ import { useCopy } from "../src/locale";
 import { PhotocardCropper, type CropRect } from "../src/media/PhotocardCropper";
 import { colors } from "../src/theme";
 import { SeoullyButton } from "../src/ui/SeoullyControls";
+import { SeoullyMessageScreen } from "../src/ui/SeoullyMessageScreen";
 import { SeoullyScreen } from "../src/ui/SeoullyScreen";
 import { SeoullyText } from "../src/ui/SeoullyText";
 
@@ -159,13 +160,9 @@ export default function AddCollectibleScreen() {
   ].filter(Boolean).join(" · ");
 
   if (hydrating && social.kind !== "demo") return <SeoullyLoadingState fullScreen label={copy.brand} />;
-  if (savedHoldingId) return <SeoullyScreen>
-    <View style={styles.container}>
-      <SeoullyText variant="title">{copy.collectibleSaved}</SeoullyText>
-      {message ? <SeoullyText accessibilityRole="alert">{message}</SeoullyText> : null}
-      <SeoullyButton label={copy.viewInRoom} block onPress={() => { try { router.replace(fromOnboarding ? { pathname: "/onboarding", params: { phase: "reveal", holdingId: savedHoldingId } } : { pathname: "/room", params: { holdingId: savedHoldingId } }); } catch { setMessage(copy.addConfirmationFailed); } }} />
-    </View>
-  </SeoullyScreen>;
+  if (savedHoldingId) return <SeoullyMessageScreen title={copy.collectibleSaved} message={message} alert>
+    <SeoullyButton label={copy.viewInRoom} block multiline onPress={() => { try { router.replace(fromOnboarding ? { pathname: "/onboarding", params: { phase: "reveal", holdingId: savedHoldingId } } : { pathname: "/room", params: { holdingId: savedHoldingId } }); } catch { setMessage(copy.addConfirmationFailed); } }} />
+  </SeoullyMessageScreen>;
   return (
     <SeoullyScreen>
       <ScrollView contentContainerStyle={styles.container}>

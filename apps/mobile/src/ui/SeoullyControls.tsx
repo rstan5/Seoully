@@ -12,6 +12,7 @@ export function SeoullyButton({
   disabled = false,
   block = false,
   fill = false,
+  multiline = false,
   onPress,
 }: {
   label: string;
@@ -19,6 +20,7 @@ export function SeoullyButton({
   disabled?: boolean;
   block?: boolean;
   fill?: boolean;
+  multiline?: boolean;
   onPress: () => void;
 }) {
   const reduceMotion = useReduceMotion();
@@ -54,7 +56,7 @@ export function SeoullyButton({
       <SeoullyText
         variant="button"
         color={labelColor}
-        numberOfLines={fill ? 2 : 1}
+        numberOfLines={multiline ? undefined : fill ? 2 : 1}
         style={styles.label}
       >
         {label}

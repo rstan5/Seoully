@@ -1,13 +1,10 @@
-import { View } from "react-native";
 import { Stack } from "expo-router";
 import { useCopy } from "../locale";
 import { ROOM_THEMES } from "../room/theme";
-import { colors } from "../theme";
 import { immersiveRoomFill } from "../ui/shellLayout";
 import { SeoullyButton } from "../ui/SeoullyControls";
 import { SeoullyLoadingState } from "../ui/SeoullyLoadingState";
-import { SeoullyScreen } from "../ui/SeoullyScreen";
-import { SeoullyText } from "../ui/SeoullyText";
+import { SeoullyMessageScreen } from "../ui/SeoullyMessageScreen";
 import { useBootstrap } from "./BootstrapProvider";
 import { AUTH_ROUTE_OWNER, screensForDestination } from "./routing";
 
@@ -31,14 +28,9 @@ export function AuthRouteTree() {
           ? t.startupApiFailed
           : t.startupOnboardingFailed;
     return (
-      <SeoullyScreen>
-        <View style={{ flex: 1, gap: 16, justifyContent: "center", paddingHorizontal: 16 }}>
-          <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum} style={{ textAlign: "center" }}>
-            {message}
-          </SeoullyText>
-          <SeoullyButton label={t.retry} block onPress={() => boot.refresh()} />
-        </View>
-      </SeoullyScreen>
+      <SeoullyMessageScreen message={message} alert>
+        <SeoullyButton label={t.retry} block multiline onPress={() => boot.refresh()} />
+      </SeoullyMessageScreen>
     );
   }
 

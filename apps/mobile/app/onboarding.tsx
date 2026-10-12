@@ -24,6 +24,7 @@ import { readFirstCollectibleDraft } from "../src/onboarding/firstCollectibleSto
 import { SeoullyButton, SeoullyChoiceChip } from "../src/ui/SeoullyControls";
 import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
 import { useBootstrap } from "../src/startup/BootstrapProvider";
+import { SeoullyMessageScreen } from "../src/ui/SeoullyMessageScreen";
 import { SeoullyScreen } from "../src/ui/SeoullyScreen";
 import { SeoullyText } from "../src/ui/SeoullyText";
 
@@ -197,12 +198,9 @@ export default function OnboardingScreen() {
 
   if (!state) {
     return (
-      <SeoullyScreen>
-        <View style={styles.centered}>
-          <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum}>{error}</SeoullyText>
-          <SeoullyButton label={t.retry} block onPress={() => { void load(); }} />
-        </View>
-      </SeoullyScreen>
+      <SeoullyMessageScreen message={error} alert>
+        <SeoullyButton label={t.retry} block multiline onPress={() => { void load(); }} />
+      </SeoullyMessageScreen>
     );
   }
 
@@ -304,7 +302,6 @@ export default function OnboardingScreen() {
 
 const styles = StyleSheet.create({
   container: { flexGrow: 1, paddingBottom: 16, paddingHorizontal: 24 },
-  centered: { flex: 1, gap: 16, justifyContent: "center", paddingHorizontal: 16 },
   topline: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   language: { justifyContent: "center", minHeight: 44, paddingHorizontal: 4 },
   headline: { marginTop: 32, fontSize: 32, lineHeight: 38 },

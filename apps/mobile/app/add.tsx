@@ -36,8 +36,9 @@ export default function AddCollectibleScreen() {
   const fromOnboarding = params.from === "onboarding";
   const submitting = useRef(false);
   const [draft, setDraft] = useState<FirstCollectibleDraft | null>(null);
-  const [hydrating, setHydrating] = useState(fromOnboarding);
+  const [hydrating, setHydrating] = useState(true);
   const [uri, setUri] = useState<string | null>(null);
+  const [savedHoldingId, setSavedHoldingId] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [shareReference, setShareReference] = useState(catalogReferenceConsentDefault());
@@ -60,10 +61,10 @@ export default function AddCollectibleScreen() {
       .finally(() => { setHydrating(false); });
   }
   useEffect(() => {
-    if (fromOnboarding) void restoreDraft();
+    if (social.kind !== "demo") void restoreDraft();
     // Only restore when entering this logical Add operation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromOnboarding, params.templateId]);
+  }, [fromOnboarding, params.templateId, social.kind]);
 
   async function choose(source: "camera" | "library") {
     setMessage(null);
@@ -110,42 +111,15 @@ export default function AddCollectibleScreen() {
     setWorking(true);
     setMessage(null);
     try {
-      if (fromOnboarding) {
-        if (!draft) throw new Error("draft_unavailable");
-        const next = { ...draft, photoUri: uri, shareReference: false };
-        await saveFirstCollectibleDraft(next);
-        const holding = await confirmFirstCollectible(next, { read: loadMyHolding, create: createHolding,
-          photo: uploadHoldingPhoto, reference: uploadCatalogReferencePhoto, save: saveFirstCollectibleDraft });
-        if (!holding) throw new Error("holding_unavailable");
-        await clearFirstCollectibleDraft();
-        router.replace({ pathname: "/onboarding", params: { phase: "reveal", holdingId: holding.id } });
-        return;
-      }
-      const { holding } = await createHolding(params.templateId);
-      let photoFailed = false;
-      if (uri) {
-        try {
-          await uploadHoldingPhoto(holding.id, uri);
-        } catch {
-          photoFailed = true;
-        }
-        if (shouldShareCatalogReference({ consent: shareReference, isNewTemplate, hasPersonalMedia: !photoFailed })) {
-          try {
-            await uploadCatalogReferencePhoto(params.templateId, uri);
-          } catch {
-            photoFailed = true;
-          }
-        }
-      }
-      router.replace(fromOnboarding
-        ? {
-            pathname: "/onboarding",
-            params: { phase: "reveal", holdingId: holding.id, ...(photoFailed ? { photoWarning: "1" } : {}) },
-          }
-        : {
-            pathname: "/collectible",
-            params: { holdingId: holding.id, ...(photoFailed ? { photoWarning: "1" } : {}) },
-          });
+      if (!draft) throw new Error("draft_unavailable");
+      const next = { ...draft, photoUri: uri, shareReference: fromOnboarding ? false : shouldShareCatalogReference({ consent: shareReference, isNewTemplate, hasPersonalMedia: Boolean(uri) }) };
+      await saveFirstCollectibleDraft(next);
+      const holding = await confirmFirstCollectible(next, { read: loadMyHolding, create: createHolding,
+        photo: uploadHoldingPhoto, reference: uploadCatalogReferencePhoto, save: saveFirstCollectibleDraft });
+      if (!holding) throw new Error("holding_unavailable");
+      await clearFirstCollectibleDraft();
+      if (fromOnboarding) router.replace({ pathname: "/onboarding", params: { phase: "reveal", holdingId: holding.id } });
+      else setSavedHoldingId(holding.id);
       return;
     } catch (error) {
       const diagnostic = error instanceof Error && /^(holding_read|holding_create|media_upload):[0-9]{3}:[a-z_]+$/.test(error.message) ? error.message
@@ -165,8 +139,15 @@ export default function AddCollectibleScreen() {
     params.kind ? collectibleKindLabel(params.kind, copy) : "",
   ].filter(Boolean).join(" · ");
 
-  if (hydrating) return <SeoullyLoadingState fullScreen label={copy.brand} />;
-  if (fromOnboarding && !draft) return <SeoullyScreen><SeoullyText accessibilityRole="alert">{message}</SeoullyText><SeoullyButton label={copy.retry} onPress={() => { setHydrating(true); void restoreDraft(); }} /></SeoullyScreen>;
+  if (hydrating && social.kind !== "demo") return <SeoullyLoadingState fullScreen label={copy.brand} />;
+  if (!draft && social.kind !== "demo") return <SeoullyScreen><SeoullyText accessibilityRole="alert">{message}</SeoullyText><SeoullyButton label={copy.retry} onPress={() => { setHydrating(true); void restoreDraft(); }} /></SeoullyScreen>;
+  if (savedHoldingId) return <SeoullyScreen>
+    <View style={styles.container}>
+      <SeoullyText variant="title">{copy.collectibleSaved}</SeoullyText>
+      {message ? <SeoullyText accessibilityRole="alert">{message}</SeoullyText> : null}
+      <SeoullyButton label={copy.viewInRoom} block onPress={() => router.replace({ pathname: "/room", params: { holdingId: savedHoldingId } })} />
+    </View>
+  </SeoullyScreen>;
   return (
     <SeoullyScreen>
       <ScrollView contentContainerStyle={styles.container}>
@@ -204,7 +185,7 @@ export default function AddCollectibleScreen() {
           </Pressable>
         ) : null}
         <SeoullyButton
-          label={working ? copy.saving : copy.addToCollection}
+          label={working ? copy.saving : copy.saveCollectible}
           disabled={working}
           block
           onPress={() => { void add(); }}

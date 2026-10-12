@@ -25,7 +25,7 @@ import {
   pocketLocalPosition,
 } from "./composition";
 
-const BinderCardMotion = createContext({ heldHoldingId: undefined as string | undefined, reducedMotion: false, paused: false, binderAt: DESK_BINDER_AT, onMediaError: undefined as (() => void) | undefined });
+const BinderCardMotion = createContext({ heldHoldingId: undefined as string | undefined, reducedMotion: false, paused: false, turning: false, binderAt: DESK_BINDER_AT, onMediaError: undefined as (() => void) | undefined });
 
 export const BINDER_PAGE_W = COMP_PAGE_W;
 export const BINDER_PAGE_H = COMP_PAGE_H;
@@ -57,6 +57,7 @@ export function NativeOpenBinder({
   onOpen,
   onHold,
   onTurnComplete,
+  onTurnCancel,
   onTurnEdge,
   onMediaError,
 }: {
@@ -79,6 +80,7 @@ export function NativeOpenBinder({
   onOpen?: () => void;
   onHold: (holding: NativeHolding | null) => void;
   onTurnComplete: () => void;
+  onTurnCancel?: () => void;
   onTurnEdge: (dir: 1 | -1) => void;
   onMediaError?: () => void;
 }) {
@@ -97,8 +99,11 @@ export function NativeOpenBinder({
   const [lastSpread, setLastSpread] = useState(spread);
   if (open && spread !== lastSpread) setLastSpread(spread);
   const visibleSpread = open ? spread : lastSpread;
-  const left = turnDir === -1 && turningTo ? turningTo.left : visibleSpread?.left;
-  const right = turnDir === 1 && turningTo ? turningTo.right : visibleSpread?.right;
+  const [preparedTurn, setPreparedTurn] = useState<string | null>(null);
+  const turnKey = turningTo && turnDir !== 0 ? `${turnDir}:${turningTo.index}:${[...turningTo.left.pockets, ...turningTo.right.pockets].map(p => `${p.holding?.id ?? ""}:${p.holding?.personalMediaUrl ?? p.holding?.template.imageUrl ?? ""}`).join("|")}` : null;
+  const readyToTurn = Boolean(turnKey && preparedTurn === turnKey);
+  const left = readyToTurn && turnDir === -1 && turningTo ? turningTo.left : visibleSpread?.left;
+  const right = readyToTurn && turnDir === 1 && turningTo ? turningTo.right : visibleSpread?.right;
   const leaf = turnDir === 1 ? spread?.right : turnDir === -1 ? spread?.left : undefined;
   const leafBack = turnDir === 1 ? turningTo?.left : turningTo?.right;
 
@@ -158,14 +163,15 @@ export function NativeOpenBinder({
     .multiply(new Quaternion().setFromEuler(new Euler(BINDER_DISPLAY_TILT-Math.PI/2,0,0)))
     .multiply(new Quaternion().setFromEuler(new Euler(0,-Math.PI/2,0))));
   const [initialPosition]=useState<[number,number,number]>(()=>[rest.x,rest.y+BINDER_DISPLAY_CENTER_Y*0.62,rest.z]);
-  return <BinderCardMotion.Provider value={{ heldHoldingId, reducedMotion, paused, binderAt, onMediaError }}>
+  return <BinderCardMotion.Provider value={{ heldHoldingId, reducedMotion, paused, turning: turnDir !== 0, binderAt, onMediaError }}>
     <group ref={stand} position={[rest.x,rest.y,rest.z]} rotation={[0,restRotation.y,0]} scale={0.62}><BinderDisplayStand /></group>
     <group ref={group} position={initialPosition} quaternion={initialQuaternion} scale={0.62}
       onClick={(event)=>{event.stopPropagation();if (!open && progress.current===0) onOpen?.();}}>
       <group ref={bodyRef} position={[0,0,-BINDER_CLOSED_CENTER_Z]}>
         <DisplayBinder cover={cover} paper={paper} ownerName={ownerName} left={left} right={right} leftRef={leftRef} rightRef={rightRef}
-          heldHoldingId={heldHoldingId} interactive={open} onHold={onHold} onTurnEdge={onTurnEdge} />
-        {open && leaf && turnDir !== 0 ? <TurningLeaf page={leaf} back={leafBack} dir={turnDir} reducedMotion={reducedMotion} paused={paused} paper={paper} cover={cover} heldHoldingId={heldHoldingId} onHold={onHold} onComplete={onTurnComplete} /> : null}
+          heldHoldingId={heldHoldingId} interactive={open && turnDir === 0} onHold={onHold} onTurnEdge={onTurnEdge} />
+        {open && turningTo && turnKey ? <TurnPreparation key={turnKey} spread={turningTo} onReady={() => setPreparedTurn(turnKey)} onError={() => { onMediaError?.(); onTurnCancel?.(); }} /> : null}
+        {open && readyToTurn && leaf && turnDir !== 0 ? <TurningLeaf page={leaf} back={leafBack} dir={turnDir} reducedMotion={reducedMotion} paused={paused} paper={paper} cover={cover} heldHoldingId={heldHoldingId} onHold={onHold} onComplete={onTurnComplete} /> : null}
       </group>
     </group>
   </BinderCardMotion.Provider>;
@@ -220,13 +226,19 @@ function BinderLeaf({
 }) {
   const x = pageLocalX(side);
   const angle = side === "left" ? Math.PI/2 : -Math.PI/2;
-  return <group ref={leafRef} position={[side === "left" ? -BINDER_SPINE_W / 2 : BINDER_SPINE_W / 2, 0, 0]} rotation={[0, angle, 0]}>
+  return <group ref={leafRef} onClick={(event) => {
+    event.stopPropagation();
+    if (interactive && !heldHoldingId && event.delta <= 8) onTurnEdge();
+  }} position={[side === "left" ? -BINDER_SPINE_W / 2 : BINDER_SPINE_W / 2, 0, 0]} rotation={[0, angle, 0]}>
     <group position={[x - (side === "left" ? -BINDER_SPINE_W / 2 : BINDER_SPINE_W / 2), 0, 0]}>
-    <mesh position={[side === "left" ? -0.04 : 0.04, 0, -0.025]} onClick={(event) => { if (interactive) { event.stopPropagation(); onTurnEdge(); } }}>
+    <mesh position={[side === "left" ? -0.04 : 0.04, 0, -0.025]}>
       <boxGeometry args={[BINDER_PAGE_W + 0.08, BINDER_PAGE_H + 0.1, 0.03]} />
       <meshStandardMaterial color={cover} roughness={0.6} />
     </mesh>
-    <mesh position={[0, 0, 0.002]}>
+    <mesh position={[0, 0, 0.002]} onClick={(event) => {
+      event.stopPropagation();
+      if (interactive && !heldHoldingId && event.delta <= 8) onTurnEdge();
+    }}>
       <planeGeometry args={[BINDER_PAGE_W, BINDER_PAGE_H]} />
       <meshStandardMaterial color={paper} roughness={0.82} side={DoubleSide} />
     </mesh>
@@ -235,6 +247,28 @@ function BinderLeaf({
     {page ? <PagePockets page={page} heldHoldingId={heldHoldingId} paper={paper} onHold={onHold} /> : null}
     </group>
   </group>;
+}
+
+/** Resolve destination photos before moving paper; no visible placeholder handoff. */
+function TurnPreparation({ spread, onReady, onError }: { spread: NativeBinderSpread; onReady: () => void; onError: () => void }) {
+  const cards = [...spread.left.pockets, ...spread.right.pockets].flatMap(p => {
+    const h = p.holding;
+    const url = h?.personalMediaUrl ?? h?.template.imageUrl;
+    return h && url ? [{ id: h.id, url }] : [];
+  });
+  const [ready, setReady] = useState<Set<string>>(() => new Set());
+  const done = cards.every(card => ready.has(card.id));
+  useEffect(() => { if (done) onReady(); }, [done, onReady]);
+  return <>{cards.map(card => <PreparedCard key={card.id} id={card.id} url={card.url} onError={onError} onReady={() => setReady(prior => prior.has(card.id) ? prior : new Set([...prior, card.id]))} />)}</>;
+}
+function PreparedCard({ id, url, onReady, onError }: { id: string; url: string; onReady: () => void; onError: () => void }) {
+  const uri = useCachedSignedMedia(id, url, onError);
+  return uri ? <CardImageBoundary key={uri} onError={onError}><Suspense fallback={null}><PreparedTexture uri={uri} onReady={onReady} /></Suspense></CardImageBoundary> : null;
+}
+function PreparedTexture({ uri, onReady }: { uri: string; onReady: () => void }) {
+  useLoader(TextureLoader, uri);
+  useEffect(() => { onReady(); }, [onReady]);
+  return null;
 }
 
 function TurningLeaf({
@@ -370,7 +404,7 @@ function PocketCard({
     }
   });
   const imageUrl = holding.personalMediaUrl ?? holding.template.imageUrl;
-  return <group ref={group} onClick={(event) => { event.stopPropagation(); if (active) returning.current = true; else if (!motion.heldHoldingId && (!imageUrl || textureReady)) onHold(holding); }}>
+  return <group ref={group} onClick={(event) => { event.stopPropagation(); if (motion.turning) return; if (active) returning.current = true; else if (!motion.heldHoldingId && (!imageUrl || textureReady)) onHold(holding); }}>
     <mesh>
       <boxGeometry args={[CARD_W, CARD_H, 0.012]} />
       <meshStandardMaterial color={paper} roughness={0.45} />

@@ -71,6 +71,7 @@ export function NativeRoomRenderer({
   onCardMediaError,
   onTurnEdge,
   onTurnComplete,
+  onTurnCancel,
   exploreRef,
   previewRef,
   objectPreviewRef,
@@ -118,6 +119,7 @@ export function NativeRoomRenderer({
   onCardMediaError?: () => void;
   onTurnEdge?: (dir: 1 | -1) => void;
   onTurnComplete?: () => void;
+  onTurnCancel?: () => void;
   exploreRef?: MutableRefObject<ExploreOffset>;
   previewRef?: MutableRefObject<RoomRenderable | null>;
   objectPreviewRef?: MutableRefObject<RoomObjectInstance | null>;
@@ -272,6 +274,7 @@ export function NativeRoomRenderer({
       onOpen={view.kind === "binder" || view.kind === "edit" || Boolean(heldId) || Boolean(heldObjectId) ? undefined : onOpenBinder}
       onHold={(holding) => onHoldCard?.(holding)}
       onMediaError={onCardMediaError}
+      onTurnCancel={onTurnCancel}
       onTurnComplete={() => onTurnComplete?.()}
       onTurnEdge={(dir) => onTurnEdge?.(dir)}
     /> : null}

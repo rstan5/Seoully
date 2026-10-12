@@ -5,6 +5,30 @@ import { Directory, File, Paths } from "expo-file-system";
 const CACHE_DIRECTORY = "seoully-signed-media";
 
 let downloadSequence = 0;
+// Exact signed URL + logical media identity: never reuse another viewer's URL.
+// Share in-flight and completed downloads across page/card remounts.
+const downloads = new Map<string, Promise<string>>();
+const completed = new Map<string, string>();
+function cachedDownload(cacheKey: string, url: string, requestKey: string) {
+  const existing = downloads.get(requestKey);
+  if (existing) return existing;
+  const pending = (async () => {
+    const directory = new Directory(Paths.cache, CACHE_DIRECTORY);
+    directory.create({ idempotent: true, intermediates: true });
+    const destination = new File(directory, `${safeCacheKey(cacheKey)}-${++downloadSequence}.img`);
+    const file = await File.downloadFileAsync(url, destination, { idempotent: true });
+    completed.set(requestKey, file.uri);
+    // Bound session bookkeeping without deleting a file still used by a mesh.
+    while (completed.size > 128) {
+      const oldest = completed.keys().next().value!;
+      completed.delete(oldest);
+      downloads.delete(oldest);
+    }
+    return file.uri;
+  })().catch(error => { downloads.delete(requestKey); completed.delete(requestKey); throw error; });
+  downloads.set(requestKey, pending);
+  return pending;
+}
 
 export function useCachedSignedMedia(cacheKey?: string | null, url?: string | null, onError?: () => void) {
   const failure = useRef(onError);
@@ -14,17 +38,12 @@ export function useCachedSignedMedia(cacheKey?: string | null, url?: string | nu
   useEffect(() => {
     if (!cacheKey || !url || !requestKey) return;
     let active = true;
-    void (async () => {
-      const directory = new Directory(Paths.cache, CACHE_DIRECTORY);
-      directory.create({ idempotent: true, intermediates: true });
-      const destination = new File(directory, `${safeCacheKey(cacheKey)}-${++downloadSequence}.img`);
-      return File.downloadFileAsync(url, destination, { idempotent: true });
-    })()
-      .then((file) => { if (active) setCached({ key: requestKey, uri: file.uri }); })
+    void cachedDownload(cacheKey, url, requestKey)
+      .then((uri) => { if (active) setCached({ key: requestKey, uri }); })
       .catch(() => { if (active) failure.current?.(); });
     return () => { active = false; };
   }, [cacheKey, requestKey, url]);
-  return requestKey && cached?.key === requestKey ? cached.uri : null;
+  return requestKey ? (completed.get(requestKey) ?? (cached?.key === requestKey ? cached.uri : null)) : null;
 }
 
 export function CachedSignedImage({

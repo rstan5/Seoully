@@ -64,7 +64,7 @@ for (const [label, source] of [["onboarding", onboarding], ["collect", collect],
 // H. Add flow reuse
 assertContains(collect, 'pathname: "/add"', "collect opens add");
 assertContains(collect, 'from: "onboarding"', "collect passes onboarding");
-assertContains(add, "createHolding(params.templateId)", "canonical createHolding");
+assertContains(add, "create: createHolding", "canonical retry-safe createHolding dependency");
 assertNotContains(onboarding, "createHolding(", "onboarding does not duplicate Holding");
 
 // I/J catalog + manual
@@ -74,7 +74,7 @@ assertContains(read("apps/mobile/src/manualCatalog.ts"), "contributeCatalogItem(
 assertContains(collect, "addManuallyTitle", "manual add visible");
 
 // K/L/M/N media + crop + consent
-assertContains(add, "uploadHoldingPhoto(holding.id, uri)", "personal media");
+assertContains(add, "photo: uploadHoldingPhoto", "personal media uses retry-safe orchestration");
 assertContains(add, "PhotocardCropper", "photocard crop");
 assert.equal(catalogReferenceConsentDefault(), false);
 assert.equal(shouldShareCatalogReference({ consent: false, isNewTemplate: true, hasPersonalMedia: true }), false);
@@ -101,7 +101,7 @@ assert.equal(resolveOnboardingPhase({
 assert.equal(resumeAfterHoldingDoesNotCollect("reveal"), true);
 
 // T optional media failure
-assertContains(add, "photoFailed", "photo failure keeps holding");
+assertContains(add, "confirmFirstCollectible(next", "photo failure retains retry-safe ownership draft");
 assertNotContains(onboarding, "onboardOpenRoom", "ownership interstitial removed");
 
 // U placement is required, through the existing Room

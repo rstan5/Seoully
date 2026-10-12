@@ -144,6 +144,8 @@ export function RoomWorldScreen({
   const [paused, setPaused] = useState(false);
   const [canvasEpoch, setCanvasEpoch] = useState(0);
   const [turnDir, setTurnDir] = useState<1 | -1 | 0>(0);
+  const binderTurnLock = useRef(false);
+  useEffect(() => { if (turnDir === 0) binderTurnLock.current = false; }, [turnDir]);
   const [turningSpreadIndex, setTurningSpreadIndex] = useState<number | null>(null);
   const [heldId, setHeldId] = useState<string | null>(null);
   const [placingItem, setPlacingItem] = useState<RoomRenderable | null>(null);
@@ -182,7 +184,7 @@ export function RoomWorldScreen({
   const exploreRef = useRef<ExploreOffset>({ ...IDENTITY_EXPLORE });
   const homeExploreRef = useRef<ExploreOffset>({ ...IDENTITY_EXPLORE });
   const frozenExploreRef = useRef<ExploreOffset>({ ...IDENTITY_EXPLORE });
-  const gestureRef = useRef({ lastDx: 0, lastDy: 0, pinching: false, pinchStart: 0, dollyStart: 1, objectDrag: false, releasing: false });
+  const gestureRef = useRef({ lastDx: 0, lastDy: 0, pinching: false, pinchStart: 0, dollyStart: 1, binderTurned: false, objectDrag: false, releasing: false });
   // Selection never owns touches. Only an object-origin long press grants drag ownership.
   const activeTouchesRef = useRef(0);
   const touchOwnerRef = useRef<string | null>(null);
@@ -454,6 +456,7 @@ export function RoomWorldScreen({
     },
     onPanResponderGrant: (event) => {
       clearPendingPress();
+      gestureRef.current.binderTurned = false;
       gestureRef.current.lastDx = 0;
       gestureRef.current.lastDy = 0;
       gestureRef.current.objectDrag = Boolean(heldRef.current || heldObjectRef.current);
@@ -530,10 +533,12 @@ export function RoomWorldScreen({
         highlightSurfaceIdRef.current = held.surfaceId;
         return;
       }
-      if (viewRef.current.kind === "binder" && !viewRef.current.heldHoldingId && Math.abs(gesture.dx) > 48 && turnDir === 0) {
+      if (viewRef.current.kind === "binder" && !viewRef.current.heldHoldingId && Math.abs(gesture.dx) > 48 && turnDir === 0 && !gestureRef.current.binderTurned) {
         const dir = gesture.dx < 0 ? 1 : -1;
         const to = binderSpreadIndex + dir;
-        if (to >= 0 && to < spreads.length) {
+        if (to >= 0 && to < spreads.length && !binderTurnLock.current) {
+          gestureRef.current.binderTurned = true;
+          binderTurnLock.current = true;
           setTurnDir(dir);
           setTurningSpreadIndex(to);
         }
@@ -1460,14 +1465,12 @@ export function RoomWorldScreen({
             if (view.kind === "binder" && view.heldHoldingId) return;
             setBinderHintSeen(true);
             const to = binderSpreadIndex + dir;
-            if (to < 0 || to >= spreads.length || turnDir !== 0) return;
-            if (reducedMotion) {
-              setView({ kind: "binder", spread: to });
-              return;
-            }
+            if (to < 0 || to >= spreads.length || turnDir !== 0 || binderTurnLock.current) return;
+            binderTurnLock.current = true;
             setTurnDir(dir);
             setTurningSpreadIndex(to);
           }}
+          onTurnCancel={() => { setTurnDir(0); setTurningSpreadIndex(null); }}
           onTurnComplete={() => {
             if (turningSpreadIndex == null) return;
             setView({ kind: "binder", spread: turningSpreadIndex });

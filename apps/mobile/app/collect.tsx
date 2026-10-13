@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { type NativeCatalogTemplate } from "../src/api";
 import { queueFirstCollectible } from "../src/onboarding/firstCollectibleStorage";
 import { submitManualCatalog } from "../src/manualCatalog";
@@ -124,10 +124,16 @@ export default function CollectScreen() {
             <View style={styles.entry}>
               <SeoullyText variant="title" style={styles.headline}>{fromOnboarding ? copy.onboardCollectFirstTitle : copy.catalogEntryTitle}</SeoullyText>
               <SeoullyText variant="secondary" style={styles.lede}>{fromOnboarding ? copy.onboardCollectFirstLede : copy.catalogEntryLede}</SeoullyText>
-              <SeoullyButton label={copy.searchSeoullyCatalog} block onPress={() => setStep("search")} />
-              <SeoullyText variant="caption" style={styles.kicker}>{copy.searchSeoullyCatalogLede}</SeoullyText>
-              <SeoullyButton label={copy.addManuallyTitle} variant="ghost" block onPress={() => setStep("manual")} />
-              <SeoullyText variant="caption" style={styles.kicker}>{copy.addManuallyLede}</SeoullyText>
+              <View style={styles.choices}>
+                <Pressable accessibilityRole="button" onPress={() => setStep("search")} style={({ pressed }) => [styles.choice, styles.catalogChoice, pressed && styles.choicePressed]}>
+                  <SeoullyText variant="button" color={colors.onPrimary} style={styles.choiceTitle}>{copy.searchSeoullyCatalog}</SeoullyText>
+                  <SeoullyText variant="secondary" color={colors.onPrimary} style={styles.choiceCopy}>{copy.searchSeoullyCatalogLede}</SeoullyText>
+                </Pressable>
+                <Pressable accessibilityRole="button" onPress={() => setStep("manual")} style={({ pressed }) => [styles.choice, styles.manualChoice, pressed && styles.choicePressed]}>
+                  <SeoullyText variant="button" color={colors.plum} style={styles.choiceTitle}>{copy.addManuallyTitle}</SeoullyText>
+                  <SeoullyText variant="secondary" color={colors.plum} style={styles.choiceCopy}>{copy.addManuallyLede}</SeoullyText>
+                </Pressable>
+              </View>
             </View>
           ) : null}
 
@@ -224,8 +230,15 @@ export default function CollectScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { paddingBottom: 64, paddingHorizontal: 16 },
-  entry: { paddingTop: 8 },
+  container: { flexGrow: 1, paddingBottom: 32, paddingHorizontal: 16 },
+  entry: { flexGrow: 1, paddingTop: 24, paddingBottom: 24 },
+  choices: { flexGrow: 1, justifyContent: "center", gap: 24, paddingVertical: 24 },
+  choice: { minHeight: 120, justifyContent: "center", borderRadius: 20, paddingVertical: 28, paddingHorizontal: 24, gap: 10, borderWidth: 1 },
+  catalogChoice: { backgroundColor: colors.action, borderColor: colors.action },
+  manualChoice: { backgroundColor: colors.lilacSoft, borderColor: colors.border },
+  choicePressed: { opacity: 0.85 },
+  choiceTitle: { textAlign: "center" },
+  choiceCopy: { textAlign: "center", lineHeight: 22 },
   headline: { letterSpacing: -0.8, marginBottom: 8, marginTop: 10 },
   lede: { lineHeight: 22, marginBottom: 28 },
   kicker: { letterSpacing: 0.6, marginBottom: 18, marginTop: 8, textTransform: "uppercase" },

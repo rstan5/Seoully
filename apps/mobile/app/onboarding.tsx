@@ -252,7 +252,7 @@ export default function OnboardingScreen() {
       : t.onboardingInterestLead;
 
   if (!editingTastes && !greeted.has(phase)) return <View style={styles.world}>
-    <HeartFarewell destination="next" text={phase === "collect" ? t.onboardCollectFirstTitle : title} onContinue={() => setGreeted(previous => new Set(previous).add(phase))} />
+    <HeartFarewell destination="next" text={phase === "collect" ? t.onboardingCollectGreeting : phase === "group" ? t.onboardingGroupGreeting : phase === "bias" ? t.onboardingBiasGreeting : t.onboardingInterestGreeting} onContinue={() => setGreeted(previous => new Set(previous).add(phase))} />
   </View>;
 
   return (

@@ -3,18 +3,16 @@ import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { mobileConfig } from "../src/config";
 import { KeyboardScreen } from "../src/components/KeyboardScreen";
-import { useCopy, useLocale } from "../src/locale";
+import { useCopy } from "../src/locale";
 import { supabase } from "../src/supabase";
 import { useBootstrap } from "../src/startup/BootstrapProvider";
 import { colors } from "../src/theme";
-import { BrandMark } from "../src/ui/BrandMark";
 import { SeoullyButton } from "../src/ui/SeoullyControls";
 import { SeoullyScreen } from "../src/ui/SeoullyScreen";
 import { SeoullyText } from "../src/ui/SeoullyText";
 
 export default function Index() {
   const t = useCopy();
-  const { toggleLocale } = useLocale();
   const boot = useBootstrap();
   const [gate, setGate] = useState<"welcome" | "create" | "signin">("welcome");
   const [createMode, setCreateMode] = useState(false);
@@ -54,12 +52,6 @@ export default function Index() {
     <SeoullyScreen edges={["top", "bottom"]}>
       <KeyboardScreen>
         <View style={styles.container}>
-          {gate === "signin" ? <View style={styles.topline}>
-            <BrandMark />
-            <Pressable accessibilityRole="button" onPress={toggleLocale} style={styles.language}>
-              <SeoullyText variant="button">{t.switchLanguage}</SeoullyText>
-            </Pressable>
-          </View> : null}
           {gate === "welcome" ? (
             <View style={styles.welcome}>
               <View style={styles.hero}><HeartGreeting large text={`${t.welcomeLine1}\n${t.welcomeLine2}`} /></View>
@@ -71,9 +63,9 @@ export default function Index() {
           ) : null}
           {gate !== "welcome" ? (
             <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={styles.account}>
-              {createMode ? <View style={styles.accountHeading}>
-                <HeartGreeting key="create" large showHeart={false} text={t.createWorldHeading} />
-              </View> : <SeoullyText variant="secondary" style={styles.tagline}>{t.tagline}</SeoullyText>}
+              <View style={styles.accountHeading}>
+                <HeartGreeting key={gate} large showHeart={false} inlineHeart text={createMode ? t.createWorldHeading : t.signInWorldHeading} />
+              </View>
               {!mobileConfig.authConfigured ? (
                 <SeoullyText variant="secondary" color={colors.plum} style={styles.warning}>{t.notConfigured}</SeoullyText>
               ) : !mobileConfig.productApiConfigured ? (
@@ -122,8 +114,6 @@ export default function Index() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", paddingHorizontal: 16 },
-  topline: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
-  language: { justifyContent: "center", minHeight: 44, paddingHorizontal: 4 },
   centered: { flex: 1, gap: 16, justifyContent: "center", paddingHorizontal: 16 },
   welcome: { flex: 1, gap: 12, paddingBottom: 12 },
   hero: { flex: 1, justifyContent: "center", paddingBottom: 32 },

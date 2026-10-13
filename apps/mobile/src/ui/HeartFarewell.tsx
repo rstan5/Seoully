@@ -35,7 +35,7 @@ function HeartScene({ text, ready, onContinue, reduced, destination = "corner" }
 
   const motionTiming = destination === "next" ? dialogueMotionTiming : heartSceneTiming;
   const readingMs = destination === "next" ? dialogueReadingMs(chars.length) : heartSceneTiming.reading;
-  const arcHeight = Math.min(90, Math.max(60, height * 0.1));
+  const arcHeight = Math.min(150, Math.max(110, height * 0.17), Math.max(0, originY - insets.top - 16));
   // A quadratic arc uses the same native progress value for both axes.
   const arcY = useMemo(() => destination === "next" ? Animated.multiply(Animated.multiply(journey, journey), -arcHeight) : 0, [arcHeight, destination, journey]);
   const arriving = destination === "next" && scene.stage === "enter";

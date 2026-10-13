@@ -1,3 +1,4 @@
+import { ScreenBack } from "../components/ScreenBack";
 import { topHeaderMetrics, topHeaderRow } from "../ui/shellLayout";
 import { useLanguageControlWidth, LanguageModal } from "../ui/GlobalLanguageControl";
 import { PHOTOCARD } from "./photocard";
@@ -104,7 +105,7 @@ export function PhotocardCropper({
 
   return <LanguageModal languageInk={colors.ink} animationType="slide" visible onRequestClose={() => { if (!busy) onCancel(); }}>
     <SafeAreaView edges={["top", "bottom"]} style={styles.screen}>
-      <View style={[topHeaderRow, { minHeight: header.height, width: "100%", paddingRight: languageWidth + 18 }]}><SeoullyText control variant="title" style={{ flexShrink: 1 }}>{title}</SeoullyText></View>
+      <View style={[topHeaderRow, { minHeight: header.height, width: "100%", paddingRight: languageWidth + 18, gap: 12 }]}><ScreenBack label={backLabel} onPress={() => { if (!busy) onCancel(); }} /><SeoullyText control variant="title" style={{ flexShrink: 1 }}>{title}</SeoullyText></View>
       <SeoullyText variant="secondary" style={styles.hint}>{hint}</SeoullyText>
       <View style={styles.cropArea} onLayout={event => setArea(event.nativeEvent.layout)}>
       <View ref={frame} onLayout={measureFrame} {...panResponder.panHandlers} style={[styles.viewport, { width: viewportWidth, height: viewportHeight }]}>

@@ -1,3 +1,4 @@
+import { onboardingHeading } from "../src/onboarding/presentation";
 import { PhotocardCollectorCount } from "../src/ui/PhotocardCollectorCount";
 import { PHOTOCARD } from "../src/media/photocard";
 import { useEffect, useRef, useState } from "react";
@@ -161,14 +162,14 @@ export default function AddCollectibleScreen() {
   ].filter(Boolean).join(" · ");
 
   if (hydrating && social.kind !== "demo") return <SeoullyLoadingState fullScreen label={copy.brand} />;
-  if (savedHoldingId) return <SeoullyMessageScreen title={copy.collectibleSaved} message={message} alert>
+  if (savedHoldingId) return <SeoullyMessageScreen header={fromOnboarding ? <View style={{ paddingHorizontal: 16 }}><ScreenBack label={copy.back} onPress={() => router.replace({ pathname: "/onboarding", params: { phase: "reveal", holdingId: savedHoldingId } })} /></View> : undefined} title={copy.collectibleSaved} message={message} alert>
     <SeoullyButton label={copy.viewInRoom} block multiline onPress={() => { try { router.replace(fromOnboarding ? { pathname: "/onboarding", params: { phase: "reveal", holdingId: savedHoldingId } } : { pathname: "/room", params: { holdingId: savedHoldingId } }); } catch { setMessage(copy.addConfirmationFailed); } }} />
   </SeoullyMessageScreen>;
   return (
     <SeoullyScreen>
       <ScrollView contentContainerStyle={styles.container}>
-        <ScreenBack label={copy.back} onPress={() => router.back()} />
-        <SeoullyText variant="title" style={styles.headline}>{copy.addPhotoTitle}</SeoullyText>
+        <ScreenBack disabled={working} label={copy.back} onPress={() => router.back()} />
+        <SeoullyText variant="title" style={[styles.headline, fromOnboarding ? { ...onboardingHeading, marginTop: onboardingHeading.marginTop - styles.container.gap } : null]}>{copy.addPhotoTitle}</SeoullyText>
         <SeoullyText variant="handle" color={colors.plum}>{params.name ?? copy.catalogItemFallback}</SeoullyText>
         {meta ? <SeoullyText variant="caption" style={styles.meta}>{meta}</SeoullyText> : null}
         <PhotocardCollectorCount templateId={params.templateId ?? ""} kind={params.kind ?? ""} />

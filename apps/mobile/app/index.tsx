@@ -1,3 +1,4 @@
+import { ScreenBack } from "../src/components/ScreenBack";
 import { HeartGreeting } from "../src/ui/HeartGreeting";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
@@ -63,6 +64,7 @@ export default function Index() {
           ) : null}
           {gate !== "welcome" ? (
             <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={styles.account}>
+              <ScreenBack disabled={submitting} label={t.back} onPress={() => { setGate("welcome"); setMessage(null); }} />
               <View style={styles.accountHeading}>
                 <HeartGreeting key={`${gate}:${createMode ? t.createWorldHeading : t.signInWorldHeading}`} large showHeart={false} inlineHeart text={createMode ? t.createWorldHeading : t.signInWorldHeading} />
               </View>
@@ -97,9 +99,6 @@ export default function Index() {
                 >
                   <SeoullyText variant="button" color={colors.plum}>{createMode ? t.signIn : t.createAccount}</SeoullyText>
                 </Pressable>
-                <Pressable accessibilityRole="button" onPress={() => { setGate("welcome"); setMessage(null); }} style={styles.secondary}>
-                  <SeoullyText variant="button">{t.back}</SeoullyText>
-                </Pressable>
                 {message ? <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum}>{message}</SeoullyText> : null}
               </View>
             </ScrollView>
@@ -120,7 +119,7 @@ const styles = StyleSheet.create({
   welcomeTitle: { letterSpacing: -0.8, lineHeight: 36 },
   tagline: { marginTop: 8, lineHeight: 22 },
   warning: { backgroundColor: colors.lilacSoft, borderRadius: 14, marginTop: 16, padding: 14 },
-  account: { flexGrow: 1, paddingTop: 24, paddingBottom: 16 },
+  account: { flexGrow: 1, paddingTop: 0, paddingBottom: 16 },
   accountHeading: { flexGrow: 1, justifyContent: "center", paddingVertical: 32, minHeight: 200 },
   form: { gap: 10, marginTop: 24 },
   input: {

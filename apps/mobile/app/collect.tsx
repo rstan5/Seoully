@@ -1,7 +1,7 @@
-import { topHeaderMetrics } from "../src/ui/shellLayout";
+import { onboardingHeading, onboardingDescription } from "../src/onboarding/presentation";
 import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { type NativeCatalogTemplate } from "../src/api";
 import { queueFirstCollectible } from "../src/onboarding/firstCollectibleStorage";
 import { submitManualCatalog } from "../src/manualCatalog";
@@ -23,7 +23,6 @@ type Step = "entry" | "search" | "manual";
 
 export default function CollectScreen() {
   const copy = useCopy();
-  const header = topHeaderMetrics(useWindowDimensions().fontScale);
   const router = useRouter();
   const social = useSocialRepository();
   const params = useLocalSearchParams<{ from?: string }>();
@@ -115,17 +114,16 @@ export default function CollectScreen() {
     <SeoullyScreen>
       <KeyboardScreen>
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          {step !== "entry" || !fromOnboarding ? (
-            <ScreenBack
-              label={copy.back}
-              onPress={() => (step === "entry" ? router.back() : setStep("entry"))}
-            />
-          ) : null}
+          <ScreenBack disabled={working} label={copy.back} onPress={() => {
+            if (step !== "entry") { setStep("entry"); return; }
+            if (fromOnboarding) router.replace({ pathname: "/onboarding", params: { phase: "interest", back: "1" } });
+            else router.back();
+          }} />
 
           {step === "entry" ? (
-            <View style={[styles.entry, fromOnboarding ? { paddingTop: header.height + 24 } : null]}>
-              <SeoullyText variant="title" style={styles.headline}>{fromOnboarding ? copy.onboardCollectFirstTitle : copy.catalogEntryTitle}</SeoullyText>
-              <SeoullyText variant="secondary" style={styles.lede}>{fromOnboarding ? copy.onboardCollectFirstLede : copy.catalogEntryLede}</SeoullyText>
+            <View style={[styles.entry, fromOnboarding ? { paddingTop: 0 } : null]}>
+              <SeoullyText variant="title" style={[styles.headline, fromOnboarding ? onboardingHeading : null]}>{fromOnboarding ? copy.onboardCollectFirstTitle : copy.catalogEntryTitle}</SeoullyText>
+              <SeoullyText variant="secondary" style={[styles.lede, fromOnboarding ? onboardingDescription : null]}>{fromOnboarding ? copy.onboardCollectFirstLede : copy.catalogEntryLede}</SeoullyText>
               <View style={styles.choices}>
                 <Pressable accessibilityRole="button" onPress={() => setStep("search")} style={({ pressed }) => [styles.choice, styles.catalogChoice, pressed && styles.choicePressed]}>
                   <SeoullyText variant="button" color={colors.onPrimary} style={styles.choiceTitle}>{copy.searchSeoullyCatalog}</SeoullyText>
@@ -141,8 +139,8 @@ export default function CollectScreen() {
 
           {step === "search" ? (
             <View>
-              <SeoullyText variant="title" style={styles.headline}>{copy.searchSeoullyCatalog}</SeoullyText>
-              <SeoullyText variant="secondary" style={styles.lede}>{copy.catalogDetailSearchLede}</SeoullyText>
+              <SeoullyText variant="title" style={[styles.headline, fromOnboarding ? onboardingHeading : null]}>{copy.searchSeoullyCatalog}</SeoullyText>
+              <SeoullyText variant="secondary" style={[styles.lede, fromOnboarding ? onboardingDescription : null]}>{copy.catalogDetailSearchLede}</SeoullyText>
               <SeoullyField
                 label={copy.catalogDetailSearchLabel}
                 value={query}
@@ -173,8 +171,8 @@ export default function CollectScreen() {
 
           {step === "manual" ? (
             <View>
-              <SeoullyText variant="title" style={styles.headline}>{copy.catalogDescribeTitle}</SeoullyText>
-              <SeoullyText variant="secondary" style={styles.lede}>{copy.catalogDescribeLede}</SeoullyText>
+              <SeoullyText variant="title" style={[styles.headline, fromOnboarding ? onboardingHeading : null]}>{copy.catalogDescribeTitle}</SeoullyText>
+              <SeoullyText variant="secondary" style={[styles.lede, fromOnboarding ? onboardingDescription : null]}>{copy.catalogDescribeLede}</SeoullyText>
               <SeoullyField
                 label={copy.catalogName}
                 value={name}

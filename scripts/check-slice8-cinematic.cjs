@@ -31,9 +31,9 @@ const bubbleNode=tree=>tree.props.children.props.children.props.children[1];
 test('dialogue enters from upper right and exits upper left on one continuous U arc, keeping its established resting pose',()=>{
   const h=sceneHarness(false,{destination:'next'}),tree=h.render(),transforms=tree.props.children.props.style.transform;
   const journey=h.animations.find(a=>a.transition).value;
-  assert.equal(evaluate(transforms[0].translateX),390);assert.equal(evaluate(transforms[1].translateY),-84.4);
+  assert.equal(evaluate(transforms[0].translateX),390);assert.equal(evaluate(transforms[1].translateY),-143.48000000000002);
   for(const value of [-1,-.75,-.5,-.25,0,.25,.5,.75,1]) {
-    journey.setValue(value);assert.ok(Math.abs(evaluate(transforms[0].translateX)+390*value)<1e-10);assert.ok(Math.abs(evaluate(transforms[1].translateY)+84.4*value*value)<1e-10);
+    journey.setValue(value);assert.ok(Math.abs(evaluate(transforms[0].translateX)+390*value)<1e-10);assert.ok(Math.abs(evaluate(transforms[1].translateY)+Math.min(150,Math.max(110,844*.17))*value*value)<1e-10);
   }
   journey.setValue(0);assert.equal(evaluate(transforms[2].scale),1);h.cleanup();
 });
@@ -73,7 +73,7 @@ test('language replacement cancels prior typing and reading; translated scene re
 
 for(const [width,height] of [[320,568],[390,844],[430,932],[600,1200]])test(`right-to-left U arc covers both offscreen edges and preserves rest at ${width}x${height}`,()=>{
   const h=sceneHarness(false,{destination:'next',width,height}),tree=h.render(),actor=tree.props.children,transforms=actor.props.style.transform,journey=h.animations.find(a=>a.transition).value;
-  const amplitude=Math.min(90,Math.max(60,height*.1));let previousX=Infinity;
+  const amplitude=Math.min(150,Math.max(110,height*.17),Math.max(0,Math.min(height-34-Math.min(112,width*.3)-20,Math.max(height*.46,47+140+24))-47-16));let previousX=Infinity;
   for(const progress of [-1,-.75,-.5,-.25,0,.25,.5,.75,1]){
     journey.setValue(progress);const x=evaluate(transforms[0].translateX),y=evaluate(transforms[1].translateY);
     assert.ok(x<previousX);previousX=x;assert.ok(Math.abs(y+amplitude*progress*progress)<1e-9);

@@ -78,16 +78,27 @@ function ProfileEntryNavigation() {
   const router = useRouter();
   const navigation = useRootNavigationState();
   const sent = useRef(false);
-  const appRoute = navigation?.routes.find(route => route.name === "(tabs)");
+  const acknowledged = useRef(false);
+  const activeRoute = navigation?.routes[navigation.index ?? 0];
+  const appRoute = activeRoute?.name === "(tabs)" ? activeRoute : undefined;
   const appMounted = Boolean(appRoute?.state?.key);
   const profileFocused = appRoute?.state?.routes[appRoute.state.index ?? 0]?.name === "profile";
   useEffect(() => {
-    if (!boot.profileEntryRequested) { sent.current = false; return; }
-    if (!appMounted || sent.current) return;
+    if (!boot.profileEntryRequested) { sent.current = false; acknowledged.current = false; return; }
+    if (!appMounted) return;
+    // A queued replace is not acknowledgement: retain intent through guard reconciliation.
+    if (profileFocused) {
+      if (!acknowledged.current) {
+        acknowledged.current = true;
+        startupTrace("profile handoff", "profile_focused");
+        boot.consumeProfileEntry();
+      }
+      return;
+    }
+    if (sent.current) return;
     sent.current = true;
     startupTrace("profile handoff", "navigation_dispatched");
-    if (!profileFocused) router.replace("/(tabs)/profile");
-    boot.consumeProfileEntry();
+    router.replace("/(tabs)/profile");
   }, [appMounted, boot, profileFocused, router]);
   return null;
 }

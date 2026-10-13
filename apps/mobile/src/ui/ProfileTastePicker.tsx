@@ -2,7 +2,7 @@ import { readSelectedCatalogIdentity } from "../data/collectorIdentity";
 import { prepareIdentitySubmission, finishIdentitySubmission, readIdentitySubmission } from "../data/identitySubmission";
 import { SeoullyButton } from "./SeoullyControls";
 import { useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { contributeCatalogIdentity, searchCollectorGroups, searchCollectorMembers } from "../api";
 import { useCopy } from "../locale";
 import { RetryNotice } from "../components/RetryNotice";
@@ -12,8 +12,8 @@ import { IDENTITY_LIGHT, useProfileIdentity } from "./ProfileIdentity";
 import { toggleIdentitySelection, unselectedIdentityOptions } from "./collectorArchetypes";
 export type TasteOption = { id: string; name: string; groupId?: string; groupName?: string; catalogId?: string };
 
-export function ProfileTastePicker({ kind, selected, onChange, initialOptions, preferredGroups = [], disabled, live = true, canContribute = false, userId, onBusyChange, showHeading = true }: {
-  showHeading?: boolean; kind: "groups" | "biases"; selected: string[]; onChange: (ids: string[]) => void | Promise<void>;
+export function ProfileTastePicker({ kind, selected, onChange, initialOptions, preferredGroups = [], disabled, live = true, canContribute = false, userId, onBusyChange, showHeading = true, style }: {
+  style?: StyleProp<ViewStyle>; showHeading?: boolean; kind: "groups" | "biases"; selected: string[]; onChange: (ids: string[]) => void | Promise<void>;
   initialOptions: TasteOption[]; preferredGroups?: string[]; disabled?: boolean; live?: boolean; canContribute?: boolean; userId: string; onBusyChange: (active: boolean) => void;
 }) {
   const copy = useCopy();
@@ -103,7 +103,7 @@ export function ProfileTastePicker({ kind, selected, onChange, initialOptions, p
       {option.groupName ? <SeoullyText variant="caption">{option.groupName}</SeoullyText> : null}
     </Pressable>;
   }
-  return <View style={styles.section}>
+  return <View style={[styles.section, style]}>
     {showHeading ? <SeoullyText variant="section">{kind === "groups" ? copy.profileFavoriteGroups : copy.profileBiases}</SeoullyText> : null}
     {selected.length ? <>
       <SeoullyText variant="caption">{copy.profileSelected}</SeoullyText>

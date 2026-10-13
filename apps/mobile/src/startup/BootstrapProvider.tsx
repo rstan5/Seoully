@@ -139,7 +139,7 @@ export function BootstrapProvider({ children }: PropsWithChildren) {
   }, [applySnapshot, refresh]);
 
   const enterApp = useCallback((target?: "profile") => {
-    setProfileEntryRequested(target === "profile");
+    setProfileEntryRequested(previous => target === "profile" || previous);
     setReturningWelcome(false);
     generation.current += 1;
     applySnapshot({ destination: "app", authenticated: true, onboardingStep: "done", errorKind: null }, generation.current);

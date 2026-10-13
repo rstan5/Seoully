@@ -63,6 +63,7 @@ export default function OnboardingWorldIntro({ holdingId, photocard, playArrival
     try {
       const result = await updateNativeOnboarding({ action: "complete" });
       if (result.step !== "done") throw new Error("first_home_not_confirmed");
+      startupTrace("onboarding completion", "server_confirmed");
       if (mounted.current) setComplete(true);
     } catch { if (mounted.current) setError(true); }
     finally { completing.current = false; }

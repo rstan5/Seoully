@@ -1,10 +1,11 @@
-import { topHeaderMetrics } from "../src/ui/shellLayout";
+import { supabase } from "../src/supabase";
+import { onboardingHeading, onboardingDescription, onboardingSpacing } from "../src/onboarding/presentation";
 import { readSelectedCatalogIdentity } from "../src/data/collectorIdentity";
 import { readOnboardingIdentityDraft, saveOnboardingIdentityDraft, clearOnboardingIdentityDraft } from "../src/onboarding/identityDraft";
 import { ProfileTastePicker, type TasteOption } from "../src/ui/ProfileTastePicker";
 import { HeartFarewell } from "../src/ui/HeartFarewell";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   loadMyHolding,
@@ -55,10 +56,9 @@ function interestLabel(id: string, t: ReturnType<typeof useCopy>) {
 
 export default function OnboardingScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ edit?: string; phase?: string; holdingId?: string; photoWarning?: string }>();
+  const params = useLocalSearchParams<{ edit?: string; back?: string; phase?: string; holdingId?: string; photoWarning?: string }>();
   const editingTastes = params.edit === "1";
   const t = useCopy();
-  const header = topHeaderMetrics(useWindowDimensions().fontScale);
   const { setDemo } = useDataMode();
   const boot = useBootstrap();
   const loadGeneration = useRef(0);
@@ -105,7 +105,7 @@ export default function OnboardingScreen() {
       if (!editingTastes && next.step === "interest") {
         const pending = await readFirstCollectibleDraft();
         if (generation !== loadGeneration.current) return;
-        if (pending) {
+        if (pending && params.phase !== "interest") {
           router.replace({ pathname: "/add", params: { templateId: pending.templateId, name: pending.templateInfo?.name ?? "", kind: pending.templateInfo?.kind ?? "", from: "onboarding", ...(pending.newTemplate ? { newTemplate: "true" } : {}) } });
           return;
         }
@@ -138,7 +138,10 @@ export default function OnboardingScreen() {
       setGroupOptions([...next.groups.map(g => ({ id: g.id, name: g.name })), ...selected.groups]);
       setBiasOptions([...next.members.map(m => ({ id: m.id, name: m.stageName, groupId: m.groupId })), ...selected.members.map(m => ({ id: m.id, name: m.stageName, groupId: m.groupId, groupName: m.groupName }))]);
       setState(next);
-      setPhase(resolved === "edit" ? "group" : resolved === "interest" && !editingTastes && !draft?.archetypeComplete ? "archetype" : resolved);
+      if (params.back === "1" && resolved === "interest") {
+        setGreeted(previous => new Set<OnboardingPhase>([...previous, "group", "bias", "archetype", "interest", "collect"]));
+      }
+      setPhase(resolved === "edit" ? "group" : resolved === "interest" && !editingTastes && !draft?.archetypeComplete && params.phase !== "interest" ? "archetype" : resolved);
       setCollectorType(draft?.collectorType ?? identity?.profile.collectorType ?? "Collector");
       setArchetypeComplete(draft?.archetypeComplete ?? false);
       setGroupIds(restoredGroups);
@@ -159,7 +162,7 @@ export default function OnboardingScreen() {
     return () => { loadGeneration.current++; };
     // First-run identity is Live. Demo stays a post-arrival explorer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editingTastes, params.phase, params.holdingId]));
+  }, [editingTastes, params.phase, params.holdingId, params.back]));
 
   useEffect(() => {
     if (phase !== "collect" || editingTastes || !greeted.has("collect")) return;
@@ -230,7 +233,20 @@ export default function OnboardingScreen() {
     }
   }
 
-  function backIdentity() {
+  async function backIdentity() {
+    if (savingIdentity.current || tastePending > 0) return;
+    if (phase === "group") {
+      if (editingTastes) { router.back(); return; }
+      savingIdentity.current = true;
+      setSaving(true);
+      try {
+        if (identityUserId) await saveOnboardingIdentityDraft(identityUserId, { groupIds, biasIds, collectorType, archetypeComplete });
+        const result = await supabase.auth.signOut();
+        if (result.error) throw result.error;
+      } catch { setError(t.onboardingSaveFailed); }
+      finally { savingIdentity.current = false; setSaving(false); }
+      return;
+    }
     if (phase === "bias") setPhase("group");
     else if (phase === "archetype") setPhase("bias");
     else if (phase === "interest") setPhase(editingTastes ? "bias" : "archetype");
@@ -262,7 +278,10 @@ export default function OnboardingScreen() {
             photocard={holding ? isBinderEligible(holding) : false}
             copy={t}
             onContinue={finish}
-            onBack={() => setPhase("interest")}
+            onBack={() => {
+              setGreeted(previous => new Set<OnboardingPhase>([...previous, "group", "bias", "archetype", "interest", "collect"]));
+              setPhase("interest");
+            }}
           />
         </Suspense>
       </View>
@@ -287,20 +306,18 @@ export default function OnboardingScreen() {
   return (
     <SeoullyScreen edges={["top", "bottom"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-      <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={[styles.container, !(editingTastes || phase === "bias" || phase === "archetype" || phase === "interest") ? { paddingTop: header.height } : null]}>
-        {editingTastes || phase === "bias" || phase === "archetype" || phase === "interest" ? (
-          <ScreenBack label={t.back} onPress={() => (editingTastes && phase === "group" ? router.back() : backIdentity())} />
-        ) : null}
-        <SeoullyText variant="title" style={styles.headline}>{title}</SeoullyText>
-        <SeoullyText variant="secondary" style={styles.lead}>{lead}</SeoullyText>
+      <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={styles.container}>
+        <ScreenBack disabled={saving || tastePending > 0} label={phase === "group" && !editingTastes ? t.signOut : t.back} onPress={() => { void backIdentity(); }} />
+        <SeoullyText variant="title" style={[styles.headline, onboardingHeading]}>{title}</SeoullyText>
+        <SeoullyText variant="secondary" style={[styles.lead, onboardingDescription]}>{lead}</SeoullyText>
 
-        {phase === "group" ? <ProfileTastePicker showHeading={false} kind="groups" selected={groupIds}
+        {phase === "group" ? <ProfileTastePicker showHeading={false} kind="groups" style={{ marginTop: onboardingSpacing.content }} selected={groupIds}
           onChange={ids => changeTastes(ids, biasIds)} initialOptions={groupOptions}
           canContribute={canContribute} userId={identityUserId} onBusyChange={tasteBusyChanged} disabled={saving} /> : null}
-        {phase === "bias" ? <ProfileTastePicker showHeading={false} kind="biases" selected={biasIds}
+        {phase === "bias" ? <ProfileTastePicker showHeading={false} kind="biases" style={{ marginTop: onboardingSpacing.content }} selected={biasIds}
           onChange={ids => changeTastes(groupIds, ids)} initialOptions={biasOptions} preferredGroups={groupIds}
           canContribute={canContribute} userId={identityUserId} onBusyChange={tasteBusyChanged} disabled={saving} /> : null}
-        {phase === "archetype" ? <View accessibilityRole="radiogroup" accessibilityLabel={t.profileArchetype} style={{ gap: 8, marginTop: 20 }}>
+        {phase === "archetype" ? <View accessibilityRole="radiogroup" accessibilityLabel={t.profileArchetype} style={{ gap: 8, marginTop: onboardingSpacing.content }}>
           {COLLECTOR_ARCHETYPES.map((value, index) => <Pressable key={value} disabled={saving} accessibilityRole="radio" accessibilityState={{ checked: collectorType === value }} onPress={() => { void changeArchetype(collectorType === value ? "Collector" : value); }} style={{ padding: 14, minHeight: 56, borderRadius: 16, borderWidth: 1, borderColor: collectorType === value ? colors.action : colors.border, backgroundColor: collectorType === value ? colors.lilacSoft : colors.surface }}>
             <SeoullyText variant="handle">{archetypeLabel(value, t)}{collectorType === value ? "  ✓" : ""}</SeoullyText>
             <SeoullyText variant="caption">{t[`archetypeHint${index}` as "archetypeHint0"]}</SeoullyText>
@@ -343,7 +360,7 @@ const styles = StyleSheet.create({
   language: { justifyContent: "center", minHeight: 44, paddingHorizontal: 4 },
   headline: { marginTop: 32, fontSize: 32, lineHeight: 38 },
   lead: { marginTop: 6, maxWidth: 340 },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 20, paddingBottom: 24 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: onboardingSpacing.content, paddingBottom: 24 },
   footer: { gap: 12, marginTop: "auto", paddingTop: 24 },
   heart: { height: 48, marginTop: 28, width: 48 },
   ask: { marginTop: 10 },

@@ -65,6 +65,7 @@ export function resolveOnboardingPhase(input: {
   if (input.durableStep === "bias") return "bias";
 
   const owned = input.holdingCount > 0;
+  if (!owned && input.requestedPhase === "interest") return "interest";
   if (!owned) return input.interestsSaved ? "collect" : "interest";
   return "room";
 }

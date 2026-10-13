@@ -6,7 +6,8 @@ import { SeoullyScreen } from "./SeoullyScreen";
 import { SeoullyText } from "./SeoullyText";
 
 /** Dedicated message destinations only; inline notices and loaders keep their own layout. */
-export function SeoullyMessageScreen({ title, message, alert = false, children }: {
+export function SeoullyMessageScreen({ title, message, alert = false, children, header }: {
+  header?: ReactNode;
   title?: string;
   message?: string | null;
   alert?: boolean;
@@ -15,6 +16,7 @@ export function SeoullyMessageScreen({ title, message, alert = false, children }
   return (
     <SeoullyScreen edges={["top", "bottom", "left", "right"]}>
       <KeyboardScreen>
+        {header}
         <ScrollView style={styles.scroll} contentContainerStyle={styles.viewport}
           keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
           <View style={styles.composition}>

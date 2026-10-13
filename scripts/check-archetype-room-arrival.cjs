@@ -23,7 +23,7 @@ function handler(name, scope) {
 test('canonical single archetype catalog reused; Biases advances to Archetype before interests/collectible', () => {
   assert.match(onboardingSource, /COLLECTOR_ARCHETYPES.map/); assert.match(onboardingSource, /collectorType === value \? "Collector" : value/);
   assert.match(onboardingSource, /else setPhase\("archetype"\)/); assert.match(onboardingSource, /phase === "archetype" \? t.onboardingArchetypeGreeting/);
-  let phase; const back = handler('backIdentity', { phase: 'archetype', setPhase: x => phase = x }); back(); assert.equal(phase, 'bias');
+  let phase; const back = handler('backIdentity', { savingIdentity:{current:false},tastePending:0,phase: 'archetype', setPhase: x => phase = x }); back(); assert.equal(phase, 'bias');
 });
 for (const collectorType of ['Photocard Hunter', 'Collector']) test(`confirmed ${collectorType} saves only real Profile field, then checkpoint; failed save stays retryable`, async () => {
   let fail = true, next, complete = false, error; const patches = [], drafts = [];
@@ -35,7 +35,7 @@ test('selection/removal and confirmed checkpoint survive relaunch without losing
   const s = disk(), file = 'apps/mobile/src/onboarding/identityDraft.ts'; let api = load(file, s.mocks);
   for (const collectorType of ['Multi-Stan', 'Collector']) { await api.saveOnboardingIdentityDraft('one', { groupIds: ['bts'], biasIds: ['jungkook'], collectorType, archetypeComplete: true }); api = load(file, s.mocks); const draft = await api.readOnboardingIdentityDraft('one'); assert.equal(draft.collectorType, collectorType); assert.equal(draft.archetypeComplete, true); assert.deepEqual(clean(draft.groupIds), ['bts']); }
   assert.equal(await api.readOnboardingIdentityDraft('two'), null);
-  assert.match(onboardingSource, /!draft\?\.archetypeComplete \? "archetype"/);
+  assert.match(onboardingSource, /!draft\?\.archetypeComplete && params.phase !== "interest" \? "archetype"/);
 });
 test('arrival presentation claim is scoped, concurrent-safe, durable and never writes ownership', async () => {
   const s = disk(), file = 'apps/mobile/src/onboarding/roomArrival.ts'; let api = load(file, s.mocks);
@@ -57,7 +57,7 @@ function intro({ photocard = true, reduced = false, playArrival = true, fail = f
     'react-native': { View: 'View', Pressable: 'Pressable', StyleSheet: { create: x => x, absoluteFill: {} }, Animated: { View: 'Animated', Value, timing(value, config) { return { start(fn) { animations.push({ config, finish: () => { value.value = config.toValue; fn({ finished: true }); } }); }, stop() {} }; } }, AppState: { currentState: 'active', addEventListener(_, fn) { appListener = fn; return { remove() { appListener = null; } }; } } },
     '../ui/HeartFarewell': { HeartFarewell: 'Heart' }, '../room/RoomWorldScreen': { RoomWorldScreen: 'Room' }, '../room/RoomMessage': { RoomMessage: 'Message', roomMessageStyles: { text: {} } }, '../ui/SeoullyText': { SeoullyText: 'Text' }, '../ui/SeoullyCompanion': { SeoullyCompanion: 'Companion' }, '../ui/motion': { useMotionPreference: () => reduced }, '../theme': { colors: { canvas: 'pink' } }, '../data': { useSocialRepository: () => ({ capabilities: { persistRoom: true } }) }, '../api': { updateNativeOnboarding: async () => { requests++; if (fail) throw Error('offline'); return confirmation ?? { step: 'done' }; } }, '../room/roomStyle': { DEFAULT_ROOM_STYLE: {}, resolveRoomLook: x => x }, '../room/theme': { roomOverlayChrome: () => ({ color: 'ink', border: 'line' }) }, './roomArrival': { nextArrivalMessage: current => current === 'home' ? 'edit' : current === 'edit' ? 'profile' : current },
   }, timerGlobals);
-  return { copy, resolveCompletion: () => resolveCompletion?.({step:"done"}), render() { index = 0; effects = []; const tree = api.default({ holdingId: 'card', photocard, playArrival, copy, onContinue: () => profile++, onBack() {} }); effects.forEach(fn => fn()); return tree; }, fade() { const a = animations.at(-1); assert.equal(a.config.duration, reduced ? 0 : 600); a.finish(); }, tick() { assert.equal(timers.size, 1); [...timers.values()][0](); }, background() { appListener('background'); }, foreground() { appListener('active'); }, blur() { focusedCleanup(); }, cleanup() { slots.forEach(s => s?.cleanup?.()); }, get timers() { return timers.size; }, get profile() { return profile; }, get requests() { return requests; } };
+  return { copy, allowCompletion:()=>{fail=false}, resolveCompletion: () => resolveCompletion?.({step:"done"}), render() { index = 0; effects = []; const tree = api.default({ holdingId: 'card', photocard, playArrival, copy, onContinue: () => profile++, onBack() {} }); effects.forEach(fn => fn()); return tree; }, fade() { const a = animations.at(-1); assert.equal(a.config.duration, reduced ? 0 : 600); a.finish(); }, tick() { assert.equal(timers.size, 1); [...timers.values()][0](); }, background() { appListener('background'); }, foreground() { appListener('active'); }, blur() { focusedCleanup(); }, cleanup() { slots.forEach(s => s?.cleanup?.()); }, get timers() { return timers.size; }, get profile() { return profile; }, get requests() { return requests; } };
 }
 function room(tree) { return tree.props.children[0]; }
 function descendants(node) { if (!node || typeof node !== 'object') return []; return [node, ...[node.props?.children].flat(Infinity).flatMap(descendants)]; }
@@ -147,4 +147,19 @@ test('manually opened Binder acknowledges delayed loaded card membership without
   const file=fs.readFileSync('apps/mobile/src/room/RoomWorldScreen.tsx','utf8'),start=file.indexOf('  const initialBinderOpened'),end=file.indexOf('  function clearPendingPress',start);let effect,opens=0,confirmed=0;
   const scope={startupTrace(){},useRef:current=>({current}),useEffect:fn=>effect=fn,initialHoldingId:'card',spreads:[{}],roomLayout:{objects:[]},view:{kind:'binder'},viewRef:{current:{kind:'binder'}},objectHasKind:()=>true,spreadIndexForHolding:()=>0,openBinderFromWorld:()=>{opens++;return true},demo:false,mode:'own',onboardingEvents:{current:{onLiveBinderConfirmed(ids){assert.equal(ids[0],'card');confirmed++}}}};
   vm.runInNewContext(ts.transpileModule(file.slice(start,end),{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,scope);effect();effect();assert.equal(opens,0);assert.equal(confirmed,1);
+});
+test('failed completion then retry preserves the first Profile tap and navigates only after authoritative done',async()=>{
+ const h=intro({fail:true});await arrive(h);h.tick();h.render();h.tick();let tree=h.render();
+ const button=descendants(room(tree).props.roomGuidance).find(x=>x.props.onPress?.name==='requestProfile');button.props.onPress();await new Promise(setImmediate);tree=h.render();assert.equal(h.profile,0);
+ assert.ok(descendants(room(tree).props.roomGuidance).some(x=>x.props.accessibilityRole==='alert'));
+ h.allowCompletion();const retry=descendants(room(tree).props.roomGuidance).find(x=>x.type==='Pressable'&&x.props.children?.props.children===h.copy.retry);assert.ok(retry);retry.props.onPress();await new Promise(setImmediate);h.render();h.render();assert.equal(h.profile,1);h.cleanup();
+});
+for(const [current,previous] of [['bias','group'],['archetype','bias'],['interest','archetype']])test(`real Back handler ${current} → ${previous} preserves collector selections`,async()=>{
+ const groups=['bts'],biases=['jungkook'];let next,navigations=0;
+ const back=handler('backIdentity',{phase:current,editingTastes:false,savingIdentity:{current:false},tastePending:0,groupIds:groups,biasIds:biases,setPhase:value=>next=value,router:{back(){navigations++}}});
+ await back();assert.equal(next,previous);assert.deepEqual(groups,['bts']);assert.deepEqual(biases,['jungkook']);assert.equal(navigations,0);
+});
+test('initial exit saves draft before signout; completed Profile preferences are never cleared',async()=>{
+ const order=[],scope={phase:'group',editingTastes:false,savingIdentity:{current:false},tastePending:0,identityUserId:'collector',groupIds:['bts'],biasIds:['jungkook'],collectorType:'Photocard Hunter',archetypeComplete:true,setSaving(){},setError(){throw Error('unexpected error')},t:{onboardingSaveFailed:'retry'},saveOnboardingIdentityDraft:async(_,draft)=>{order.push('draft');assert.deepEqual(clean(draft.groupIds),['bts'])},supabase:{auth:{signOut:async()=>{order.push('signout');return {error:null}}}}};
+ await handler('backIdentity',scope)();assert.deepEqual(order,['draft','signout']);assert.equal(scope.savingIdentity.current,false);
 });

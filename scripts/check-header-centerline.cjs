@@ -22,8 +22,8 @@ test('toggle, social bell, and Room controls consume the same metrics; no per-sc
  assert.match(global,/blocked \|\| boot.destination === "loading"/);assert.match(global,/pointerEvents="box-none"/);
 });
 test('onboarding keeps editorial title below navigation and reserves the same row even without Back',()=>{
- const source=read('apps/mobile/app/onboarding.tsx');assert.match(source,/paddingTop: header.height/);assert.match(source,/headline: \{ marginTop: 32/);assert.match(source,/<ScreenBack/);
- assert.match(read('apps/mobile/app/collect.tsx'),/paddingTop: header.height \+ 24/);
+ const source=read('apps/mobile/app/onboarding.tsx');assert.doesNotMatch(source,/paddingTop: header.height/);assert.match(source,/onboardingHeading/);assert.match(source,/headline: \{ marginTop: 32/);assert.match(source,/<ScreenBack/);
+ assert.match(read('apps/mobile/app/collect.tsx'),/fromOnboarding \? onboardingHeading/);
 });
 test('full-screen crop modal and Edit Profile center titles with shared rows; bottom sheets retain local headers',()=>{
  const crop=read('apps/mobile/src/media/PhotocardCropper.tsx'),edit=read('apps/mobile/app/edit-profile.tsx');

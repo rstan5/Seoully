@@ -12,7 +12,7 @@ import { AuthRouteTree } from "../src/startup/AuthRouteTree";
 import { BootstrapProvider } from "../src/startup/BootstrapProvider";
 import { GlobalLanguageControl, LanguageControlProvider } from "../src/ui/GlobalLanguageControl";
 import { ProfileIdentityScope } from "../src/ui/ProfileIdentity";
-import { SeoullyCompanion } from "../src/ui/SeoullyCompanion";
+import { SeoullyCompanionHost } from "../src/ui/SeoullyCompanionHost";
 
 export default function RootLayout() {
   useEffect(() => {
@@ -40,7 +40,7 @@ export default function RootLayout() {
                 <ProfileIdentityScope>
                   <LanguageControlProvider>
                     <AuthRouteTree />
-                    <SeoullyCompanion />
+                    <SeoullyCompanionHost />
                     <GlobalLanguageControl />
                   </LanguageControlProvider>
                 </ProfileIdentityScope>

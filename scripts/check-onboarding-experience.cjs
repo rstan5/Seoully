@@ -2,7 +2,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 function load(file,mocks={},extra={}){const m={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,{module:m,exports:m.exports,URL,require:n=>mocks[n]??(n.endsWith('.png')?1:require(n)),...extra});return m.exports;}
 const motion=load('apps/mobile/src/ui/heartMotion.ts').heartMotion;
 function greeting(reduced,inlineHeart=false){let slots=[],index=0,effects=[],timer,stops=0,cleared=0;class Value{interpolate(c){return c}stopAnimation(){stops++}}
-const jsx=(type,props)=>({type,props});const react={useState(v){const i=index++;if(!(i in slots))slots[i]=typeof v==='function'?v():v;return [slots[i],n=>slots[i]=typeof n==='function'?n(slots[i]):n]},useEffect(f){effects.push(f)}};
+const jsx=(type,props)=>({type,props});const react={useState(v){const i=index++;if(!(i in slots))slots[i]=typeof v==='function'?v():v;return [slots[i],n=>slots[i]=typeof n==='function'?n(slots[i]):n]},useRef(v){const i=index++;return slots[i]??(slots[i]={current:v})},useEffect(f){effects.push(f)}};
 const Component=load('apps/mobile/src/ui/HeartGreeting.tsx',{'react':react,'react/jsx-runtime':{jsx,jsxs:jsx},'react-native':{Animated:{Value,View:'Animated',timing:()=>({}),sequence:()=>({}),loop:()=>({start(){},stop(){stops++}})},Easing:{inOut:x=>x,sin:1},Image:'Image',Pressable:'Pressable',StyleSheet:{create:x=>x}},'./SeoullyText':{SeoullyText:'Text'},'./motion':{useMotionPreference:()=>reduced},'./heartMotion':{heartMotion:motion}},{setInterval(fn,ms){assert.equal(ms,32);timer=fn;return 1},clearInterval(){cleared++}}).HeartGreeting;
 return {render(){index=0;return Component({text:'Hello ♡',large:true,inlineHeart})},start(){return effects[0]()},tick(){timer()},get stops(){return stops},get cleared(){return cleared}};}
 test('typed greeting reveals at medium speed, tap finishes immediately and cleanup stops work',()=>{const h=greeting(false);let tree=h.render(),cleanup=h.start();h.tick();tree=h.render();assert.equal(tree.props.children[1].props.children[0],'H');tree.props.onPress();tree=h.render();assert.equal(tree.props.children[1].props.children[0],'Hello ♡');cleanup();assert.ok(h.stops);assert.ok(h.cleared)});
@@ -16,9 +16,9 @@ test('artist search uses existing catalog reads, excludes restricted rows and ne
 
 test('inline text heart reserves its space, appears on completion, and respects reduced motion',()=>{
   const h=greeting(false,true);let tree=h.render();h.start();
-  let heart=tree.props.children[1].props.children[2];assert.equal(heart.props.children,' ♡');assert.equal(heart.props.style[1].opacity,0);
-  tree.props.onPress();tree=h.render();assert.equal(tree.props.children[1].props.children[2].props.style[1].opacity,1);
-  const staticTree=greeting(true,true).render();assert.equal(staticTree.props.children[1].props.children[2].props.style[1].opacity,1);
+  let heart=tree.props.children[1].props.children[2];assert.equal(heart.props.children,' ♡');assert.equal(heart.props.style[2].opacity,0);
+  tree.props.onPress();tree=h.render();assert.equal(tree.props.children[1].props.children[2].props.style[2].opacity,1);
+  const staticTree=greeting(true,true).render();assert.equal(staticTree.props.children[1].props.children[2].props.style[2].opacity,1);
 });
 test('substantial collectible choices retain canonical search/manual navigation and integrated helper copy',()=>{
  const s=fs.readFileSync('apps/mobile/app/collect.tsx','utf8');

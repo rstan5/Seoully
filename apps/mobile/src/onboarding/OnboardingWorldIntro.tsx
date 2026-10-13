@@ -10,6 +10,7 @@ import { RoomWorldScreen } from "../room/RoomWorldScreen";
 import { SeoullyCompanion } from "../ui/SeoullyCompanion";
 import { SeoullyText } from "../ui/SeoullyText";
 import { useMotionPreference } from "../ui/motion";
+import { usePausedCountdown } from "../ui/usePausedCountdown";
 import { colors } from "../theme";
 import { nextArrivalMessage, type ArrivalMessage } from "./roomArrival";
 import { DEFAULT_ROOM_STYLE, resolveRoomLook } from "../room/roomStyle";
@@ -29,6 +30,7 @@ export default function OnboardingWorldIntro({ holdingId, photocard, playArrival
   const [roomFailed, setRoomFailed] = useState(false);
   const [handoff, setHandoff] = useState(!playArrival);
   const [visible, setVisible] = useState(!playArrival);
+  const [binderMayEnter, setBinderMayEnter] = useState(!playArrival);
   const [established, setEstablished] = useState(false);
   const [cover] = useState(() => new Animated.Value(playArrival ? 1 : 0));
   const [complete, setComplete] = useState(false);
@@ -43,19 +45,14 @@ export default function OnboardingWorldIntro({ holdingId, photocard, playArrival
 
   useEffect(() => {
     if (!handoff || visible || reduced === null) return;
-    const animation = Animated.timing(cover, { toValue: 0, duration: reduced ? 0 : 280, useNativeDriver: true });
+    const animation = Animated.timing(cover, { toValue: 0, duration: reduced ? 0 : 600, useNativeDriver: true });
     animation.start(({ finished }) => { if (finished) setVisible(true); });
     return () => animation.stop();
   }, [cover, handoff, reduced, visible]);
-  // One timer, owned by the currently visible message. Backgrounding pauses it;
-  // returning grants the full reading interval instead of skipping unseen text.
+  usePausedCountdown(reduced ? 0 : 300, visible && active && focused && photocard && !binderMayEnter, "binder-entrance", () => setBinderMayEnter(true));
   const arrivalVisible = ready && worldReady && visible && established && focused && active;
   const messagesVisible = arrivalVisible && (photocard || complete);
-  useEffect(() => {
-    if (!messagesVisible || message === "dismissed" || message === "profile") return;
-    const timer = setTimeout(() => setMessage(nextArrivalMessage), 3000);
-    return () => clearTimeout(timer);
-  }, [message, messagesVisible]);
+  usePausedCountdown(5000, messagesVisible && message !== "dismissed" && message !== "profile", message, () => setMessage(nextArrivalMessage));
 
   async function finish(confirmedHoldingId?: string) {
     if (!holdingId || confirmedHoldingId !== holdingId || completing.current || complete) return;
@@ -81,7 +78,7 @@ export default function OnboardingWorldIntro({ holdingId, photocard, playArrival
         {error ? <><SeoullyText accessibilityRole="alert" variant="caption" style={roomMessageStyles.text} color={chrome.color}>{copy.onboardingSaveFailed}</SeoullyText>
           <Pressable accessibilityRole="button" onPress={() => { void finish(confirmed.current); }} style={styles.action}><SeoullyText variant="caption" color={chrome.color}>{copy.retry}</SeoullyText></Pressable></> : null}
         {message === "profile" ? <Pressable accessibilityRole="button" disabled={!complete} onPress={() => { setMessage("dismissed"); onContinue(); }} style={[styles.action, { borderColor: chrome.border, borderWidth: 1, opacity: complete ? 1 : 0.6 }]}><SeoullyText variant="caption" color={chrome.color}>{copy.roomArrivalProfile}</SeoullyText></Pressable> : null}
-      </RoomMessage> : visible && !photocard && !complete ? <RoomMessage chrome={chrome}><SeoullyText color={chrome.color} style={roomMessageStyles.text}>{copy.onboardPlaceFirst}</SeoullyText></RoomMessage> : null} onRoomAppearance={setPromptStyle} loadingCovered={!handoff} initialHoldingId={visible && photocard ? holdingId : undefined} mode="own" demo={false} persistLive={social.capabilities.persistRoom} copy={copy}
+      </RoomMessage> : visible && !photocard && !complete ? <RoomMessage chrome={chrome}><SeoullyText color={chrome.color} style={roomMessageStyles.text}>{copy.onboardPlaceFirst}</SeoullyText></RoomMessage> : null} onRoomAppearance={setPromptStyle} loadingCovered={!handoff} initialHoldingId={binderMayEnter && photocard ? holdingId : undefined} mode="own" demo={false} persistLive={social.capabilities.persistRoom} copy={copy}
       onWorldReady={() => { setWorldReady(true); if (!photocard) setEstablished(true); }}
       onBinderArrivalReady={() => setEstablished(true)}
       onLeave={() => { setMessage("dismissed"); if (complete) onContinue(); else onBack(); }}
@@ -101,6 +98,6 @@ export default function OnboardingWorldIntro({ holdingId, photocard, playArrival
 const styles = StyleSheet.create({
   wrap: { flex: 1 },
   messageRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  dismiss: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center", alignSelf: "flex-start", marginLeft: -8, marginTop: -8 },
+  dismiss: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center", alignSelf: "center", marginLeft: -8 },
   action: { minHeight: 44, justifyContent: "center", alignSelf: "flex-start", paddingHorizontal: 10, borderRadius: 12 },
 });

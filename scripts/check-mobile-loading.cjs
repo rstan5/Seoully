@@ -40,11 +40,11 @@ test('single root loading host covers all chrome, survives overlapping boundarie
  h.react.createContext=value=>(context={Provider:'Provider',value});h.react.useContext=()=>context.value;
  const {SeoullyLoadingHost,SeoullyLoadingState}=load('apps/mobile/src/ui/SeoullyLoadingState.tsx',name=>name==='react'?h.react:name==='react-native'?native:name==='../theme'?{colors:{canvas:'canonical'}}:{});
  const render=()=>{h.reset();return SeoullyLoadingHost({children:'destination-and-chrome'})};
- let tree=render();context.value=tree.props.value;
+ let tree=render();context.value=tree.props.value;assert.equal(tree.props.children.props.value,false);
  SeoullyLoadingState({label:'Feed',fullScreen:true});const releaseFeed=h.effects.at(-1)();
- tree=render();let root=tree.props.children;assert.equal(root.props.children[0].props.pointerEvents,'none');assert.equal(root.props.children[0].props.accessibilityElementsHidden,true);assert.equal(root.props.children[1].props.children.props.label,'Feed');
- const releaseRoom=context.value.show('Room');releaseFeed();tree=render();root=tree.props.children;assert.equal(root.props.children[1].props.children.props.label,'Room');
- releaseRoom();tree=render();root=tree.props.children;assert.equal(root.props.children[0].props.pointerEvents,'auto');assert.equal(root.props.children[1],null);
+ tree=render();assert.equal(tree.props.children.props.value,true);let root=tree.props.children.props.children;assert.equal(root.props.children[0].props.pointerEvents,'none');assert.equal(root.props.children[0].props.accessibilityElementsHidden,true);assert.equal(root.props.children[1].props.children.props.label,'Feed');
+ const releaseRoom=context.value.show('Room');releaseFeed();tree=render();root=tree.props.children.props.children;assert.equal(root.props.children[1].props.children.props.label,'Room');
+ releaseRoom();tree=render();root=tree.props.children.props.children;assert.equal(root.props.children[0].props.pointerEvents,'auto');assert.equal(root.props.children[1],null);
 });
 test('reduced-motion preference is conservative until read and responds to live settings changes',async()=>{
  const h=hooks();let changed,removed=false;

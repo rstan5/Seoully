@@ -1,4 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
+import * as Linking from "expo-linking";
+import { isReturningWelcomeLaunch } from "./welcomeEligibility";
 import { loadNativeOnboarding } from "../api";
 import { mobileConfig } from "../config";
 import { supabase } from "../supabase";
@@ -23,6 +25,8 @@ type BootstrapContextValue = {
   onboardingStep: NativeOnboardingStep | null;
   errorKind: StartupErrorKind | null;
   companionEligible: boolean;
+  returningWelcome: boolean;
+  finishReturningWelcome: () => void;
   refresh: () => void;
   enterApp: () => void;
 };
@@ -70,6 +74,10 @@ export function BootstrapProvider({ children }: PropsWithChildren) {
   const [eligibility, setEligibility] = useState<CompanionEligibilityInput>(initialCompanionEligibility);
   const [errorKind, setErrorKind] = useState<StartupErrorKind | null>(null);
   const generation = useRef(0);
+  const coldLaunch = useRef(true);
+  const linkInterrupted = useRef(false);
+  const [returningWelcome, setReturningWelcome] = useState(false);
+  const finishReturningWelcome = useCallback(() => setReturningWelcome(false), []);
 
   const applySnapshot = useCallback((snapshot: StartupSnapshot, token: number) => {
     if (token !== generation.current) return;
@@ -80,6 +88,10 @@ export function BootstrapProvider({ children }: PropsWithChildren) {
   }, []);
 
   const refresh = useCallback(() => {
+    const initial = coldLaunch.current;
+    coldLaunch.current = false;
+    const initialUrl = initial ? withTimeout(Linking.getInitialURL(), 500, "initial_url_unavailable").catch(() => "unknown-deep-link") : Promise.resolve("not-cold");
+    setReturningWelcome(false);
     const token = ++generation.current;
     setEligibility(initialCompanionEligibility());
     setErrorKind(null);
@@ -90,7 +102,14 @@ export function BootstrapProvider({ children }: PropsWithChildren) {
       productApiConfigured: mobileConfig.productApiConfigured,
       restoreSession,
       loadOnboarding: loadOnboardingBounded,
-    }).then((snapshot) => applySnapshot(snapshot, token));
+    }).then(async (snapshot) => {
+      if (token !== generation.current) return;
+      if (!initial || snapshot.destination !== "app") { applySnapshot(snapshot, token); return; }
+      const url = await initialUrl;
+      if (token !== generation.current) return;
+      setReturningWelcome(isReturningWelcomeLaunch(initial && !linkInterrupted.current, snapshot, url));
+      applySnapshot(snapshot, token);
+    });
   }, [applySnapshot]);
 
   useEffect(() => {
@@ -98,16 +117,20 @@ export function BootstrapProvider({ children }: PropsWithChildren) {
     const { data } = supabase.auth.onAuthStateChange((event) => {
       if (event !== "SIGNED_OUT") return;
       startupTrace("auth restore complete", "signed_out");
+      setReturningWelcome(false);
       generation.current += 1;
       applySnapshot({ destination: "welcome", authenticated: false, onboardingStep: null, errorKind: null }, generation.current);
     });
+    const links = Linking.addEventListener("url", () => { linkInterrupted.current = true; setReturningWelcome(false); });
     return () => {
+      links.remove();
       clearTimeout(timer);
       data.subscription.unsubscribe();
     };
   }, [applySnapshot, refresh]);
 
   const enterApp = useCallback(() => {
+    setReturningWelcome(false);
     generation.current += 1;
     applySnapshot({ destination: "app", authenticated: true, onboardingStep: "done", errorKind: null }, generation.current);
   }, [applySnapshot]);
@@ -118,10 +141,12 @@ export function BootstrapProvider({ children }: PropsWithChildren) {
     authenticated: eligibility.authenticated,
     onboardingStep: eligibility.onboardingStep,
     errorKind,
-    companionEligible: companionIsEligible(eligibility),
+    companionEligible: companionIsEligible(eligibility) && !returningWelcome,
+    returningWelcome,
+    finishReturningWelcome,
     refresh,
     enterApp,
-  }), [eligibility, enterApp, errorKind, refresh]);
+  }), [eligibility, enterApp, errorKind, refresh, returningWelcome, finishReturningWelcome]);
 
   return <BootstrapContext.Provider value={value}>{children}</BootstrapContext.Provider>;
 }

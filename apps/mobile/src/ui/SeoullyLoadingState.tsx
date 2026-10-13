@@ -4,6 +4,9 @@ import { Animated, Easing, Image, StyleSheet, View } from "react-native";
 import { colors } from "../theme";
 import { useReduceMotion } from "./motion";
 
+const LoadingActive = createContext(false);
+export const useBlockingLoadingActive = () => useContext(LoadingActive);
+
 const LoadingHost = createContext<{ show: (label: string) => () => void } | null>(null);
 
 /** One root overlay covers navigation chrome without native modal presentation changes. */
@@ -16,12 +19,12 @@ export function SeoullyLoadingHost({ children }: PropsWithChildren) {
   }, []);
   const host = useMemo(() => ({ show }), [show]);
   const label = [...loads.values()].at(-1);
-  return <LoadingHost.Provider value={host}>
+  return <LoadingHost.Provider value={host}><LoadingActive.Provider value={!!label}>
     <View style={styles.wrap}>
       <View style={styles.content} pointerEvents={label ? "none" : "auto"} accessibilityElementsHidden={!!label} importantForAccessibility={label ? "no-hide-descendants" : "auto"}>{children}</View>
       {label ? <View style={styles.overlay}><HeartLoadingSurface label={label} /></View> : null}
     </View>
-  </LoadingHost.Provider>;
+  </LoadingActive.Provider></LoadingHost.Provider>;
 }
 
 /** Full-screen use is only for blocking hydration; inline use leaves current content interactive. */

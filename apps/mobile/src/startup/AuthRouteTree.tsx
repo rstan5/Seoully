@@ -1,3 +1,5 @@
+import { View } from "react-native";
+import { ReturningWelcome } from "./ReturningWelcome";
 import { Stack } from "expo-router";
 import { useCopy } from "../locale";
 import { ROOM_THEMES } from "../room/theme";
@@ -35,6 +37,8 @@ export function AuthRouteTree() {
   }
 
   return (
+    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1 }} accessibilityElementsHidden={boot.returningWelcome} importantForAccessibility={boot.returningWelcome ? "no-hide-descendants" : "auto"}>
     <Stack screenOptions={{ headerShown: false, animation: "fade" }}>
       <Stack.Protected guard={screens.welcome}>
         <Stack.Screen name="index" />
@@ -58,5 +62,8 @@ export function AuthRouteTree() {
         <Stack.Screen name="collectible" />
       </Stack.Protected>
     </Stack>
+    </View>
+    {boot.returningWelcome ? <ReturningWelcome onFinished={boot.finishReturningWelcome} /> : null}
+    </View>
   );
 }

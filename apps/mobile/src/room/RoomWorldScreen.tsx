@@ -397,6 +397,8 @@ export function RoomWorldScreen({
     if (!initialHoldingId || initialBinderOpened.current === initialHoldingId || !spreads.length || !objectHasKind(roomLayout.objects, "desk")) return;
     if (spreadIndexForHolding(spreads, initialHoldingId) < 0) return;
     initialBinderOpened.current = initialHoldingId;
+    // Never reset a camera/gesture the collector already chose during the arrival pause.
+    if (viewRef.current.kind !== "home") { onBinderArrivalReady?.(); return; }
     // The same entry path as tapping the physical Binder, exactly once.
     openBinderFromWorld(initialHoldingId);
     // Changes to page data must not restart the entrance or overwrite user gestures.

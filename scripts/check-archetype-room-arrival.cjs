@@ -48,12 +48,14 @@ function intro({ photocard = true, reduced = false, playArrival = true, fail = f
   const react = { useState(initial) { const i = index++; if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial; return [slots[i], value => slots[i] = typeof value === 'function' ? value(slots[i]) : value]; }, useRef(value) { const i = index++; return slots[i] ?? (slots[i] = { current: value }); }, useCallback: (fn, deps) => { const i = index++; if (!slots[i] || deps.some((v, j) => v !== slots[i].deps[j])) slots[i] = { fn, deps }; return slots[i].fn; }, useEffect(fn, deps) { const i = index++; if (!slots[i] || deps.some((v, j) => v !== slots[i].deps[j])) effects.push(() => { slots[i]?.cleanup?.(); slots[i] = { deps, cleanup: fn() }; }); } };
   class Value { constructor(value) { this.value = value; } }
   const copy = { roomArrivalHome: 'Home ♡', roomArrivalEdit: 'Edit', roomArrivalFinish: 'Find people', roomArrivalProfile: 'Profile', onboardingSaveFailed: 'retry', close: 'Close', onboardPlaceFirst: 'Place', onboardOwnershipHandoff: 'handoff' };
+  const timerGlobals = { setTimeout(fn, ms) { assert.ok(ms >= 0 && ms <= 5000); const id = ++next; timers.set(id, fn); return id; }, clearTimeout: id => timers.delete(id) };
+  const countdown = load('apps/mobile/src/ui/usePausedCountdown.ts', { react }, timerGlobals);
   const api = load('apps/mobile/src/onboarding/OnboardingWorldIntro.tsx', {
-    react, 'react/jsx-runtime': { jsx, jsxs: jsx }, 'expo-router': { useFocusEffect(fn) { react.useEffect(() => { focusedCleanup = fn(); return focusedCleanup; }, [fn]); } },
+    react, '../ui/usePausedCountdown': countdown, 'react/jsx-runtime': { jsx, jsxs: jsx }, 'expo-router': { useFocusEffect(fn) { react.useEffect(() => { focusedCleanup = fn(); return focusedCleanup; }, [fn]); } },
     'react-native': { View: 'View', Pressable: 'Pressable', StyleSheet: { create: x => x, absoluteFill: {} }, Animated: { View: 'Animated', Value, timing(value, config) { return { start(fn) { animations.push({ config, finish: () => { value.value = config.toValue; fn({ finished: true }); } }); }, stop() {} }; } }, AppState: { currentState: 'active', addEventListener(_, fn) { appListener = fn; return { remove() { appListener = null; } }; } } },
     '../ui/HeartFarewell': { HeartFarewell: 'Heart' }, '../room/RoomWorldScreen': { RoomWorldScreen: 'Room' }, '../room/RoomMessage': { RoomMessage: 'Message', roomMessageStyles: { text: {} } }, '../ui/SeoullyText': { SeoullyText: 'Text' }, '../ui/SeoullyCompanion': { SeoullyCompanion: 'Companion' }, '../ui/motion': { useMotionPreference: () => reduced }, '../theme': { colors: { canvas: 'pink' } }, '../data': { useSocialRepository: () => ({ capabilities: { persistRoom: true } }) }, '../api': { updateNativeOnboarding: async () => { requests++; if (fail) throw Error('offline'); return { step: 'done' }; } }, '../room/roomStyle': { DEFAULT_ROOM_STYLE: {}, resolveRoomLook: x => x }, '../room/theme': { roomOverlayChrome: () => ({ color: 'ink', border: 'line' }) }, './roomArrival': { nextArrivalMessage: current => current === 'home' ? 'edit' : current === 'edit' ? 'profile' : current },
-  }, { setTimeout(fn, ms) { assert.equal(ms, 3000); const id = ++next; timers.set(id, fn); return id; }, clearTimeout: id => timers.delete(id) });
-  return { copy, render() { index = 0; effects = []; const tree = api.default({ holdingId: 'card', photocard, playArrival, copy, onContinue: () => profile++, onBack() {} }); effects.forEach(fn => fn()); return tree; }, fade() { const a = animations.at(-1); assert.equal(a.config.duration, reduced ? 0 : 280); a.finish(); }, tick() { assert.equal(timers.size, 1); [...timers.values()][0](); }, background() { appListener('background'); }, foreground() { appListener('active'); }, blur() { focusedCleanup(); }, cleanup() { slots.forEach(s => s?.cleanup?.()); }, get timers() { return timers.size; }, get profile() { return profile; }, get requests() { return requests; } };
+  }, timerGlobals);
+  return { copy, render() { index = 0; effects = []; const tree = api.default({ holdingId: 'card', photocard, playArrival, copy, onContinue: () => profile++, onBack() {} }); effects.forEach(fn => fn()); return tree; }, fade() { const a = animations.at(-1); assert.equal(a.config.duration, reduced ? 0 : 600); a.finish(); }, tick() { assert.equal(timers.size, 1); [...timers.values()][0](); }, background() { appListener('background'); }, foreground() { appListener('active'); }, blur() { focusedCleanup(); }, cleanup() { slots.forEach(s => s?.cleanup?.()); }, get timers() { return timers.size; }, get profile() { return profile; }, get requests() { return requests; } };
 }
 function room(tree) { return tree.props.children[0]; }
 function descendants(node) { if (!node || typeof node !== 'object') return []; return [node, ...[node.props?.children].flat(Infinity).flatMap(descendants)]; }
@@ -61,7 +63,7 @@ async function arrive(h, photocard = true) {
   let tree = h.render(); const world = room(tree); world.props.onLiveSnapshotReady({ placements: [] }); world.props.onWorldReady();
   tree = h.render(); assert.equal(tree.props.children[2].props.ready, true); tree.props.children[2].props.onContinue();
   tree = h.render(); assert.equal(room(tree).props.initialHoldingId, undefined); h.fade(); tree = h.render();
-  if (photocard) { assert.equal(room(tree).props.initialHoldingId, 'card'); room(tree).props.onLiveBinderConfirmed(['card']); room(tree).props.onBinderArrivalReady(); }
+  if (photocard) { assert.equal(room(tree).props.initialHoldingId, undefined); h.tick(); tree = h.render(); assert.equal(room(tree).props.initialHoldingId, 'card'); room(tree).props.onLiveBinderConfirmed(['card']); room(tree).props.onBinderArrivalReady(); }
   else { assert.equal(room(tree).props.initialHoldingId, undefined); room(tree).props.onLivePlacementConfirmed('card'); }
   await new Promise(setImmediate); return h.render();
 }
@@ -70,7 +72,7 @@ test('heart waits for actual world; fade precedes Binder; one companion and no f
   const tree = await arrive(h); assert.equal(tree.props.children.filter(x => x?.type === 'Companion').length, 1); assert.equal(tree.props.children.some(x => x?.type === 'Heart'), false);
   assert.equal(room(tree).props.suppressAmbientGuidance, true); assert.equal(tree.type, 'View'); assert.equal(h.requests, 1); h.cleanup();
 });
-test('messages run visible 3s → 3s → persistent Profile; action never repeats Holding creation', async () => {
+test('messages run visible 5s → 5s → persistent Profile; action never repeats Holding creation', async () => {
   const h = intro(); let tree = await arrive(h); assert.ok(descendants(room(tree).props.roomGuidance).some(x => x.props.children === 'Home ♡'));
   h.tick(); tree = h.render(); assert.ok(descendants(room(tree).props.roomGuidance).some(x => x.props.children === 'Edit'));
   h.tick(); tree = h.render(); assert.equal(h.timers, 0); const action = descendants(room(tree).props.roomGuidance).find(x => x.type === 'Pressable' && x.props.disabled === false); action.props.onPress(); assert.equal(h.profile, 1); assert.equal(h.requests, 1); h.cleanup();
@@ -103,7 +105,7 @@ test('initial Binder request uses normal open path once, refuses unavailable car
   const file = fs.readFileSync('apps/mobile/src/room/RoomWorldScreen.tsx', 'utf8');
   const start = file.indexOf('  const initialBinderOpened'), end = file.indexOf('  function clearPendingPress', start);
   let effect, called = 0, exists = false; const refs = [];
-  const scope = { useRef(value) { const ref = { current: value }; refs.push(ref); return ref; }, useEffect(fn) { effect = fn; }, initialHoldingId: 'card', spreads: [{}], roomLayout: { objects: [] }, objectHasKind: () => true, spreadIndexForHolding: () => exists ? 0 : -1, openBinderFromWorld: id => { assert.equal(id, 'card'); called++; } };
+  const scope = { useRef(value) { const ref = { current: value }; refs.push(ref); return ref; }, useEffect(fn) { effect = fn; }, initialHoldingId: 'card', spreads: [{}], roomLayout: { objects: [] }, viewRef: {current:{kind:'home'}}, objectHasKind: () => true, spreadIndexForHolding: () => exists ? 0 : -1, openBinderFromWorld: id => { assert.equal(id, 'card'); called++; } };
   vm.runInNewContext(ts.transpileModule(file.slice(start, end), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, scope);
   effect(); assert.equal(called, 0); exists = true; effect(); effect(); assert.equal(called, 1);
 });

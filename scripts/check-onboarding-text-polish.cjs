@@ -8,6 +8,7 @@ function greeting(reduced) {
   let cursor = 0, slots = [], pending = [], timer, cleanup, stopped = false;
   const react = {
     useState(initial) { const i = cursor++; if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial; return [slots[i], value => slots[i] = typeof value === 'function' ? value(slots[i]) : value]; },
+    useRef(value) { const i = cursor++; return slots[i] ?? (slots[i] = { current: value }); },
     useEffect(fn) { pending.push(fn); },
   };
   class Value { interpolate(x) { return x; } stopAnimation() { stopped = true; } }

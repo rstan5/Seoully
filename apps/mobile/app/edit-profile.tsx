@@ -1,3 +1,4 @@
+import { useLanguageControlTone } from "../src/ui/GlobalLanguageControl";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import { randomUUID } from "expo-crypto";
@@ -20,7 +21,7 @@ import { loadNativeOnboarding, updateNativeProfile, readProfileCapabilities, upl
 import { useSocialRepository } from "../src/data";
 import { KeyboardScreen } from "../src/components/KeyboardScreen";
 import { RetryNotice } from "../src/components/RetryNotice";
-import { useCopy, useLocale } from "../src/locale";
+import { useCopy } from "../src/locale";
 import { supabase } from "../src/supabase";
 import { colors, sizes } from "../src/theme";
 import { SeoullyAvatar } from "../src/ui/SeoullyAvatar";
@@ -32,7 +33,6 @@ import { SeoullyText } from "../src/ui/SeoullyText";
 export default function EditProfileScreen() {
   const router = useRouter();
   const copy = useCopy();
-  const { toggleLocale } = useLocale();
   const insets = useSafeAreaInsets();
   const latestCopy = useRef(copy);
   const refreshGeneration = useRef(0);
@@ -151,6 +151,7 @@ export default function EditProfileScreen() {
   }
 
   const palette = useMemo(() => identityPalette(nativeProfileTheme(appearance, roomStyle)), [appearance, roomStyle]);
+  useLanguageControlTone(palette.ink);
 
   if (loading && !identity && !error) return <SeoullyLoadingState fullScreen label={copy.profileEdit} />;
 
@@ -163,12 +164,7 @@ export default function EditProfileScreen() {
             <SeoullyText variant="body">{copy.editCancel}</SeoullyText>
           </Pressable>
           <View pointerEvents="none" style={styles.titleCenter}><SeoullyText variant="handle">{copy.profileEdit}</SeoullyText></View>
-          <View style={styles.topEnd}>
-            <Pressable accessibilityRole="button" accessibilityLabel={copy.switchLanguage} onPress={toggleLocale} style={styles.topAction}>
-              <SeoullyText variant="button">{copy.switchLanguage}</SeoullyText>
-            </Pressable>
 
-          </View>
         </View>
 
         {error ? <View style={styles.notice}><RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /></View> : null}

@@ -1,3 +1,4 @@
+import { useDialogueLanguageControl } from "./GlobalLanguageControl";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Image, Pressable, StyleSheet, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -10,9 +11,10 @@ import { advanceHeartScene, dialogueMotionTiming, dialogueReadingMs, heartSceneT
 
 /** Opaque character scene between stages; never completes production onboarding. */
 export function HeartFarewell({ text, ready = true, onContinue, destination = "corner" }: { text: string; ready?: boolean; onContinue: () => void; destination?: "corner" | "next" }) {
+  useDialogueLanguageControl();
   const reduced = useMotionPreference();
   if (reduced === null) return <Pressable style={styles.cover} />;
-  return <HeartScene key={String(reduced)} text={text} ready={ready} onContinue={onContinue} reduced={reduced} destination={destination} />;
+  return <HeartScene key={`${reduced}:${text}`} text={text} ready={ready} onContinue={onContinue} reduced={reduced} destination={destination} />;
 }
 
 function HeartScene({ text, ready, onContinue, reduced, destination = "corner" }: { text: string; ready: boolean; onContinue: () => void; reduced: boolean; destination?: "corner" | "next" }) {

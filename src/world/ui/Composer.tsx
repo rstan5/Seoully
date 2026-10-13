@@ -7,7 +7,6 @@ import { repository } from "@/domain/memory-repository";
 import { useRepoRevision } from "@/domain/use-repository";
 import type { CollectibleTemplate, PostMedia, TemplateId, UserId } from "@/domain/types";
 import { useT } from "@/locale/store";
-import { LanguageToggle } from "@/world/ui/LanguageToggle";
 import { PhotocardCollectorCount } from "./PhotocardCollectorCount";
 import { ObjectTile } from "@/world/ui/ObjectTile";
 import { SocialAvatar } from "@/world/ui/SocialAvatar";
@@ -142,7 +141,7 @@ export function Composer({
         <button type="button" onClick={back}>{t("compose.cancel")}</button>
         <strong>{t("compose.newPost")}</strong>
         <div className="s-compose-top-actions">
-          <LanguageToggle />
+
           <button type="button" className="s-compose-share" disabled={!picked || publishing} onClick={() => void post()}>
             {t("compose.share")}
           </button>

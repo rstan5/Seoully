@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { heartScene } from "@/design/motion";
-import { useT } from "@/locale/store";
+import { useLocale, useT } from "@/locale/store";
 import { useReducedMotion } from "@/world/stage/useViewport";
 import { useHeartCompanion } from "@/world/store/heartCompanionStore";
 import { SeoullyHeartMark } from "@/world/ui/onboard/SeoullyHeartMark";
@@ -58,6 +58,8 @@ export function HeartScene() {
   const reducedRef = useRef(reduced);
   reducedRef.current = reduced;
   const t = useT();
+  const locale = useLocale();
+  const lastToken = useRef(token);
   const [phase, setPhase] = useState<Phase>("cover");
   const [line, setLine] = useState(0);
 
@@ -75,7 +77,9 @@ export function HeartScene() {
       return;
     }
     setPhase("cover");
-    setLine(0);
+    // Translation restarts presentation without losing the current dialogue line.
+    if (lastToken.current !== token) setLine(0);
+    lastToken.current = token;
     const still = reducedRef.current;
     const enterAt = still ? heartScene.coverReducedMs : heartScene.coverMs;
     const enterFor = still ? heartScene.enterReducedMs : heartScene.enterMs;
@@ -85,7 +89,7 @@ export function HeartScene() {
       window.clearTimeout(start);
       window.clearTimeout(talk);
     };
-  }, [open, token]);
+  }, [open, token, locale]);
 
   useEffect(() => {
     if (!open || !typedOut) return;

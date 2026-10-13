@@ -12,7 +12,6 @@ import type { UserId } from "@/domain/types";
 import { useWorld } from "@/world/store/worldStore";
 import { useT } from "@/locale/store";
 import { BrandMark } from "@/world/ui/BrandMark";
-import { LanguageToggle } from "@/world/ui/LanguageToggle";
 import { IconBell } from "@/world/ui/SocialIcons";
 import { SocialNav } from "@/world/ui/SocialNav";
 
@@ -65,7 +64,7 @@ export function SocialShell({
               <BrandMark />
             </span>
             <div className="s-top-end">
-              <LanguageToggle />
+
               <button type="button" className="s-bell" aria-label={t("nav.notifications")} onClick={showNotices}>
                 <IconBell />
                 {unread > 0 && <span className="s-badge">{unread}</span>}

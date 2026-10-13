@@ -1,7 +1,8 @@
+import { LanguageModal } from "../ui/GlobalLanguageControl";
 import { PhotocardCollectorCount } from "../ui/PhotocardCollectorCount";
 import { roomMessageStyles } from "./RoomMessage";
 import { roomChromeSurface, type RoomChrome } from "./theme";
-import { Modal, TextInput, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { TextInput, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeHolding } from "../api";
 import { collectibleKindLabel, type MobileCopy } from "../i18n";
 import { filterStoredHoldings } from "./storedHoldings";
@@ -43,7 +44,7 @@ export function StoredCollectionSheet({
   onEditToPlace?: () => void;
 }) {
   const matches = filterStoredHoldings(holdings, query);
-  return <Modal
+  return <LanguageModal
     animationType={reducedMotion ? "none" : "slide"}
     onRequestClose={onClose}
     transparent
@@ -89,7 +90,7 @@ export function StoredCollectionSheet({
         </ScrollView>}
       </View>
     </View>
-  </Modal>;
+  </LanguageModal>;
 }
 
 const styles = StyleSheet.create({

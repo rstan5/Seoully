@@ -5,7 +5,6 @@ import { repository } from "@/domain/memory-repository";
 import { relationCopy } from "@/locale/copy";
 import { useLocale, useT } from "@/locale/store";
 import { formatMessageWhen } from "@/locale/translate";
-import { LanguageToggle } from "@/world/ui/LanguageToggle";
 import { useRepoRevision } from "@/domain/use-repository";
 import type { CollectibleTemplate, Member, PostId, TemplateId, UserId } from "@/domain/types";
 import { ObjectTile } from "@/world/ui/ObjectTile";
@@ -104,7 +103,7 @@ export function CollectorThread({
           <strong>{peer.displayName}</strong>
           <span>@{peer.handle}</span>
         </div>
-        <LanguageToggle />
+
       </header>
 
       {about.length > 0 && context && (

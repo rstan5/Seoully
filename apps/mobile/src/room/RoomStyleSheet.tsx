@@ -1,7 +1,8 @@
+import { LanguageModal } from "../ui/GlobalLanguageControl";
 import { roomMessageStyles } from "./RoomMessage";
 import { relativeLuminance } from "../ui/profileContrast";
 import { roomChromeSurface, type RoomChrome } from "./theme";
-import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { MobileCopy } from "../i18n";
 import { spacing } from "../theme";
 import { chrome } from "../ui/shellLayout";
@@ -37,7 +38,7 @@ export function RoomStyleSheet({
   onChange: (next: NativeRoomStyle) => void;
   onClose: () => void;
 }) {
-  return <Modal animationType={reducedMotion ? "none" : "slide"} onRequestClose={onClose} transparent visible={visible}>
+  return <LanguageModal animationType={reducedMotion ? "none" : "slide"} onRequestClose={onClose} transparent visible={visible}>
     <View style={styles.frame}>
       <Pressable accessibilityRole="button" onPress={onClose} style={styles.dismiss} />
       <View style={[styles.sheet, roomChromeSurface(roomChrome), { paddingBottom: bottomInset + chrome.companionSize + chrome.companionClearance }]}>
@@ -58,7 +59,7 @@ export function RoomStyleSheet({
         </ScrollView>
       </View>
     </View>
-  </Modal>;
+  </LanguageModal>;
 }
 
 function styleLabel(copy: MobileCopy, kind: string, id: string) {

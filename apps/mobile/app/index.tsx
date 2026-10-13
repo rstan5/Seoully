@@ -54,7 +54,7 @@ export default function Index() {
         <View style={styles.container}>
           {gate === "welcome" ? (
             <View style={styles.welcome}>
-              <View style={styles.hero}><HeartGreeting large text={`${t.welcomeLine1}\n${t.welcomeLine2}`} /></View>
+              <View style={styles.hero}><HeartGreeting key={`${t.welcomeLine1}:${t.welcomeLine2}`} large text={`${t.welcomeLine1}\n${t.welcomeLine2}`} /></View>
               <SeoullyButton label={t.welcomeCreate} block onPress={() => { setGate("create"); setCreateMode(true); }} />
               <Pressable accessibilityRole="button" onPress={() => { setGate("signin"); setCreateMode(false); }} style={styles.secondary}>
                 <SeoullyText variant="button" color={colors.plum}>{t.welcomeSignin}</SeoullyText>
@@ -64,7 +64,7 @@ export default function Index() {
           {gate !== "welcome" ? (
             <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={styles.account}>
               <View style={styles.accountHeading}>
-                <HeartGreeting key={gate} large showHeart={false} inlineHeart text={createMode ? t.createWorldHeading : t.signInWorldHeading} />
+                <HeartGreeting key={`${gate}:${createMode ? t.createWorldHeading : t.signInWorldHeading}`} large showHeart={false} inlineHeart text={createMode ? t.createWorldHeading : t.signInWorldHeading} />
               </View>
               {!mobileConfig.authConfigured ? (
                 <SeoullyText variant="secondary" color={colors.plum} style={styles.warning}>{t.notConfigured}</SeoullyText>

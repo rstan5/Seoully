@@ -66,7 +66,7 @@ function displayReasons(compatibility: SocialCompatibility, copy: MobileCopy) {
 
 export default function CollectorScreen() {
   const copy = useCopy();
-  const { locale, toggleLocale } = useLocale();
+  const { locale } = useLocale();
   const router = useRouter();
   const social = useSocialRepository();
   const { userId = "" } = useLocalSearchParams<{ userId?: string }>();
@@ -227,9 +227,7 @@ export default function CollectorScreen() {
         <SeoullyProfileChrome>
       <View style={styles.top}>
         <ScreenBack label={copy.back} onPress={() => router.back()} />
-        <Pressable accessibilityRole="button" onPress={toggleLocale} style={styles.lang}>
-          <SeoullyText variant="button">{copy.switchLanguage}</SeoullyText>
-        </Pressable>
+
       </View>
       {room.failed ? <View style={styles.notice}><RetryNotice message={copy.roomUnavailable} retryLabel={copy.retry} onRetry={room.retry} /></View> : null}
       {error ? <View style={styles.notice}><RetryNotice message={error} retryLabel={copy.retry} onRetry={refresh} /></View> : null}

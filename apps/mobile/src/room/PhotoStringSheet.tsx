@@ -1,7 +1,8 @@
+import { LanguageModal } from "../ui/GlobalLanguageControl";
 import { roomMessageStyles } from "./RoomMessage";
 import { roomChromeSurface, type RoomChrome } from "./theme";
 import { useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeHolding } from "../api";
 import type { MobileCopy } from "../i18n";
 import { CachedSignedImage } from "../media/cachedMedia";
@@ -29,7 +30,7 @@ export function PhotoStringSheet({ roomChrome, object, holdings, copy, reducedMo
       return free < 0 ? current : current.map((value, i) => i === free ? id : value);
     });
   }
-  return <Modal transparent visible animationType={reducedMotion ? "none" : "slide"} onRequestClose={onClose}>
+  return <LanguageModal transparent visible animationType={reducedMotion ? "none" : "slide"} onRequestClose={onClose}>
     <View style={styles.frame}>
       <Pressable style={styles.dismiss} onPress={onClose} accessibilityLabel={copy.close} />
       <View style={[styles.sheet, roomChromeSurface(roomChrome), { paddingBottom: bottomInset + chrome.companionSize + chrome.companionClearance }]}>
@@ -51,7 +52,7 @@ export function PhotoStringSheet({ roomChrome, object, holdings, copy, reducedMo
         <Pressable disabled={saving} onPress={async () => { setSaving(true); try { if (await onSave(slots)) onClose(); } finally { setSaving(false); } }} style={[styles.done, roomChromeSurface(roomChrome), saving && styles.disabled]}><SeoullyText color={roomChrome.color}>{copy.finishEditing}</SeoullyText></Pressable>
       </View>
     </View>
-  </Modal>;
+  </LanguageModal>;
 }
 const styles = StyleSheet.create({
   close: { flexShrink: 0, minHeight: 44, minWidth: 44, justifyContent: "center", alignItems: "center" },

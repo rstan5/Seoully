@@ -25,7 +25,6 @@ import type {
 } from "@/domain/types";
 import { collectorTypeLabel, interestLabel, localizeError, photoErrorKey, themePresetLabel } from "@/locale/copy";
 import { useT } from "@/locale/store";
-import { LanguageToggle } from "@/world/ui/LanguageToggle";
 import { SocialAvatar } from "@/world/ui/SocialAvatar";
 import { useSession } from "@/world/store/sessionStore";
 import { updateMySeoullyProfile } from "@/server/auth/actions";
@@ -197,7 +196,7 @@ export function EditProfile({
         </button>
         <h1>{t("edit.title")}</h1>
         <div className="s-top-end">
-          <LanguageToggle />
+
           <button type="button" className="s-edit-text is-save" onClick={() => void save()}>
             {t("edit.save")}
           </button>

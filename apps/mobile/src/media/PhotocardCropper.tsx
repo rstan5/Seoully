@@ -1,7 +1,8 @@
+import { LanguageModal } from "../ui/GlobalLanguageControl";
 import { PHOTOCARD } from "./photocard";
 /* eslint-disable react-hooks/refs -- Gesture refs are read and written only inside PanResponder callbacks. */
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Image, Modal, PanResponder, Pressable, StyleSheet, View } from "react-native";
+import { Image, PanResponder, Pressable, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { constrainCrop, cropRectangle, pinchCrop, type CropTransform } from "./cropGeometry";
 import { colors, spacing } from "../theme";
@@ -98,7 +99,7 @@ export function PhotocardCropper({
   const adjustZoom = (delta: number) => commit({ ...current.current, zoom: current.current.zoom + delta });
   const useCrop = () => { if (busy || imageState !== "ready" || !measured) return; onUse(cropRectangle(current.current, asset.width, asset.height, viewportWidth)); };
 
-  return <Modal animationType="slide" visible onRequestClose={() => { if (!busy) onCancel(); }}>
+  return <LanguageModal languageInk={colors.ink} animationType="slide" visible onRequestClose={() => { if (!busy) onCancel(); }}>
     <SafeAreaView edges={["top", "bottom"]} style={styles.screen}>
       <SeoullyText variant="title">{title}</SeoullyText>
       <SeoullyText variant="secondary" style={styles.hint}>{hint}</SeoullyText>
@@ -131,7 +132,7 @@ export function PhotocardCropper({
         <SeoullyText variant="button" color={colors.muted}>{backLabel}</SeoullyText>
       </Pressable>
     </SafeAreaView>
-  </Modal>;
+  </LanguageModal>;
 }
 
 function distance(a: { pageX: number; pageY: number }, b: { pageX: number; pageY: number }) {

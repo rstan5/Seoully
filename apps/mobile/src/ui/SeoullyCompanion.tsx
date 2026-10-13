@@ -1,3 +1,4 @@
+import { LanguageModal } from "./GlobalLanguageControl";
 import { heartMotion } from "./heartMotion";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -5,7 +6,6 @@ import {
   Easing,
   Image,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -177,7 +177,7 @@ export function SeoullyCompanion({ guidance, onboardingActive = false }: { guida
           </Animated.View>
         </Pressable>
       </View>
-      <Modal animationType={reduceMotion ? "none" : "slide"} onRequestClose={() => setOpen(false)} transparent visible={open}>
+      <LanguageModal animationType={reduceMotion ? "none" : "slide"} onRequestClose={() => setOpen(false)} transparent visible={open}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modal}>
           <Pressable accessibilityRole="button" onPress={() => setOpen(false)} style={styles.veil} />
           <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
@@ -263,7 +263,7 @@ export function SeoullyCompanion({ guidance, onboardingActive = false }: { guida
             </View>
           </View>
         </KeyboardAvoidingView>
-      </Modal>
+      </LanguageModal>
     </>
   );
 }

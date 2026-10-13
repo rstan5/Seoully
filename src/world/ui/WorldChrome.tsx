@@ -10,7 +10,6 @@ import { useViewport } from "@/world/stage/useViewport";
 import { useTraversal } from "@/world/useTraversal";
 import { localizeError } from "@/locale/copy";
 import { useT } from "@/locale/store";
-import { LanguageToggle } from "@/world/ui/LanguageToggle";
 import { Portrait } from "@/world/ui/Portrait";
 
 /**
@@ -153,16 +152,6 @@ export function WorldChrome({
               {t("room.yourRoom")}
             </button>
           )}
-          {!visiting && (
-            <button
-              className="u-eyebrow"
-              style={{ fontSize: 8.5, color: "var(--room-ink-soft)" }}
-              onClick={enterEdit}
-            >
-              {t("room.editRoom")}
-            </button>
-          )}
-          <LanguageToggle />
           <button
             type="button"
             className="u-eyebrow"
@@ -172,6 +161,15 @@ export function WorldChrome({
           >
             {t("room.discover")}
           </button>
+          {!visiting && (
+            <button
+              className="u-eyebrow"
+              style={{ fontSize: 8.5, color: "var(--room-ink-soft)" }}
+              onClick={enterEdit}
+            >
+              {t("room.editRoom")}
+            </button>
+          )}
         </div>
       )}
 

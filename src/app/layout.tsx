@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Baloo_2, Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
+import { GlobalLanguageControl } from "@/world/ui/GlobalLanguageControl";
 
 /**
  * Baloo 2 is the product typeface — room, social, and onboarding.
@@ -37,7 +38,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${baloo.variable} ${korean.variable} ${baloo.className}`}>
-      <body>{children}</body>
+      <body>{children}<GlobalLanguageControl /></body>
     </html>
   );
 }

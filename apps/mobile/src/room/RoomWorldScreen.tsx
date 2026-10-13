@@ -1,3 +1,4 @@
+import { useLanguageControlWidth, useLanguageControlTone } from "../ui/GlobalLanguageControl";
 import { startupTrace } from "../startup/trace";
 import { PhotocardCollectorCount } from "../ui/PhotocardCollectorCount";
 import { roomOverlayLayout } from "./overlayLayout";
@@ -136,6 +137,8 @@ export function RoomWorldScreen({
   suppressAmbientGuidance?: boolean;
   deferFirstRoomEdit?: boolean;
 }) {
+  const loadCopy = useRef(copy);
+  loadCopy.current = copy;
   const onboardingEvents = useRef({ onLiveSnapshotReady, onLivePlacementConfirmed, onLiveBinderConfirmed, onLiveSnapshotFailed });
   onboardingEvents.current = { onLiveSnapshotReady, onLivePlacementConfirmed, onLiveBinderConfirmed, onLiveSnapshotFailed };
   const [snapshot, setSnapshot] = useState<NativeRoomSnapshot | null>(null);
@@ -355,14 +358,14 @@ export function RoomWorldScreen({
         setPrivateRoom(false);
         onboardingEvents.current.onLiveSnapshotReady?.(next);
       } else {
-        setError(copy.demoRoomUnavailable);
+        setError(loadCopy.current.demoRoomUnavailable);
         setLoading(false);
         return;
       }
       setError(null);
     } catch {
       if (demo || liveSync.acceptsLoad(ticket)) {
-        setError(copy.roomUnavailable);
+        setError(loadCopy.current.roomUnavailable);
         if (!demo) onboardingEvents.current.onLiveSnapshotFailed?.();
       }
     } finally {
@@ -370,7 +373,7 @@ export function RoomWorldScreen({
     }
     // applyLoadedLayout is a local helper over refs/setters; including it retriggers Room fetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [copy.demoRoomUnavailable, copy.roomUnavailable, demo, mode, persistLive, userId, liveSync, deferFirstRoomEdit]);
+  }, [demo, mode, persistLive, userId, liveSync, deferFirstRoomEdit]);
 
   useFocusEffect(useCallback(() => {
     clearPendingPress();
@@ -1700,15 +1703,16 @@ function OverlayChrome({
   onStorage?: () => void;
   onLayout?: (event: LayoutChangeEvent) => void;
 }) {
+  const languageWidth = useLanguageControlWidth();
+  useLanguageControlTone(chrome.color);
   const chip = [styles.overlayChip, roomChromeSurface(chrome)];
-  return <View pointerEvents="box-none" onLayout={onLayout} style={[styles.overlayBar, style]}>
+  return <View pointerEvents="box-none" onLayout={onLayout} style={[styles.overlayBar, style, { paddingRight: 16 + languageWidth + 18 }]}>
     <Pressable accessibilityRole="button" onPress={onBack} style={chip}>
       <SeoullyText variant="button" color={chrome.color}>{copy.back}</SeoullyText>
     </Pressable>
-    <View pointerEvents="none" style={styles.overlaySpacer} />
     {readOnly || !onEdit ? <View pointerEvents="none" style={styles.overlaySpacer} /> : <View pointerEvents="box-none" style={styles.overlayActions}>
-      {showStorage ? <Pressable onPress={onStorage} style={chip}><SeoullyText variant="button" color={chrome.color}>{copy.storedAccess}</SeoullyText></Pressable> : null}
       {editing ? <Pressable onPress={onCancel} style={chip}><SeoullyText variant="button" color={chrome.color}>{copy.cancelEditing}</SeoullyText></Pressable> : <Pressable onPress={onEdit} style={chip}><SeoullyText variant="button" color={chrome.color}>{copy.editRoom}</SeoullyText></Pressable>}
+      {showStorage ? <Pressable onPress={onStorage} style={chip}><SeoullyText variant="button" color={chrome.color}>{copy.storedAccess}</SeoullyText></Pressable> : null}
     </View>}
   </View>;
 }
@@ -1764,14 +1768,14 @@ function loadDemoRoom(): typeof import("./demoRoom") {
 
 const styles = StyleSheet.create({
   world: { flex: 1 },
-  overlayBar: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 16 },
+  overlayBar: { alignItems: "flex-start", flexDirection: "row", flexWrap: "wrap", gap: 16 },
   messageStack: { position: "absolute" },
   messageContent: { gap: 16, paddingBottom: 2 },
   overlayChip: { maxWidth: "100%", alignItems: "center", borderRadius: 999, borderWidth: 1, justifyContent: "center", minHeight: 44, paddingHorizontal: spacing.sm },
   overlaySpacer: { flex: 1 },
   entrance: { alignItems: "center", bottom: 0, justifyContent: "center", left: 0, paddingHorizontal: 28, position: "absolute", right: 0, top: 0 },
   entranceText: { fontSize: 22, lineHeight: 28, textAlign: "center", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 8 },
-  overlayActions: { flexDirection: "row", flexWrap: "wrap", flexShrink: 1, gap: 16 },
+  overlayActions: { flex: 1, minWidth: 0, flexDirection: "row-reverse", flexWrap: "wrap", flexShrink: 1, gap: 16 },
   empty: { marginTop: 24, paddingHorizontal: chrome.gutter },
   stage: StyleSheet.absoluteFill,
   helperTitle: { fontWeight: "700", textAlign: "center" },

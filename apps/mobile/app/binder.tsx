@@ -1,9 +1,10 @@
+import { LanguageModal } from "../src/ui/GlobalLanguageControl";
 import { PhotocardCollectorCount } from "../src/ui/PhotocardCollectorCount";
 import { PHOTOCARD } from "../src/media/photocard";
 import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { AccessibilityInfo, Animated, Easing, FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { AccessibilityInfo, Animated, Easing, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSocialRepository } from "../src/data";
@@ -223,7 +224,7 @@ function CardInspection({ selection, returnLabel, detailsLabel, onClose }: { sel
   const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [origin ? origin.x + origin.width / 2 - width / 2 : 0, 0] });
   const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [origin ? origin.y + origin.height / 2 - height / 2 : 80, 0] });
   const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [origin ? Math.max(0.18, origin.width / 300) : 0.7, 1] });
-  return <Modal animationType="none" transparent visible={Boolean(selection)} onRequestClose={returnCard}>
+  return <LanguageModal animationType="none" transparent visible={Boolean(selection)} onRequestClose={returnCard}>
     <Animated.View style={[styles.modalBackdrop, { opacity: progress }]}>
       <Animated.View style={[styles.inspection, { transform: [{ translateX }, { translateY }, { scale }] }]}>
         {mediaUri ? <Image resizeMode="contain" source={{ uri: mediaUri }} style={styles.inspectImage} /> : <View style={styles.inspectFallback} />}
@@ -234,7 +235,7 @@ function CardInspection({ selection, returnLabel, detailsLabel, onClose }: { sel
         <Pressable accessibilityRole="button" onPress={returnCard} style={styles.closeButton}><Text style={styles.closeText}>{returnLabel}</Text></Pressable>
       </Animated.View>
     </Animated.View>
-  </Modal>;
+  </LanguageModal>;
 }
 
 const styles = StyleSheet.create({

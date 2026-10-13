@@ -3,7 +3,7 @@ import { View } from "react-native";
 import { ReturningWelcome } from "./ReturningWelcome";
 import { useEffect, useRef } from "react";
 import { Stack, useRouter, useRootNavigationState } from "expo-router";
-import { useCopy } from "../locale";
+import { useCopy, useLocale } from "../locale";
 import { ROOM_THEMES } from "../room/theme";
 import { immersiveRoomFill } from "../ui/shellLayout";
 import { SeoullyButton } from "../ui/SeoullyControls";
@@ -16,6 +16,7 @@ export { AUTH_ROUTE_OWNER };
 
 export function AuthRouteTree() {
   const t = useCopy();
+  const { locale } = useLocale();
   const boot = useBootstrap();
   const screens = screensForDestination(boot.destination);
 
@@ -66,7 +67,7 @@ export function AuthRouteTree() {
     </Stack>
     </View>
     {screens.app ? <ProfileEntryNavigation /> : null}
-    {boot.returningWelcome ? <ReturningWelcome displayName={boot.welcomeName} onFinished={boot.finishReturningWelcome} /> : null}
+    {boot.returningWelcome ? <ReturningWelcome key={locale} displayName={boot.welcomeName} onFinished={boot.finishReturningWelcome} /> : null}
     </View>
   );
 }

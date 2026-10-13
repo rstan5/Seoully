@@ -6,6 +6,7 @@ import { isDemoWorldAllowed, useDataMode, useSocialRepository } from "../data";
 import { useCopy } from "../locale";
 import { colors } from "../theme";
 import { BrandMark } from "./BrandMark";
+import { useLanguageControlWidth } from "./GlobalLanguageControl";
 import { chrome } from "./shellLayout";
 import { IconBell } from "./icons";
 import { pressShift, useReduceMotion } from "./motion";
@@ -13,15 +14,14 @@ import { useProfileIdentity, useProfileInk, useProfileMute } from "./ProfileIden
 import { SeoullyText } from "./SeoullyText";
 
 export function SeoullyHeader({
-  languageLabel,
-  onToggleLanguage,
   trailing,
 }: {
-  languageLabel: string;
-  onToggleLanguage: () => void;
+  languageLabel?: string;
+  onToggleLanguage?: () => void;
   trailing?: ReactNode;
 }) {
   const copy = useCopy();
+  const languageWidth = useLanguageControlWidth();
   const router = useRouter();
   const reduceMotion = useReduceMotion();
   const { demo, setDemo } = useDataMode();
@@ -45,7 +45,7 @@ export function SeoullyHeader({
   }, [social]));
 
   return (
-    <View style={[styles.top, identity ? { borderBottomColor: identity.line } : null]}>
+    <View style={[styles.top, { paddingRight: chrome.gutter + languageWidth + 18 }, identity ? { borderBottomColor: identity.line } : null]}>
       <BrandMark />
       <View style={styles.end}>
         {allowed ? (
@@ -67,33 +67,24 @@ export function SeoullyHeader({
             </SeoullyText>
           </Pressable>
         ) : null}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={languageLabel}
-          hitSlop={10}
-          onPress={onToggleLanguage}
-          style={({ pressed }) => [styles.lang, pressShift(pressed, reduceMotion)]}
-        >
-          <SeoullyText variant="button" color={ink}>{languageLabel}</SeoullyText>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={unread > 0 ? `${copy.notices}, ${unread}` : copy.notices}
-          hitSlop={8}
-          onPress={() => router.push("/notices")}
-          style={({ pressed }) => [styles.bell, pressShift(pressed, reduceMotion)]}
-        >
-          <IconBell color={ink} />
-          {unread > 0 ? (
-            <View style={styles.badge}>
-              <SeoullyText control variant="caption" color={colors.onPrimary} style={styles.badgeText}>
-                {unread > 9 ? "9+" : String(unread)}
-              </SeoullyText>
-            </View>
-          ) : null}
-        </Pressable>
         {trailing}
       </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={unread > 0 ? `${copy.notices}, ${unread}` : copy.notices}
+        hitSlop={8}
+        onPress={() => router.push("/notices")}
+        style={({ pressed }) => [styles.bell, { position: "absolute", top: (chrome.headerHeight - 44) / 2, right: chrome.gutter + languageWidth + 18 }, pressShift(pressed, reduceMotion)]}
+      >
+        <IconBell color={ink} />
+        {unread > 0 ? (
+          <View style={styles.badge}>
+            <SeoullyText control variant="caption" color={colors.onPrimary} style={styles.badgeText}>
+              {unread > 9 ? "9+" : String(unread)}
+            </SeoullyText>
+          </View>
+        ) : null}
+      </Pressable>
     </View>
   );
 }
@@ -119,6 +110,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexShrink: 1,
     marginLeft: "auto",
+    paddingRight: 44,
   },
   demo: {
     borderColor: colors.border,
@@ -132,11 +124,6 @@ const styles = StyleSheet.create({
   demoOn: {
     backgroundColor: colors.lilacSoft,
     borderColor: colors.lilac,
-  },
-  lang: {
-    justifyContent: "center",
-    minHeight: 44,
-    paddingHorizontal: 4,
   },
   bell: {
     alignItems: "center",

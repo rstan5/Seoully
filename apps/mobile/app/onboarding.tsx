@@ -1,3 +1,4 @@
+import { chrome } from "../src/ui/shellLayout";
 import { readSelectedCatalogIdentity } from "../src/data/collectorIdentity";
 import { readOnboardingIdentityDraft, saveOnboardingIdentityDraft, clearOnboardingIdentityDraft } from "../src/onboarding/identityDraft";
 import { ProfileTastePicker, type TasteOption } from "../src/ui/ProfileTastePicker";
@@ -285,7 +286,7 @@ export default function OnboardingScreen() {
   return (
     <SeoullyScreen edges={["top", "bottom"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-      <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={styles.container}>
+      <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={[styles.container, !(editingTastes || phase === "bias" || phase === "archetype" || phase === "interest") ? { paddingTop: chrome.headerHeight } : null]}>
         {editingTastes || phase === "bias" || phase === "archetype" || phase === "interest" ? (
           <ScreenBack label={t.back} onPress={() => (editingTastes && phase === "group" ? router.back() : backIdentity())} />
         ) : null}

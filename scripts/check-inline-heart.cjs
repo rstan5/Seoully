@@ -46,5 +46,5 @@ test('font assets are tiny, bundled before native content, with Unicode-only web
 });
 test('auth reserves full-size inline heart until typewriter completion; welcome unchanged',()=>{
  const s=fs.readFileSync('apps/mobile/src/ui/HeartGreeting.tsx','utf8');assert.match(s,/opacity: shown >= text.length \? 1 : 0/);assert.match(s,/variant="title" style=\{\[large && styles.large/);assert.doesNotMatch(s,/fontSize: 30/);
- const account=fs.readFileSync('apps/mobile/app/index.tsx','utf8');assert.match(account,/showHeart=\{false\} inlineHeart/);assert.match(account,/<HeartGreeting large text=/);
+ const account=fs.readFileSync('apps/mobile/app/index.tsx','utf8');assert.match(account,/showHeart=\{false\} inlineHeart/);assert.match(account,/<HeartGreeting key=\{[^\n]+\} large text=/);
 });

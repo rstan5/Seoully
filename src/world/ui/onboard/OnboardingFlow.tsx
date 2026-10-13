@@ -12,7 +12,6 @@ import { homeWhere, interestLabel, kindLabel, localizeError } from "@/locale/cop
 import { useT } from "@/locale/store";
 import { useReducedMotion } from "@/world/stage/useViewport";
 import { BrandMark } from "@/world/ui/BrandMark";
-import { LanguageToggle } from "@/world/ui/LanguageToggle";
 import { HeartScene } from "@/world/ui/onboard/HeartScene";
 import { PhotocardCollectorCount } from "@/world/ui/PhotocardCollectorCount";
 import { ObjectTile } from "@/world/ui/ObjectTile";
@@ -35,9 +34,6 @@ export function OnboardingFlow() {
   return (
     <div className="onboard">
       <div className="onboard-frame">
-        <div className="onboard-lang">
-          <LanguageToggle />
-        </div>
         {canLeave ? (
           <button type="button" className="onboard-logo" onClick={showWelcome}>
             <BrandMark />

@@ -1,14 +1,12 @@
 import { useBootstrap } from "../../src/startup/BootstrapProvider";
 import { Tabs } from "expo-router";
 import { useCopy } from "../../src/locale";
-import { ProfileIdentityScope } from "../../src/ui/ProfileIdentity";
 import { SeoullyTabBar } from "../../src/ui/SeoullyTabBar";
 
 export default function TabsLayout() {
   const t = useCopy();
   const boot = useBootstrap();
   return (
-    <ProfileIdentityScope>
       <Tabs
         initialRouteName={boot.profileEntryRequested ? "profile" : "index"}
         tabBar={(props) => <SeoullyTabBar {...props} />}
@@ -23,6 +21,5 @@ export default function TabsLayout() {
         <Tabs.Screen name="notices" options={{ href: null, title: t.notices }} />
         <Tabs.Screen name="send-to" options={{ href: null, title: t.sendTo }} />
       </Tabs>
-    </ProfileIdentityScope>
   );
 }

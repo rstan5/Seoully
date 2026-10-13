@@ -2,7 +2,6 @@
 
 import { useT } from "@/locale/store";
 import { BrandMark } from "@/world/ui/BrandMark";
-import { LanguageToggle } from "@/world/ui/LanguageToggle";
 import { SeoullyHeart } from "@/world/ui/onboard/SeoullyHeart";
 import { useSession } from "@/world/store/sessionStore";
 import { localizeError } from "@/locale/copy";
@@ -17,9 +16,6 @@ export function WelcomeGate() {
   return (
     <div className="onboard">
       <div className="onboard-frame onboard-welcome">
-        <div className="onboard-lang">
-          <LanguageToggle />
-        </div>
         <p className="onboard-logo">
           <BrandMark />
         </p>

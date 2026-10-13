@@ -10,6 +10,8 @@ import { LocaleProvider } from "../src/locale";
 import { supabase } from "../src/supabase";
 import { AuthRouteTree } from "../src/startup/AuthRouteTree";
 import { BootstrapProvider } from "../src/startup/BootstrapProvider";
+import { GlobalLanguageControl, LanguageControlProvider } from "../src/ui/GlobalLanguageControl";
+import { ProfileIdentityScope } from "../src/ui/ProfileIdentity";
 import { SeoullyCompanion } from "../src/ui/SeoullyCompanion";
 
 export default function RootLayout() {
@@ -35,8 +37,13 @@ export default function RootLayout() {
             <StatusBar style="dark" />
             <View style={{ flex: 1 }}>
               <BootstrapProvider>
-                <AuthRouteTree />
-                <SeoullyCompanion />
+                <ProfileIdentityScope>
+                  <LanguageControlProvider>
+                    <AuthRouteTree />
+                    <SeoullyCompanion />
+                    <GlobalLanguageControl />
+                  </LanguageControlProvider>
+                </ProfileIdentityScope>
               </BootstrapProvider>
             </View>
           </FontProvider>

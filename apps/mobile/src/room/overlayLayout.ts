@@ -16,7 +16,7 @@ export function roomOverlayLayout({ width, height, insets, headerHeight = 0, foo
   const reservedBottom = bottom + Math.max(companionWidth + heartMotion.travel, hasFooter ? footerHeight || 44 : 0) + ROOM_OVERLAY_GAP;
   const messageWidth = Math.min(360, Math.max(0, width - left - right));
   return {
-    navigation: { paddingTop: insets.top + ROOM_OVERLAY_GAP, paddingLeft: left, paddingRight: right },
+    navigation: { paddingTop: insets.top + (chrome.headerHeight - 44) / 2, paddingLeft: left, paddingRight: right },
     footer: { bottom, left, right: footerRight, paddingBottom: 12 },
     messages: { top, left: left + Math.max(0, (width - left - right - messageWidth) / 2), width: messageWidth, maxHeight: Math.max(0, height - top - reservedBottom) },
   };

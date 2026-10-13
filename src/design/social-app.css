@@ -2841,3 +2841,18 @@
     white-space: normal;
   }
 }
+
+/* The language control is viewport-owned, never positioned by page headers. */
+.global-language-control {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 4px);
+  right: calc(env(safe-area-inset-right, 0px) + 16px);
+  z-index: 10000;
+  color: var(--s-ink, #352637);
+}
+.s-top-end { padding-right: calc(var(--language-control-width, 64px) + 8px); }
+.s-top-end .s-bell {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 4px);
+  right: calc(env(safe-area-inset-right, 0px) + 24px + var(--language-control-width, 64px));
+}

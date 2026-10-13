@@ -482,3 +482,11 @@
     animation: none;
   }
 }
+
+/* Other Room controls adapt to the global rightmost language anchor. */
+.world-chrome-nav {
+  left: auto;
+  right: calc(env(safe-area-inset-right, 0px) + 24px + var(--language-control-width, 64px));
+  top: calc(env(safe-area-inset-top, 0px) + 4px);
+  min-height: 44px;
+}

@@ -98,7 +98,7 @@ test('all four existing sheet headers share spacing and keep their Modal behavio
   for(const name of ['RoomShopSheet','RoomStyleSheet','StoredCollectionSheet','PhotoStringSheet']) {
     const source=fs.readFileSync(`apps/mobile/src/room/${name}.tsx`,'utf8');
     assert.match(source,/styles.header, roomMessageStyles.sheetHeader/);
-    assert.match(source,/<Modal/);
+    assert.match(source,/<LanguageModal/);
     assert.match(source,/onRequestClose=\{onClose\}/);
     assert.match(source,/minHeight: 44/);
   }
@@ -108,7 +108,7 @@ test('all four existing sheet headers share spacing and keep their Modal behavio
 const sourceFile = ts.createSourceFile('RoomWorldScreen.tsx', screen, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const chromeFunction = sourceFile.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'OverlayChrome');
 const context = {
-  exports: {}, styles: {}, View: 'View', Pressable: 'Pressable', SeoullyText: 'Text',
+  exports: {}, styles: {}, useLanguageControlWidth: () => 64, useLanguageControlTone: () => {}, View: 'View', Pressable: 'Pressable', SeoullyText: 'Text',
   roomChromeSurface: load('apps/mobile/src/room/theme.ts').roomChromeSurface,
   require: () => ({ jsx: (type,props) => ({type,props}), jsxs: (type,props) => ({type,props}) }),
 };
@@ -132,6 +132,6 @@ for (const mode of ['normal','edit','public']) test(`${mode}: rendered top contr
     const buttons=nodes.filter(node=>node.type==='Pressable');
     assert.equal(buttons.length,mode==='public'?1:3);
     buttons.forEach(node=>node.props.onPress());
-    assert.deepEqual(called,mode==='public'?['back']:['back','storage',mode==='edit'?'cancel':'edit']);
+    assert.deepEqual(called,mode==='public'?['back']:['back',mode==='edit'?'cancel':'edit','storage']);
   }
 });

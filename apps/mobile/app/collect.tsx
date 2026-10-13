@@ -233,7 +233,8 @@ export default function CollectScreen() {
 const styles = StyleSheet.create({
   container: { flexGrow: 1, paddingBottom: 32, paddingHorizontal: 16 },
   entry: { flexGrow: 1, paddingTop: 24, paddingBottom: 24 },
-  choices: { flexGrow: 1, justifyContent: "center", gap: 24, paddingVertical: 24 },
+  // Share surplus height with the space below, instead of centering in all of it.
+  choices: { flexGrow: 0.5, justifyContent: "center", gap: 24, paddingVertical: 24 },
   choice: { minHeight: 120, justifyContent: "center", borderRadius: 20, paddingVertical: 28, paddingHorizontal: 24, gap: 10, borderWidth: 1 },
   catalogChoice: { backgroundColor: colors.action, borderColor: colors.action },
   manualChoice: { backgroundColor: colors.lilacSoft, borderColor: colors.border },

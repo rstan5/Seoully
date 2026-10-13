@@ -84,7 +84,7 @@ function HeartScene({ text, ready, onContinue, reduced, destination = "corner" }
         <Image accessible={false} source={require("../../assets/brand/seoully-heart-mark.png")} resizeMode="contain" style={{ width: heartSize, height: heartSize }} />
         <Animated.View onLayout={event => setBubbleHeight(event.nativeEvent.layout.height)} style={[styles.bubble, { width: bubbleWidth, left: (heartSize - bubbleWidth) / 2, bottom: heartSize + 6,
           opacity: bubble, transform: [{ translateY: bubbleHeight / 2 + heartSize / 2 + 6 }, { scale: bubble }, { translateY: -bubbleHeight / 2 - heartSize / 2 - 6 }] }]}>
-          <SeoullyText variant="secondary" style={styles.speech}>{chars.slice(0, reduced ? chars.length : scene.count).join("")}<SeoullyText style={{ opacity: 0 }}>{chars.slice(reduced ? chars.length : scene.count).join("")}</SeoullyText></SeoullyText>
+          <SeoullyText variant="secondary" style={styles.speech}>{chars.slice(0, reduced ? chars.length : scene.count).join("")}<SeoullyText variant="secondary" style={[styles.speech, { opacity: 0 }]}>{chars.slice(reduced ? chars.length : scene.count).join("")}</SeoullyText></SeoullyText>
           <Animated.View style={styles.tail} />
         </Animated.View>
       </Animated.View>

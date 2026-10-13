@@ -24,6 +24,6 @@ test('substantial collectible choices retain canonical search/manual navigation 
  const s=fs.readFileSync('apps/mobile/app/collect.tsx','utf8');
  for(const step of ['search','manual'])assert.ok(s.includes(`onPress={() => setStep("${step}")}`));
  for(const copy of ['searchSeoullyCatalogLede','addManuallyLede'])assert.ok(s.includes(`{copy.${copy}}</SeoullyText>\n                </Pressable>`));
- assert.match(s,/choice: \{ minHeight: 120/);assert.match(s,/choices: \{ flexGrow: 1, justifyContent: "center", gap: 24/);
+ assert.match(s,/choice: \{ minHeight: 120/);assert.match(s,/choices: \{ flexGrow: 0\.5, justifyContent: "center", gap: 24/);
  assert.match(s,/accessibilityRole="button"/);assert.match(s,/container: \{ flexGrow: 1/);
 });

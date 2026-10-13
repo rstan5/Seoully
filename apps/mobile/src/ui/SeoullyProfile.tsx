@@ -1,3 +1,4 @@
+import { PhotocardCollectorCount } from "./PhotocardCollectorCount";
 import type { ReactNode } from "react";
 import { Image, Pressable, StyleSheet, View } from "react-native";
 import type { SocialTheme } from "../data/types";
@@ -109,6 +110,7 @@ export function SeoullyProfileMeta({
 }
 
 export function SeoullyOwnedRow({
+  template,
   title,
   meta,
   imageUrl,
@@ -119,6 +121,7 @@ export function SeoullyOwnedRow({
   onToggleTrade,
   onRemove,
 }: {
+  template?: { id: string; kind: string };
   title: string;
   meta?: string;
   imageUrl?: string;
@@ -133,6 +136,7 @@ export function SeoullyOwnedRow({
   return (
     <View style={styles.owned}>
       <SeoullyShelfRow
+        template={template}
         title={title}
         meta={meta}
         imageUrl={imageUrl}
@@ -212,6 +216,7 @@ export function SeoullyHighlight({
 }
 
 export function SeoullyShelfRow({
+  template,
   title,
   meta,
   imageUrl,
@@ -219,6 +224,7 @@ export function SeoullyShelfRow({
   action,
   onPress,
 }: {
+  template?: { id: string; kind: string };
   title: string;
   meta?: string;
   imageUrl?: string;
@@ -233,6 +239,7 @@ export function SeoullyShelfRow({
       <View style={styles.rowCopy}>
         <SeoullyText variant="handle" numberOfLines={1}>{title}</SeoullyText>
         {meta ? <SeoullyText variant="caption" numberOfLines={1}>{meta}</SeoullyText> : null}
+        {template ? <PhotocardCollectorCount templateId={template.id} kind={template.kind} /> : null}
       </View>
       {action ? <SeoullyText variant="caption" color={accent}>{action}</SeoullyText> : null}
     </>

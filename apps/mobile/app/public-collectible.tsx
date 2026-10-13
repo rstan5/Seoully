@@ -1,3 +1,4 @@
+import { PhotocardCollectorCount } from "../src/ui/PhotocardCollectorCount";
 import { useCallback, useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ScrollView, StyleSheet, View } from "react-native";
@@ -115,6 +116,7 @@ export default function PublicCollectibleScreen() {
               {collectibleKindLabel(template.kind, copy)}
             </SeoullyText>
             <SeoullyText variant="title">{template.name}</SeoullyText>
+            <PhotocardCollectorCount templateId={template.id} kind={template.kind} />
             <SeoullyText variant="secondary" style={styles.meta}>
               {[template.groupName, template.memberName, template.releaseName].filter(Boolean).join(" · ")}
             </SeoullyText>

@@ -1,3 +1,4 @@
+import { PhotocardCollectorCount } from "../src/ui/PhotocardCollectorCount";
 import { PHOTOCARD } from "../src/media/photocard";
 import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -227,6 +228,7 @@ function CardInspection({ selection, returnLabel, detailsLabel, onClose }: { sel
       <Animated.View style={[styles.inspection, { transform: [{ translateX }, { translateY }, { scale }] }]}>
         {mediaUri ? <Image resizeMode="contain" source={{ uri: mediaUri }} style={styles.inspectImage} /> : <View style={styles.inspectFallback} />}
         <Text style={styles.inspectTitle}>{selection?.holding.template.name}</Text>
+        <PhotocardCollectorCount templateId={selection?.holding.templateId ?? ""} kind={selection?.holding.template.kind ?? ""} />
         <Text style={styles.inspectMeta}>{[selection?.holding.template.groupName, selection?.holding.template.memberName, selection?.holding.template.releaseName].filter(Boolean).join(" · ")}</Text>
         <Pressable accessibilityRole="button" onPress={() => { if (selection) router.push({ pathname: "/collectible", params: { holdingId: selection.holding.id } }); }} style={styles.closeButton}><Text style={styles.closeText}>{detailsLabel}</Text></Pressable>
         <Pressable accessibilityRole="button" onPress={returnCard} style={styles.closeButton}><Text style={styles.closeText}>{returnLabel}</Text></Pressable>

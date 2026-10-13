@@ -154,6 +154,7 @@ export default function CollectScreen() {
               {hits.map((template) => (
                 <SeoullyShelfRow
                   key={template.id}
+                  template={template}
                   title={template.name}
                   meta={[template.groupName, template.memberName, template.releaseName, template.descriptor, collectibleKindLabel(template.kind, copy)].filter(Boolean).join(" · ")}
                   onPress={() => { void openPhoto(template).catch(() => setSearchError(copy.collectibleCreateFailed)); }}

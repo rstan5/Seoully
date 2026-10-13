@@ -34,7 +34,8 @@
     "check:binder-flow": "node scripts/check-binder-flow.cjs",
     "check:onboarding-identity": "node --test scripts/check-onboarding-identity-refinement.cjs",
     "check:mobile-messages": "node --test scripts/check-message-screen.cjs",
-    "check:add-paper-recovery": "node scripts/check-add-paper-recovery.cjs"
+    "check:add-paper-recovery": "node scripts/check-add-paper-recovery.cjs",
+    "check:photocard-collectors": "node scripts/check-photocard-collector-count.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

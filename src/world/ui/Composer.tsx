@@ -8,6 +8,7 @@ import { useRepoRevision } from "@/domain/use-repository";
 import type { CollectibleTemplate, PostMedia, TemplateId, UserId } from "@/domain/types";
 import { useT } from "@/locale/store";
 import { LanguageToggle } from "@/world/ui/LanguageToggle";
+import { PhotocardCollectorCount } from "./PhotocardCollectorCount";
 import { ObjectTile } from "@/world/ui/ObjectTile";
 import { SocialAvatar } from "@/world/ui/SocialAvatar";
 import { useWorld } from "@/world/store/worldStore";
@@ -260,7 +261,7 @@ export function Composer({
                 const template = repository.getTemplate(id);
                 const remote = productionCollectibles.find((item) => item.id === id);
                 if (template) return <SelectedCollectible key={id} template={template} onRemove={() => toggleCollectible(id)} />;
-                return remote ? <span key={id} className="s-compose-collectible-chip"><span aria-hidden="true" className="s-independent-heart">♡</span><span><strong>{remote.name}</strong><em>{[remote.groupName, remote.memberName, remote.releaseName].filter(Boolean).join(" · ")}</em></span><button type="button" aria-label={t("compose.removeCollectible", { name: remote.name })} onClick={() => toggleCollectible(id as TemplateId)}>×</button></span> : null;
+                return remote ? <span key={id} className="s-compose-collectible-chip"><span aria-hidden="true" className="s-independent-heart">♡</span><span><strong>{remote.name}</strong><em>{[remote.groupName, remote.memberName, remote.releaseName].filter(Boolean).join(" · ")}</em><PhotocardCollectorCount templateId={remote.id} kind={remote.kind} /></span><button type="button" aria-label={t("compose.removeCollectible", { name: remote.name })} onClick={() => toggleCollectible(id as TemplateId)}>×</button></span> : null;
               })}
             </div>
             <button type="button" className="s-compose-add-tag" aria-expanded={collectiblesOpen} onClick={() => setCollectiblesOpen((open) => !open)}>
@@ -274,7 +275,7 @@ export function Composer({
                     <li key={template.id}>
                       <span className="s-compose-result-object">
                         {"groupName" in template ? <span aria-hidden="true" className="s-independent-heart">♡</span> : <ObjectTile template={template} {...(template.memberId && repository.getMember(template.memberId) ? { member: repository.getMember(template.memberId) } : {})} height={44} />}
-                        <span><strong>{"memberName" in template ? template.memberName ?? template.groupName : template.memberId ? repository.getMember(template.memberId)?.stageName : repository.getGroup(template.groupId)?.name}</strong><em>{"groupName" in template ? [template.groupName, template.memberName, template.releaseName, template.name].filter(Boolean).join(" · ") : collectibleLine(template)}</em></span>
+                        <span><strong>{"memberName" in template ? template.memberName ?? template.groupName : template.memberId ? repository.getMember(template.memberId)?.stageName : repository.getGroup(template.groupId)?.name}</strong><em>{"groupName" in template ? [template.groupName, template.memberName, template.releaseName, template.name].filter(Boolean).join(" · ") : collectibleLine(template)}</em>{"groupName" in template && <PhotocardCollectorCount templateId={template.id} kind={template.kind} />}</span>
                       </span>
                       <button type="button" className="s-compose-tag-button" aria-pressed={taggedTemplateIds.includes(template.id as TemplateId)} onClick={() => toggleCollectible(template.id as TemplateId)}>
                         {taggedTemplateIds.includes(template.id as TemplateId) ? t("compose.tagged") : t("compose.tag")}

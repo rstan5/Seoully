@@ -129,6 +129,8 @@ export type Rarity = "common" | "uncommon" | "rare" | "grail";
  */
 export interface CollectibleTemplate {
   id: TemplateId;
+  /** Confirmed canonical catalog identity for transitional local representations. */
+  catalogId?: string;
   kind: CollectibleKind;
   name: string;
   groupId: GroupId;

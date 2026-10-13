@@ -65,6 +65,7 @@ export interface CollectionRepository {
   listReleases(groupId?: string): Release[];
   listTemplates(): CollectibleTemplate[];
   searchCatalog(query: string): CollectibleTemplate[];
+  linkCanonicalCatalogIdentity(templateId: TemplateId, catalogId: string): void;
   adoptProductionCatalogTemplate(input: {
     id: string;
     name: string;

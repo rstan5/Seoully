@@ -1,4 +1,7 @@
 export const en = {
+  "photocardCollectors.count": "{count} collectors on Seoully",
+  "photocardCollectors.unknown": "Collector count unavailable",
+  "photocardCollectors.explanation": "Collectors on Seoully — collectors who have added this exact photocard to their collection.",
   "lang.switchToKorean": "한국어로 변경",
   "lang.switchToEnglish": "Switch to English",
 

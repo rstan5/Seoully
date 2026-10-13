@@ -1,5 +1,7 @@
 "use client";
+import { isCanonicalPhotocard } from "@/domain/photocard-collector-count";
 
+import { PhotocardCollectorCount } from "./PhotocardCollectorCount";
 import type { CollectibleTemplate, Member } from "@/domain/types";
 import { CARD_RATIO, Photocard } from "@/world/objects/Photocard";
 
@@ -11,7 +13,7 @@ import { CARD_RATIO, Photocard } from "@/world/objects/Photocard";
  * product's claim is that these are objects, and that claim is either true
  * everywhere it appears or it isn't true.
  */
-export function ObjectTile({
+function ObjectArtwork({
   template,
   member,
   title,
@@ -97,4 +99,10 @@ export function ObjectTile({
       </span>
     </div>
   );
+}
+
+/** Listings only. Physical Binder/Room card meshes never contain metadata. */
+export function ObjectTile(props: Parameters<typeof ObjectArtwork>[0]) {
+  if (!isCanonicalPhotocard(props.template.catalogId ?? props.template.id, props.template.kind)) return <ObjectArtwork {...props} />;
+  return <div className="s-object-with-count"><ObjectArtwork {...props} /><PhotocardCollectorCount templateId={props.template.catalogId ?? props.template.id} kind={props.template.kind} /></div>;
 }

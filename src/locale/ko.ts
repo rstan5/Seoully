@@ -1,6 +1,9 @@
 import type { MessageKey } from "./en";
 
 export const ko: Record<MessageKey, string> = {
+  "photocardCollectors.count": "서울리 컬렉터 {count}명",
+  "photocardCollectors.unknown": "컬렉터 수를 불러올 수 없어요",
+  "photocardCollectors.explanation": "이 포토카드를 컬렉션에 추가한 서울리 컬렉터 수예요.",
   "lang.switchToKorean": "한국어로 변경",
   "lang.switchToEnglish": "Switch to English",
 

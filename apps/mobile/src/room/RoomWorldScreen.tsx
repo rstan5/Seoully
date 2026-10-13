@@ -1,3 +1,4 @@
+import { PhotocardCollectorCount } from "../ui/PhotocardCollectorCount";
 import { roomOverlayLayout } from "./overlayLayout";
 import { RoomMessage, roomMessageStyles } from "./RoomMessage";
 import { SeoullyLoadingState } from "../ui/SeoullyLoadingState";
@@ -1636,6 +1637,7 @@ function InspectionTray({
   return <View onLayout={onLayout} style={[roomMessageStyles.surface, styles.inspection, roomChromeSurface(roomChrome), style]}>
     <View style={styles.inspectionCopy}>
       <SeoullyText numberOfLines={1} variant="handle" color={roomChrome.color} style={styles.inspectionTitle}>{holding.template.name}</SeoullyText>
+      <PhotocardCollectorCount templateId={holding.templateId} kind={holding.template.kind} color={roomChrome.color} />
       <SeoullyText numberOfLines={1} variant="caption" color={roomChrome.color} style={styles.inspectionMeta}>
         {[holding.template.groupName, holding.template.memberName, collectibleKindLabel(holding.template.kind, copy)].filter(Boolean).join(" · ")}
       </SeoullyText>

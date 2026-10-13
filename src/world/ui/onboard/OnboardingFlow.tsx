@@ -14,6 +14,7 @@ import { useReducedMotion } from "@/world/stage/useViewport";
 import { BrandMark } from "@/world/ui/BrandMark";
 import { LanguageToggle } from "@/world/ui/LanguageToggle";
 import { HeartScene } from "@/world/ui/onboard/HeartScene";
+import { PhotocardCollectorCount } from "@/world/ui/PhotocardCollectorCount";
 import { ObjectTile } from "@/world/ui/ObjectTile";
 import { SocialAvatar } from "@/world/ui/SocialAvatar";
 import { PhotoPicker } from "@/world/ui/PhotoPicker";
@@ -365,8 +366,8 @@ function DetailSearch() {
       <h1>{t("catalog.searchCatalog")}</h1>
       <p className="onboard-lede">{t("catalog.detailSearchLede")}</p>
       <div className="onboard-field"><label htmlFor="catalog-detail-search">{t("catalog.detailSearchLabel")}</label><input id="catalog-detail-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("catalog.detailSearchPlaceholder")} /></div>
-      <ul className="onboard-search">{hits.slice(0, 8).map((template) => { const group = repository.getGroup(template.groupId); const member = template.memberId ? repository.getMember(template.memberId) : undefined; return <li key={template.id}><button type="button" onClick={() => searchPick(template.id)}><strong>{template.name}</strong><em>{[group?.name, member?.stageName, kindLabel(template.kind, t)].filter(Boolean).join(" · ")}</em></button></li>; })}</ul>
-      {sharedHits.length > 0 && <ul className="onboard-search">{sharedHits.map((template) => <li key={template.id}><button type="button" onClick={() => searchPickProduction(template)}><strong>{template.name}</strong><em>{[template.groupName, template.memberName, kindLabel(template.kind, t)].filter(Boolean).join(" · ")}</em></button></li>)}</ul>}
+      <ul className="onboard-search">{hits.slice(0, 8).map((template) => { const group = repository.getGroup(template.groupId); const member = template.memberId ? repository.getMember(template.memberId) : undefined; return <li key={template.id}><button type="button" onClick={() => searchPick(template.id)}><strong>{template.name}</strong><PhotocardCollectorCount templateId={template.catalogId ?? template.id} kind={template.kind} /><em>{[group?.name, member?.stageName, kindLabel(template.kind, t)].filter(Boolean).join(" · ")}</em></button></li>; })}</ul>
+      {sharedHits.length > 0 && <ul className="onboard-search">{sharedHits.map((template) => <li key={template.id}><button type="button" onClick={() => searchPickProduction(template)}><strong>{template.name}</strong><PhotocardCollectorCount templateId={template.id} kind={template.kind} /><em>{[template.groupName, template.memberName, kindLabel(template.kind, t)].filter(Boolean).join(" · ")}</em></button></li>)}</ul>}
       {query.trim() && hits.length === 0 && sharedHits.length === 0 && <p className="onboard-kicker">{t("catalog.detailNoResults")}</p>}
       <div className="onboard-actions"><button type="button" className="onboard-btn is-ghost" onClick={() => startDescribe(query)}>Add Manually</button><button type="button" className="onboard-btn is-ghost" onClick={openCollect}>Back</button></div>
     </>

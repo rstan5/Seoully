@@ -1,3 +1,4 @@
+import { PhotocardCollectorCount } from "../../src/ui/PhotocardCollectorCount";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -512,6 +513,7 @@ function CollectibleResults({
               onPress={hit.owner ? () => onOpenOwner(hit.owner!.userId) : undefined}
               staticRow={!hit.owner}
             />
+            <PhotocardCollectorCount templateId={item.id} kind={item.kind} />
             <View style={styles.actions}>
               <Pressable accessibilityRole="button" onPress={() => onAdd(item)}>
                 <SeoullyText variant="button" color={colors.plum}>{addLabel}</SeoullyText>

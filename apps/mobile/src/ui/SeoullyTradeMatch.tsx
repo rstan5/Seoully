@@ -32,6 +32,7 @@ function TradeColumn({
       {items.map((item) => (
         <SeoullyShelfRow
           key={item.templateId}
+          template={{ id: item.templateId, kind: item.kind }}
           title={item.name}
           meta={captionFor(item, copy)}
           colorway={item.colorway}

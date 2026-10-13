@@ -292,6 +292,7 @@ export default function ProfileScreen() {
             {holdings.map((holding) => (
               <SeoullyOwnedRow
                 key={holding.id}
+                template={holding.template}
                 title={holding.template.name}
                 meta={[holding.template.groupName, holding.template.memberName, holding.template.releaseName, collectibleKindLabel(holding.template.kind, copy)].filter(Boolean).join(" · ")}
                 imageUrl={holding.personalMediaUrl}
@@ -324,6 +325,7 @@ export default function ProfileScreen() {
             {wishlist.map((entry) => (
               <SeoullyShelfRow
                 key={entry.id}
+                template={entry.template}
                 title={entry.template.name}
                 meta={[entry.template.groupName, entry.template.memberName, collectibleKindLabel(entry.template.kind, copy)].filter(Boolean).join(" · ")}
                 action={copy.removeFromWishlist}

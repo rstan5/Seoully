@@ -1,5 +1,6 @@
 "use client";
 
+import { PhotocardCollectorCount } from "./PhotocardCollectorCount";
 import { AnimatePresence, motion } from "motion/react";
 import { repository } from "@/domain/memory-repository";
 import type { HoldingView, TemplateId, UserId } from "@/domain/types";
@@ -55,6 +56,7 @@ export function InspectPlate({
               {view.release ? ` · ${view.release.title}` : ""}
             </p>
           )}
+          <PhotocardCollectorCount templateId={view.template.catalogId ?? view.template.id} kind={view.template.kind} />
           {!view.member && view.release && (
             <p className="inspect-plate-sub">
               {view.group.name}

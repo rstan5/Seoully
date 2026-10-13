@@ -1,3 +1,4 @@
+import { PhotocardCollectorCount } from "../ui/PhotocardCollectorCount";
 import { roomMessageStyles } from "./RoomMessage";
 import { roomChromeSurface, type RoomChrome } from "./theme";
 import { Modal, TextInput, Pressable, ScrollView, StyleSheet, View } from "react-native";
@@ -73,6 +74,7 @@ export function StoredCollectionSheet({
             {look.imageUrl ? <CachedSignedImage cacheKey={holding.id} url={look.imageUrl} style={styles.thumb} /> : <View style={[styles.thumb, styles.thumbFallback, { backgroundColor: look.color }]} />}
             <View style={styles.meta}>
               <SeoullyText color={roomChrome.color} numberOfLines={1} variant="handle" style={styles.name}>{holding.template.name}</SeoullyText>
+              <PhotocardCollectorCount templateId={holding.templateId} kind={holding.template.kind} color={roomChrome.color} />
               <SeoullyText numberOfLines={1} variant="caption" color={roomChrome.color}>
                 {[holding.template.groupName, holding.template.memberName, collectibleKindLabel(holding.template.kind, copy)].filter(Boolean).join(" · ")}
               </SeoullyText>

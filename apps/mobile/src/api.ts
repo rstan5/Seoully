@@ -6,6 +6,10 @@ import { isProductApiConfigured } from "./config-rules";
 import { supabase } from "./supabase";
 import type { AskSurfaceContext } from "seoully-domain/ask-context";
 
+const collectorCountListeners = new Set<() => void>();
+export const onCollectorOwnershipChanged = (fn: () => void) => { collectorCountListeners.add(fn); return () => { collectorCountListeners.delete(fn); }; };
+const notifyCollectorOwnershipChanged = () => collectorCountListeners.forEach(fn => fn());
+
 function productApiBase(): string {
   const value = (process.env.EXPO_PUBLIC_API_URL ?? "").replace(/\/$/, "").trim();
   if (!isProductApiConfigured(value)) throw new Error("product_api_unconfigured");
@@ -111,6 +115,7 @@ export async function createHolding(templateId: string, holdingId?: string): Pro
   if (!response.ok) return apiFailure(response, "holding_create");
   const payload = await response.json() as { holding?: NativeHolding };
   if (!payload.holding?.id) throw new Error("holding_create_failed");
+  notifyCollectorOwnershipChanged();
   return { holding: payload.holding };
 }
 
@@ -179,6 +184,7 @@ export async function removeHolding(holdingId: string) {
     body: JSON.stringify({ holdingId }),
   });
   if (!response.ok) throw new Error("holding_delete_failed");
+  notifyCollectorOwnershipChanged();
 }
 
 export type NativeCollectorMatchItem = {
@@ -936,4 +942,15 @@ export async function contributeCatalogIdentity(input: { submissionId: string; k
   const { contribution } = await response.json();
   if (!contribution?.id || !contribution.groupId || (input.kind === "member" && !contribution.memberId)) throw new Error("identity_contribution_unconfirmed");
   return contribution;
+}
+
+/** Aggregate-only authenticated read; no private inventory reaches the client. */
+export async function readPhotocardCollectorCounts(templateIds: string[]): Promise<Record<string, number>> {
+  const accessToken = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/catalog/collector-counts`, {
+    method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ templateIds }),
+  });
+  if (!response.ok) throw new Error("collector_counts_unavailable");
+  return (await response.json() as { counts: Record<string, number> }).counts;
 }

@@ -1,3 +1,4 @@
+import { PhotocardCollectorCount } from "./PhotocardCollectorCount";
 import { useState } from "react";
 import { Image, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { colors, elevation, radii, spacing } from "../theme";
@@ -85,10 +86,12 @@ export function SeoullyCollectorIdentity({
 }
 
 export function SeoullyCollectiblePreview({
+  templateId,
   name,
   kind,
   colorway,
 }: {
+  templateId?: string;
   name: string;
   kind: string;
   colorway?: { base: string; accent: string; ink: string };
@@ -105,6 +108,7 @@ export function SeoullyCollectiblePreview({
       <View style={styles.collectibleCopy}>
         <SeoullyText variant="caption" color={ink} numberOfLines={1}>{name}</SeoullyText>
         <SeoullyText variant="metadata" color={kindColor} numberOfLines={1}>{kind}</SeoullyText>
+        {templateId ? <PhotocardCollectorCount templateId={templateId} kind={kind} /> : null}
       </View>
     </View>
   );
@@ -226,7 +230,7 @@ export function SeoullyPost({
       {item.taggedCollectibles && item.taggedCollectibles.length > 0 ? (
         <View style={styles.collectibles}>
           {item.taggedCollectibles.map((tag) => (
-            <SeoullyCollectiblePreview key={tag.templateId} name={tag.name} kind={tag.kind} colorway={tag.colorway} />
+            <SeoullyCollectiblePreview key={tag.templateId} templateId={tag.templateId} name={tag.name} kind={tag.kind} colorway={tag.colorway} />
           ))}
         </View>
       ) : null}

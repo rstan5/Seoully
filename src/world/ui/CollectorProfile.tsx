@@ -1,5 +1,6 @@
 "use client";
 
+import { PhotocardCollectorCount } from "./PhotocardCollectorCount";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { isOpenToTrade } from "@/domain/compatibility";
 import { repository } from "@/domain/memory-repository";
@@ -709,6 +710,7 @@ function OwnedRow({
               if (session.kind === "auth" && view.holding.productionId) {
                 const result = await removeProductionHolding({ holdingId: view.holding.productionId });
                 if (!result.ok || !result.result.removed) return;
+                window.dispatchEvent(new Event("seoully:ownership-changed"));
               }
               repository.removeHolding(view.holding.id);
             }}
@@ -779,6 +781,7 @@ function WishlistSearch({
                   }}
                 >
                   <strong>{template.name}</strong>
+                  <PhotocardCollectorCount templateId={template.catalogId ?? template.id} kind={template.kind} />
                   <em>{[group?.name, member?.stageName, wanted ? t("common.saved") : kindLabel(template.kind, t)].filter(Boolean).join(" · ")}</em>
                 </button>
               </li>
@@ -801,6 +804,7 @@ function WishlistSearch({
                 }}
               >
                 <strong>{hit.name}</strong>
+                <PhotocardCollectorCount templateId={hit.id} kind={hit.kind} />
                 <em>{[hit.groupName, hit.memberName, hit.releaseName, kindLabel(hit.kind, t)].filter(Boolean).join(" · ")}</em>
               </button>
             </li>

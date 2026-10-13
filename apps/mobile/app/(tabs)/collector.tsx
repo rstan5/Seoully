@@ -335,6 +335,7 @@ export default function CollectorScreen() {
             {collector.visibility.collectionPublic ? collector.holdings.map((holding) => (
               <SeoullyShelfRow
                 key={holding.id}
+                template={holding.template}
                 title={holding.template.name}
                 meta={[
                   holding.template.groupName,
@@ -362,6 +363,7 @@ export default function CollectorScreen() {
             {collector.visibility.wishlistPublic ? collector.wishlist.map((entry) => (
               <SeoullyShelfRow
                 key={entry.id}
+                template={entry.template}
                 title={entry.template.name}
                 meta={[entry.template.groupName, entry.template.memberName, collectibleKindLabel(entry.template.kind, copy)].filter(Boolean).join(" · ")}
                 colorway={entry.template.colorway}

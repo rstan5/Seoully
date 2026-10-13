@@ -262,6 +262,13 @@ export class MemoryCollectionRepository implements CollectionRepository {
       })
       .slice(0, 24);
   }
+  linkCanonicalCatalogIdentity(templateId: TemplateId, catalogId: string) {
+    const template = this.userTemplates.find(item => item.id === templateId);
+    if (!template || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(catalogId)) return;
+    template.catalogId = catalogId;
+    this.persistLive();
+    this.notify();
+  }
   adoptProductionCatalogTemplate(input: {
     id: string;
     name: string;

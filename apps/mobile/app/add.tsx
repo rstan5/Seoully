@@ -1,3 +1,4 @@
+import { PhotocardCollectorCount } from "../src/ui/PhotocardCollectorCount";
 import { PHOTOCARD } from "../src/media/photocard";
 import { useEffect, useRef, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
@@ -170,6 +171,7 @@ export default function AddCollectibleScreen() {
         <SeoullyText variant="title" style={styles.headline}>{copy.addPhotoTitle}</SeoullyText>
         <SeoullyText variant="handle" color={colors.plum}>{params.name ?? copy.catalogItemFallback}</SeoullyText>
         {meta ? <SeoullyText variant="caption" style={styles.meta}>{meta}</SeoullyText> : null}
+        <PhotocardCollectorCount templateId={params.templateId ?? ""} kind={params.kind ?? ""} />
         <SeoullyText variant="secondary" style={styles.lede}>{copy.onboardPhotoLead}</SeoullyText>
         {uri ? (
           <Pressable accessibilityRole="button" accessibilityLabel={copy.cropPhotocard} disabled={!photocard || working} onPress={() => { Image.getSize(uri, (width, height) => setCropAsset({ uri, width, height }), () => setMessage(copy.photoPrepareFailed)); }}>

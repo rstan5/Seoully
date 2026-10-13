@@ -1,3 +1,4 @@
+import { PhotocardCollectorCount } from "../src/ui/PhotocardCollectorCount";
 import { useCallback, useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -155,6 +156,7 @@ export default function CollectibleDetailScreen() {
               {collectibleKindLabel(holding.template.kind, copy)}
             </SeoullyText>
             <SeoullyText variant="title">{holding.template.name}</SeoullyText>
+            <PhotocardCollectorCount templateId={holding.templateId} kind={holding.template.kind} />
             <SeoullyText variant="secondary" style={styles.meta}>
               {[holding.template.groupName, holding.template.memberName, holding.template.releaseName].filter(Boolean).join(" · ")}
             </SeoullyText>

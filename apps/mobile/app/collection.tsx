@@ -199,6 +199,7 @@ export default function CollectionScreen() {
         ) : null}
         renderItem={({ item }) => item.kind === "holding" ? (
           <SeoullyOwnedRow
+            template={item.holding.template}
             title={item.holding.template.name}
             meta={[item.holding.template.groupName, item.holding.template.memberName, item.holding.template.releaseName, item.holding.template.descriptor, collectibleKindLabel(item.holding.template.kind, copy)].filter(Boolean).join(" · ")}
             imageUrl={item.holding.personalMediaUrl}
@@ -211,6 +212,7 @@ export default function CollectionScreen() {
           />
         ) : (
           <SeoullyShelfRow
+            template={item.entry.template}
             title={item.entry.template.name}
             meta={[item.entry.template.groupName, item.entry.template.memberName, item.entry.template.releaseName, collectibleKindLabel(item.entry.template.kind, copy)].filter(Boolean).join(" · ")}
             action={copy.removeFromWishlist}

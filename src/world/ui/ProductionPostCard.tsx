@@ -1,5 +1,6 @@
 "use client";
 
+import { PhotocardCollectorCount } from "./PhotocardCollectorCount";
 import { useEffect, useState, type FormEvent } from "react";
 import type { UserId } from "@/domain/types";
 import { productionComment, productionComments, productionLike, productionUnlike } from "@/server/social/actions";
@@ -51,6 +52,7 @@ export function ProductionPostCard({ post, viewerId, onViewProfile }: { post: So
       </div>
       {likeCount > 0 ? <p className="s-post-likes">{likeCount === 1 ? t("post.likeOne") : t("post.likeMany", { count: likeCount })}</p> : null}
       <p className="s-post-caption"><button type="button" onClick={() => onViewProfile(post.author.userId as UserId)}>{post.author.handle}</button>{" "}{post.caption}</p>
+      {post.taggedCollectibles.map(tag => <div key={tag.templateId}><span>{tag.name}</span>{" "}<PhotocardCollectorCount templateId={tag.templateId} kind={tag.kind} /></div>)}
       {commentsOpen ? <div className="s-post-comments">{comments.map((comment) => <p key={comment.id}><button type="button" onClick={() => onViewProfile(comment.author.userId as UserId)}>{comment.author.handle}</button>{" "}{comment.body}</p>)}<form className="s-post-comment-form" onSubmit={(event) => void submitComment(event)}><input value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={1000} placeholder={t("post.addComment")} /><button type="submit" disabled={!draft.trim() || busy}>{t("post.post")}</button></form></div> : null}
     </article>
   );

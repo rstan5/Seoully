@@ -1,0 +1,16 @@
+/* Remain one metadata row inside existing search/post span layouts. */
+span[role="img"].s-photocard-collector-count {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  white-space: nowrap;
+  gap: 4px;
+  color: var(--s-mute, var(--ink-soft, #8a7380));
+  font-size: 11px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.s-photocard-collector-count > svg { width: 13px; height: 13px; flex: none; }
+.s-object-with-count { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; flex: none; }
+
+.s-photocard-collector-count > span { display: inline; }

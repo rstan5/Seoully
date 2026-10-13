@@ -724,6 +724,7 @@ export const useSession = create<SessionState>((set, get) => ({
         set({ error: ownership.reason === "unauthenticated" ? "error.invalidCredentials" : "error.authUnavailable" });
         return;
       }
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("seoully:ownership-changed"));
       set({ productionHoldingId: ownership.holding.id });
       const contributedPhoto = get().photo;
       if (get().referenceImageConsent && contributedPhoto) {
@@ -764,6 +765,10 @@ export const useSession = create<SessionState>((set, get) => ({
         return;
       }
       durableHoldingId = ownership.holding.id;
+    }
+    if (confirmedProductionTemplateId) {
+      repository.linkCanonicalCatalogIdentity(selectedTemplateId, confirmedProductionTemplateId);
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("seoully:ownership-changed"));
     }
     const first =
       (session.kind === "local" || session.kind === "auth") && !repository.onboardingState(session.userId).firstHoldingComplete;

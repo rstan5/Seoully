@@ -1,5 +1,6 @@
 "use client";
 
+import { PhotocardCollectorCount } from "./PhotocardCollectorCount";
 import { useEffect } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ease } from "@/design/motion";
@@ -171,6 +172,7 @@ export function EditChrome({
                   <span className="u-eyebrow" style={{ fontSize: 7.5 }}>
                     {view.template.name}
                   </span>
+                  <PhotocardCollectorCount templateId={view.template.catalogId ?? view.template.id} kind={view.template.kind} />
                 </button>
               ))}
               {storedDecor.map((object) => {

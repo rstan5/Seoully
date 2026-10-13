@@ -1,4 +1,5 @@
-import { Text, type StyleProp, type TextProps, type TextStyle } from "react-native";
+import { Text, StyleSheet, type StyleProp, type TextProps, type TextStyle } from "react-native";
+import { withInlineHearts } from "./InlineHeart";
 import { useLocale } from "../locale";
 import { CONTROL_LABEL_OPTICAL_Y, colors, faces, type } from "../theme";
 import { useProfileIdentity } from "./ProfileIdentity";
@@ -22,6 +23,7 @@ export function SeoullyText({
   color,
   control,
   style,
+  children,
   ...props
 }: TextProps & { variant?: SeoullyTextVariant; color?: string; control?: boolean; style?: StyleProp<TextStyle> }) {
   const { locale } = useLocale();
@@ -35,6 +37,7 @@ export function SeoullyText({
         : identity.ink)
     : variantColor[variant];
   const optical = locale === "en" && (control || variant === "button");
+  const resolved = StyleSheet.flatten([{ fontFamily: faces[locale][spec.face] }, style]);
   return (
     <Text
       {...props}
@@ -50,6 +53,6 @@ export function SeoullyText({
         { color: color ?? inherited },
         style,
       ]}
-    />
+    >{withInlineHearts(children, resolved.fontFamily ?? faces[locale][spec.face], resolved.fontWeight)}</Text>
   );
 }

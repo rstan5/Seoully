@@ -10,6 +10,12 @@ import { SeoullyLoadingState } from "./ui/SeoullyLoadingState";
 
 export function FontProvider({ children }: PropsWithChildren) {
   const [loaded, error] = useFonts({
+    SeoullyHeartBaloo2400: require("../../../public/fonts/inline-heart/SeoullyHeartBaloo2400.ttf"),
+    SeoullyHeartBaloo2600: require("../../../public/fonts/inline-heart/SeoullyHeartBaloo2600.ttf"),
+    SeoullyHeartBaloo2700: require("../../../public/fonts/inline-heart/SeoullyHeartBaloo2700.ttf"),
+    SeoullyHeartNotoSansKR400: require("../../../public/fonts/inline-heart/SeoullyHeartNotoSansKR400.ttf"),
+    SeoullyHeartNotoSansKR600: require("../../../public/fonts/inline-heart/SeoullyHeartNotoSansKR600.ttf"),
+    SeoullyHeartNotoSansKR700: require("../../../public/fonts/inline-heart/SeoullyHeartNotoSansKR700.ttf"),
     DancingScript: require("../assets/fonts/DancingScript.ttf"),
     Baloo2_400Regular,
     Baloo2_600SemiBold,

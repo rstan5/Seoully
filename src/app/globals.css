@@ -9,6 +9,7 @@
 @import "../design/social-app.css";
 @import "../design/onboard.css";
 @import "../design/heart-companion.css";
+@import "../design/inline-heart.css";
 
 /* ==========================================================================
    Seoully design tokens
@@ -20,10 +21,10 @@
 
 @theme {
   /* --- Type ------------------------------------------------------------- */
-  --font-display: var(--font-baloo), ui-sans-serif, system-ui, sans-serif;
-  --font-sans: var(--font-baloo), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-baloo), ui-sans-serif, system-ui, sans-serif;
-  --font-social: var(--font-baloo);
+  --font-display: "Seoully Inline Heart", var(--font-baloo), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Seoully Inline Heart", var(--font-baloo), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Seoully Inline Heart", var(--font-baloo), ui-sans-serif, system-ui, sans-serif;
+  --font-social: "Seoully Inline Heart", var(--font-baloo);
 
   /* Editorial scale. Large sizes are for the world; small sizes are for
      labels that sit *on* objects, so they stay tight and legible. */

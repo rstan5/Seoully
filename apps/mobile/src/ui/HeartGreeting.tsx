@@ -24,7 +24,7 @@ export function HeartGreeting({ text, large = false, showHeart = true, inlineHea
     {showHeart ? <Animated.View style={{ transform: [{ translateY: reduced ? 0 : hover.interpolate({ inputRange: [0, 1], outputRange: [heartMotion.travel / 2, -heartMotion.travel / 2] }) }] }}>
       <Image accessible={false} source={require("../../assets/brand/seoully-heart-mark.png")} resizeMode="contain" style={{ width: large ? 128 : 76, height: large ? 128 : 76 }} />
     </Animated.View> : null}
-    <SeoullyText variant="title" style={[styles.text, large && styles.large]}>{text.slice(0, shown)}<SeoullyText style={{ opacity: 0 }}>{text.slice(shown)}</SeoullyText>{inlineHeart ? <SeoullyText style={[styles.inlineHeart, { opacity: shown >= text.length ? 1 : 0 }]}> ♡</SeoullyText> : null}</SeoullyText>
+    <SeoullyText variant="title" style={[styles.text, large && styles.large]}>{text.slice(0, shown)}<SeoullyText style={{ opacity: 0 }}>{text.slice(shown)}</SeoullyText>{inlineHeart ? <SeoullyText variant="title" style={[large && styles.large, { opacity: shown >= text.length ? 1 : 0 }]}> ♡</SeoullyText> : null}</SeoullyText>
   </Pressable>;
 }
-const styles = StyleSheet.create({ wrap: { alignItems: "center", gap: 32 }, text: { textAlign: "center" }, inlineHeart: { fontSize: 30, lineHeight: 49 }, large: { fontSize: 42, lineHeight: 49, letterSpacing: -1.2 } });
+const styles = StyleSheet.create({ wrap: { alignItems: "center", gap: 32 }, text: { textAlign: "center" }, large: { fontSize: 42, lineHeight: 49, letterSpacing: -1.2 } });

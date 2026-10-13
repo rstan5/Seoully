@@ -1,0 +1,74 @@
+[
+  {
+    "font": "SeoullyHeartBaloo2400",
+    "family": "Baloo2",
+    "weight": 400,
+    "unitsPerEm": 1000,
+    "bottom": -5,
+    "top": 613,
+    "advance": 703
+  },
+  {
+    "font": "SeoullyHeartBaloo2500",
+    "family": "Baloo2",
+    "weight": 500,
+    "unitsPerEm": 1000,
+    "bottom": -6,
+    "top": 614,
+    "advance": 705
+  },
+  {
+    "font": "SeoullyHeartBaloo2600",
+    "family": "Baloo2",
+    "weight": 600,
+    "unitsPerEm": 1000,
+    "bottom": -6,
+    "top": 615,
+    "advance": 706
+  },
+  {
+    "font": "SeoullyHeartBaloo2700",
+    "family": "Baloo2",
+    "weight": 700,
+    "unitsPerEm": 1000,
+    "bottom": -7,
+    "top": 616,
+    "advance": 708
+  },
+  {
+    "font": "SeoullyHeartBaloo2800",
+    "family": "Baloo2",
+    "weight": 800,
+    "unitsPerEm": 1000,
+    "bottom": -8,
+    "top": 617,
+    "advance": 710
+  },
+  {
+    "font": "SeoullyHeartNotoSansKR400",
+    "family": "NotoSansKR",
+    "weight": 400,
+    "unitsPerEm": 1000,
+    "bottom": 0,
+    "top": 733,
+    "advance": 819
+  },
+  {
+    "font": "SeoullyHeartNotoSansKR600",
+    "family": "NotoSansKR",
+    "weight": 600,
+    "unitsPerEm": 1000,
+    "bottom": 0,
+    "top": 739,
+    "advance": 825
+  },
+  {
+    "font": "SeoullyHeartNotoSansKR700",
+    "family": "NotoSansKR",
+    "weight": 700,
+    "unitsPerEm": 1000,
+    "bottom": 0,
+    "top": 741,
+    "advance": 827
+  }
+]

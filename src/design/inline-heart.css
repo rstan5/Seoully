@@ -1,0 +1,46 @@
+/* Unicode-only fallback: all other letters remain in the original typeface.
+ * Web uses Baloo 2 for Latin capitals in both locales (see globals.css).
+ * No CSS size/vertical-align/line-height hacks; the glyph itself is cap-aligned. */
+@font-face {
+  font-family: "Seoully Inline Heart";
+  src: url("/fonts/inline-heart/SeoullyHeartBaloo2400.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  unicode-range: U+2661;
+}
+@font-face {
+  font-family: "Seoully Inline Heart";
+  src: url("/fonts/inline-heart/SeoullyHeartBaloo2500.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  unicode-range: U+2661;
+}
+@font-face {
+  font-family: "Seoully Inline Heart";
+  src: url("/fonts/inline-heart/SeoullyHeartBaloo2600.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 600;
+  font-display: block;
+  unicode-range: U+2661;
+}
+@font-face {
+  font-family: "Seoully Inline Heart";
+  src: url("/fonts/inline-heart/SeoullyHeartBaloo2700.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  unicode-range: U+2661;
+}
+@font-face {
+  font-family: "Seoully Inline Heart";
+  src: url("/fonts/inline-heart/SeoullyHeartBaloo2800.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 800;
+  font-display: block;
+  unicode-range: U+2661;
+}
+
+/* These Composer hearts are independent avatar/object icons, not typography. */
+.s-independent-heart { font-family: var(--font-baloo), ui-sans-serif, system-ui, sans-serif; }

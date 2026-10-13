@@ -235,8 +235,7 @@ export default function OnboardingScreen() {
   }
 
   function finish() {
-    boot.enterApp();
-    router.replace("/(tabs)/profile");
+    boot.enterApp("profile");
   }
 
   if (loading || (phase === "collect" && greeted.has("collect"))) {

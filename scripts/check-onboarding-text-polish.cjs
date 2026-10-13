@@ -21,11 +21,11 @@ function greeting(reduced) {
   const module = { exports: {} };
   vm.runInNewContext(ts.transpileModule(fs.readFileSync('apps/mobile/src/ui/HeartGreeting.tsx', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
     module, exports: module.exports, require: n => n.endsWith('.png') ? 1 : mocks[n],
-    setInterval(fn, ms) { assert.equal(ms, 32); timer = fn; return 1; }, clearInterval() { timer = undefined; },
+    setTimeout(fn, ms) { assert.equal(ms, 32); timer = fn; return 1; }, clearTimeout() { timer = undefined; },
   });
   return {
     render(props) { cursor = 0; pending = []; const tree = module.exports.HeartGreeting(props); if (!cleanup) cleanup = pending[0](); return tree; },
-    tick() { timer?.(); }, cleanup() { cleanup?.(); }, get active() { return !!timer; }, get stopped() { return stopped; },
+    tick() { const task = timer; timer = undefined; task?.(); }, cleanup() { cleanup?.(); }, get active() { return !!timer; }, get stopped() { return stopped; },
   };
 }
 for (const large of [false, true]) for (const text of ['Turn your fandom\ninto a home.', '내 K-pop 세상을\n만들어 볼까요?', 'A longer heading that wraps naturally']) {

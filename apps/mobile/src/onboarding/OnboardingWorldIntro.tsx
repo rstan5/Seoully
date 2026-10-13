@@ -1,3 +1,4 @@
+import { startupTrace } from "../startup/trace";
 import { HeartFarewell } from "../ui/HeartFarewell";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, AppState, Pressable, StyleSheet, View } from "react-native";
@@ -34,6 +35,8 @@ export default function OnboardingWorldIntro({ holdingId, photocard, playArrival
   const [established, setEstablished] = useState(false);
   const [cover] = useState(() => new Animated.Value(playArrival ? 1 : 0));
   const [complete, setComplete] = useState(false);
+  const navigated = useRef(false);
+  const [navigationRequested, setNavigationRequested] = useState(false);
   const [error, setError] = useState(false);
   const [message, setMessage] = useState<ArrivalMessage>("home");
   const [active, setActive] = useState(AppState.currentState !== "background" && AppState.currentState !== "inactive");
@@ -68,20 +71,33 @@ export default function OnboardingWorldIntro({ holdingId, photocard, playArrival
     if (!id || id !== holdingId) return;
     confirmed.current = id; void finish(id);
   }
+  useEffect(() => {
+    if (!navigationRequested || !complete || !active || !focused || navigated.current) return;
+    navigated.current = true;
+    setMessage("dismissed");
+    onContinue();
+  }, [active, complete, focused, navigationRequested, onContinue]);
+  function requestProfile() {
+    if (navigated.current) return;
+    startupTrace("profile handoff", complete ? "ready" : "waiting_for_completion");
+    setNavigationRequested(true);
+    if (!complete) void finish(confirmed.current);
+  }
   const messageText = message === "home" ? copy.roomArrivalHome : message === "edit" ? copy.roomArrivalEdit : copy.roomArrivalFinish;
   return <View style={styles.wrap}>
-    <RoomWorldScreen suppressAmbientGuidance roomGuidance={((messagesVisible && message !== "dismissed") || (arrivalVisible && error)) ? <RoomMessage chrome={chrome}>
+    <RoomWorldScreen deferFirstRoomEdit={photocard} suppressAmbientGuidance roomGuidance={((messagesVisible && message !== "dismissed") || (arrivalVisible && error)) ? <RoomMessage chrome={chrome}>
         <View style={styles.messageRow}>
-        <Pressable accessibilityRole="button" accessibilityLabel={copy.close} onPress={() => setMessage("dismissed")} style={styles.dismiss}><SeoullyText color={chrome.color}>×</SeoullyText></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={copy.close} onPress={() => { setNavigationRequested(false); setMessage("dismissed"); }} style={styles.dismiss}><SeoullyText color={chrome.color}>×</SeoullyText></Pressable>
         {message !== "dismissed" ? <SeoullyText variant="caption" style={roomMessageStyles.text} color={chrome.color}>{messageText}</SeoullyText> : null}
         </View>
         {error ? <><SeoullyText accessibilityRole="alert" variant="caption" style={roomMessageStyles.text} color={chrome.color}>{copy.onboardingSaveFailed}</SeoullyText>
           <Pressable accessibilityRole="button" onPress={() => { void finish(confirmed.current); }} style={styles.action}><SeoullyText variant="caption" color={chrome.color}>{copy.retry}</SeoullyText></Pressable></> : null}
-        {message === "profile" ? <Pressable accessibilityRole="button" disabled={!complete} onPress={() => { setMessage("dismissed"); onContinue(); }} style={[styles.action, { borderColor: chrome.border, borderWidth: 1, opacity: complete ? 1 : 0.6 }]}><SeoullyText variant="caption" color={chrome.color}>{copy.roomArrivalProfile}</SeoullyText></Pressable> : null}
+        {message === "profile" && !complete ? <SeoullyText accessibilityLiveRegion="polite" variant="caption" color={chrome.color}>{copy.roomArrivalSaving}</SeoullyText> : null}
+        {message === "profile" ? <Pressable accessibilityRole="button" accessibilityState={{ busy: navigationRequested && !complete }} onPress={requestProfile} style={[styles.action, { borderColor: chrome.border, borderWidth: 1, opacity: 1 }]}><SeoullyText variant="caption" color={chrome.color}>{navigationRequested && !complete ? copy.saving : copy.roomArrivalProfile}</SeoullyText></Pressable> : null}
       </RoomMessage> : visible && !photocard && !complete ? <RoomMessage chrome={chrome}><SeoullyText color={chrome.color} style={roomMessageStyles.text}>{copy.onboardPlaceFirst}</SeoullyText></RoomMessage> : null} onRoomAppearance={setPromptStyle} loadingCovered={!handoff} initialHoldingId={binderMayEnter && photocard ? holdingId : undefined} mode="own" demo={false} persistLive={social.capabilities.persistRoom} copy={copy}
       onWorldReady={() => { setWorldReady(true); if (!photocard) setEstablished(true); }}
-      onBinderArrivalReady={() => setEstablished(true)}
-      onLeave={() => { setMessage("dismissed"); if (complete) onContinue(); else onBack(); }}
+      onBinderArrivalReady={() => { startupTrace("binder arrival", "settled"); setEstablished(true); }}
+      onLeave={() => { setNavigationRequested(false); setMessage("dismissed"); if (complete) onContinue(); else onBack(); }}
       onLiveSnapshotReady={(snapshot) => {
         setReady(true); setRoomFailed(false);
         if (!photocard && snapshot.placements.some(placement => placement.holdingId === holdingId)) destinationConfirmed(holdingId);

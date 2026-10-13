@@ -408,6 +408,7 @@ export type NativeOnboardingMember = {
 };
 export type NativeOnboardingState = {
   userId: string;
+  displayName?: string;
   firstHome: { identityReady: boolean; holdingId: string | null; roomId: string | null; placedHoldingId: string | null; binderHoldingId?: string | null } | null;
   step: NativeOnboardingStep;
   favoriteGroupIds: string[];

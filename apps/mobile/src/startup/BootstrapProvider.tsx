@@ -26,9 +26,12 @@ type BootstrapContextValue = {
   errorKind: StartupErrorKind | null;
   companionEligible: boolean;
   returningWelcome: boolean;
+  welcomeName: string;
+  profileEntryRequested: boolean;
+  consumeProfileEntry: () => void;
   finishReturningWelcome: () => void;
   refresh: () => void;
-  enterApp: () => void;
+  enterApp: (target?: "profile") => void;
 };
 
 const BootstrapContext = createContext<BootstrapContextValue | null>(null);
@@ -51,7 +54,7 @@ async function restoreSession(): Promise<"signed_out" | "signed_in"> {
   return signedIn ? "signed_in" : "signed_out";
 }
 
-async function loadOnboardingBounded(): Promise<{ step: NativeOnboardingStep }> {
+async function loadOnboardingBounded(): Promise<{ step: NativeOnboardingStep; displayName?: string }> {
   startupTrace("profile begin");
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ONBOARDING_FETCH_MS);
@@ -59,7 +62,7 @@ async function loadOnboardingBounded(): Promise<{ step: NativeOnboardingStep }> 
     const state = await withTimeout(loadNativeOnboarding(controller.signal), ONBOARDING_FETCH_MS, "api_unreachable");
     startupTrace("profile complete");
     startupTrace("onboarding", state.step);
-    return { step: state.step };
+    return { step: state.step, displayName: state.displayName };
   } catch (error) {
     if (controller.signal.aborted || (error instanceof Error && (error.name === "AbortError" || error.message === "api_unreachable"))) {
       throw new Error("api_unreachable");
@@ -77,11 +80,15 @@ export function BootstrapProvider({ children }: PropsWithChildren) {
   const coldLaunch = useRef(true);
   const linkInterrupted = useRef(false);
   const [returningWelcome, setReturningWelcome] = useState(false);
+  const [welcomeName, setWelcomeName] = useState("");
+  const [profileEntryRequested, setProfileEntryRequested] = useState(false);
+  const consumeProfileEntry = useCallback(() => setProfileEntryRequested(false), []);
   const finishReturningWelcome = useCallback(() => setReturningWelcome(false), []);
 
   const applySnapshot = useCallback((snapshot: StartupSnapshot, token: number) => {
     if (token !== generation.current) return;
     startupTrace("destination", snapshot.destination);
+    setWelcomeName(snapshot.displayName ?? "");
     setErrorKind(snapshot.errorKind);
     setEligibility(snapshotToEligibility(snapshot, true));
     startupTrace("bootstrap complete");
@@ -92,6 +99,7 @@ export function BootstrapProvider({ children }: PropsWithChildren) {
     coldLaunch.current = false;
     const initialUrl = initial ? withTimeout(Linking.getInitialURL(), 500, "initial_url_unavailable").catch(() => "unknown-deep-link") : Promise.resolve("not-cold");
     setReturningWelcome(false);
+    setProfileEntryRequested(false);
     const token = ++generation.current;
     setEligibility(initialCompanionEligibility());
     setErrorKind(null);
@@ -118,10 +126,11 @@ export function BootstrapProvider({ children }: PropsWithChildren) {
       if (event !== "SIGNED_OUT") return;
       startupTrace("auth restore complete", "signed_out");
       setReturningWelcome(false);
+      setProfileEntryRequested(false);
       generation.current += 1;
       applySnapshot({ destination: "welcome", authenticated: false, onboardingStep: null, errorKind: null }, generation.current);
     });
-    const links = Linking.addEventListener("url", () => { linkInterrupted.current = true; setReturningWelcome(false); });
+    const links = Linking.addEventListener("url", () => { linkInterrupted.current = true; setReturningWelcome(false); setProfileEntryRequested(false); });
     return () => {
       links.remove();
       clearTimeout(timer);
@@ -129,7 +138,8 @@ export function BootstrapProvider({ children }: PropsWithChildren) {
     };
   }, [applySnapshot, refresh]);
 
-  const enterApp = useCallback(() => {
+  const enterApp = useCallback((target?: "profile") => {
+    setProfileEntryRequested(target === "profile");
     setReturningWelcome(false);
     generation.current += 1;
     applySnapshot({ destination: "app", authenticated: true, onboardingStep: "done", errorKind: null }, generation.current);
@@ -143,10 +153,13 @@ export function BootstrapProvider({ children }: PropsWithChildren) {
     errorKind,
     companionEligible: companionIsEligible(eligibility) && !returningWelcome,
     returningWelcome,
+    welcomeName,
+    profileEntryRequested,
+    consumeProfileEntry,
     finishReturningWelcome,
     refresh,
     enterApp,
-  }), [eligibility, enterApp, errorKind, refresh, returningWelcome, finishReturningWelcome]);
+  }), [eligibility, enterApp, errorKind, refresh, returningWelcome, welcomeName, profileEntryRequested, consumeProfileEntry, finishReturningWelcome]);
 
   return <BootstrapContext.Provider value={value}>{children}</BootstrapContext.Provider>;
 }

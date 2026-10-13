@@ -1,6 +1,8 @@
+import { startupTrace } from "./trace";
 import { View } from "react-native";
 import { ReturningWelcome } from "./ReturningWelcome";
-import { Stack } from "expo-router";
+import { useEffect, useRef } from "react";
+import { Stack, useRouter, useRootNavigationState } from "expo-router";
 import { useCopy } from "../locale";
 import { ROOM_THEMES } from "../room/theme";
 import { immersiveRoomFill } from "../ui/shellLayout";
@@ -63,7 +65,28 @@ export function AuthRouteTree() {
       </Stack.Protected>
     </Stack>
     </View>
-    {boot.returningWelcome ? <ReturningWelcome onFinished={boot.finishReturningWelcome} /> : null}
+    {screens.app ? <ProfileEntryNavigation /> : null}
+    {boot.returningWelcome ? <ReturningWelcome displayName={boot.welcomeName} onFinished={boot.finishReturningWelcome} /> : null}
     </View>
   );
+}
+
+/** Dispatch only after the protected app tree exists, never from its outgoing screen. */
+function ProfileEntryNavigation() {
+  const boot = useBootstrap();
+  const router = useRouter();
+  const navigation = useRootNavigationState();
+  const sent = useRef(false);
+  const appRoute = navigation?.routes.find(route => route.name === "(tabs)");
+  const appMounted = Boolean(appRoute?.state?.key);
+  const profileFocused = appRoute?.state?.routes[appRoute.state.index ?? 0]?.name === "profile";
+  useEffect(() => {
+    if (!boot.profileEntryRequested) { sent.current = false; return; }
+    if (!appMounted || sent.current) return;
+    sent.current = true;
+    startupTrace("profile handoff", "navigation_dispatched");
+    if (!profileFocused) router.replace("/(tabs)/profile");
+    boot.consumeProfileEntry();
+  }, [appMounted, boot, profileFocused, router]);
+  return null;
 }

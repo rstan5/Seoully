@@ -30,6 +30,7 @@ export function initialCompanionEligibility(): CompanionEligibilityInput {
 }
 
 export type StartupSnapshot = {
+  displayName?: string;
   destination: Exclude<StartupDestination, "loading">;
   authenticated: boolean;
   onboardingStep: NativeOnboardingStep | null;
@@ -76,7 +77,7 @@ export async function runStartupBootstrap(deps: {
   authConfigured: boolean;
   productApiConfigured: boolean;
   restoreSession: () => Promise<"signed_out" | "signed_in">;
-  loadOnboarding: () => Promise<{ step: NativeOnboardingStep }>;
+  loadOnboarding: () => Promise<{ step: NativeOnboardingStep; displayName?: string }>;
 }): Promise<StartupSnapshot> {
   if (!deps.authConfigured) {
     return { destination: "error", authenticated: false, onboardingStep: null, errorKind: "config" };
@@ -105,6 +106,7 @@ export async function runStartupBootstrap(deps: {
       return { destination: "error", authenticated: true, onboardingStep: null, errorKind: "onboarding" };
     }
     return {
+      ...(onboarding.displayName !== undefined ? { displayName: onboarding.displayName } : {}),
       destination: resolveAuthDestination({ authenticated: true, onboardingStep: step }),
       authenticated: true,
       onboardingStep: step,

@@ -45,6 +45,7 @@ async function currentState(
   | {
       client: NonNullable<ReturnType<typeof createSupabaseBearerClient>>;
       userId: string;
+      displayName: string;
       step: OnboardingStep;
       favoriteGroupIds: string[];
       biasMemberIds: string[];
@@ -72,6 +73,7 @@ async function currentState(
   return {
     client,
     userId: identity.user.id,
+    displayName: data.display_name?.trim() ?? "",
     step,
     favoriteGroupIds: data.favorite_group_ids ?? [],
     biasMemberIds: data.bias_member_ids ?? [],
@@ -90,6 +92,7 @@ export async function GET(request: Request) {
     const knownNames = new Set(GROUPS.map(group => group.name.toLocaleLowerCase()));
     return NextResponse.json({
       userId: state.userId,
+      displayName: state.displayName,
       step: state.step,
       firstHome: state.step === "interest" ? await readFirstHome(state.client, state.userId, state.identityReady) : null,
       favoriteGroupIds: state.favoriteGroupIds,

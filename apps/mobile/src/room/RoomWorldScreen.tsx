@@ -1,3 +1,4 @@
+import { startupTrace } from "../startup/trace";
 import { PhotocardCollectorCount } from "../ui/PhotocardCollectorCount";
 import { roomOverlayLayout } from "./overlayLayout";
 import { RoomMessage, roomMessageStyles } from "./RoomMessage";
@@ -110,6 +111,7 @@ export function RoomWorldScreen({
   roomGuidance,
   loadingCovered = false,
   suppressAmbientGuidance = false,
+  deferFirstRoomEdit = false,
 }: {
   mode: RoomWorldMode;
   userId?: string;
@@ -132,6 +134,7 @@ export function RoomWorldScreen({
   roomGuidance?: ReactNode;
   loadingCovered?: boolean;
   suppressAmbientGuidance?: boolean;
+  deferFirstRoomEdit?: boolean;
 }) {
   const onboardingEvents = useRef({ onLiveSnapshotReady, onLivePlacementConfirmed, onLiveBinderConfirmed, onLiveSnapshotFailed });
   onboardingEvents.current = { onLiveSnapshotReady, onLivePlacementConfirmed, onLiveBinderConfirmed, onLiveSnapshotFailed };
@@ -243,7 +246,7 @@ export function RoomWorldScreen({
     }
     setRoomLayout(next);
     if (viewRef.current.kind === "edit") return;
-    if (!shouldAutoEnterFirstRoomEdit(next, readOnlyRoom)) return;
+    if (deferFirstRoomEdit || !shouldAutoEnterFirstRoomEdit(next, readOnlyRoom)) return;
     firstEntryRef.current = true;
     showHelper("first");
     editBaseline.current = cloneRenderables(loadedItems);
@@ -367,7 +370,7 @@ export function RoomWorldScreen({
     }
     // applyLoadedLayout is a local helper over refs/setters; including it retriggers Room fetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [copy.demoRoomUnavailable, copy.roomUnavailable, demo, mode, persistLive, userId, liveSync]);
+  }, [copy.demoRoomUnavailable, copy.roomUnavailable, demo, mode, persistLive, userId, liveSync, deferFirstRoomEdit]);
 
   useFocusEffect(useCallback(() => {
     clearPendingPress();
@@ -396,14 +399,22 @@ export function RoomWorldScreen({
   useEffect(() => {
     if (!initialHoldingId || initialBinderOpened.current === initialHoldingId || !spreads.length || !objectHasKind(roomLayout.objects, "desk")) return;
     if (spreadIndexForHolding(spreads, initialHoldingId) < 0) return;
-    initialBinderOpened.current = initialHoldingId;
-    // Never reset a camera/gesture the collector already chose during the arrival pause.
-    if (viewRef.current.kind !== "home") { onBinderArrivalReady?.(); return; }
-    // The same entry path as tapping the physical Binder, exactly once.
-    openBinderFromWorld(initialHoldingId);
+    // A competing user view is not acknowledgement of a Binder entrance.
+    // Keep the request pending until that interaction returns home.
+    if (viewRef.current.kind === "binder") {
+      initialBinderOpened.current = initialHoldingId;
+      // Confirm newly hydrated membership without restarting a manual entrance.
+      if (!demo && mode === "own") onboardingEvents.current.onLiveBinderConfirmed?.([initialHoldingId]);
+      return;
+    }
+    if (viewRef.current.kind !== "home") { startupTrace("binder arrival", "waiting_for_home"); return; }
+    if (openBinderFromWorld(initialHoldingId)) {
+      initialBinderOpened.current = initialHoldingId;
+      startupTrace("binder arrival", "request_accepted");
+    } else startupTrace("binder arrival", "awaiting_layout");
     // Changes to page data must not restart the entrance or overwrite user gestures.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialHoldingId, spreads, roomLayout.objects]);
+  }, [initialHoldingId, spreads, roomLayout.objects, view.kind]);
 
   function clearPendingPress() {
     if (pendingPressRef.current) clearTimeout(pendingPressRef.current.timer);
@@ -737,7 +748,8 @@ export function RoomWorldScreen({
   function openBinderFromWorld(holdingId?: string, deskId?: string) {
     const originId = primaryBinderDeskId(latestObjects.current);
     const desk = latestObjects.current.find((object) => object.id === originId && object.kind === "desk");
-    if (!desk) return;
+    if (!desk) return false;
+    if (holdingId && spreadIndexForHolding(spreads, holdingId) < 0) return false;
 
     captureBinderReturn();
     setSelectedObjectId(null);
@@ -746,6 +758,7 @@ export function RoomWorldScreen({
     setStorageOpen(false);
     setView(openBinderView(Math.max(0, index)));
     if (!demo && mode === "own") onboardingEvents.current.onLiveBinderConfirmed?.(binderPages.flatMap(page => page.pockets.flatMap(pocket => pocket.holding ? [pocket.holding.id] : [])));
+    return true;
   }
 
   async function wishlistHolding(holding: NativeHolding) {

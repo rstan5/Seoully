@@ -1,3 +1,4 @@
+import { onboardingTrace } from "./startup/onboardingTrace";
 import type { ProfileThemeChoice } from "seoully-domain/types";
 import { fetch as expoFetch } from "expo/fetch";
 import { personalPhotoForm, photoMultipart } from "./media/photoUpload";
@@ -475,18 +476,23 @@ export async function searchCollectorMembers(query: string, signal?: AbortSignal
 }
 
 export async function loadNativeOnboarding(signal?: AbortSignal): Promise<NativeOnboardingState> {
+  onboardingTrace("onboarding_http_start", { intent: "read" });
   const accessToken = await mobileAccessToken();
   const response = await fetch(`${productApiBase()}/api/mobile/onboarding`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     ...(signal ? { signal } : {}),
-  });
+  }).catch(error => { onboardingTrace("onboarding_http_failure", { status: 0, category: "transport_or_abort" }); throw error; });
+  onboardingTrace("onboarding_http_end", { intent: "read", status: response.status, category: response.ok ? "ok" : "http_error" });
   if (!response.ok) throw new Error("onboarding_unavailable");
-  return response.json() as Promise<NativeOnboardingState>;
+  const result = await response.json() as NativeOnboardingState;
+  onboardingTrace("onboarding_read", { checkpoint: result.step });
+  return result;
 }
 
 export async function updateNativeOnboarding(
   patch: NativeOnboardingPatch,
 ): Promise<{ step: NativeOnboardingStep }> {
+  onboardingTrace("onboarding_http_start", { intent: patch.action });
   const accessToken = await mobileAccessToken();
   const response = await fetch(`${productApiBase()}/api/mobile/onboarding`, {
     method: "PATCH",
@@ -495,9 +501,12 @@ export async function updateNativeOnboarding(
       "Content-Type": "application/json",
     },
     body: JSON.stringify(patch),
-  });
+  }).catch(error => { onboardingTrace("onboarding_http_failure", { status: 0, category: "transport_or_abort" }); throw error; });
+  onboardingTrace("onboarding_http_end", { intent: patch.action, status: response.status, category: response.ok ? "ok" : "http_error" });
   if (!response.ok) throw new Error("onboarding_update_failed");
-  return response.json() as Promise<{ step: NativeOnboardingStep }>;
+  const result = await response.json() as { step: NativeOnboardingStep };
+  onboardingTrace("onboarding_write", { checkpoint: result.step });
+  return result;
 }
 
 export type NativeDiscoveryReason = {

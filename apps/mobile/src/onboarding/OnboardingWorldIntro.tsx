@@ -1,3 +1,4 @@
+import { onboardingTrace } from "../startup/onboardingTrace";
 import { startupTrace } from "../startup/trace";
 import { HeartFarewell } from "../ui/HeartFarewell";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -25,7 +26,7 @@ export default function OnboardingWorldIntro({ holdingId, photocard, playArrival
   const completing = useRef(false);
   const confirmed = useRef<string | undefined>(undefined);
   const mounted = useRef(true);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => { mounted.current = true; onboardingTrace("room_intro_mount", { mounted: true }); return () => { onboardingTrace("room_intro_mount", { mounted: false }); mounted.current = false; }; }, []);
   const [ready, setReady] = useState(false);
   const [worldReady, setWorldReady] = useState(false);
   const [roomFailed, setRoomFailed] = useState(false);
@@ -42,7 +43,7 @@ export default function OnboardingWorldIntro({ holdingId, photocard, playArrival
   const [active, setActive] = useState(AppState.currentState !== "background" && AppState.currentState !== "inactive");
   const [focused, setFocused] = useState(true);
   useFocusEffect(useCallback(() => { setFocused(true); return () => setFocused(false); }, []));
-  useEffect(() => { const sub = AppState.addEventListener("change", state => setActive(state === "active")); return () => sub.remove(); }, []);
+  useEffect(() => { const sub = AppState.addEventListener("change", state => { onboardingTrace("lifecycle", { lifecycle: state }); setActive(state === "active"); }); return () => sub.remove(); }, []);
   const [promptStyle, setPromptStyle] = useState(DEFAULT_ROOM_STYLE);
   const chrome = roomOverlayChrome(resolveRoomLook(promptStyle));
 
@@ -59,13 +60,15 @@ export default function OnboardingWorldIntro({ holdingId, photocard, playArrival
 
   async function finish(confirmedHoldingId?: string) {
     if (!holdingId || confirmedHoldingId !== holdingId || completing.current || complete) return;
+    onboardingTrace("completion_start", { holdingConfirmed: true });
     completing.current = true; setError(false);
     try {
       const result = await updateNativeOnboarding({ action: "complete" });
       if (result.step !== "done") throw new Error("first_home_not_confirmed");
       startupTrace("onboarding completion", "server_confirmed");
+      onboardingTrace("completion_confirmed", { completed: true });
       if (mounted.current) setComplete(true);
-    } catch { if (mounted.current) setError(true); }
+    } catch { onboardingTrace("completion_failed", { category: "request_or_confirmation" }); if (mounted.current) setError(true); }
     finally { completing.current = false; }
   }
   function destinationConfirmed(id?: string) {
@@ -81,6 +84,7 @@ export default function OnboardingWorldIntro({ holdingId, photocard, playArrival
   function requestProfile() {
     if (navigated.current) return;
     startupTrace("profile handoff", complete ? "ready" : "waiting_for_completion");
+    onboardingTrace("go_profile_press", { completed: complete, holdingConfirmed: Boolean(confirmed.current), intent: "profile" });
     setNavigationRequested(true);
     if (!complete) void finish(confirmed.current);
   }
@@ -94,7 +98,7 @@ export default function OnboardingWorldIntro({ holdingId, photocard, playArrival
         {error ? <><SeoullyText accessibilityRole="alert" variant="caption" style={roomMessageStyles.text} color={chrome.color}>{copy.onboardingSaveFailed}</SeoullyText>
           <Pressable accessibilityRole="button" onPress={() => { void finish(confirmed.current); }} style={styles.action}><SeoullyText variant="caption" color={chrome.color}>{copy.retry}</SeoullyText></Pressable></> : null}
         {message === "profile" && !complete ? <SeoullyText accessibilityLiveRegion="polite" variant="caption" color={chrome.color}>{copy.roomArrivalSaving}</SeoullyText> : null}
-        {message === "profile" ? <Pressable accessibilityRole="button" accessibilityState={{ busy: navigationRequested && !complete }} onPress={requestProfile} style={[styles.action, { borderColor: chrome.border, borderWidth: 1, opacity: 1 }]}><SeoullyText variant="caption" color={chrome.color}>{navigationRequested && !complete ? copy.saving : copy.roomArrivalProfile}</SeoullyText></Pressable> : null}
+        {message === "profile" ? <Pressable accessibilityRole="button" accessibilityState={{ busy: navigationRequested && !complete }} onPressIn={() => onboardingTrace("go_profile_touch", { focused: true })} onPress={requestProfile} style={[styles.action, { borderColor: chrome.border, borderWidth: 1, opacity: 1 }]}><SeoullyText variant="caption" color={chrome.color}>{navigationRequested && !complete ? copy.saving : copy.roomArrivalProfile}</SeoullyText></Pressable> : null}
       </RoomMessage> : visible && !photocard && !complete ? <RoomMessage chrome={chrome}><SeoullyText color={chrome.color} style={roomMessageStyles.text}>{copy.onboardPlaceFirst}</SeoullyText></RoomMessage> : null} onRoomAppearance={setPromptStyle} loadingCovered={!handoff} initialHoldingId={binderMayEnter && photocard ? holdingId : undefined} mode="own" demo={false} persistLive={social.capabilities.persistRoom} copy={copy}
       onWorldReady={() => { setWorldReady(true); if (!photocard) setEstablished(true); }}
       onBinderArrivalReady={() => { startupTrace("binder arrival", "settled"); setEstablished(true); }}

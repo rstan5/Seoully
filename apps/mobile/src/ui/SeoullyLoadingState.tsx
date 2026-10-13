@@ -1,3 +1,4 @@
+import { onboardingTrace } from "../startup/onboardingTrace";
 import { heartMotion, loadingHeartHalfCycleMs } from "./heartMotion";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { Animated, Easing, Image, StyleSheet, View } from "react-native";
@@ -19,6 +20,8 @@ export function SeoullyLoadingHost({ children }: PropsWithChildren) {
   }, []);
   const host = useMemo(() => ({ show }), [show]);
   const label = [...loads.values()].at(-1);
+  const blocked = Boolean(label);
+  useEffect(() => { onboardingTrace("blocking_overlay", { overlay: blocked }); }, [blocked]);
   return <LoadingHost.Provider value={host}><LoadingActive.Provider value={!!label}>
     <View style={styles.wrap}>
       <View style={styles.content} pointerEvents={label ? "none" : "auto"} accessibilityElementsHidden={!!label} importantForAccessibility={label ? "no-hide-descendants" : "auto"}>{children}</View>

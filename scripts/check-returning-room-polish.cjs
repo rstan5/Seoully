@@ -2,7 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), vm = require('node:vm'), ts = require('typescript');
 const jsx = (type, props) => ({ type, props });
-function load(file, mocks = {}, globals = {}) { const module = { exports: {} }; vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText, { module, exports: module.exports, URL, AbortController, require: name => mocks[name] ?? (name.endsWith('.png') ? 1 : require(name)), ...globals }); return module.exports; }
+function load(file, mocks = {}, globals = {}) { const module = { exports: {} }; vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText, { module, exports: module.exports, URL, AbortController, require: name => (name.endsWith('onboardingTrace') ? {onboardingTrace(){}} : mocks[name]) ?? (name.endsWith('.png') ? 1 : require(name)), ...globals }); return module.exports; }
 function harness() {
   let index = 0, slots = [], effects = [], now = 0, id = 0; const timers = new Map(), animations = [];
   const react = { createContext: value => ({ Provider: 'Provider', value }), useContext: context => context.value, useState(initial) { const i = index++; if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial; return [slots[i], value => slots[i] = typeof value === 'function' ? value(slots[i]) : value]; }, useRef(current) { const i = index++; return slots[i] ?? (slots[i] = { current }); }, useEffect(fn, deps) { const i = index++; if (!slots[i] || deps.some((x, j) => x !== slots[i].deps[j])) effects.push(() => { slots[i]?.cleanup?.(); slots[i] = { deps, cleanup: fn() }; }); }, useMemo(fn, deps) { const i = index++; if (!slots[i] || deps.some((x, j) => x !== slots[i].deps[j])) slots[i] = { deps, value: fn() }; return slots[i].value; }, useCallback(fn, deps) { return react.useMemo(() => fn, deps); } };
@@ -94,7 +94,7 @@ test('queued Profile handoff waits for the protected app navigator, dispatches o
   const h=harness(),file=fs.readFileSync('apps/mobile/src/startup/AuthRouteTree.tsx','utf8'),ast=ts.createSourceFile('routes.tsx',file,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
   const fn=ast.statements.find(node=>ts.isFunctionDeclaration(node)&&node.name?.text==='ProfileEntryNavigation');let mounted=false,pending=true,calls=0,focused=false;
   const router={replace(path){assert.ok(mounted);assert.equal(path,'/(tabs)/profile');calls++}};
-  const scope={useRef:h.react.useRef,useEffect:h.react.useEffect,startupTrace(){},useBootstrap:()=>({profileEntryRequested:pending,consumeProfileEntry(){pending=false}}),useRouter:()=>router,useRootNavigationState:()=>({routes:mounted?[{name:'(tabs)',state:{key:'tabs-ready',index:0,routes:[{name:focused?'profile':'index'}]}}]:[{name:'onboarding'}]})};
+  const scope={useRef:h.react.useRef,useEffect:h.react.useEffect,startupTrace(){},onboardingTrace(){},useBootstrap:()=>({profileEntryRequested:pending,consumeProfileEntry(){pending=false}}),useRouter:()=>router,useRootNavigationState:()=>({key:'root',routeNames:mounted?['(tabs)','collect']:['onboarding','collect'],routes:mounted?[{name:'(tabs)',state:{key:'tabs-ready',index:0,routes:[{name:focused?'profile':'index'}]}}]:[{name:'onboarding'}]})};
   const navigate=vm.runInNewContext(ts.transpileModule(`(${fn.getText(ast)})`,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,scope);
   h.render(navigate);assert.equal(calls,0);mounted=true;h.render(navigate);assert.equal(calls,1);assert.equal(pending,true);focused=true;h.render(navigate);assert.equal(pending,false);h.render(navigate);h.render(navigate);assert.equal(calls,1);h.cleanup();
 });
@@ -114,7 +114,7 @@ test('temporary blocking loader pauses the same welcome headline and its hold in
 test('Profile handoff starts the app directly on Profile and consumes readiness without replacing the same tab twice', () => {
   const tabs=fs.readFileSync('apps/mobile/app/(tabs)/_layout.tsx','utf8');assert.match(tabs,/initialRouteName=\{boot.profileEntryRequested \? "profile" : "index"\}/);
   const h=harness(),file=fs.readFileSync('apps/mobile/src/startup/AuthRouteTree.tsx','utf8'),ast=ts.createSourceFile('routes.tsx',file,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX),fn=ast.statements.find(node=>ts.isFunctionDeclaration(node)&&node.name?.text==='ProfileEntryNavigation');let ready=false,consumed=0;
-  const scope={useRef:h.react.useRef,useEffect:h.react.useEffect,startupTrace(){},useBootstrap:()=>({profileEntryRequested:true,consumeProfileEntry(){consumed++}}),useRouter:()=>({replace(){throw Error('duplicate tab replacement')}}),useRootNavigationState:()=>({routes:[{name:'(tabs)',state:ready?{key:'tabs-ready',index:0,routes:[{name:'profile'}]}:undefined}]})};
+  const scope={useRef:h.react.useRef,useEffect:h.react.useEffect,startupTrace(){},onboardingTrace(){},useBootstrap:()=>({profileEntryRequested:true,consumeProfileEntry(){consumed++}}),useRouter:()=>({replace(){throw Error('duplicate tab replacement')}}),useRootNavigationState:()=>({key:'root',routeNames:ready?['(tabs)']:['onboarding'],routes:[{name:'(tabs)',state:ready?{key:'tabs-ready',index:0,routes:[{name:'profile'}]}:undefined}]})};
   const navigate=vm.runInNewContext(ts.transpileModule(`(${fn.getText(ast)})`,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,scope);h.render(navigate);assert.equal(consumed,0);ready=true;h.render(navigate);h.render(navigate);assert.equal(consumed,1);h.cleanup();
 });
 test('signout or a competing deep link clears pending Profile entry rather than replaying it later',async()=>{
@@ -125,11 +125,11 @@ test('completion plus delayed guards resolves to Profile and stays there after s
   // The Room completion handler supplies this only after the authenticated server returns done.
   provider.render().enterApp('profile');assert.equal(provider.render().onboardingStep,'done');
   const source=fs.readFileSync('apps/mobile/src/startup/AuthRouteTree.tsx','utf8'),ast=ts.createSourceFile('routes.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX),fn=ast.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='ProfileEntryNavigation');
-  let state={index:1,routes:[{name:'(tabs)',state:{key:'new-app',index:0,routes:[{name:'index'}]}},{name:'onboarding'}]},queued=null,calls=0;
-  const scope={useRef:h.react.useRef,useEffect:h.react.useEffect,startupTrace(){},useBootstrap:()=>provider.render(),useRootNavigationState:()=>state,useRouter:()=>({replace(route){calls++;queued=route}})};
+  let state={key:'root',routeNames:['onboarding','collect'],index:1,routes:[{name:'(tabs)',state:{key:'new-app',index:0,routes:[{name:'index'}]}},{name:'onboarding'}]},queued=null,calls=0;
+  const scope={useRef:h.react.useRef,useEffect:h.react.useEffect,startupTrace(){},onboardingTrace(){},useBootstrap:()=>provider.render(),useRootNavigationState:()=>state,useRouter:()=>({replace(route){calls++;queued=route}})};
   const navigate=vm.runInNewContext(ts.transpileModule(`(${fn.getText(ast)})`,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,scope);
   h.render(navigate);assert.equal(calls,0,'background tab state is not readiness');assert.equal(provider.render().profileEntryRequested,true);
-  state={...state,index:0,routes:[state.routes[0]]};h.render(navigate);assert.equal(queued,'/(tabs)/profile');assert.equal(provider.render().profileEntryRequested,true,'uncommitted replace must not consume intent');
+  state={...state,routeNames:['(tabs)','collect'],index:0,routes:[state.routes[0]]};h.render(navigate);assert.equal(queued,'/(tabs)/profile');assert.equal(provider.render().profileEntryRequested,true,'uncommitted replace must not consume intent');
   h.render(navigate);assert.equal(calls,1);
   state.routes[0].state.routes=[{name:'profile'}];h.render(navigate);assert.equal(provider.render().profileEntryRequested,false);
   provider.advance(2500);await new Promise(setImmediate);assert.equal(provider.render().destination,'app','late interest snapshot is rejected by generation');

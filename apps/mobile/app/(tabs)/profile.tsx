@@ -1,3 +1,4 @@
+import { onboardingTrace } from "../../src/startup/onboardingTrace";
 import { readSelectedCatalogIdentity } from "../../src/data/collectorIdentity";
 import { archetypeLabel } from "../../src/ui/collectorArchetypes";
 import { resolveRoomLook } from "../../src/room/roomStyle";
@@ -127,6 +128,7 @@ export default function ProfileScreen() {
         setDemoGroups([]);
         setDemoBiases([]);
         setTheme(undefined);
+        onboardingTrace("profile_hydrated", { profileReady: true, checkpoint: tastes?.step ?? null });
         setOnboarding(tastes);
         setCatalogMembers(members.members);
         setCatalogGroups(members.groups);
@@ -141,8 +143,9 @@ export default function ProfileScreen() {
   }, [copy.profileUnavailable, social]);
 
   useFocusEffect(useCallback(() => {
+    onboardingTrace("profile_focus", { focused: true });
     void refresh();
-    return () => { refreshGeneration.current++; };
+    return () => { onboardingTrace("profile_focus", { focused: false }); refreshGeneration.current++; };
   }, [refresh]));
 
   const groups = useMemo(() => {

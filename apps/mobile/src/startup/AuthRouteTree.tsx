@@ -1,3 +1,4 @@
+import { onboardingTrace } from "./onboardingTrace";
 import { startupTrace } from "./trace";
 import { View } from "react-native";
 import { ReturningWelcome } from "./ReturningWelcome";
@@ -19,6 +20,18 @@ export function AuthRouteTree() {
   const { locale } = useLocale();
   const boot = useBootstrap();
   const screens = screensForDestination(boot.destination);
+  const navigation = useRootNavigationState();
+  let current = navigation?.routes[navigation.index ?? 0];
+  const routeNames: string[] = [];
+  while (current) {
+    routeNames.push(current.name);
+    const child = current.state;
+    current = child?.routes[child.index ?? 0] as typeof current;
+  }
+  const route = routeNames.join("/");
+  useEffect(() => {
+    onboardingTrace("guard", { route, destination: boot.destination, authenticated: boot.authenticated, checkpoint: boot.onboardingStep, intent: boot.profileEntryRequested ? "profile" : "none" });
+  }, [route, boot.destination, boot.authenticated, boot.onboardingStep, boot.profileEntryRequested]);
 
   if (boot.destination === "loading") {
     return <SeoullyLoadingState fullScreen label={t.brand} />;
@@ -72,7 +85,7 @@ export function AuthRouteTree() {
   );
 }
 
-/** Dispatch only after the protected app tree exists, never from its outgoing screen. */
+/** Dispatch when the root registry admits tabs. A surviving shared route need not mount tabs first. */
 function ProfileEntryNavigation() {
   const boot = useBootstrap();
   const router = useRouter();
@@ -81,16 +94,18 @@ function ProfileEntryNavigation() {
   const acknowledged = useRef(false);
   const activeRoute = navigation?.routes[navigation.index ?? 0];
   const appRoute = activeRoute?.name === "(tabs)" ? activeRoute : undefined;
-  const appMounted = Boolean(appRoute?.state?.key);
+  const appAvailable = Boolean(navigation?.key && navigation.routeNames.includes("(tabs)"));
   const profileFocused = appRoute?.state?.routes[appRoute.state.index ?? 0]?.name === "profile";
   useEffect(() => {
     if (!boot.profileEntryRequested) { sent.current = false; acknowledged.current = false; return; }
-    if (!appMounted) return;
+    onboardingTrace("profile_intent", { available: appAvailable, focused: profileFocused, intent: "profile" });
+    if (!appAvailable) return;
     // A queued replace is not acknowledgement: retain intent through guard reconciliation.
     if (profileFocused) {
       if (!acknowledged.current) {
         acknowledged.current = true;
         startupTrace("profile handoff", "profile_focused");
+        onboardingTrace("profile_focus_ack", { route: "(tabs)/profile", completed: true });
         boot.consumeProfileEntry();
       }
       return;
@@ -98,7 +113,8 @@ function ProfileEntryNavigation() {
     if (sent.current) return;
     sent.current = true;
     startupTrace("profile handoff", "navigation_dispatched");
+    onboardingTrace("router_replace", { destination: "(tabs)/profile" });
     router.replace("/(tabs)/profile");
-  }, [appMounted, boot, profileFocused, router]);
+  }, [appAvailable, boot, profileFocused, router]);
   return null;
 }

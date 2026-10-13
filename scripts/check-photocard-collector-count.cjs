@@ -40,7 +40,7 @@ for(const locale of ['en','ko'])test(`${locale}: web rendered zero/unknown and c
 });
 test('native authenticated batched transport and confirmed ownership invalidation use existing session',async()=>{
  const requests=[];let signedIn=true,fail=false,notifications=0;
- const api=load('apps/mobile/src/api.ts',{'expo/fetch':{},'./media/photoUpload':{},'./apiFailure':{apiFailure:async()=>{throw Error('request_failed');}},'./config-rules':{isProductApiConfigured:()=>true},'./supabase':{supabase:{auth:{getSession:async()=>({data:{session:signedIn?{access_token:'test-session'}:null}})}}}},{
+ const api=load('apps/mobile/src/api.ts',{'expo/fetch':{},'./media/photoUpload':{},'./apiFailure':{apiFailure:async()=>{throw Error('request_failed');}},'./config-rules':{isProductApiConfigured:()=>true},'./startup/onboardingTrace':{onboardingTrace(){}},'./supabase':{supabase:{auth:{getSession:async()=>({data:{session:signedIn?{access_token:'test-session'}:null}})}}}},{
   process:{env:{EXPO_PUBLIC_API_URL:'http://dev.test'}},fetch:async(url,options)=>{requests.push({url,options});if(fail)return new Response('{}',{status:503});return new Response(JSON.stringify(url.endsWith('/collector-counts')?{counts:{[id(1)]:8}}:{holding:{id:id(20)}}));}
  });
  const stop=api.onCollectorOwnershipChanged(()=>notifications++);

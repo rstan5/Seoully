@@ -1,3 +1,4 @@
+import { onboardingTrace } from "../src/startup/onboardingTrace";
 import { supabase } from "../src/supabase";
 import { onboardingHeading, onboardingDescription, onboardingSpacing } from "../src/onboarding/presentation";
 import { readSelectedCatalogIdentity } from "../src/data/collectorIdentity";
@@ -83,8 +84,17 @@ export default function OnboardingScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    onboardingTrace("onboarding_mount", { mounted: true });
+    return () => onboardingTrace("onboarding_mount", { mounted: false });
+  }, []);
+  useEffect(() => {
+    onboardingTrace("onboarding_phase", { stage: phase, checkpoint: state?.step ?? null });
+  }, [phase, state?.step]);
+
   async function load() {
     const generation = ++loadGeneration.current;
+    onboardingTrace("onboarding_load", { mounted: true });
     setLoading(true);
     setState(null);
     setError(null);
@@ -93,6 +103,7 @@ export default function OnboardingScreen() {
       const [next, capabilities, identity] = await Promise.all([
         loadNativeOnboarding(), readProfileCapabilities(), resolveNativeIdentity<NativeIdentity>(),
       ]);
+      onboardingTrace("onboarding_hydrated", { checkpoint: next.step, profileReady: Boolean(identity), holdingConfirmed: Boolean(next.firstHome?.holdingId) });
       const userId = next.userId;
       if (!userId || identity?.user.id !== userId) throw new Error("unauthenticated");
       if (generation !== loadGeneration.current) return;

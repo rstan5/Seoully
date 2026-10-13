@@ -1,3 +1,5 @@
+import { useBootstrap } from "../src/startup/BootstrapProvider";
+import { onboardingTrace } from "../src/startup/onboardingTrace";
 import { onboardingHeading } from "../src/onboarding/presentation";
 import { PhotocardCollectorCount } from "../src/ui/PhotocardCollectorCount";
 import { PHOTOCARD } from "../src/media/photocard";
@@ -25,6 +27,7 @@ import { SeoullyText } from "../src/ui/SeoullyText";
 export default function AddCollectibleScreen() {
   const copy = useCopy();
   const router = useRouter();
+  const boot = useBootstrap();
   const social = useSocialRepository();
   const params = useLocalSearchParams<{
     templateId: string;
@@ -49,6 +52,8 @@ export default function AddCollectibleScreen() {
   const [message, setMessage] = useState<string | null>(null);
   const [shareReference, setShareReference] = useState(catalogReferenceConsentDefault());
   const [cropAsset, setCropAsset] = useState<{ uri: string; width: number; height: number } | null>(null);
+  useEffect(() => { onboardingTrace("add_mount", { mounted: true }); return () => onboardingTrace("add_mount", { mounted: false }); }, []);
+  useEffect(() => { onboardingTrace("add_state", { holdingConfirmed: Boolean(savedHoldingId), overlay: hydrating || working }); }, [savedHoldingId, hydrating, working]);
   const photocard = params.kind === "photocard";
   const isNewTemplate = params.newTemplate === "true";
 
@@ -139,6 +144,7 @@ export default function AddCollectibleScreen() {
         photo: uploadHoldingPhoto, reference: uploadCatalogReferencePhoto, save: persistDraft });
       if (!holding) throw new Error("holding_unavailable");
       ownershipConfirmed = true;
+      onboardingTrace("holding_confirmed", { holdingConfirmed: true });
       setSavedHoldingId(holding.id);
       await clearFirstCollectibleDraft(draftScope.current);
       if (fromOnboarding) router.replace({ pathname: "/onboarding", params: { phase: "reveal", holdingId: holding.id } });
@@ -162,8 +168,17 @@ export default function AddCollectibleScreen() {
   ].filter(Boolean).join(" · ");
 
   if (hydrating && social.kind !== "demo") return <SeoullyLoadingState fullScreen label={copy.brand} />;
-  if (savedHoldingId) return <SeoullyMessageScreen header={fromOnboarding ? <View style={{ paddingHorizontal: 16 }}><ScreenBack label={copy.back} onPress={() => router.replace({ pathname: "/onboarding", params: { phase: "reveal", holdingId: savedHoldingId } })} /></View> : undefined} title={copy.collectibleSaved} message={message} alert>
-    <SeoullyButton label={copy.viewInRoom} block multiline onPress={() => { try { router.replace(fromOnboarding ? { pathname: "/onboarding", params: { phase: "reveal", holdingId: savedHoldingId } } : { pathname: "/room", params: { holdingId: savedHoldingId } }); } catch { setMessage(copy.addConfirmationFailed); } }} />
+  function viewSavedHolding(source: "back" | "view" = "view") {
+    onboardingTrace("saved_confirmation_press", { completed: boot.onboardingStep === "done", intent: source });
+    if (!savedHoldingId) return;
+    try {
+      router.replace(fromOnboarding && boot.destination === "onboarding"
+        ? { pathname: "/onboarding", params: { phase: "reveal", holdingId: savedHoldingId } }
+        : { pathname: "/room", params: { holdingId: savedHoldingId } });
+    } catch { setMessage(copy.addConfirmationFailed); }
+  }
+  if (savedHoldingId) return <SeoullyMessageScreen header={fromOnboarding ? <View style={{ paddingHorizontal: 16 }}><ScreenBack label={copy.back} onPress={() => viewSavedHolding("back")} /></View> : undefined} title={copy.collectibleSaved} message={message} alert>
+    <SeoullyButton label={copy.viewInRoom} block multiline onPress={() => viewSavedHolding("view")} />
   </SeoullyMessageScreen>;
   return (
     <SeoullyScreen>

@@ -1,3 +1,4 @@
+import { onboardingTrace } from "./onboardingTrace";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
 import * as Linking from "expo-linking";
 import { isReturningWelcomeLaunch } from "./welcomeEligibility";
@@ -86,7 +87,8 @@ export function BootstrapProvider({ children }: PropsWithChildren) {
   const finishReturningWelcome = useCallback(() => setReturningWelcome(false), []);
 
   const applySnapshot = useCallback((snapshot: StartupSnapshot, token: number) => {
-    if (token !== generation.current) return;
+    if (token !== generation.current) { onboardingTrace("bootstrap_snapshot", { stale: true }); return; }
+    onboardingTrace("bootstrap_snapshot", { destination: snapshot.destination, checkpoint: snapshot.onboardingStep, authenticated: snapshot.authenticated, stale: false });
     startupTrace("destination", snapshot.destination);
     setWelcomeName(snapshot.displayName ?? "");
     setErrorKind(snapshot.errorKind);
@@ -111,10 +113,10 @@ export function BootstrapProvider({ children }: PropsWithChildren) {
       restoreSession,
       loadOnboarding: loadOnboardingBounded,
     }).then(async (snapshot) => {
-      if (token !== generation.current) return;
+      if (token !== generation.current) { onboardingTrace("bootstrap_snapshot", { stale: true }); return; }
       if (!initial || snapshot.destination !== "app") { applySnapshot(snapshot, token); return; }
       const url = await initialUrl;
-      if (token !== generation.current) return;
+      if (token !== generation.current) { onboardingTrace("bootstrap_snapshot", { stale: true }); return; }
       setReturningWelcome(isReturningWelcomeLaunch(initial && !linkInterrupted.current, snapshot, url));
       applySnapshot(snapshot, token);
     });
@@ -139,6 +141,7 @@ export function BootstrapProvider({ children }: PropsWithChildren) {
   }, [applySnapshot, refresh]);
 
   const enterApp = useCallback((target?: "profile") => {
+    onboardingTrace("enter_app", { intent: target ?? "app", completed: true });
     setProfileEntryRequested(previous => target === "profile" || previous);
     setReturningWelcome(false);
     generation.current += 1;

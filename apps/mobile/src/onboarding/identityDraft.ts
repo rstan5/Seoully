@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export type OnboardingIdentityDraft = { groupIds: string[]; biasIds: string[] };
+export type OnboardingIdentityDraft = { groupIds: string[]; biasIds: string[]; collectorType?: string; archetypeComplete?: boolean };
 const key = (userId: string) => `seoully:onboarding-identity:${userId}`;
 // Serialize disk writes so rapid selections cannot restore an older draft.
 const writes = new Map<string, Promise<void>>();
@@ -20,6 +20,8 @@ export async function readOnboardingIdentityDraft(userId: string): Promise<Onboa
   if (!value || !Array.isArray(value.groupIds) || !Array.isArray(value.biasIds)
     || value.groupIds.length > 24 || value.biasIds.length > 48
     || [...value.groupIds, ...value.biasIds].some(id => typeof id !== "string" || !/^[a-z0-9_-]{1,64}$/.test(id))) return null;
+  if (value.collectorType !== undefined && (typeof value.collectorType !== "string" || value.collectorType.length > 80)) return null;
+  if (value.archetypeComplete !== undefined && typeof value.archetypeComplete !== "boolean") return null;
   return value;
 }
 export function saveOnboardingIdentityDraft(userId: string, draft: OnboardingIdentityDraft) {

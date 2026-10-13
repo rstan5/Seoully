@@ -84,13 +84,13 @@ test('placement feedback passes through, actionable save errors retain retry and
 });
 test('first-home EN/KO guidance shares layout while completion, dismissal and retry stay unchanged',()=>{
   const intro=fs.readFileSync('apps/mobile/src/onboarding/OnboardingWorldIntro.tsx','utf8');
-  assert.match(intro,/roomGuidance=\{ready && handoff/);
+  assert.match(intro,/roomGuidance=\{\(\(messagesVisible/);
   assert.match(intro,/<RoomMessage chrome=\{chrome\}/);
-  assert.match(intro,/setDismissed\(true\)/);
+  assert.match(intro,/setMessage\("dismissed"\)/);
   assert.match(intro,/void finish\(confirmed.current\)/);
-  assert.match(intro,/onPress=\{onContinue\}/);
+  assert.match(intro,/onContinue\(\)/);
   assert.doesNotMatch(intro,/bottom: insets|numberOfLines/);
-  for (const label of ['onboardFirstHomeComplete','onboardBinderFirst','onboardPlaceFirst']) assert.ok(intro.includes('copy.'+label));
+  for (const label of ['roomArrivalHome','roomArrivalEdit','roomArrivalFinish','onboardPlaceFirst']) assert.ok(intro.includes('copy.'+label));
   assert.equal(roomMessageStyles.text.lineHeight,19);
   assert.equal(roomMessageStyles.text.flexShrink,1);
 });

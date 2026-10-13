@@ -38,6 +38,8 @@ const ZONE_HOTSPOTS: Record<CanonicalZoneKind, { position: [number, number, numb
 };
 
 export function NativeRoomRenderer({
+  onWorldReady,
+  onBinderArrivalReady,
   ownerName = "",
   presentation,
   items,
@@ -85,6 +87,8 @@ export function NativeRoomRenderer({
   onOpenStorage,
   placingItem = null,
 }: {
+  onWorldReady?: () => void;
+  onBinderArrivalReady?: () => void;
   ownerName?: string;
   /** Read-only, demand-rendered Profile overview. */
   presentation?: "profile";
@@ -169,6 +173,7 @@ export function NativeRoomRenderer({
       gl.shadowMap.type = PCFShadowMap;
     }}
   >
+    {onWorldReady || onBinderArrivalReady ? <ArrivalReadiness onWorldReady={onWorldReady} onBinderArrivalReady={onBinderArrivalReady} view={view} motion={binderMotionRef} /> : null}
     <color attach="background" args={[theme.void]} />
     <ambientLight intensity={0.64 * theme.brightness} color={theme.fill} />
     <directionalLight
@@ -644,4 +649,23 @@ function PhotoStringForm({ object, holdings, publicCards, readOnly, color }: {
       </group>;
     })}
   </group>;
+}
+
+/** Observe existing rendering/camera motion; never drives or resets it. */
+function ArrivalReadiness({ onWorldReady, onBinderArrivalReady, view, motion }: { onWorldReady?: () => void; onBinderArrivalReady?: () => void; view: NativeWorldView; motion: MutableRefObject<number> }) {
+  const frames = useRef(0);
+  const sent = useRef(false);
+  const previousCamera = useRef(new Vector3());
+  const enteredBinder = useRef(false);
+  useFrame(({ camera }) => {
+    // A frame has actually been drawn before exposing the prepared world.
+    if (++frames.current === 2) onWorldReady?.();
+    if (view.kind === "binder") enteredBinder.current = true;
+    if (!sent.current && enteredBinder.current && onBinderArrivalReady
+      && (view.kind !== "binder" || (motion.current > 0.99 && camera.position.distanceTo(previousCamera.current) < 0.002))) {
+      sent.current = true; onBinderArrivalReady();
+    }
+    previousCamera.current.copy(camera.position);
+  });
+  return null;
 }

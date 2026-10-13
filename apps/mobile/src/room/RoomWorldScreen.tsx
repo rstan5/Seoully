@@ -104,9 +104,12 @@ export function RoomWorldScreen({
   onLivePlacementConfirmed,
   onLiveBinderConfirmed,
   onLiveSnapshotFailed,
+  onWorldReady,
+  onBinderArrivalReady,
   onRoomAppearance,
   roomGuidance,
   loadingCovered = false,
+  suppressAmbientGuidance = false,
 }: {
   mode: RoomWorldMode;
   userId?: string;
@@ -123,9 +126,12 @@ export function RoomWorldScreen({
   onLivePlacementConfirmed?: (holdingId: string) => void;
   onLiveBinderConfirmed?: (holdingIds: string[]) => void;
   onLiveSnapshotFailed?: () => void;
+  onWorldReady?: () => void;
+  onBinderArrivalReady?: () => void;
   onRoomAppearance?: (style: NativeRoomStyle) => void;
   roomGuidance?: ReactNode;
   loadingCovered?: boolean;
+  suppressAmbientGuidance?: boolean;
 }) {
   const onboardingEvents = useRef({ onLiveSnapshotReady, onLivePlacementConfirmed, onLiveBinderConfirmed, onLiveSnapshotFailed });
   onboardingEvents.current = { onLiveSnapshotReady, onLivePlacementConfirmed, onLiveBinderConfirmed, onLiveSnapshotFailed };
@@ -386,17 +392,16 @@ export function RoomWorldScreen({
   const currentSpread = spreads[binderSpreadIndex];
   const turningSpread = turningSpreadIndex != null ? spreads[turningSpreadIndex] : undefined;
 
+  const initialBinderOpened = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (!initialHoldingId || !spreads.length || !objectHasKind(roomLayout.objects, "desk")) return;
-    const index = spreadIndexForHolding(spreads, initialHoldingId);
-    if (index < 0) return;
-    const task = setTimeout(() => {
-      binderReturnRef.current = { view: { kind: "home" }, explore: { ...exploreRef.current } };
-      setView(openBinderView(index));
-      if (!demo && mode === "own") onboardingEvents.current.onLiveBinderConfirmed?.([initialHoldingId]);
-    }, 0);
-    return () => clearTimeout(task);
-  }, [initialHoldingId, spreads, roomLayout.objects, demo, mode]);
+    if (!initialHoldingId || initialBinderOpened.current === initialHoldingId || !spreads.length || !objectHasKind(roomLayout.objects, "desk")) return;
+    if (spreadIndexForHolding(spreads, initialHoldingId) < 0) return;
+    initialBinderOpened.current = initialHoldingId;
+    // The same entry path as tapping the physical Binder, exactly once.
+    openBinderFromWorld(initialHoldingId);
+    // Changes to page data must not restart the entrance or overwrite user gestures.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialHoldingId, spreads, roomLayout.objects]);
 
   function clearPendingPress() {
     if (pendingPressRef.current) clearTimeout(pendingPressRef.current.timer);
@@ -1400,6 +1405,8 @@ export function RoomWorldScreen({
       <Suspense fallback={demo || loadingCovered ? null : <SeoullyLoadingState fullScreen label={copy.enteringYourRoom} />}>
         <NativeRoomRenderer
           key={canvasEpoch}
+          onWorldReady={onWorldReady}
+          onBinderArrivalReady={onBinderArrivalReady}
           ownerName={ownerName}
           items={items}
           photoStringHoldings={holdings}
@@ -1498,12 +1505,12 @@ export function RoomWorldScreen({
         <ScrollView pointerEvents="box-none" style={{ flexGrow: 0, flexShrink: 1 }} contentContainerStyle={styles.messageContent} keyboardShouldPersistTaps="handled">
           {error ? <Pressable accessibilityRole="button" onPress={() => void refresh()}><RoomMessage chrome={overlayTheme}><SeoullyText accessibilityRole="alert" style={roomMessageStyles.text} color={overlayTheme.color}>{error} · {copy.retry}</SeoullyText></RoomMessage></Pressable> : null}
           {roomGuidance}
-          {helperKind ? <Animated.View pointerEvents="none" style={{ opacity: helperOpacity }}><RoomMessage chrome={overlayTheme} pointerEvents="none">
+          {helperKind && !roomGuidance && !suppressAmbientGuidance ? <Animated.View pointerEvents="none" style={{ opacity: helperOpacity }}><RoomMessage chrome={overlayTheme} pointerEvents="none">
             <SeoullyText variant="handle" color={overlayTheme.color} style={[roomMessageStyles.text, styles.helperTitle]}>{helperKind === "first" ? copy.roomFirstTitle : copy.roomEditHoldHint}</SeoullyText>
             {helperKind === "first" ? <SeoullyText color={overlayTheme.color} style={roomMessageStyles.text}>{copy.roomFirstLead}</SeoullyText> : null}
             {helperKind === "edit" ? <SeoullyText color={overlayTheme.color} style={roomMessageStyles.text}>{copy.roomEditLookHint}</SeoullyText> : null}
           </RoomMessage></Animated.View> : null}
-          {hint ? <RoomMessage chrome={overlayTheme} pointerEvents="none"><SeoullyText color={overlayTheme.color} style={roomMessageStyles.text}>{hint}</SeoullyText></RoomMessage> : null}
+          {hint && ((!roomGuidance && !suppressAmbientGuidance) || toast || placingItem) ? <RoomMessage chrome={overlayTheme} pointerEvents="none"><SeoullyText color={overlayTheme.color} style={roomMessageStyles.text}>{hint}</SeoullyText></RoomMessage> : null}
           {deskPresent && view.kind === "zone" && view.zone === "desk" && !selectedItem ? <RoomMessage chrome={overlayTheme}>
             <Pressable accessibilityRole="button" onPress={() => openBinderFromWorld()} style={[styles.toolChip, controlSurface]}><SeoullyText variant="caption" color={overlayTheme.color}>{copy.openBinder}</SeoullyText></Pressable>
           </RoomMessage> : null}

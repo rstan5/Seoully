@@ -2,6 +2,7 @@ export type DurableOnboardingStep = "group" | "bias" | "interest" | "done";
 export type OnboardingPhase =
   | "group"
   | "bias"
+  | "archetype"
   | "interest"
   | "collect"
   | "reveal"

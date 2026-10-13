@@ -15,7 +15,7 @@ import { loadCollectorProfile, loadCollectorRoom, loadNativeRoom, removeNativeRo
 import { binderSpreads, buildNativeBinderPages, spreadIndexForHolding } from "../binder/model";
 import { collectibleKindLabel, type MobileCopy } from "../i18n";
 import { spacing } from "../theme";
-import { chrome, immersiveRoomFill } from "../ui/shellLayout";
+import { chrome, topHeaderMetrics, immersiveRoomFill } from "../ui/shellLayout";
 import { SeoullyText } from "../ui/SeoullyText";
 import { cloneRenderables, holdingRemainsAfterStore, isObjectHistory, isStoredHistoryMarker, pushPlacementHistory, restoreEditBaseline, revertDrop, storeRenderable, type PlacementHistoryEntry } from "./editSession";
 import {
@@ -146,7 +146,7 @@ export function RoomWorldScreen({
   const [holdings, setHoldings] = useState<NativeHolding[]>([]);
   const [view, setView] = useState<NativeWorldView>({ kind: "home" });
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const { width: overlayWidth, height: overlayHeight } = useWindowDimensions();
+  const { width: overlayWidth, height: overlayHeight, fontScale } = useWindowDimensions();
   const [headerHeight, setHeaderHeight] = useState(0);
   const [footerHeight, setFooterHeight] = useState(0);
   const [privateRoom, setPrivateRoom] = useState(false);
@@ -1346,7 +1346,7 @@ export function RoomWorldScreen({
   const selectedRoomObject = roomLayout.objects.find((item) => item.id === selectedObjectId) ?? null;
   const archivePresent = objectHasKind(roomLayout.objects, "archive");
   const deskPresent = objectHasKind(roomLayout.objects, "desk");
-  const overlayLayout = roomOverlayLayout({ width: overlayWidth, height: overlayHeight, insets, headerHeight, footerHeight,
+  const overlayLayout = roomOverlayLayout({ width: overlayWidth, height: overlayHeight, fontScale, insets, headerHeight, footerHeight,
     hasFooter: Boolean(editing || binderHeld || (selectedItem && view.kind !== "binder")),
   });
   const overlayPad = overlayLayout.navigation;
@@ -1704,8 +1704,9 @@ function OverlayChrome({
   onLayout?: (event: LayoutChangeEvent) => void;
 }) {
   const languageWidth = useLanguageControlWidth();
+  const header = topHeaderMetrics(useWindowDimensions().fontScale);
   useLanguageControlTone(chrome.color);
-  const chip = [styles.overlayChip, roomChromeSurface(chrome)];
+  const chip = [styles.overlayChip, { minHeight: header.controlHeight }, roomChromeSurface(chrome)];
   return <View pointerEvents="box-none" onLayout={onLayout} style={[styles.overlayBar, style, { paddingRight: 16 + languageWidth + 18 }]}>
     <Pressable accessibilityRole="button" onPress={onBack} style={chip}>
       <SeoullyText variant="button" color={chrome.color}>{copy.back}</SeoullyText>

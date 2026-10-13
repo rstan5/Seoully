@@ -35,12 +35,13 @@ function HeartScene({ text, ready, onContinue, reduced, destination = "corner" }
 
   const motionTiming = destination === "next" ? dialogueMotionTiming : heartSceneTiming;
   const readingMs = destination === "next" ? dialogueReadingMs(chars.length) : heartSceneTiming.reading;
+  const arcHeight = Math.min(90, Math.max(60, height * 0.1));
   // A quadratic arc uses the same native progress value for both axes.
-  const arcY = useMemo(() => destination === "next" ? Animated.multiply(Animated.multiply(journey, journey), -36) : 0, [destination, journey]);
+  const arcY = useMemo(() => destination === "next" ? Animated.multiply(Animated.multiply(journey, journey), -arcHeight) : 0, [arcHeight, destination, journey]);
   const arriving = destination === "next" && scene.stage === "enter";
   const departing = scene.stage === "exit" || scene.stage === "waiting";
   useEffect(() => {
-    if (reduced || arriving) { hover.setValue(0); return; }
+    if (reduced || destination === "next" || arriving) { hover.setValue(0); return; }
     if (departing) {
       const settle = Animated.timing(hover, { toValue: 0, duration: motionTiming.exit, useNativeDriver: true });
       settle.start();
@@ -52,7 +53,7 @@ function HeartScene({ text, ready, onContinue, reduced, destination = "corner" }
     ]));
     floating.start();
     return () => { floating.stop(); hover.stopAnimation(); };
-  }, [arriving, bubble, chars.length, departing, hover, journey, motionTiming.exit, reduced]);
+  }, [arriving, bubble, chars.length, departing, destination, hover, journey, motionTiming.exit, reduced]);
 
   useEffect(() => {
     const stage = scene.stage;
@@ -84,7 +85,7 @@ function HeartScene({ text, ready, onContinue, reduced, destination = "corner" }
   return <Pressable accessibilityRole="button" accessibilityLabel={text} onPress={() => send("tap")} style={styles.cover}>
     <Animated.View style={{ opacity: reduced === null ? 0 : 1, position: "absolute", top: originY, left: width / 2 - heartSize / 2, width: heartSize,
       transform: [
-        { translateX: reduced ? 0 : journey.interpolate({ inputRange: [-1, 0, 1], outputRange: [destination === "next" ? -width : width, 0, destination === "next" ? -width : width / 2 - corner.right - (chrome.companionSize + 8) / 2] }) },
+        { translateX: reduced ? 0 : journey.interpolate({ inputRange: [-1, 0, 1], outputRange: [width, 0, destination === "next" ? -width : width / 2 - corner.right - (chrome.companionSize + 8) / 2] }) },
         { translateY: reduced ? 0 : destination === "next" ? arcY : journey.interpolate({ inputRange: [-1, -0.5, 0, 1], outputRange: [36, -12, 0, height - corner.bottom - chrome.companionSize / 2 - originY - heartSize / 2] }) },
         { scale: reduced ? 1 : journey.interpolate({ inputRange: [-1, 0, 1], outputRange: [0.9, 1, destination === "next" ? 0.9 : chrome.companionSize / heartSize] }) },
       ] }}>

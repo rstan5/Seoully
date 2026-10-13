@@ -1,3 +1,4 @@
+import { topHeaderMetrics, topHeaderRow } from "../src/ui/shellLayout";
 import { useLanguageControlTone } from "../src/ui/GlobalLanguageControl";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -16,7 +17,7 @@ import { readOwnerProfileRoom } from "../src/room/useProfileRoom";
 import { parseRoomStyle, type NativeRoomStyle } from "../src/room/roomStyle";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { loadNativeOnboarding, updateNativeProfile, readProfileCapabilities, uploadProfileAvatar, type NativeIdentity, type ProfileCapabilities } from "../src/api";
 import { useSocialRepository } from "../src/data";
 import { KeyboardScreen } from "../src/components/KeyboardScreen";
@@ -34,6 +35,7 @@ export default function EditProfileScreen() {
   const router = useRouter();
   const copy = useCopy();
   const insets = useSafeAreaInsets();
+  const header = topHeaderMetrics(useWindowDimensions().fontScale);
   const latestCopy = useRef(copy);
   const refreshGeneration = useRef(0);
   useEffect(() => { latestCopy.current = copy; }, [copy]);
@@ -159,11 +161,11 @@ export default function EditProfileScreen() {
     <SeoullyScreen backgroundColor={palette.mist}>
       <ProfileIdentityProvider palette={palette}>
       <KeyboardScreen>
-        <View style={styles.top}>
+        <View style={[styles.top, topHeaderRow, { minHeight: header.height }]}>
           <Pressable accessibilityRole="button" disabled={busy || tastePending > 0} onPress={() => router.back()} style={styles.topAction}>
-            <SeoullyText variant="body">{copy.editCancel}</SeoullyText>
+            <SeoullyText control variant="body">{copy.editCancel}</SeoullyText>
           </Pressable>
-          <View pointerEvents="none" style={styles.titleCenter}><SeoullyText variant="handle">{copy.profileEdit}</SeoullyText></View>
+          <View pointerEvents="none" style={styles.titleCenter}><SeoullyText control variant="handle">{copy.profileEdit}</SeoullyText></View>
 
         </View>
 

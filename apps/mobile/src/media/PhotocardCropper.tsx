@@ -1,8 +1,9 @@
-import { LanguageModal } from "../ui/GlobalLanguageControl";
+import { topHeaderMetrics, topHeaderRow } from "../ui/shellLayout";
+import { useLanguageControlWidth, LanguageModal } from "../ui/GlobalLanguageControl";
 import { PHOTOCARD } from "./photocard";
 /* eslint-disable react-hooks/refs -- Gesture refs are read and written only inside PanResponder callbacks. */
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Image, PanResponder, Pressable, StyleSheet, View } from "react-native";
+import { Image, PanResponder, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { constrainCrop, cropRectangle, pinchCrop, type CropTransform } from "./cropGeometry";
 import { colors, spacing } from "../theme";
@@ -47,6 +48,8 @@ export function PhotocardCropper({
   const measured = area.width > 0 && area.height > 0;
   const viewportWidth = Math.max(1, Math.min(330, area.width, area.height * CARD_RATIO));
   const viewportHeight = viewportWidth / CARD_RATIO;
+  const header = topHeaderMetrics(useWindowDimensions().fontScale);
+  const languageWidth = useLanguageControlWidth();
   const [transform, setTransform] = useState<Transform>({ x: 0, y: 0, zoom: 1 });
   const current = useRef<CropTransform>({ x: 0, y: 0, zoom: 1 });
   const session = useRef<{ count: number; origin: CropTransform; point: { x: number; y: number }; distance: number } | null>(null);
@@ -101,7 +104,7 @@ export function PhotocardCropper({
 
   return <LanguageModal languageInk={colors.ink} animationType="slide" visible onRequestClose={() => { if (!busy) onCancel(); }}>
     <SafeAreaView edges={["top", "bottom"]} style={styles.screen}>
-      <SeoullyText variant="title">{title}</SeoullyText>
+      <View style={[topHeaderRow, { minHeight: header.height, width: "100%", paddingRight: languageWidth + 18 }]}><SeoullyText control variant="title" style={{ flexShrink: 1 }}>{title}</SeoullyText></View>
       <SeoullyText variant="secondary" style={styles.hint}>{hint}</SeoullyText>
       <View style={styles.cropArea} onLayout={event => setArea(event.nativeEvent.layout)}>
       <View ref={frame} onLayout={measureFrame} {...panResponder.panHandlers} style={[styles.viewport, { width: viewportWidth, height: viewportHeight }]}>
@@ -143,7 +146,7 @@ function midpoint(a: { pageX: number; pageY: number }, b: { pageX: number; pageY
 }
 
 const styles = StyleSheet.create({
-  screen: { alignItems: "center", backgroundColor: colors.canvas, flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.sm },
+  screen: { alignItems: "center", backgroundColor: colors.canvas, flex: 1, paddingHorizontal: spacing.lg, paddingTop: 0, paddingBottom: spacing.sm },
   hint: { marginBottom: spacing.lg, marginTop: spacing.xs, textAlign: "center" },
   cropArea: { flex: 1, width: "100%", alignItems: "center", justifyContent: "center", marginVertical: spacing.sm },
   viewport: { backgroundColor: colors.ink, borderRadius: 18, overflow: "hidden" },

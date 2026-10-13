@@ -1,13 +1,13 @@
 import type { ReactNode } from "react";
 import { useCallback, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { isDemoWorldAllowed, useDataMode, useSocialRepository } from "../data";
 import { useCopy } from "../locale";
 import { colors } from "../theme";
 import { BrandMark } from "./BrandMark";
 import { useLanguageControlWidth } from "./GlobalLanguageControl";
-import { chrome } from "./shellLayout";
+import { chrome, topHeaderMetrics, topHeaderRow } from "./shellLayout";
 import { IconBell } from "./icons";
 import { pressShift, useReduceMotion } from "./motion";
 import { useProfileIdentity, useProfileInk, useProfileMute } from "./ProfileIdentity";
@@ -21,6 +21,7 @@ export function SeoullyHeader({
   trailing?: ReactNode;
 }) {
   const copy = useCopy();
+  const header = topHeaderMetrics(useWindowDimensions().fontScale);
   const languageWidth = useLanguageControlWidth();
   const router = useRouter();
   const reduceMotion = useReduceMotion();
@@ -45,8 +46,8 @@ export function SeoullyHeader({
   }, [social]));
 
   return (
-    <View style={[styles.top, { paddingRight: chrome.gutter + languageWidth + 18 }, identity ? { borderBottomColor: identity.line } : null]}>
-      <BrandMark />
+    <View style={[styles.top, topHeaderRow, { minHeight: header.height, paddingRight: chrome.gutter + languageWidth + 18 }, identity ? { borderBottomColor: identity.line } : null]}>
+      <View pointerEvents="box-none" style={[topHeaderRow, { minHeight: header.height }]}><BrandMark /></View>
       <View style={styles.end}>
         {allowed ? (
           <Pressable
@@ -74,7 +75,7 @@ export function SeoullyHeader({
         accessibilityLabel={unread > 0 ? `${copy.notices}, ${unread}` : copy.notices}
         hitSlop={8}
         onPress={() => router.push("/notices")}
-        style={({ pressed }) => [styles.bell, { position: "absolute", top: (chrome.headerHeight - 44) / 2, right: chrome.gutter + languageWidth + 18 }, pressShift(pressed, reduceMotion)]}
+        style={({ pressed }) => [styles.bell, { height: header.controlHeight, position: "absolute", top: header.controlTop, right: chrome.gutter + languageWidth + 18 }, pressShift(pressed, reduceMotion)]}
       >
         <IconBell color={ink} />
         {unread > 0 ? (

@@ -1,6 +1,7 @@
+import { topHeaderMetrics } from "../src/ui/shellLayout";
 import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { type NativeCatalogTemplate } from "../src/api";
 import { queueFirstCollectible } from "../src/onboarding/firstCollectibleStorage";
 import { submitManualCatalog } from "../src/manualCatalog";
@@ -22,6 +23,7 @@ type Step = "entry" | "search" | "manual";
 
 export default function CollectScreen() {
   const copy = useCopy();
+  const header = topHeaderMetrics(useWindowDimensions().fontScale);
   const router = useRouter();
   const social = useSocialRepository();
   const params = useLocalSearchParams<{ from?: string }>();
@@ -121,7 +123,7 @@ export default function CollectScreen() {
           ) : null}
 
           {step === "entry" ? (
-            <View style={styles.entry}>
+            <View style={[styles.entry, fromOnboarding ? { paddingTop: header.height + 24 } : null]}>
               <SeoullyText variant="title" style={styles.headline}>{fromOnboarding ? copy.onboardCollectFirstTitle : copy.catalogEntryTitle}</SeoullyText>
               <SeoullyText variant="secondary" style={styles.lede}>{fromOnboarding ? copy.onboardCollectFirstLede : copy.catalogEntryLede}</SeoullyText>
               <View style={styles.choices}>

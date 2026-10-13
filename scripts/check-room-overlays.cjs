@@ -108,7 +108,7 @@ test('all four existing sheet headers share spacing and keep their Modal behavio
 const sourceFile = ts.createSourceFile('RoomWorldScreen.tsx', screen, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const chromeFunction = sourceFile.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'OverlayChrome');
 const context = {
-  exports: {}, styles: {}, useLanguageControlWidth: () => 64, useLanguageControlTone: () => {}, View: 'View', Pressable: 'Pressable', SeoullyText: 'Text',
+  exports: {}, styles: {}, useLanguageControlWidth: () => 64, topHeaderMetrics: () => ({controlHeight:44}), useWindowDimensions: () => ({fontScale:1}), useLanguageControlTone: () => {}, View: 'View', Pressable: 'Pressable', SeoullyText: 'Text',
   roomChromeSurface: load('apps/mobile/src/room/theme.ts').roomChromeSurface,
   require: () => ({ jsx: (type,props) => ({type,props}), jsxs: (type,props) => ({type,props}) }),
 };

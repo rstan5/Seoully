@@ -1,10 +1,10 @@
-import { chrome } from "../src/ui/shellLayout";
+import { topHeaderMetrics } from "../src/ui/shellLayout";
 import { readSelectedCatalogIdentity } from "../src/data/collectorIdentity";
 import { readOnboardingIdentityDraft, saveOnboardingIdentityDraft, clearOnboardingIdentityDraft } from "../src/onboarding/identityDraft";
 import { ProfileTastePicker, type TasteOption } from "../src/ui/ProfileTastePicker";
 import { HeartFarewell } from "../src/ui/HeartFarewell";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   loadMyHolding,
@@ -58,6 +58,7 @@ export default function OnboardingScreen() {
   const params = useLocalSearchParams<{ edit?: string; phase?: string; holdingId?: string; photoWarning?: string }>();
   const editingTastes = params.edit === "1";
   const t = useCopy();
+  const header = topHeaderMetrics(useWindowDimensions().fontScale);
   const { setDemo } = useDataMode();
   const boot = useBootstrap();
   const loadGeneration = useRef(0);
@@ -286,7 +287,7 @@ export default function OnboardingScreen() {
   return (
     <SeoullyScreen edges={["top", "bottom"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-      <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={[styles.container, !(editingTastes || phase === "bias" || phase === "archetype" || phase === "interest") ? { paddingTop: chrome.headerHeight } : null]}>
+      <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={[styles.container, !(editingTastes || phase === "bias" || phase === "archetype" || phase === "interest") ? { paddingTop: header.height } : null]}>
         {editingTastes || phase === "bias" || phase === "archetype" || phase === "interest" ? (
           <ScreenBack label={t.back} onPress={() => (editingTastes && phase === "group" ? router.back() : backIdentity())} />
         ) : null}

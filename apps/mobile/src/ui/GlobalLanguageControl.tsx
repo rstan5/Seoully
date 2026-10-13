@@ -1,11 +1,11 @@
 import { createContext, useCallback, useContext, useLayoutEffect, useState, type ComponentProps, type PropsWithChildren } from "react";
-import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { Modal, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCopy, useLocale } from "../locale";
 import { useBootstrap } from "../startup/BootstrapProvider";
 import { colors } from "../theme";
-import { chrome } from "./shellLayout";
+import { chrome, topHeaderMetrics } from "./shellLayout";
 import { usePublishedProfileIdentity } from "./ProfileIdentity";
 import { useBlockingLoadingActive } from "./SeoullyLoadingState";
 import { pressShift, useReduceMotion } from "./motion";
@@ -48,6 +48,7 @@ export function GlobalLanguageControl({ inModal = false, inkOverride }: { inModa
   const { toggleLocale: onToggleLanguage } = useLocale();
   const reduceMotion = useReduceMotion();
   const insets = useSafeAreaInsets();
+  const header = topHeaderMetrics(useWindowDimensions().fontScale);
   const boot = useBootstrap();
   const blocked = useBlockingLoadingActive();
   const control = useContext(LanguageControlContext);
@@ -61,7 +62,7 @@ export function GlobalLanguageControl({ inModal = false, inkOverride }: { inModa
       hitSlop={10}
       onPress={onToggleLanguage}
       onLayout={event => control.measure(event.nativeEvent.layout.width)}
-      style={({ pressed }) => [styles.lang, { position: "absolute", top: insets.top + (chrome.headerHeight - 44) / 2, right: insets.right + chrome.gutter }, pressShift(pressed, reduceMotion)]}
+      style={({ pressed }) => [styles.lang, { minHeight: header.controlHeight, position: "absolute", top: insets.top + header.controlTop, right: insets.right + chrome.gutter }, pressShift(pressed, reduceMotion)]}
     >
       <SeoullyText variant="button" color={ink}>{languageLabel}</SeoullyText>
     </Pressable>

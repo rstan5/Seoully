@@ -1,4 +1,4 @@
-import { sizes } from "../theme";
+import { sizes, type as typography } from "../theme";
 
 /**
  * Shared native shell metrics. Web `.s-top` is 52px / 16px gutter.
@@ -68,3 +68,13 @@ export function companionPlacement(input: { insets: EdgeInsets; hasBottomNav: bo
     right: input.insets.right + chrome.gutter,
   };
 }
+
+/** One centerline for safe-area-local headers; text scaling expands every row equally. */
+export function topHeaderMetrics(fontScale = 1) {
+  const controlHeight = Math.max(44, Math.ceil(typography.button.lineHeight * Math.max(1, fontScale)));
+  const verticalRoom = chrome.headerHeight - 44;
+  const height = Math.max(chrome.headerHeight, Math.ceil(typography.title.lineHeight * Math.max(1, fontScale)) + verticalRoom, controlHeight + verticalRoom);
+  return { height, controlHeight, controlTop: (height - controlHeight) / 2, center: height / 2 };
+}
+
+export const topHeaderRow = { alignItems: "center", flexDirection: "row", minHeight: chrome.headerHeight } as const;

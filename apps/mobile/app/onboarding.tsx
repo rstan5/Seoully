@@ -30,7 +30,7 @@ import {
   type OnboardingPhase,
 } from "../src/onboarding/journey";
 import { colors } from "../src/theme";
-import { claimRoomArrival } from "../src/onboarding/roomArrival";
+import { readRoomArrivalStage, recordRoomArrivalStage, type RoomArrivalStage } from "../src/onboarding/roomArrival";
 import { readFirstCollectibleDraft } from "../src/onboarding/firstCollectibleStorage";
 import { SeoullyButton, SeoullyChoiceChip } from "../src/ui/SeoullyControls";
 import { SeoullyLoadingState } from "../src/ui/SeoullyLoadingState";
@@ -78,7 +78,7 @@ export default function OnboardingScreen() {
   const [collectorType, setCollectorType] = useState("Collector");
   const [archetypeComplete, setArchetypeComplete] = useState(false);
   const [interests, setInterests] = useState<string[]>(["photocards"]);
-  const [playArrival, setPlayArrival] = useState(false);
+  const [arrivalStage, setArrivalStage] = useState<RoomArrivalStage>("heart");
   const [holding, setHolding] = useState<NativeHolding | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -157,9 +157,9 @@ export default function OnboardingScreen() {
       setBiasIds(restoredBiases);
       if (next.collectorInterests.length > 0) setInterests(next.collectorInterests);
       if (resolved === "room" && confirmedHolding) {
-        const fresh = await claimRoomArrival(userId, confirmedHolding.id);
-        onboardingTrace("room_intro_selection", { stage: fresh ? "guided-fresh" : "guided-resume", checkpoint: next.step });
-        setPlayArrival(fresh);
+        const stage = await readRoomArrivalStage(userId, confirmedHolding.id);
+        onboardingTrace("room_intro_selection", { stage, checkpoint: next.step });
+        setArrivalStage(stage);
       }
       if (generation !== loadGeneration.current) return;
       setHolding(confirmedHolding);
@@ -286,7 +286,8 @@ export default function OnboardingScreen() {
       <View style={styles.world}>
         <Suspense fallback={<SeoullyLoadingState fullScreen label={t.room} />}>
           <OnboardingWorldIntro
-            playArrival={playArrival}
+            initialStage={arrivalStage}
+            onPresentationStage={stage => recordRoomArrivalStage(identityUserId, holding!.id, stage)}
             holdingId={holding?.id}
             photocard={holding ? isBinderEligible(holding) : false}
             copy={t}

@@ -114,7 +114,8 @@ export function RoomWorldScreen({
   roomGuidance,
   loadingCovered = false,
   suppressAmbientGuidance = false,
-  deferFirstRoomEdit = false,
+  // First-time guidance belongs exclusively to OnboardingWorldIntro.
+  deferFirstRoomEdit = true,
 }: {
   mode: RoomWorldMode;
   userId?: string;

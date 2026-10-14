@@ -37,13 +37,14 @@ test('selection/removal and confirmed checkpoint survive relaunch without losing
   assert.equal(await api.readOnboardingIdentityDraft('two'), null);
   assert.match(onboardingSource, /!draft\?\.archetypeComplete && params.phase !== "interest" \? "archetype"/);
 });
-test('arrival presentation claim is scoped, concurrent-safe, durable and never writes ownership', async () => {
+test('arrival checkpoints are scoped, durable, monotonic presentation history without ownership writes', async () => {
   const s = disk(), file = 'apps/mobile/src/onboarding/roomArrival.ts'; let api = load(file, s.mocks);
-  assert.deepEqual(await Promise.all([api.claimRoomArrival('one', 'card'), api.claimRoomArrival('one', 'card')]), [true, false]);
-  api = load(file, s.mocks); assert.equal(await api.claimRoomArrival('one', 'card'), false); assert.equal(await api.claimRoomArrival('two', 'card'), true);
-  assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /createMyHolding|updateNativeOnboarding|supabase/);
+  assert.equal(await api.readRoomArrivalStage('one', 'card'), 'heart');
+  await Promise.all([api.recordRoomArrivalStage('one','card','edit'), api.recordRoomArrivalStage('one','card','home')]);
+  api=load(file,s.mocks);assert.equal(await api.readRoomArrivalStage('one','card'),'edit');assert.equal(await api.readRoomArrivalStage('two','card'),'heart');
+  assert.doesNotMatch(fs.readFileSync(file,'utf8'),/createMyHolding|updateNativeOnboarding|supabase/);
 });
-function intro({ photocard = true, reduced = false, playArrival = true, fail = false, pendingCompletion = false, completionRequest, onContinue, onHome } = {}) {
+function intro({ photocard = true, reduced = false, playArrival = true, initialStage = playArrival ? "heart" : "profile", presentationWrite, fail = false, pendingCompletion = false, completionRequest, onContinue, onHome } = {}) {
   let index = 0, slots = [], effects = [], timers = new Map(), next = 0, animations = [], appListener, focusedCleanup, profile = 0, requests = 0;
   let resolveCompletion;
   const confirmation = pendingCompletion ? new Promise(resolve => { resolveCompletion = resolve; }) : null;
@@ -55,9 +56,9 @@ function intro({ photocard = true, reduced = false, playArrival = true, fail = f
   const api = load('apps/mobile/src/onboarding/OnboardingWorldIntro.tsx', {
     react, '../startup/trace': {startupTrace(){}}, '../ui/usePausedCountdown': countdown, 'react/jsx-runtime': { jsx, jsxs: jsx }, 'expo-router': { useFocusEffect(fn) { react.useEffect(() => { focusedCleanup = fn(); return focusedCleanup; }, [fn]); } },
     'react-native': { View: 'View', Pressable: 'Pressable', StyleSheet: { create: x => x, absoluteFill: {} }, Animated: { View: 'Animated', Value, timing(value, config) { return { start(fn) { animations.push({ config, finish: () => { value.value = config.toValue; fn({ finished: true }); } }); }, stop() {} }; } }, AppState: { currentState: 'active', addEventListener(_, fn) { appListener = fn; return { remove() { appListener = null; } }; } } },
-    '../ui/HeartFarewell': { HeartFarewell: 'Heart' }, '../room/RoomWorldScreen': { RoomWorldScreen: 'Room' }, '../room/RoomMessage': { RoomMessage: 'Message', roomMessageStyles: { text: {} } }, '../ui/SeoullyText': { SeoullyText: 'Text' }, '../ui/SeoullyCompanion': { SeoullyCompanion: 'Companion' }, '../ui/motion': { useMotionPreference: () => reduced }, '../theme': { colors: { canvas: 'pink' } }, '../data': { useSocialRepository: () => ({ capabilities: { persistRoom: true } }) }, '../api': { updateNativeOnboarding: async () => { requests++; if (fail) throw Error('offline'); return completionRequest ? completionRequest() : confirmation ?? { step: 'done' }; } }, '../room/roomStyle': { DEFAULT_ROOM_STYLE: {}, resolveRoomLook: x => x }, '../room/theme': { roomOverlayChrome: () => ({ color: 'ink', border: 'line' }) }, './roomArrival': { nextArrivalMessage: current => current === 'home' ? 'edit' : current === 'edit' ? 'profile' : current },
+    '../ui/SeoullyMessageScreen': {SeoullyMessageScreen:'ErrorScreen'}, '../ui/SeoullyControls':{SeoullyButton:'Retry'}, '../ui/HeartFarewell': { HeartFarewell: 'Heart' }, '../room/RoomWorldScreen': { RoomWorldScreen: 'Room' }, '../room/RoomMessage': { RoomMessage: 'Message', roomMessageStyles: { text: {} } }, '../ui/SeoullyText': { SeoullyText: 'Text' }, '../ui/SeoullyCompanion': { SeoullyCompanion: 'Companion' }, '../ui/motion': { useMotionPreference: () => reduced }, '../theme': { colors: { canvas: 'pink' } }, '../data': { useSocialRepository: () => ({ capabilities: { persistRoom: true } }) }, '../api': { updateNativeOnboarding: async () => { requests++; if (fail) throw Error('offline'); return completionRequest ? completionRequest() : confirmation ?? { step: 'done' }; } }, '../room/roomStyle': { DEFAULT_ROOM_STYLE: {}, resolveRoomLook: x => x }, '../room/theme': { roomOverlayChrome: () => ({ color: 'ink', border: 'line' }) }, './roomArrival': { nextArrivalMessage: current => current === 'home' ? 'edit' : current === 'edit' ? 'profile' : current },
   }, timerGlobals);
-  return { copy, allowCompletion:()=>{fail=false}, resolveCompletion: () => resolveCompletion?.({step:"done"}), render() { index = 0; effects = []; const tree = api.default({ holdingId: 'card', photocard, playArrival, copy, onContinue: () => { profile++; onContinue?.(); }, onHome() { profile++; onHome?.(); } }); effects.forEach(fn => fn()); return tree; }, fade() { const a = animations.at(-1); assert.equal(a.config.duration, reduced ? 0 : 600); a.finish(); }, tick() { assert.equal(timers.size, 1); [...timers.values()][0](); }, background() { appListener('background'); }, foreground() { appListener('active'); }, blur() { focusedCleanup(); }, cleanup() { slots.forEach(s => s?.cleanup?.()); }, get timers() { return timers.size; }, get profile() { return profile; }, get requests() { return requests; } };
+  return { copy, allowCompletion:()=>{fail=false}, resolveCompletion: () => resolveCompletion?.({step:"done"}), render() { index = 0; effects = []; const tree = api.default({ holdingId: 'card', photocard, initialStage, onPresentationStage: presentationWrite ?? (()=>({then(fn){fn();return{catch(){}}}})), copy, onContinue: () => { profile++; onContinue?.(); }, onHome() { profile++; onHome?.(); } }); effects.forEach(fn => fn()); return tree; }, fade() { const a = animations.at(-1); assert.equal(a.config.duration, reduced ? 0 : 600); a.finish(); }, tick() { assert.equal(timers.size, 1); [...timers.values()][0](); }, background() { appListener('background'); }, foreground() { appListener('active'); }, blur() { focusedCleanup(); }, cleanup() { slots.forEach(s => s?.cleanup?.()); }, get timers() { return timers.size; }, get profile() { return profile; }, get requests() { return requests; } };
 }
 function room(tree) { return tree.props.children[0]; }
 function descendants(node) { if (!node || typeof node !== 'object') return []; return [node, ...[node.props?.children].flat(Infinity).flatMap(descendants)]; }
@@ -72,20 +73,20 @@ async function arrive(h, photocard = true) {
 test('heart waits for actual world; fade precedes Binder; one companion and no full-screen input blocker', async () => {
   const h = intro(); const first = h.render(); assert.equal(first.props.children[2].props.ready, false); assert.equal(h.requests, 0);
   const tree = await arrive(h); assert.equal(tree.props.children.filter(x => x?.type === 'Companion').length, 1); assert.equal(tree.props.children.some(x => x?.type === 'Heart'), false);
-  assert.equal(room(tree).props.suppressAmbientGuidance, true); assert.equal(tree.type, 'View'); assert.equal(h.requests, 1); h.cleanup();
+  assert.equal(room(tree).props.suppressAmbientGuidance, true); assert.equal(tree.type, 'View'); assert.equal(h.requests, 0); h.cleanup();
 });
 test('messages run visible 5s → 5s → persistent Profile; action never repeats Holding creation', async () => {
   const h = intro(); let tree = await arrive(h); assert.ok(descendants(room(tree).props.roomGuidance).some(x => x.props.children === 'Home ♡'));
   h.tick(); tree = h.render(); assert.ok(descendants(room(tree).props.roomGuidance).some(x => x.props.children === 'Edit'));
-  h.tick(); tree = h.render(); assert.equal(h.timers, 0); const action = descendants(room(tree).props.roomGuidance).find(x => x.type === 'Pressable' && x.props.onPress?.name === 'requestDiscover'); action.props.onPress(); h.render(); assert.equal(h.profile, 1); assert.equal(h.requests, 1); h.cleanup();
+  h.tick(); tree = h.render(); assert.equal(h.timers, 0); const action = descendants(room(tree).props.roomGuidance).find(x => x.type === 'Pressable' && x.props.onPress?.name === 'requestDiscover'); action.props.onPress(); h.render(); await new Promise(setImmediate); h.render(); assert.equal(h.profile, 1); assert.equal(h.requests, 1); h.cleanup();
 });
 test('dismissal cancels future messages; background and navigation clean timers', async () => {
   const h = intro(); let tree = await arrive(h); h.background(); h.render(); assert.equal(h.timers, 0); h.foreground(); h.render(); assert.equal(h.timers, 1);
   descendants(room(tree).props.roomGuidance).find(x => x.props.accessibilityLabel === 'Close').props.onPress(); tree = h.render(); assert.equal(h.timers, 0); assert.equal(room(tree).props.roomGuidance, null); h.cleanup();
   const other = intro(); await arrive(other); other.blur(); other.render(); assert.equal(other.timers, 0); other.cleanup();
 });
-test('non-photocard waits for real placement and does not open unrelated Binder', async () => { const h = intro({ photocard: false }); const tree = await arrive(h, false); assert.equal(room(tree).props.initialHoldingId, undefined); assert.equal(h.requests, 1); assert.equal(h.timers, 1); h.cleanup(); });
-test('failed completion stays retryable and cannot enable Profile success', async () => { const h = intro({ fail: true }); const tree = await arrive(h); assert.ok(descendants(room(tree).props.roomGuidance).some(x => x.props.accessibilityRole === 'alert')); h.tick(); h.render(); h.tick(); const final = h.render(); const action = descendants(room(final).props.roomGuidance).find(x => x.props.onPress?.name === 'requestDiscover'); action.props.onPress(); h.render(); assert.equal(h.profile, 0); h.cleanup(); });
+test('non-photocard waits for real placement and does not open unrelated Binder', async () => { const h = intro({ photocard: false }); const tree = await arrive(h, false); assert.equal(room(tree).props.initialHoldingId, undefined); assert.equal(h.requests, 0); assert.equal(h.timers, 1); h.cleanup(); });
+test('failed completion stays retryable and cannot enable Profile success', async () => { const h = intro({ fail: true }); await arrive(h); assert.equal(h.requests,0); h.tick(); h.render(); h.tick(); const final = h.render(); const action = descendants(room(final).props.roomGuidance).find(x => x.props.onPress?.name === 'requestDiscover'); action.props.onPress(); h.render(); assert.equal(h.profile, 0); h.cleanup(); });
 test('reduced motion uses direct fade and same messages; interrupted arrival does not replay heart', async () => { const h = intro({ reduced: true }); await arrive(h); h.cleanup(); assert.equal(h.timers, 0); const resumed = intro({ playArrival: false }); assert.equal(resumed.render().props.children.some(x => x?.type === 'Heart'), false); resumed.cleanup(); });
 test('EN/KO includes archetype introduction and all three Room welcome messages', () => { const { copy } = load('apps/mobile/src/i18n.ts', {}); for (const lang of ['en', 'ko']) for (const key of ['onboardingArchetypeTitle', 'onboardingArchetypeLead', 'onboardingArchetypeGreeting', 'roomArrivalHome', 'roomArrivalEdit', 'roomArrivalFinish', 'roomArrivalProfile']) assert.ok(copy(lang)[key]); assert.notEqual(copy('en').onboardingArchetypeGreeting, copy('ko').onboardingArchetypeGreeting); });
 test('actual render readiness waits one drawn frame and observes existing Binder/camera settling only once', () => {
@@ -136,12 +137,12 @@ test('Binder one-shot is not consumed by Edit mode or a rejected command; delaye
   scope.viewRef.current.kind='home'; effect(); assert.equal(calls,1); assert.equal(ref.current,undefined);
   accepted=true; effect(); assert.equal(ref.current,'card'); effect(); assert.equal(calls,2);
 });
-test('photocard arrival defers automatic fresh-Room Edit mode; normal Room entry retains it', () => {
+test('hydration never enters automatic Edit mode; manual Edit remains available', () => {
   const file=fs.readFileSync('apps/mobile/src/room/RoomWorldScreen.tsx','utf8'), ast=ts.createSourceFile('room.tsx',file,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);let fn;
   function walk(node){if(ts.isFunctionDeclaration(node)&&node.name?.text==='applyLoadedLayout')fn=node;ts.forEachChild(node,walk)}walk(ast);
   const views=[];const scope={onboardingTrace(){},clearPendingPress(){},clearHeldVisual(){},touchOwnerRef:{},activeTouchesRef:{},gestureRef:{current:{}},setSelectedObjectId(){},setSelectedId(){},demo:false,layoutStateRef:{},latestObjects:{},setRoomLayout(){},viewRef:{current:{kind:'home'}},deferFirstRoomEdit:true,shouldAutoEnterFirstRoomEdit:()=>true,firstEntryRef:{},showHelper(){},editBaseline:{},objectBaseline:{},cloneRenderables:x=>x,cloneRoomObjects:x=>x,undoStack:{},redoStack:{},setCanUndo(){},setCanRedo(){},setView:v=>views.push(v)};
   const apply=vm.runInNewContext(ts.transpileModule(`(${fn.getText(ast)})`,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,scope);
-  apply({objects:[]},false,[]);assert.equal(views.length,0);scope.deferFirstRoomEdit=false;apply({objects:[]},false,[]);assert.equal(views[0].kind,'edit');
+  apply({objects:[]},false,[]);assert.equal(views.length,0);apply({objects:[]},false,[]);assert.equal(views.length,0);assert.match(file,/deferFirstRoomEdit = true/);assert.match(file,/onEdit=\{beginEditing\}/);
 });
 test('manually opened Binder acknowledges delayed loaded card membership without a second entrance', () => {
   const file=fs.readFileSync('apps/mobile/src/room/RoomWorldScreen.tsx','utf8'),start=file.indexOf('  const initialBinderOpened'),end=file.indexOf('  function clearPendingPress',start);let effect,opens=0,confirmed=0;
@@ -150,7 +151,7 @@ test('manually opened Binder acknowledges delayed loaded card membership without
 });
 test('failed completion then retry preserves the first Profile tap and navigates only after authoritative done',async()=>{
  const h=intro({fail:true});await arrive(h);h.tick();h.render();h.tick();let tree=h.render();
- const button=descendants(room(tree).props.roomGuidance).find(x=>x.props.onPress?.name==='requestDiscover');button.props.onPress();await new Promise(setImmediate);tree=h.render();assert.equal(h.profile,0);
+ const button=descendants(room(tree).props.roomGuidance).find(x=>x.props.onPress?.name==='requestDiscover');button.props.onPress();h.render();await new Promise(setImmediate);tree=h.render();assert.equal(h.profile,0);
  assert.ok(descendants(room(tree).props.roomGuidance).some(x=>x.props.accessibilityRole==='alert'));
  h.allowCompletion();const retry=descendants(room(tree).props.roomGuidance).find(x=>x.type==='Pressable'&&x.props.children?.props.children===h.copy.retry);assert.ok(retry);retry.props.onPress();await new Promise(setImmediate);h.render();h.render();assert.equal(h.profile,1);h.cleanup();
 });

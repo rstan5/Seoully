@@ -1,5 +1,6 @@
 import "server-only";
 
+import { catalogReferenceImageMap } from "./catalog-reference-images";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { publicProfileAvatars, getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/profile";
@@ -18,7 +19,7 @@ const allowedMime = new Set(["image/jpeg", "image/png", "image/webp", "video/mp4
 export interface SocialProfileSummary { userId: string; handle: string; displayName: string; }
 export interface SocialMediaDTO { id: string; mediaType: "image" | "video"; mimeType: string; url: string; byteSize: number; sortOrder: number; }
 export interface SocialUserTag { userId: string; handle: string; displayName: string; }
-export interface SocialCollectibleTag { templateId: string; name: string; kind: string; }
+export interface SocialCollectibleTag { templateId: string; name: string; kind: string; imageUrl?: string; }
 export interface SocialCommentDTO { id: string; postId: string; author: SocialProfileSummary; body: string; createdAt: string; }
 export interface SocialPostDTO {
   id: string;
@@ -86,7 +87,8 @@ async function hydratePosts(rows: Row[], actorId: string, supabase: Awaited<Retu
   if (taggedProfilesResult.error || templatesResult.error) throw new Error("social_read_failed");
   const profiles = new Map((profilesResult.data ?? []).map((row) => [String(row.user_id), profileSummary(row)]));
   const taggedProfiles = new Map((taggedProfilesResult.data ?? []).map((row) => [String(row.user_id), profileSummary(row)]));
-  const templates = new Map((templatesResult.data ?? []).map((row) => [String(row.id), { templateId: String(row.id), name: String(row.name), kind: String(row.kind) }]));
+  const tagImages = await catalogReferenceImageMap(templateIds, supabase);
+  const templates = new Map((templatesResult.data ?? []).map((row) => [String(row.id), { templateId: String(row.id), name: String(row.name), kind: String(row.kind), imageUrl: tagImages.get(String(row.id)) }]));
   const mediaByPost = new Map<string, SocialMediaDTO[]>();
   for (const row of mediaResult.data ?? []) {
     const list = mediaByPost.get(String(row.post_id)) ?? [];
@@ -287,27 +289,39 @@ export async function listPostComments(postId: unknown, input?: unknown, client?
   return { items, nextCursor: hasMore && visible.length ? encodeCursor(String(visible.at(-1)!.created_at), String(visible.at(-1)!.id)) : null };
 }
 
-export async function createPost(input: { file: File; caption?: unknown; location?: unknown; taggedUserIds?: unknown; taggedTemplateIds?: unknown }, client?: SupabaseClient): Promise<SocialPostDTO> {
+export async function createPost(input: { file?: File; caption?: unknown; location?: unknown; taggedUserIds?: unknown; taggedTemplateIds?: unknown }, client?: SupabaseClient): Promise<SocialPostDTO> {
+  const stage = (value: string) => { if (typeof process !== "undefined" && process.env.NODE_ENV !== "production") console.info("seoully_post_publish", { stage: value }); };
+  stage("validation");
   const caption = z.string().trim().max(2_000).optional().parse(input.caption); const location = z.string().trim().max(160).optional().parse(input.location);
   const taggedUserIds = [...new Set(z.array(uuid).max(10).default([]).parse(input.taggedUserIds))]; const taggedTemplateIds = [...new Set(z.array(uuid).max(10).default([]).parse(input.taggedTemplateIds))];
-  const file = input.file; if (!(file instanceof File) || !allowedMime.has(file.type) || file.size <= 0 || file.size > MAX_MEDIA_BYTES) throw new Error("invalid_media");
-  if (!(await matchesMediaSignature(file))) throw new Error("invalid_media");
+  const file = input.file; if (file && (!(file instanceof File) || !allowedMime.has(file.type) || file.size <= 0 || file.size > MAX_MEDIA_BYTES)) throw new Error("invalid_media");
+  if (file && !(await matchesMediaSignature(file))) throw new Error("invalid_media");
+  if (!file && !caption && !taggedUserIds.length && !taggedTemplateIds.length) throw new Error("invalid_post_content");
+  stage("authentication");
   const { identity, supabase } = await actorClient(client);
   if (taggedUserIds.length) { const { data, error } = await supabase.from("profiles").select("user_id").in("user_id", taggedUserIds); if (error || (data ?? []).length !== taggedUserIds.length) throw new Error("invalid_user_tag"); }
   if (taggedTemplateIds.length) { const { data, error } = await supabase.from("collectible_templates").select("id").in("id", taggedTemplateIds).neq("status", "restricted"); if (error || (data ?? []).length !== taggedTemplateIds.length) throw new Error("invalid_collectible_tag"); }
+  stage("database_insert");
   const { data: post, error: postError } = await supabase.from("posts").insert({ author_user_id: identity.user.id, caption: caption || null, location_text: location || null, visibility: "public" }).select("id").single();
   if (postError || !post) throw new Error("post_create_failed");
   const postId = String(post.id); const path = identity.user.id + "/" + postId + "/0";
   try {
+    if (file) {
+    stage("media_upload");
     const upload = await supabase.storage.from("post-media").upload(path, file, { contentType: file.type, upsert: false });
     if (upload.error) throw new Error("post_media_upload_failed");
+    stage("media_record");
     const { error: mediaError } = await supabase.from("post_media").insert({ post_id: postId, owner_user_id: identity.user.id, storage_bucket: "post-media", storage_path: path, media_type: file.type.startsWith("video/") ? "video" : "image", mime_type: file.type, byte_size: file.size, sort_order: 0 });
     if (mediaError) throw new Error("post_media_record_failed");
+    }
+    stage("tag_write");
     if (taggedUserIds.length) { const { error } = await supabase.from("post_user_tags").insert(taggedUserIds.map((tagged_user_id) => ({ post_id: postId, tagged_user_id }))); if (error) throw new Error("post_user_tag_failed"); }
     if (taggedTemplateIds.length) { const { error } = await supabase.from("post_collectible_tags").insert(taggedTemplateIds.map((template_id) => ({ post_id: postId, template_id }))); if (error) throw new Error("post_collectible_tag_failed"); }
-    const page = await listPosts([identity.user.id], { limit: 1 }, client); const created = page.items.find((item) => item.id === postId); if (!created) throw new Error("post_read_failed"); return created;
+    stage("confirmation_read");
+    const created = await getProductionPost(postId, client); if (!created) throw new Error("post_read_failed"); return created;
   } catch (error) {
-    await supabase.storage.from("post-media").remove([path]);
+    stage("rollback");
+    if (file) await supabase.storage.from("post-media").remove([path]);
     await supabase.from("posts").delete().eq("id", postId).eq("author_user_id", identity.user.id);
     throw error;
   }

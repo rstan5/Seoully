@@ -1,3 +1,4 @@
+import { postFailureCodes, postTrace } from "./postPublish";
 import { onboardingTrace } from "./startup/onboardingTrace";
 import type { ProfileThemeChoice } from "seoully-domain/types";
 import { fetch as expoFetch } from "expo/fetch";
@@ -36,6 +37,7 @@ export async function resolveNativeIdentity<T>(): Promise<T | null> {
 }
 
 export type NativeCatalogTemplate = {
+  needsReferenceImage?: boolean;
   id: string;
   groupId: string;
   memberId: string | null;
@@ -98,7 +100,8 @@ export async function searchRooms(query: string): Promise<NativeRoomDiscovery[]>
 }
 
 export async function searchCatalog(query: string): Promise<NativeCatalogTemplate[]> {
-  const response = await fetch(`${productApiBase()}/api/catalog/search?q=${encodeURIComponent(query)}&limit=24`);
+  const token = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/catalog/search?q=${encodeURIComponent(query)}&limit=24`, { headers: { Authorization: `Bearer ${token}` } });
   if (!response.ok) throw new Error("catalog_unavailable");
   const payload = await response.json() as { results?: NativeCatalogTemplate[] };
   return payload.results ?? [];
@@ -277,12 +280,16 @@ export async function contributeCatalogItem(input: { submissionKey: string; name
   const accessToken = data.session?.access_token;
   if (!accessToken) throw new Error("unauthenticated");
   const response = await fetch(`${productApiBase()}/api/mobile/catalog/contributions`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify(input) });
-  if (!response.ok) throw new Error("catalog_contribution_failed");
-  return response.json() as Promise<{ contribution: { template: NativeCatalogTemplate } }>;
+  if (!response.ok) {
+    const failure = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(failure?.error === "catalog_identity_ambiguous" ? "catalog_identity_ambiguous" : "catalog_contribution_failed");
+  }
+  return response.json() as Promise<{ contribution: { template: NativeCatalogTemplate; created: boolean } }>;
 }
 
 export type NativeSocialAuthor = { userId: string; displayName: string; handle: string };
 export type NativeCollectibleTag = {
+  imageUrl?: string;
   templateId: string;
   name: string;
   kind: string;
@@ -358,20 +365,27 @@ export async function addPostComment(postId: string, body: string): Promise<Nati
   return payload.comment;
 }
 
-export async function createNativePost(uri: string, caption: string, mimeType = "image/jpeg", tags: { taggedUserIds: string[]; taggedTemplateIds: string[] } = { taggedUserIds: [], taggedTemplateIds: [] }) {
+export async function createNativePost(uri: string | null, caption: string, mimeType = "image/jpeg", tags: { taggedUserIds: string[]; taggedTemplateIds: string[] } = { taggedUserIds: [], taggedTemplateIds: [] }) {
+  void mimeType; // Actual file MIME is validated by the shared Expo multipart path.
+  postTrace("prepare");
   const accessToken = await mobileAccessToken();
-  const body = new FormData();
-  body.append("caption", caption);
-  body.append("taggedUserIds", JSON.stringify(tags.taggedUserIds));
-  body.append("taggedTemplateIds", JSON.stringify(tags.taggedTemplateIds));
-  body.append("file", { uri, name: "seoully-post.jpg", type: mimeType } as unknown as Blob);
-  const response = await fetch(`${productApiBase()}/api/mobile/posts`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}` },
-    body,
-  });
-  if (!response.ok) throw new Error("post_create_failed");
-  return response.json() as Promise<{ post: NativeFeedPost }>;
+  const fields = { caption, taggedUserIds: JSON.stringify([...new Set(tags.taggedUserIds)]), taggedTemplateIds: JSON.stringify([...new Set(tags.taggedTemplateIds)]) };
+  let body: FormData;
+  try { body = uri ? await photoMultipart(fields, uri, 50 * 1024 * 1024) : new FormData(); }
+  catch (error) { const code = error instanceof Error && postFailureCodes.has(error.message) ? error.message : "invalid_media"; postTrace("prepare_failed", 0, code); throw new Error(`post_publish:000:${code}`); }
+  if (!uri) for (const [key, value] of Object.entries(fields)) body.append(key, value);
+  postTrace("request");
+  let response: Response;
+  try { response = await expoFetch(`${productApiBase()}/api/mobile/posts`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body }); }
+  catch { postTrace("transport", 0, "network_failure"); throw new Error("post_publish:000:network_failure"); }
+  const payload = await response.json().catch(() => null) as { post?: NativeFeedPost; error?: string } | null;
+  if (!response.ok || !payload?.post?.id) {
+    const code = payload?.error && postFailureCodes.has(payload.error) ? payload.error : "post_create_failed";
+    postTrace("response", response.status, code);
+    throw new Error(`post_publish:${response.status}:${code}`);
+  }
+  postTrace("confirmed", response.status);
+  return { post: payload.post };
 }
 
 export type NativeIdentity = {
@@ -972,7 +986,7 @@ export async function readPhotocardCollectorCounts(templateIds: string[]): Promi
 export async function loadCatalogTemplate(templateId: string): Promise<NativeCatalogTemplate> {
   const token = await mobileAccessToken();
   const response = await fetch(`${productApiBase()}/api/mobile/catalog/${encodeURIComponent(templateId)}`, { headers: { Authorization: `Bearer ${token}` } });
-  if (!response.ok) throw new Error("catalog_unavailable");
+  if (!response.ok) throw new Error(response.status === 404 ? "catalog_not_found" : "catalog_unavailable");
   return (await response.json() as { template: NativeCatalogTemplate }).template;
 }
 

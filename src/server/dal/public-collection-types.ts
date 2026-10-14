@@ -1,4 +1,5 @@
 export type PublicCatalogTemplate = {
+  imageUrl?: string;
   id: string;
   groupId: string;
   memberId: string | null;

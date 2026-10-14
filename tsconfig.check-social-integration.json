@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "incremental": false },
-  "include": ["src/server/dal/social.ts", "src/server/dal/profile.ts", "src/app/api/mobile/posts/**/*.ts", "src/server/dal/wishlist.ts", "src/app/api/mobile/wishlist/route.ts", "src/app/api/mobile/catalog/[templateId]/**/*.ts"],
+  "include": ["src/app/api/catalog/search/route.ts", "src/server/dal/public-collection.ts", "src/server/dal/social.ts", "src/server/dal/profile.ts", "src/app/api/mobile/posts/**/*.ts", "src/server/dal/wishlist.ts", "src/app/api/mobile/wishlist/route.ts", "src/app/api/mobile/catalog/[templateId]/**/*.ts"],
   "exclude": ["node_modules", "apps/mobile"]
 }

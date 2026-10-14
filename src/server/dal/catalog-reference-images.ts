@@ -44,16 +44,13 @@ export async function createCatalogReferenceImage(input: {
     .limit(1)
     .maybeSingle();
   if (contributionError) throw new Error("catalog_reference_authorization_failed");
-  if (!contribution) throw new Error("catalog_reference_not_authorized");
+  if (!contribution) {
+    const owned = await supabase.from("holdings").select("id").eq("owner_user_id", identity.user.id).eq("template_id", templateId).limit(1).maybeSingle();
+    if (owned.error || !owned.data) throw new Error("catalog_reference_not_authorized");
+  }
 
-  const { data: existing } = await supabase
-    .from("catalog_reference_images")
-    .select("id,template_id,contributed_by_user_id,source_type,status,mime_type,byte_size,storage_bucket,storage_path,created_at")
-    .eq("collectible_template_id", templateId)
-    .eq("contributed_by_user_id", identity.user.id)
-    .eq("source_key", sourceKey)
-    .maybeSingle();
-  if (existing) return signReference(supabase, existing);
+  const { data: existing } = await ownReferenceRetry(supabase, templateId, identity.user.id, sourceKey);
+  if (existing) return signReference(supabase, existing as Record<string, unknown>);
 
   const id = crypto.randomUUID();
   const path = `${identity.user.id}/${templateId}/${id}`;
@@ -78,10 +75,8 @@ export async function createCatalogReferenceImage(input: {
   if (error || !row) {
     await supabase.storage.from("catalog-reference-images").remove([path]);
     if (error?.code === "23505") {
-      const retry = await supabase.from("catalog_reference_images")
-        .select("id,template_id:collectible_template_id,contributed_by_user_id,source_type,status,mime_type,byte_size,storage_bucket,storage_path,created_at")
-        .eq("collectible_template_id", templateId).eq("contributed_by_user_id", identity.user.id).eq("source_key", sourceKey).maybeSingle();
-      if (retry.data) return signReference(supabase, retry.data);
+      const retry = await ownReferenceRetry(supabase, templateId, identity.user.id, sourceKey);
+      if (retry.data) return signReference(supabase, retry.data as Record<string, unknown>);
     }
     throw new Error("catalog_reference_record_failed");
   }
@@ -96,10 +91,13 @@ export async function listActiveCatalogReferenceImages(templateIds: string[], cl
     .select("id,template_id:collectible_template_id,contributed_by_user_id,source_type,status,mime_type,byte_size,storage_bucket,storage_path,created_at")
     .in("collectible_template_id", ids)
     .eq("status", "active")
+    .eq("storage_bucket", "catalog-reference-images")
     .order("created_at", { ascending: false })
     .limit(150);
   if (error) throw new Error("catalog_reference_read_failed");
-  return Promise.all((data ?? []).map((row) => signReference(supabase, row)));
+  // A missing legacy object must not take existing ownership/detail reads down with it.
+  const signed = await Promise.all((data ?? []).map(row => signReference(supabase, row).catch(() => null)));
+  return signed.filter((image): image is CatalogReferenceImageDTO => image !== null);
 }
 
 async function validateImage(file: File) {
@@ -132,3 +130,25 @@ async function signReference(supabase: Awaited<ReturnType<typeof createSupabaseS
 }
 
 export { MAX_BYTES as CATALOG_REFERENCE_MAX_BYTES };
+
+/** One batched reference-media path for catalog, tags and shelves; never reads personal media. */
+export async function catalogReferenceImageMap(templateIds: string[], client: SupabaseClient): Promise<Map<string, string>> {
+  if (!templateIds.length) return new Map();
+  // Catalog titles remain public; reference Storage keeps its existing authenticated boundary.
+  if (!(await client.auth.getUser()).data.user) return new Map();
+  const ids = [...new Set(templateIds)];
+  const batches: string[][] = [];
+  for (let offset = 0; offset < ids.length; offset += 50) batches.push(ids.slice(offset, offset + 50));
+  const images = (await Promise.all(batches.map(batch => listActiveCatalogReferenceImages(batch, client)))).flat();
+  const result = new Map<string, string>();
+  for (const image of images) if (!result.has(image.templateId)) result.set(image.templateId, image.url);
+  return result;
+}
+
+async function ownReferenceRetry(client: SupabaseClient, templateId: string, contributorId: string, sourceKey: string) {
+  const result = await client.rpc("own_catalog_reference_retry", { p_template_id: templateId, p_source_key: sourceKey }).maybeSingle();
+  if (!["42883", "PGRST202"].includes(result.error?.code ?? "")) return result;
+  // Pre-rollout compatibility only; post-rollout source keys are not client-readable.
+  return client.from("catalog_reference_images").select("id,template_id:collectible_template_id,contributed_by_user_id,source_type,status,mime_type,byte_size,storage_bucket,storage_path,created_at")
+    .eq("collectible_template_id", templateId).eq("contributed_by_user_id", contributorId).eq("source_key", sourceKey).maybeSingle();
+}

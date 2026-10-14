@@ -20,6 +20,7 @@ export function CollectibleDetailMetadata({ template }: { template: NativeCatalo
     <SeoullyText variant="caption" color={colors.plum} style={styles.kind}>{collectibleKindLabel(template.kind, copy)}</SeoullyText>
     <SeoullyText variant="title">{template.name}</SeoullyText>
     <PhotocardCollectorCount templateId={template.id} kind={template.kind} />
+    {template.needsReferenceImage ? <SeoullyText variant="caption">{copy.catalogNeedsMedia}</SeoullyText> : null}
     <SeoullyText variant="secondary" style={styles.meta}>{[template.groupName, template.memberName, template.releaseName].filter(Boolean).join(" · ")}</SeoullyText>
     {template.descriptor ? <SeoullyText variant="body" style={styles.description}>{template.descriptor}</SeoullyText> : null}
   </>;

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { catalogReferenceImageMap } from "./catalog-reference-images";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/profile";
@@ -39,6 +40,8 @@ export interface CatalogTemplateDTO {
   memberName: string | null;
   releaseName: string | null;
   createdAt: string;
+  imageUrl?: string;
+  needsReferenceImage?: boolean;
 }
 
 export interface CatalogContributionDTO {
@@ -60,9 +63,16 @@ export async function searchSharedCatalog(input: unknown): Promise<CatalogTempla
     const normalized = parsed.query.replace(/[%(),]/g, " ").trim();
     if (normalized) query = query.ilike("search_text", `%${normalized}%`);
   }
-  const { data, error } = await query;
-  if (error) throw new Error("catalog_search_failed");
-  return hydrateCatalogTemplates(data ?? [], supabase);
+  let result = await query.eq("publication_state", "published");
+  if (result.error?.code === "42703" || result.error?.code === "PGRST204") {
+    // Before the approved migration, preserve legacy reads and label missing imagery honestly.
+    let legacy = supabase.from("collectible_templates").select("id,group_id,member_id,release_id,kind,name,descriptor,status,created_at").neq("status", "restricted").order("created_at", { ascending: false }).range(parsed.offset, parsed.offset + parsed.limit - 1);
+    const needle = parsed.query.replace(/[%(),]/g, " ").trim();
+    if (needle) legacy = legacy.ilike("search_text", `%${needle}%`);
+    result = await legacy;
+  }
+  if (result.error) throw new Error("catalog_search_failed");
+  return hydrateCatalogTemplates(result.data ?? [], supabase);
 }
 
 export async function getSharedCatalogTemplate(templateId: string): Promise<CatalogTemplateDTO | null> {
@@ -87,6 +97,7 @@ export async function createSharedCatalogContribution(input: unknown, client?: S
   const { data, error } = await supabase.rpc("create_catalog_contribution", { p_payload: payload });
   if (error) {
     if (error.code === "42501") throw new Error("unauthenticated");
+    if (error.message.includes("catalog_identity_ambiguous")) throw new Error("catalog_identity_ambiguous");
     throw new Error("catalog_contribution_failed");
   }
   const result = data as { template?: Record<string, unknown>; contributor_user_id?: string; created?: boolean } | null;
@@ -107,11 +118,14 @@ async function hydrateCatalogTemplates(rows: Array<Record<string, unknown>>, sup
     releaseIds.length ? supabase.from("catalog_releases").select("id,title").in("id", releaseIds) : Promise.resolve({ data: [], error: null }),
   ]);
   if (groups.error || members.error || releases.error) throw new Error("catalog_search_failed");
+  const references = await catalogReferenceImageMap(rows.map(row => String(row.id)), supabase);
   const groupMap = new Map((groups.data ?? []).map((row) => [row.id, row.name]));
   const memberMap = new Map((members.data ?? []).map((row) => [row.id, row.stage_name]));
   const releaseMap = new Map((releases.data ?? []).map((row) => [row.id, row.title]));
   return rows.map((row) => ({
     id: String(row.id),
+    imageUrl: references.get(String(row.id)),
+    needsReferenceImage: !references.has(String(row.id)),
     groupId: String(row.group_id),
     memberId: typeof row.member_id === "string" ? row.member_id : null,
     releaseId: typeof row.release_id === "string" ? row.release_id : null,

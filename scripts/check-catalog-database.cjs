@@ -28,6 +28,26 @@ async function main(){
     const migrations=fs.readdirSync('supabase/migrations').filter(f=>f.endsWith('.sql')).sort();
     for(const file of migrations){
       const body=fs.readFileSync(path.join('supabase/migrations',file),'utf8');
+      if(file==='20261011000000_catalog_image_publication.sql'){
+        const trial=sql(`begin;
+          insert into auth.users(id,raw_user_meta_data) values('a8110000-0000-4000-8000-000000000090','{"handle":"history_media","display_name":"History"}');
+          insert into public.catalog_groups(id,slug,name) values('b8110000-0000-4000-8000-000000000090','history-media','History');
+          insert into public.collectible_templates(id,group_id,kind,name,normalized_name,identity_key) values
+           ('c8110000-0000-4000-8000-000000000090','b8110000-0000-4000-8000-000000000090','photocard','Legacy','legacy','history-media-one'),
+           ('c8110000-0000-4000-8000-000000000091','b8110000-0000-4000-8000-000000000090','photocard','Pictured','pictured','history-media-two');
+          insert into public.holdings(owner_user_id,template_id) select user_id,'c8110000-0000-4000-8000-000000000090' from public.profiles where handle='history_media';
+          insert into storage.objects(bucket_id,name) values('catalog-reference-images','historical-shared-reference');
+          insert into public.catalog_reference_images(collectible_template_id,storage_path,contributed_by_user_id,mime_type,byte_size) select 'c8110000-0000-4000-8000-000000000091','historical-shared-reference',user_id,'image/jpeg',100 from public.profiles where handle='history_media';
+          create temporary table original_templates as select id,to_jsonb(t) snapshot from public.collectible_templates t;
+          create temporary table original_holdings as select id,to_jsonb(h) snapshot from public.holdings h;
+          ${body}
+          select (select bool_and(to_jsonb(t)-'publication_state'=o.snapshot) from public.collectible_templates t join original_templates o using(id)) and
+           (select bool_and(to_jsonb(h)=o.snapshot) from public.holdings h join original_holdings o using(id)) and
+           (select publication_state='needs-media' from public.collectible_templates where id='c8110000-0000-4000-8000-000000000090') and
+           (select publication_state='published' from public.collectible_templates where id='c8110000-0000-4000-8000-000000000091');
+          rollback;`);
+        assert.equal(trial.split('\n').at(-1),'t','legacy template and Holding rows preserved exactly; image publication classified');
+      }
       if(file==='20261005000000_catalog_contribution_idempotency.sql'){
         // A historical contribution exists BEFORE the new migration. Roll this
         // fixture trial back, then apply the same migration cleanly below.
@@ -84,7 +104,7 @@ async function main(){
     }
     sql('create extension pgtap');
     let tapCount=0;
-    for(const file of ['room_persistence.test.sql','catalog_idempotency.test.sql','first_home.test.sql','user_profile_rls.test.sql','profile_appearance.test.sql','profile_identity.test.sql','profile_room_sync_default.test.sql','photocard_collector_counts.test.sql','profile_post_reposts.test.sql']){
+    for(const file of ['room_persistence.test.sql','catalog_idempotency.test.sql','first_home.test.sql','user_profile_rls.test.sql','profile_appearance.test.sql','profile_identity.test.sql','profile_room_sync_default.test.sql','photocard_collector_counts.test.sql','profile_post_reposts.test.sql','catalog_image_publication.test.sql']){
       const result=sql(fs.readFileSync(path.join('supabase/tests',file),'utf8'));
       const lines=result.split('\n');const failures=lines.filter(l=>/^not ok |^# Looks like/.test(l));
       assert.deepEqual(failures,[],`${file} pgTAP failures`);

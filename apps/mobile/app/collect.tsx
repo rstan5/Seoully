@@ -102,10 +102,10 @@ export default function CollectScreen() {
         releaseName: releaseName.trim() || undefined,
         kind,
         ...(versionName.trim() ? { descriptor: versionName.trim() } : {}),
-      }, fromOnboarding ? async (accepted) => { await queueFirstCollectible(accepted.contribution.template.id, true, accepted.contribution.template); } : undefined);
-      await openPhoto(result.contribution.template, { newTemplate: "true" });
-    } catch {
-      setMessage(copy.collectibleCreateFailed);
+      }, fromOnboarding ? async (accepted) => { await queueFirstCollectible(accepted.contribution.template.id, accepted.contribution.created, accepted.contribution.template); } : undefined);
+      await openPhoto(result.contribution.template, { newTemplate: String(result.contribution.created) });
+    } catch (error) {
+      setMessage(error instanceof Error && error.message === "catalog_identity_ambiguous" ? copy.catalogIdentityAmbiguous : copy.collectibleCreateFailed);
     } finally {
       submitting.current = false;
       setWorking(false);
@@ -182,6 +182,7 @@ export default function CollectScreen() {
                 onChangeText={setName}
                 placeholder={copy.catalogNamePlaceholder}
               />
+              <SeoullyButton label={copy.reviewCatalogMatches} variant="ghost" onPress={() => { setQuery([groupName, memberName, releaseName].filter(Boolean).join(" ") || name); setStep("search"); }} />
               <SeoullyText variant="caption" style={styles.kindLabel}>{copy.catalogKind}</SeoullyText>
               <View style={styles.kinds}>
                 {COLLECTIBLE_KINDS.map((item) => (

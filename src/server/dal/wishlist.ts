@@ -1,4 +1,5 @@
 import "server-only";
+import { catalogReferenceImageMap } from "./catalog-reference-images";
 
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -137,6 +138,7 @@ async function hydrateWishlist(rows: Array<Record<string, unknown>>, supabase: A
     releaseIds.length ? supabase.from("catalog_releases").select("id,title").in("id", releaseIds) : Promise.resolve({ data: [], error: null }),
   ]);
   if (groups.error || members.error || releases.error) throw new Error("wishlist_read_failed");
+  const images = await catalogReferenceImageMap(templateIds, supabase);
   const groupMap = new Map((groups.data ?? []).map((row) => [row.id, row.name]));
   const memberMap = new Map((members.data ?? []).map((row) => [row.id, row.stage_name]));
   const releaseMap = new Map((releases.data ?? []).map((row) => [row.id, row.title]));
@@ -145,6 +147,7 @@ async function hydrateWishlist(rows: Array<Record<string, unknown>>, supabase: A
     const template = templateMap.get(String(row.template_id));
     if (!template) return [];
     const mapped: CatalogTemplateDTO = {
+      imageUrl: images.get(String(template.id)), needsReferenceImage: !images.has(String(template.id)),
       id: String(template.id), groupId: String(template.group_id),
       memberId: typeof template.member_id === "string" ? template.member_id : null,
       releaseId: typeof template.release_id === "string" ? template.release_id : null,

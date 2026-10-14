@@ -1,4 +1,5 @@
 import "server-only";
+import { catalogReferenceImageMap } from "./catalog-reference-images";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCollectionPairSnapshot, type PairHolding } from "@/server/dal/collection-graph-pair";
@@ -37,11 +38,13 @@ async function loadTemplatesByIds(ids: string[], supabase: SupabaseClient) {
     releaseIds.length ? supabase.from("catalog_releases").select("id,title").in("id", releaseIds) : Promise.resolve({ data: [], error: null }),
   ]);
   if (groups.error || members.error || releases.error) throw new Error("catalog_search_failed");
+  const images = await catalogReferenceImageMap(ids, supabase);
   const groupMap = new Map((groups.data ?? []).map((row) => [row.id, row.name]));
   const memberMap = new Map((members.data ?? []).map((row) => [row.id, row.stage_name]));
   const releaseMap = new Map((releases.data ?? []).map((row) => [row.id, row.title]));
   return new Map(rows.map((row) => {
     const template: PublicCatalogTemplate = {
+      imageUrl: images.get(String(row.id)),
       id: String(row.id),
       groupId: String(row.group_id),
       memberId: typeof row.member_id === "string" ? row.member_id : null,

@@ -107,7 +107,7 @@ test('returning from Room refreshes saved style without using default or another
 test('native authenticated transport sends appearance and reads confirmed preference again (mock HTTP)',async()=>{
  let appearance={mode:'default'};const requests=[];
  const fetch=async(url,options)=>{requests.push({url,options});if(options.method==='PATCH')appearance=JSON.parse(options.body).appearance;return {ok:true,json:async()=>({identity:{user:{id:'self'},profile:{appearance}}})};};
- const api=loader({'expo/fetch':{},'./media/photoUpload':{},'./supabase':{supabase:{auth:{getSession:async()=>({data:{session:{access_token:'fixture-token'}}})}}}}, {fetch,process:{env:{EXPO_PUBLIC_API_URL:'http://fixture.local:3000'}}})('apps/mobile/src/api.ts');
+ const api=loader({'expo/fetch':{},'./postPublish':{postTrace(){},postFailureCodes:new Set()},'./media/photoUpload':{},'./supabase':{supabase:{auth:{getSession:async()=>({data:{session:{access_token:'fixture-token'}}})}}}}, {fetch,process:{env:{EXPO_PUBLIC_API_URL:'http://fixture.local:3000'}}})('apps/mobile/src/api.ts');
  const original=(await api.resolveNativeIdentity()).profile.appearance;
  const choice={mode:'custom',background:'charcoal',primary:'mint',secondary:'rose'};
  assert.deepEqual(clean((await api.updateNativeProfile({appearance:choice})).identity.profile.appearance),choice);

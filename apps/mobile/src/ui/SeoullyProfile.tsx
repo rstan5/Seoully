@@ -121,7 +121,7 @@ export function SeoullyOwnedRow({
   onToggleTrade,
   onRemove,
 }: {
-  template?: { id: string; kind: string };
+  template?: { id: string; kind: string; imageUrl?: string };
   title: string;
   meta?: string;
   imageUrl?: string;
@@ -224,7 +224,7 @@ export function SeoullyShelfRow({
   action,
   onPress,
 }: {
-  template?: { id: string; kind: string };
+  template?: { id: string; kind: string; imageUrl?: string };
   title: string;
   meta?: string;
   imageUrl?: string;
@@ -235,7 +235,7 @@ export function SeoullyShelfRow({
   const accent = useProfileAccent();
   const body = (
     <>
-      <SeoullyObjectTile colorway={colorway} imageUrl={imageUrl} height={52} />
+      <SeoullyObjectTile colorway={colorway} imageUrl={imageUrl ?? template?.imageUrl} height={52} />
       <View style={styles.rowCopy}>
         <SeoullyText variant="handle" numberOfLines={1}>{title}</SeoullyText>
         {meta ? <SeoullyText variant="caption" numberOfLines={1}>{meta}</SeoullyText> : null}

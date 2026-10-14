@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { Image, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { postFailureMessage } from "../../src/postPublish";
 import { createNativePost } from "../../src/api";
 import { useSocialRepository } from "../../src/data";
 import { KeyboardScreen } from "../../src/components/KeyboardScreen";
@@ -42,6 +44,8 @@ export default function CreateScreen() {
         for (const [key, setter] of [["collectibleTags", setCollectibleTags], ["collectorTags", setCollectorTags]] as const) {
           if (Array.isArray(draft[key])) setter((draft[key] as PostTag[]).filter(item => typeof item?.id === "string" && typeof item?.name === "string").slice(0, 10));
         }
+        setPostUri(typeof draft.postUri === "string" ? draft.postUri : null);
+        setPostMimeType(typeof draft.postMimeType === "string" ? draft.postMimeType : "image/jpeg");
         setCaption(typeof draft.caption === "string" ? draft.caption.slice(0, 2_000) : "");
       } catch {
         void AsyncStorage.removeItem(CREATE_DRAFT_KEY);
@@ -53,10 +57,10 @@ export default function CreateScreen() {
   useEffect(() => {
     if (!draftRestored) return;
     const task = setTimeout(() => {
-      void AsyncStorage.setItem(CREATE_DRAFT_KEY, JSON.stringify({ mode, caption, collectibleTags, collectorTags }));
+      void AsyncStorage.setItem(CREATE_DRAFT_KEY, JSON.stringify({ mode, caption, collectibleTags, collectorTags, postUri, postMimeType }));
     }, 250);
     return () => clearTimeout(task);
-  }, [caption, collectibleTags, collectorTags, draftRestored, mode]);
+  }, [caption, collectibleTags, collectorTags, draftRestored, mode, postMimeType, postUri]);
 
   async function choosePostPhoto(source: "camera" | "library") {
     setMessage(null);
@@ -67,14 +71,19 @@ export default function CreateScreen() {
       : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.9, exif: false });
     const asset = result.canceled ? null : result.assets[0];
     if (asset) {
-      setPostUri(asset.uri);
-      setPostMimeType(asset.mimeType ?? "image/jpeg");
+      try {
+        // Native libraries may return HEIC; the existing post Storage contract accepts JPEG/PNG/WebP.
+        const prepared = !asset.mimeType || !["image/jpeg", "image/png", "image/webp"].includes(asset.mimeType)
+          ? await ImageManipulator.manipulateAsync(asset.uri, [], { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }) : asset;
+        setPostUri(prepared.uri);
+        setPostMimeType(prepared === asset ? asset.mimeType ?? "image/jpeg" : "image/jpeg");
+      } catch { setMessage(copy.postMediaFailed); }
     }
   }
 
   async function publishPost() {
     if (social.kind === "demo") return setMessage(copy.demoWriteBlocked);
-    if (!postUri) return setMessage(copy.postPhotoRequired);
+    if (!postUri && !caption.trim() && !collectibleTags.length && !collectorTags.length) return setMessage(copy.postContentRequired);
     setWorking(true);
     setMessage(null);
     try {
@@ -84,8 +93,8 @@ export default function CreateScreen() {
       setPostUri(null);
       setCollectibleTags([]); setCollectorTags([]);
       router.replace("/(tabs)");
-    } catch {
-      setMessage(copy.postCreateFailed);
+    } catch (error) {
+      setMessage(postFailureMessage(error, copy));
     } finally {
       setWorking(false);
     }

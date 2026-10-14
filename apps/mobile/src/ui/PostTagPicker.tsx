@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Image, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeCatalogTemplate, NativeSearchUser } from "../api";
 import { useSocialRepository } from "../data";
 import { useCopy } from "../locale";
 import { colors } from "../theme";
+import { PhotocardCollectorCount } from "./PhotocardCollectorCount";
 import { SeoullyAvatar } from "./SeoullyAvatar";
 import { SeoullyButton } from "./SeoullyControls";
 import { SeoullyText } from "./SeoullyText";
 
-export type PostTag = { id: string; name: string; subtitle?: string; avatarUrl?: string };
+export type PostTag = { id: string; name: string; subtitle?: string; avatarUrl?: string; imageUrl?: string; kind?: string };
 export function PostTagPicker({ kind, selected, onSelect, onClose }: { kind: "collectible" | "collector"; selected: PostTag[]; onSelect: (item: PostTag) => void; onClose: () => void }) {
   const copy = useCopy();
   const social = useSocialRepository();
@@ -23,7 +24,7 @@ export function PostTagPicker({ kind, selected, onSelect, onClose }: { kind: "co
     let active = true;
     const task = setTimeout(() => {
       setPending(true); setFailed(false);
-      const request = kind === "collectible" ? social.searchCatalog(query).then(results => results.map((item: NativeCatalogTemplate) => ({ id: item.id, name: item.name, subtitle: [item.groupName, item.memberName, item.releaseName].filter(Boolean).join(" · ") }))) :
+      const request = kind === "collectible" ? social.searchCatalog(query).then(results => [...new Map(results.filter(item => ["photocard","album","vinyl","poster","lightstick","plushie","figure","book","apparel","memorabilia"].includes(item.kind)).map(item => [item.id, item])).values()].map((item: NativeCatalogTemplate) => ({ id: item.id, name: item.name, imageUrl: item.imageUrl, kind: item.kind, subtitle: [item.groupName, item.memberName, item.releaseName, item.descriptor].filter(Boolean).join(" · ") }))) :
         social.searchCollectors(query).then(results => results.map((item: NativeSearchUser) => ({ id: item.userId, name: item.displayName, subtitle: item.handle, avatarUrl: item.avatarUrl })));
       void request.then(results => { if (active) setItems(results); }).catch(() => { if (active) { setItems([]); setFailed(true); } }).finally(() => { if (active) setPending(false); });
     }, 180);
@@ -39,8 +40,9 @@ export function PostTagPicker({ kind, selected, onSelect, onClose }: { kind: "co
         {pending ? <SeoullyText variant="secondary">{copy.profileCatalogSearching}</SeoullyText> : null}
         {failed ? <SeoullyButton label={copy.retry} variant="ghost" onPress={() => setRetry(value => value + 1)} /> : !pending && !available.length ? <SeoullyText variant="secondary">{copy.postTagEmpty}</SeoullyText> : null}
         {available.map(item => <Pressable key={item.id} accessibilityRole="button" disabled={selected.length >= 10} onPress={() => onSelect(item)} style={styles.result}>
+          {kind === "collectible" && item.imageUrl ? <Image accessibilityLabel={item.name} source={{ uri: item.imageUrl }} resizeMode="contain" style={{ width: 44, height: 64, borderRadius: 5 }} /> : null}
           {kind === "collector" ? <SeoullyAvatar name={item.name} imageUrl={item.avatarUrl} /> : null}
-          <View style={styles.copy}><SeoullyText variant="handle">{item.name}</SeoullyText>{item.subtitle ? <SeoullyText variant="secondary">{item.subtitle}</SeoullyText> : null}</View>
+          <View style={styles.copy}><SeoullyText variant="handle">{item.name}</SeoullyText>{item.subtitle ? <SeoullyText variant="secondary">{item.subtitle}</SeoullyText> : null}{kind === "collectible" ? <>{!item.imageUrl ? <SeoullyText variant="caption">{copy.catalogNeedsMedia}</SeoullyText> : null}<PhotocardCollectorCount templateId={item.id} kind={item.kind ?? ""} /></> : null}</View>
         </Pressable>)}
       </ScrollView>
     </View>

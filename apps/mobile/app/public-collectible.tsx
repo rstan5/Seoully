@@ -60,9 +60,15 @@ export default function PublicCollectibleScreen() {
         const result = await loadCollectorRoom(userId);
         const placement = result.room?.placements.find(item => item.id === placementId);
         if (!placement) throw new Error("placement_unavailable");
-        const catalog = await loadCatalogTemplate(placement.holding.templateId);
+        const catalog = await loadCatalogTemplate(placement.holding.templateId).catch(error => {
+          if (!(error instanceof Error) || error.message !== "catalog_not_found") throw error;
+          // A public copy may be visible before its catalog draft is published.
+          // Reuse only the already-authorized Room projection; never query private Holdings.
+          const publicTemplate = placement.holding.template;
+          return { ...publicTemplate, id: placement.holding.templateId, kind: String(publicTemplate.kind ?? ""), name: String(publicTemplate.name ?? ""), groupId: String(publicTemplate.groupId ?? ""), groupName: String(publicTemplate.groupName ?? ""), descriptor: String(publicTemplate.descriptor ?? ""), status: String(publicTemplate.status ?? ""), memberId: null, releaseId: null, needsReferenceImage: true } as NativeCatalogTemplate;
+        });
         setTemplate(catalog);
-        setImageUrl(placement.holding.personalMediaUrl ?? catalog.imageUrl);
+        setImageUrl(catalog.imageUrl ?? placement.holding.personalMediaUrl);
         setTradeStatus(placement.holding.tradeStatus === "for-trade" ? "for-trade" : "not-for-trade");
       } else if (holdingId && userId) {
         const item = await loadPublicCollectorHolding(userId, holdingId);
@@ -158,15 +164,8 @@ export default function PublicCollectibleScreen() {
             <View style={styles.stack}>
               <SeoullyButton label={wanted ? copy.unsaveWishlist : copy.saveToWishlist} disabled={busy || wanted === null} block onPress={() => { void saveWanted(); }} />
               <SeoullyButton label={copy.findCollectors} variant="ghost" block onPress={() => { void findOwners(); }} />
-              {userId ? <SeoullyButton label={copy.canonicalCollectible} variant="ghost" block onPress={() => router.push({ pathname: "/public-collectible", params: { templateId: template.id } })} /> : null}
               <SeoullyButton label={copy.addYourCopy} variant="ghost" block onPress={addCopy} />
               {userId ? <SeoullyButton label={tradeStatus === "for-trade" ? copy.inquireTrade : copy.messageCollector} variant="ghost" block onPress={() => router.push({ pathname: "/thread", params: { userId, templateIds: template.id, ...(tradeStatus === "for-trade" ? { trade: "1" } : {}) } })} /> : null}
-              {userId ? <SeoullyButton
-                label={copy.profile}
-                variant="ghost"
-                block
-                onPress={() => router.push({ pathname: "/collector", params: { userId } })}
-              /> : null}
             </View>
             {owners.map(owner => <SeoullyButton key={owner.userId} label={`${owner.displayName} · ${owner.handle}`} variant="ghost" onPress={() => router.push({ pathname: "/collector", params: { userId: owner.userId } })} />)}
             {notice === copy.wishlistUnavailable ? <RetryNotice message={notice} retryLabel={copy.retry} onRetry={refresh} /> : null}

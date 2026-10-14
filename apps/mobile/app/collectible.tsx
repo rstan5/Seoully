@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import { Image, ScrollView, StyleSheet, View } from "react-native";
-import { loadMyHolding, uploadHoldingPhoto, type NativeHolding } from "../src/api";
+import { loadMyHolding, uploadCatalogReferencePhoto, uploadHoldingPhoto, type NativeHolding } from "../src/api";
 import { useSocialRepository } from "../src/data";
 import { useReportAskSurface } from "../src/ask-surface";
 import { isBinderEligible, isRoomEligible } from "../src/data/ownership";
@@ -29,6 +29,7 @@ export default function CollectibleDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [photoTarget, setPhotoTarget] = useState<"personal" | "reference">("personal");
   const [cropAsset, setCropAsset] = useState<{ uri: string; width: number; height: number } | null>(null);
   const mediaUri = useCachedSignedMedia(holding?.id, holding?.personalMediaUrl);
   const social = useSocialRepository();
@@ -62,8 +63,9 @@ export default function CollectibleDetailScreen() {
     return () => clearTimeout(task);
   }, [refresh]);
 
-  async function choosePhoto(source: "camera" | "library") {
+  async function choosePhoto(source: "camera" | "library", target: "personal" | "reference" = "personal") {
     if (!holding || busy) return;
+    setPhotoTarget(target);
     setError(null);
     const permission = source === "camera" ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) { setError(copy.photoAccessRequired); return; }
@@ -76,7 +78,7 @@ export default function CollectibleDetailScreen() {
       setCropAsset({ uri: asset.uri, width: asset.width, height: asset.height });
       return;
     }
-    await savePhoto(asset.uri);
+    await savePhoto(asset.uri, target);
   }
 
   async function useCrop(crop: CropRect) {
@@ -90,12 +92,13 @@ export default function CollectibleDetailScreen() {
     }
   }
 
-  async function savePhoto(uri: string) {
+  async function savePhoto(uri: string, target = photoTarget) {
     if (social.kind === "demo") { setError(copy.demoWriteBlocked); return; }
     if (!holding) return;
     setBusy(true);
     try {
-      await uploadHoldingPhoto(holding.id, uri);
+      if (target === "reference") await uploadCatalogReferencePhoto(holding.templateId, uri);
+      else await uploadHoldingPhoto(holding.id, uri);
       setHolding(await loadMyHolding(holding.id));
       setError(null);
     } catch {
@@ -162,6 +165,8 @@ export default function CollectibleDetailScreen() {
               </SeoullyText>
             </View>
             <View style={styles.stack}>
+              <SeoullyText variant="caption">{copy.sharedReferenceConsent}</SeoullyText>
+              <SeoullyButton label={copy.shareReferencePhoto} variant="ghost" disabled={busy} block onPress={() => { void choosePhoto("library", "reference"); }} />
               <SeoullyButton
                 label={holding.tradeStatus === "for-trade" ? copy.keepInCollection : copy.markForTrade}
                 disabled={busy}

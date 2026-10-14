@@ -91,13 +91,19 @@ export function SeoullyCollectiblePreview({
   name,
   kind,
   colorway,
+  imageUrl,
+  imageUnavailableLabel,
 }: {
   templateId?: string;
+  imageUrl?: string;
+  imageUnavailableLabel?: string;
   name: string;
   kind: string;
   colorway?: { base: string; accent: string; ink: string };
 }) {
   const router = useRouter();
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+  const showImage = Boolean(imageUrl && imageUrl !== failedUri);
   const ink = useProfileInk();
   const identity = useProfileIdentity();
   const surface = identity
@@ -106,10 +112,11 @@ export function SeoullyCollectiblePreview({
   const kindColor = identity?.mute ?? colors.muted;
   return (
     <Pressable accessibilityRole={templateId ? "button" : undefined} accessibilityLabel={name} disabled={!templateId} onPress={() => templateId && router.push({ pathname: "/public-collectible", params: { templateId, name } })} style={[styles.collectible, surface]}>
-      <View style={[styles.collectibleSwatch, colorway ? { backgroundColor: colorway.base, borderColor: colorway.accent } : null]} />
+      {showImage ? <Image source={{ uri: imageUrl }} onError={() => setFailedUri(imageUrl ?? null)} resizeMode="contain" style={styles.collectibleSwatch} /> : <View style={[styles.collectibleSwatch, colorway ? { backgroundColor: colorway.base, borderColor: colorway.accent } : null]} />}
       <View style={styles.collectibleCopy}>
         <SeoullyText variant="caption" color={ink} numberOfLines={1}>{name}</SeoullyText>
         <SeoullyText variant="metadata" color={kindColor} numberOfLines={1}>{kind}</SeoullyText>
+        {!showImage && imageUnavailableLabel ? <SeoullyText variant="metadata">{imageUnavailableLabel}</SeoullyText> : null}
         {templateId ? <PhotocardCollectorCount templateId={templateId} kind={kind} /> : null}
       </View>
     </Pressable>
@@ -233,7 +240,7 @@ export function SeoullyPost({
       {item.taggedCollectibles && item.taggedCollectibles.length > 0 ? (
         <View style={styles.collectibles}>
           {item.taggedCollectibles.map((tag) => (
-            <SeoullyCollectiblePreview key={tag.templateId} templateId={tag.templateId} name={tag.name} kind={tag.kind} colorway={tag.colorway} />
+            <SeoullyCollectiblePreview key={tag.templateId} templateId={tag.templateId} name={tag.name} kind={tag.kind} colorway={tag.colorway} imageUrl={tag.imageUrl} imageUnavailableLabel={copy.catalogNeedsMedia} />
           ))}
         </View>
       ) : null}

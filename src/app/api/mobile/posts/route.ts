@@ -13,8 +13,8 @@ export async function POST(request: Request) {
       file,
       caption: form.get("caption") ?? undefined,
       location: form.get("location") ?? undefined,
-      taggedUserIds: [],
-      taggedTemplateIds: [],
+      taggedUserIds: JSON.parse(String(form.get("taggedUserIds") ?? "[]")),
+      taggedTemplateIds: JSON.parse(String(form.get("taggedTemplateIds") ?? "[]")),
     }, client);
     return NextResponse.json({ post }, { status: 201 });
   } catch (error) {

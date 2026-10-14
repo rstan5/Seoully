@@ -14,7 +14,7 @@ export type SocialCapabilities = {
 /** Live production: only claim capabilities that have a real contract today. */
 export const LIVE_CAPABILITIES: SocialCapabilities = {
   discoverFeed: true,
-  persistRepost: false,
+  persistRepost: true,
   persistSave: false,
   deliverShare: true,
   persistMessages: true,

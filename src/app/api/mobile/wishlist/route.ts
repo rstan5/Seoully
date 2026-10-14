@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addToMyWishlist, listMyWishlist, removeFromMyWishlist } from "@/server/dal/wishlist";
+import { myWishlistMembership, addToMyWishlist, listMyWishlist, removeFromMyWishlist } from "@/server/dal/wishlist";
 import { createSupabaseBearerClient } from "@/server/supabase/bearer";
 
 export async function GET(request: Request) {
@@ -7,6 +7,8 @@ export async function GET(request: Request) {
   if (!client) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   try {
     const url = new URL(request.url);
+    const templateId = url.searchParams.get("templateId");
+    if (templateId) return NextResponse.json({ wanted: await myWishlistMembership(templateId, client) }, { headers: { "Cache-Control": "no-store" } });
     const entries = await listMyWishlist({
       limit: Number(url.searchParams.get("limit") ?? "100"),
       offset: Number(url.searchParams.get("offset") ?? "0"),

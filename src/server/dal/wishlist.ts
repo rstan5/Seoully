@@ -158,3 +158,13 @@ async function hydrateWishlist(rows: Array<Record<string, unknown>>, supabase: A
     return [{ id: String(row.id), ownerUserId: String(row.owner_user_id), templateId: String(row.template_id), createdAt: String(row.created_at), updatedAt: String(row.updated_at), template: mapped }];
   });
 }
+
+/** Bounded owner-only membership lookup; no wishlist contents leave this endpoint. */
+export async function myWishlistMembership(templateId: unknown, client: SupabaseClient): Promise<boolean> {
+  const id = z.string().uuid().parse(templateId);
+  const identity = await getCurrentIdentityFromClient(client);
+  if (!identity) throw new Error("unauthenticated");
+  const result = await client.from("wishlist_entries").select("id").eq("owner_user_id", identity.user.id).eq("template_id", id).maybeSingle();
+  if (result.error) throw new Error("wishlist_read_failed");
+  return Boolean(result.data);
+}

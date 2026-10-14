@@ -70,6 +70,7 @@ export function AuthRouteTree() {
         <Stack.Screen name="collector-room" options={{ contentStyle: immersiveRoomFill(ROOM_THEMES.hearth.void), gestureEnabled: false, fullScreenGestureEnabled: false }} />
         <Stack.Screen name="edit-profile" />
         <Stack.Screen name="public-collectible" />
+        <Stack.Screen name="post" />
         <Stack.Screen name="room" options={{ contentStyle: immersiveRoomFill(ROOM_THEMES.hearth.void), gestureEnabled: false, fullScreenGestureEnabled: false }} />
         <Stack.Screen name="thread" />
       </Stack.Protected>

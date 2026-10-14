@@ -1,0 +1,43 @@
+begin;
+select no_plan();
+insert into auth.users(id,raw_user_meta_data) values
+ ('a8100000-0000-4000-8000-000000000001','{"handle":"repost_a","display_name":"A"}'),
+ ('a8100000-0000-4000-8000-000000000002','{"handle":"repost_b","display_name":"B"}');
+insert into public.posts(id,author_user_id,caption) select 'b8100000-0000-4000-8000-000000000001',user_id,'Original' from public.profiles where handle='repost_a';
+select ok((select relrowsecurity from pg_class where oid='public.post_reposts'::regclass),'repost RLS enabled');
+select ok(not has_table_privilege('anon','public.post_reposts','select'),'no anonymous repost access');
+select ok(not has_table_privilege('authenticated','public.post_reposts','update'),'no rewrite grant');
+select ok(not has_function_privilege('anon','public.profile_post_timeline(uuid,integer,timestamptz,uuid)','execute'),'no anonymous timeline');
+select ok(not (select prosecdef from pg_proc where oid='public.profile_post_timeline(uuid,integer,timestamptz,uuid)'::regprocedure),'timeline respects invoker RLS');
+set local role authenticated;
+select set_config('request.jwt.claim.sub','a8100000-0000-4000-8000-000000000002',true);
+insert into public.post_reposts(reposter_user_id,post_id) values(public.current_seoully_user_id(),'b8100000-0000-4000-8000-000000000001') on conflict do nothing;
+insert into public.post_reposts(reposter_user_id,post_id) values(public.current_seoully_user_id(),'b8100000-0000-4000-8000-000000000001') on conflict do nothing;
+select is((select count(*)::int from public.post_reposts),1,'retry creates one relationship');
+select is((select count(*)::int from public.posts),1,'no new Discover/Following post row');
+select is((select count(*)::int from public.profile_post_timeline(public.current_seoully_user_id())),1,'reposter profile includes original');
+select ok((select reposted from public.profile_post_timeline(public.current_seoully_user_id())),'attribution is explicit');
+select throws_ok($$insert into public.post_reposts(reposter_user_id,post_id) select user_id,'b8100000-0000-4000-8000-000000000001' from public.profiles where handle='repost_a'$$,'42501',null,'cannot impersonate reposter');
+select set_config('request.jwt.claim.sub','a8100000-0000-4000-8000-000000000001',true);
+select throws_ok($$insert into public.post_reposts(reposter_user_id,post_id) values(public.current_seoully_user_id(),'b8100000-0000-4000-8000-000000000001')$$,'42501',null,'cannot repost self');
+delete from public.post_reposts;
+select is((select count(*)::int from public.post_reposts),1,'cannot undo another collector repost');
+select set_config('request.jwt.claim.sub','a8100000-0000-4000-8000-000000000002',true);
+delete from public.post_reposts where reposter_user_id=public.current_seoully_user_id();
+select is((select count(*)::int from public.post_reposts),0,'own undo works');
+insert into public.post_reposts(reposter_user_id,post_id) values(public.current_seoully_user_id(),'b8100000-0000-4000-8000-000000000001');
+reset role;
+-- A future visibility/moderation policy must restrict reposts too, never bypass RLS.
+create policy test_hidden_original on public.posts as restrictive for select to authenticated using (author_user_id = public.current_seoully_user_id());
+set local role authenticated;
+select is((select count(*)::int from public.profile_post_timeline(public.current_seoully_user_id())),0,'inaccessible original omitted by invoker RLS');
+select is((select count(*)::int from public.post_reposts),0,'inaccessible original has no public repost reference');
+reset role;
+drop policy test_hidden_original on public.posts;
+delete from public.posts where id='b8100000-0000-4000-8000-000000000001';
+set local role authenticated;
+select is((select count(*)::int from public.profile_post_timeline(public.current_seoully_user_id())),0,'deleted original never cached/exposed');
+select is((select count(*)::int from public.post_reposts),0,'original removal cascades');
+reset role;
+select * from finish();
+rollback;

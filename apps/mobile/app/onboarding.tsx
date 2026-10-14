@@ -291,7 +291,7 @@ export default function OnboardingScreen() {
             holdingId={holding?.id}
             photocard={holding ? isBinderEligible(holding) : false}
             copy={t}
-            onContinue={() => finish("discover")}
+            onContinue={() => finish("profile")}
             onHome={() => finish("profile")}
           />
         </Suspense>

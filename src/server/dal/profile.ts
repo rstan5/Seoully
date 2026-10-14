@@ -202,3 +202,20 @@ function mapIdentity(
     profile: mappedProfile,
   };
 }
+
+/** Search avatars are restricted by the same selected-avatar Storage policy. */
+export async function publicProfileAvatars(userIds: string[], client: SupabaseClient): Promise<Map<string, string>> {
+  if (!userIds.length) return new Map();
+  const result = await client.from("profiles").select("user_id,avatar_id").in("user_id", userIds.slice(0, 25));
+  if (["42703", "PGRST204"].includes(result.error?.code ?? "")) return new Map();
+  if (result.error) throw new Error("social_search_failed");
+  const rows = (result.data ?? []).filter(row => typeof row.avatar_id === "string" && z.string().uuid().safeParse(row.avatar_id).success);
+  if (!rows.length) return new Map();
+  const signed = await client.storage.from("profile-avatars").createSignedUrls(rows.map(row => `${row.user_id}/${row.avatar_id}.jpg`), 900);
+  if (signed.error) return new Map();
+  const byPath = new Map((signed.data ?? []).flatMap(item => item.path && item.signedUrl ? [[item.path, item.signedUrl] as [string, string]] : []));
+  return new Map(rows.flatMap(row => {
+    const url = byPath.get(`${row.user_id}/${row.avatar_id}.jpg`);
+    return url ? [[String(row.user_id), url] as [string, string]] : [];
+  }));
+}

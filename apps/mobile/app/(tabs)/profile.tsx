@@ -349,6 +349,7 @@ export default function ProfileScreen() {
                 item={post}
                 copy={copy}
                 locale={locale}
+                onRemoveRepost={() => setPosts(current => current.filter(item => item.id !== post.id))}
                 onChange={(next) => setPosts((current) => current.map((item) => item.id === next.id ? next : item))}
               />
             ))}
@@ -368,7 +369,7 @@ const styles = StyleSheet.create({
   actions: { alignItems: "stretch", flexDirection: "row", gap: 8, marginTop: 14 },
   enter: { marginTop: 10 },
   inlineNotice: { marginTop: 10 },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 16, paddingTop: 14 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingTop: 14 },
   highlights: { gap: 10, paddingHorizontal: 16, paddingTop: 16 },
   notice: { paddingHorizontal: 16, paddingTop: 12 },
   underlayHint: { paddingHorizontal: 16, paddingTop: 8 },

@@ -6,6 +6,7 @@ import { colors } from "../theme";
 import { SeoullyText } from "./SeoullyText";
 import { companionPlacement, chrome } from "./shellLayout";
 import { useMotionPreference } from "./motion";
+import { dialogueArcHeight } from "./dialogueArc";
 import { heartMotion } from "./heartMotion";
 import { advanceHeartScene, dialogueMotionTiming, dialogueReadingMs, heartSceneTiming, type HeartSceneState } from "./heartScene";
 
@@ -35,7 +36,7 @@ function HeartScene({ text, ready, onContinue, reduced, destination = "corner" }
 
   const motionTiming = destination === "next" ? dialogueMotionTiming : heartSceneTiming;
   const readingMs = destination === "next" ? dialogueReadingMs(chars.length) : heartSceneTiming.reading;
-  const arcHeight = Math.min(150, Math.max(110, height * 0.17), Math.max(0, originY - insets.top - 16));
+  const arcHeight = dialogueArcHeight(height, insets.top, insets.bottom, originY, heartSize);
   // A quadratic arc uses the same native progress value for both axes.
   const arcY = useMemo(() => destination === "next" ? Animated.multiply(Animated.multiply(journey, journey), -arcHeight) : 0, [arcHeight, destination, journey]);
   const arriving = destination === "next" && scene.stage === "enter";

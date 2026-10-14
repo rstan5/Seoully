@@ -275,7 +275,7 @@ const overlaps07 = buildRoomRenderables([holding07, twin07], [
   { ...placement07, id: "p08", holdingId: twin07.id, transform: saved07 },
 ]);
 assert.deepEqual(overlaps07[0].position, overlaps07[1].position, "intentional overlap remains authoritative");
-assertContains(worldScreen, 'if (!desk) return;', "no Binder entry without Desk");
+assertContains(worldScreen, 'if (!desk) return false;', "no Binder entry without Desk");
 
 // Repair 08 extends the physical builder and privacy checks.
 import "./check-room-repair08";

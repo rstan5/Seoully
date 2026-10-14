@@ -35,6 +35,7 @@
     "check:onboarding-identity": "node --test scripts/check-onboarding-identity-refinement.cjs",
     "check:mobile-messages": "node --test scripts/check-message-screen.cjs",
     "check:add-paper-recovery": "node scripts/check-add-paper-recovery.cjs",
+    "check:social-integration": "tsc --project tsconfig.check-social-integration.json && node --test scripts/check-social-integration.cjs",
     "check:photocard-collectors": "node scripts/check-photocard-collector-count.cjs"
   },
   "dependencies": {

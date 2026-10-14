@@ -1,4 +1,4 @@
-import { PhotocardCollectorCount } from "../src/ui/PhotocardCollectorCount";
+import { CollectibleDetailMetadata } from "../src/ui/CollectibleDetailIdentity";
 import { useCallback, useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -10,7 +10,7 @@ import { useReportAskSurface } from "../src/ask-surface";
 import { isBinderEligible, isRoomEligible } from "../src/data/ownership";
 import { RetryNotice } from "../src/components/RetryNotice";
 import { ScreenBack } from "../src/components/ScreenBack";
-import { collectibleKindLabel } from "../src/i18n";
+
 import { useCopy, useLocale } from "../src/locale";
 import { useCachedSignedMedia } from "../src/media/cachedMedia";
 import { PhotocardCropper, type CropRect } from "../src/media/PhotocardCropper";
@@ -152,15 +152,7 @@ export default function CollectibleDetailScreen() {
               </View>
             )}
             {photoWarning === "1" ? <SeoullyText variant="secondary" color={colors.plum} style={styles.kind}>{copy.holdingAddedPhotoFailed}</SeoullyText> : null}
-            <SeoullyText variant="caption" color={colors.plum} style={styles.kind}>
-              {collectibleKindLabel(holding.template.kind, copy)}
-            </SeoullyText>
-            <SeoullyText variant="title">{holding.template.name}</SeoullyText>
-            <PhotocardCollectorCount templateId={holding.templateId} kind={holding.template.kind} />
-            <SeoullyText variant="secondary" style={styles.meta}>
-              {[holding.template.groupName, holding.template.memberName, holding.template.releaseName].filter(Boolean).join(" · ")}
-            </SeoullyText>
-            {holding.template.descriptor ? <SeoullyText variant="body" style={styles.descriptor}>{holding.template.descriptor}</SeoullyText> : null}
+            <CollectibleDetailMetadata template={holding.template} />
             <View style={styles.statusRow}>
               <SeoullyText variant="handle" color={colors.plum}>
                 {holding.tradeStatus === "for-trade" ? copy.forTrade : copy.notForTrade}

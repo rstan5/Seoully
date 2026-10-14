@@ -28,7 +28,7 @@ export default function CollectorRoomScreen() {
       copy={copy}
       onLeave={() => { if (router.canGoBack()) router.back(); else router.replace("/(tabs)/search"); }}
       onOwnRoom={() => router.replace("/room")}
-      onInspectCollectible={(holdingId) => router.push({ pathname: "/public-collectible", params: { userId, holdingId } })}
+      onInspectCollectible={(holdingId) => router.push({ pathname: "/public-collectible", params: social.kind === "demo" ? { userId, holdingId } : { userId, placementId: holdingId } })}
       onWishlistCollectible={(holding) => social.setWishlist(holding.templateId, true)}
       onMessageCollectible={(holding) => {
         if (!social.capabilities.persistMessages) return;

@@ -11,6 +11,7 @@ import { colors } from "../../src/theme";
 import { SeoullyButton, SeoullyChoiceChip } from "../../src/ui/SeoullyControls";
 import { SeoullyHeader } from "../../src/ui/SeoullyHeader";
 import { SeoullyScreen } from "../../src/ui/SeoullyScreen";
+import { PostTagPicker, type PostTag } from "../../src/ui/PostTagPicker";
 import { SeoullyText } from "../../src/ui/SeoullyText";
 
 const CREATE_DRAFT_KEY = "seoully.mobile.create-draft.v1";
@@ -24,6 +25,9 @@ export default function CreateScreen() {
   const [caption, setCaption] = useState("");
   const [postUri, setPostUri] = useState<string | null>(null);
   const [postMimeType, setPostMimeType] = useState("image/jpeg");
+  const [tagPicker, setTagPicker] = useState<"collectible" | "collector" | null>(null);
+  const [collectibleTags, setCollectibleTags] = useState<PostTag[]>([]);
+  const [collectorTags, setCollectorTags] = useState<PostTag[]>([]);
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [draftRestored, setDraftRestored] = useState(false);
@@ -35,6 +39,9 @@ export default function CreateScreen() {
       try {
         const draft = JSON.parse(stored) as Record<string, unknown>;
         if (draft.mode === "post" || draft.mode === "collectible") setMode(draft.mode);
+        for (const [key, setter] of [["collectibleTags", setCollectibleTags], ["collectorTags", setCollectorTags]] as const) {
+          if (Array.isArray(draft[key])) setter((draft[key] as PostTag[]).filter(item => typeof item?.id === "string" && typeof item?.name === "string").slice(0, 10));
+        }
         setCaption(typeof draft.caption === "string" ? draft.caption.slice(0, 2_000) : "");
       } catch {
         void AsyncStorage.removeItem(CREATE_DRAFT_KEY);
@@ -46,10 +53,10 @@ export default function CreateScreen() {
   useEffect(() => {
     if (!draftRestored) return;
     const task = setTimeout(() => {
-      void AsyncStorage.setItem(CREATE_DRAFT_KEY, JSON.stringify({ mode, caption }));
+      void AsyncStorage.setItem(CREATE_DRAFT_KEY, JSON.stringify({ mode, caption, collectibleTags, collectorTags }));
     }, 250);
     return () => clearTimeout(task);
-  }, [caption, draftRestored, mode]);
+  }, [caption, collectibleTags, collectorTags, draftRestored, mode]);
 
   async function choosePostPhoto(source: "camera" | "library") {
     setMessage(null);
@@ -71,10 +78,11 @@ export default function CreateScreen() {
     setWorking(true);
     setMessage(null);
     try {
-      await createNativePost(postUri, caption, postMimeType);
+      await createNativePost(postUri, caption, postMimeType, { taggedUserIds: collectorTags.map(tag => tag.id), taggedTemplateIds: collectibleTags.map(tag => tag.id) });
       await AsyncStorage.removeItem(CREATE_DRAFT_KEY);
       setCaption("");
       setPostUri(null);
+      setCollectibleTags([]); setCollectorTags([]);
       router.replace("/(tabs)");
     } catch {
       setMessage(copy.postCreateFailed);
@@ -111,6 +119,14 @@ export default function CreateScreen() {
                 multiline
                 style={[styles.input, styles.caption]}
               />
+              <View style={styles.row}>
+                <SeoullyButton label={copy.tagCollectible} variant="ghost" fill disabled={working} onPress={() => setTagPicker("collectible")} />
+                <SeoullyButton label={copy.tagCollectors} variant="ghost" fill disabled={working} onPress={() => setTagPicker("collector")} />
+              </View>
+              <View style={styles.tabs}>
+                {collectibleTags.map(tag => <SeoullyChoiceChip key={tag.id} selected label={tag.name} onPress={() => setCollectibleTags(tags => tags.filter(item => item.id !== tag.id))} />)}
+                {collectorTags.map(tag => <SeoullyChoiceChip key={tag.id} selected label={tag.subtitle ?? tag.name} onPress={() => setCollectorTags(tags => tags.filter(item => item.id !== tag.id))} />)}
+              </View>
               <SeoullyButton label={copy.publishPost} disabled={working} block onPress={() => { void publishPost(); }} />
             </>
           ) : (
@@ -123,6 +139,10 @@ export default function CreateScreen() {
           {message ? <SeoullyText accessibilityRole="alert" variant="secondary" color={colors.plum}>{message}</SeoullyText> : null}
         </ScrollView>
       </KeyboardScreen>
+      {tagPicker ? <PostTagPicker kind={tagPicker} selected={tagPicker === "collectible" ? collectibleTags : collectorTags} onClose={() => setTagPicker(null)} onSelect={tag => {
+        const update = (items: PostTag[]) => items.some(item => item.id === tag.id) || items.length >= 10 ? items : [...items, tag];
+        if (tagPicker === "collectible") setCollectibleTags(update); else setCollectorTags(update);
+      }} /> : null}
     </SeoullyScreen>
   );
 }

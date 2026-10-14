@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
   lang: { justifyContent: "center", minHeight: 44, paddingHorizontal: 4 },
   container: { paddingBottom: 48 },
   card: { paddingHorizontal: 16, paddingTop: 8 },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 16, paddingTop: 14 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingTop: 14 },
   highlights: { gap: 12, paddingHorizontal: 16, paddingTop: 16 },
   actions: { flexDirection: "row", gap: 8, marginTop: 14 },
   enter: { marginTop: 10 },

@@ -299,6 +299,8 @@ export type NativeFeedPost = {
   commentCount: number;
   likedByMe: boolean;
   repostedByMe?: boolean;
+  repostAvailable?: boolean;
+  reposter?: NativeSocialAuthor;
   savedByMe?: boolean;
   repostOf?: string | null;
   originAuthor?: NativeSocialAuthor;
@@ -356,10 +358,12 @@ export async function addPostComment(postId: string, body: string): Promise<Nati
   return payload.comment;
 }
 
-export async function createNativePost(uri: string, caption: string, mimeType = "image/jpeg") {
+export async function createNativePost(uri: string, caption: string, mimeType = "image/jpeg", tags: { taggedUserIds: string[]; taggedTemplateIds: string[] } = { taggedUserIds: [], taggedTemplateIds: [] }) {
   const accessToken = await mobileAccessToken();
   const body = new FormData();
   body.append("caption", caption);
+  body.append("taggedUserIds", JSON.stringify(tags.taggedUserIds));
+  body.append("taggedTemplateIds", JSON.stringify(tags.taggedTemplateIds));
   body.append("file", { uri, name: "seoully-post.jpg", type: mimeType } as unknown as Blob);
   const response = await fetch(`${productApiBase()}/api/mobile/posts`, {
     method: "POST",
@@ -963,4 +967,39 @@ export async function readPhotocardCollectorCounts(templateIds: string[]): Promi
   });
   if (!response.ok) throw new Error("collector_counts_unavailable");
   return (await response.json() as { counts: Record<string, number> }).counts;
+}
+
+export async function loadCatalogTemplate(templateId: string): Promise<NativeCatalogTemplate> {
+  const token = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/catalog/${encodeURIComponent(templateId)}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!response.ok) throw new Error("catalog_unavailable");
+  return (await response.json() as { template: NativeCatalogTemplate }).template;
+}
+
+export async function setNativePostReposted(postId: string, reposted: boolean): Promise<{ persisted: boolean }> {
+  const token = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/posts/${encodeURIComponent(postId)}/repost`, { method: reposted ? "PUT" : "DELETE", headers: { Authorization: `Bearer ${token}` } });
+  if (!response.ok) throw new Error("repost_unavailable");
+  return response.json();
+}
+
+export async function loadNativePost(postId: string): Promise<NativeFeedPost> {
+  const token = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/posts/${encodeURIComponent(postId)}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!response.ok) throw new Error("social_read_failed");
+  return (await response.json() as { post: NativeFeedPost }).post;
+}
+
+export async function loadCatalogOwners(templateId: string): Promise<NativeSocialAuthor[]> {
+  const token = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/catalog/${encodeURIComponent(templateId)}/owners`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!response.ok) throw new Error("owners_unavailable");
+  return (await response.json() as { owners: NativeSocialAuthor[] }).owners;
+}
+
+export async function loadWishlistMembership(templateId: string): Promise<boolean> {
+  const token = await mobileAccessToken();
+  const response = await fetch(`${productApiBase()}/api/mobile/wishlist?templateId=${encodeURIComponent(templateId)}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!response.ok) throw new Error("wishlist_read_failed");
+  return (await response.json() as { wanted: boolean }).wanted;
 }

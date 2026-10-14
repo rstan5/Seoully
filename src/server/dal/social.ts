@@ -2,7 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/profile";
+import { publicProfileAvatars, getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/profile";
 import { createSupabaseServerClient } from "@/server/supabase/server";
 import { searchSharedCatalog, type CatalogTemplateDTO } from "@/server/dal/catalog";
 import { findOwnersOfTemplate } from "@/server/dal/collection-graph";
@@ -33,9 +33,14 @@ export interface SocialPostDTO {
   likeCount: number;
   commentCount: number;
   likedByMe: boolean;
+  repostedByMe?: boolean;
+  repostAvailable?: boolean;
+  repostOf?: string;
+  originAuthor?: SocialProfileSummary;
+  reposter?: SocialProfileSummary;
 }
 export interface SocialPage<T> { items: T[]; nextCursor: string | null; }
-export interface SocialSearchUser { userId: string; handle: string; displayName: string; }
+export interface SocialSearchUser { userId: string; handle: string; displayName: string; avatarUrl?: string; }
 export interface SocialDiscoverCollectible {
   template: CatalogTemplateDTO;
   owner: SocialSearchUser | null;
@@ -92,13 +97,17 @@ async function hydratePosts(rows: Row[], actorId: string, supabase: Awaited<Retu
   for (const row of userTagsResult.data ?? []) { const tag = taggedProfiles.get(String(row.tagged_user_id)); if (tag) taggedUsersByPost.set(String(row.post_id), [...(taggedUsersByPost.get(String(row.post_id)) ?? []), tag]); }
   const taggedCollectiblesByPost = new Map<string, SocialCollectibleTag[]>();
   for (const row of collectibleTagsResult.data ?? []) { const tag = templates.get(String(row.template_id)); if (tag) taggedCollectiblesByPost.set(String(row.post_id), [...(taggedCollectiblesByPost.get(String(row.post_id)) ?? []), tag]); }
+  const reposts = await supabase.from("post_reposts").select("post_id").eq("reposter_user_id", actorId).in("post_id", postIds);
+  const missingReposts = ["42P01", "PGRST205"].includes(reposts.error?.code ?? "");
+  if (reposts.error && !missingReposts) throw new Error("social_read_failed");
+  const reposted = new Set((reposts.data ?? []).map(row => String(row.post_id)));
   const liked = new Set((likesResult.data ?? []).map((row) => String(row.post_id)));
   return rows.flatMap((row) => {
     const author = profiles.get(String(row.author_user_id));
     if (!author) return [];
     const likeCount = Array.isArray(row.post_likes) ? Number((row.post_likes[0] as Row | undefined)?.count ?? 0) : Number(row.like_count ?? 0);
     const commentCount = Array.isArray(row.post_comments) ? Number((row.post_comments[0] as Row | undefined)?.count ?? 0) : Number(row.comment_count ?? 0);
-    return [{ id: String(row.id), author, caption: String(row.caption ?? ""), location: typeof row.location_text === "string" ? row.location_text : null, visibility: "public" as const, createdAt: String(row.created_at), media: mediaByPost.get(String(row.id)) ?? [], taggedUsers: taggedUsersByPost.get(String(row.id)) ?? [], taggedCollectibles: taggedCollectiblesByPost.get(String(row.id)) ?? [], likeCount, commentCount, likedByMe: liked.has(String(row.id)) }];
+    return [{ id: String(row.id), author, caption: String(row.caption ?? ""), location: typeof row.location_text === "string" ? row.location_text : null, visibility: "public" as const, createdAt: String(row.created_at), media: mediaByPost.get(String(row.id)) ?? [], taggedUsers: taggedUsersByPost.get(String(row.id)) ?? [], taggedCollectibles: taggedCollectiblesByPost.get(String(row.id)) ?? [], likeCount, commentCount, likedByMe: liked.has(String(row.id)), repostedByMe: reposted.has(String(row.id)), repostAvailable: !missingReposts && String(row.author_user_id) !== actorId }];
   });
 }
 
@@ -187,7 +196,8 @@ export async function searchProductionUsers(query: unknown, client?: SupabaseCli
   let request = supabase.from("profiles").select("user_id,handle,display_name").neq("user_id", identity.user.id).order("display_name").limit(8);
   if (safeText) request = request.or("handle.ilike.%" + safeText + "%,display_name.ilike.%" + safeText + "%");
   const { data, error } = await request; if (error) throw new Error("social_search_failed");
-  return (data ?? []).map((row) => ({ userId: String(row.user_id), handle: String(row.handle), displayName: String(row.display_name) }));
+  const avatars = await publicProfileAvatars((data ?? []).map(row => String(row.user_id)), supabase);
+  return (data ?? []).map(row => ({ userId: String(row.user_id), handle: String(row.handle), displayName: String(row.display_name), ...(avatars.has(String(row.user_id)) ? { avatarUrl: avatars.get(String(row.user_id)) } : {}) }));
 }
 
 export async function searchProductionCollectibles(query: unknown): Promise<CatalogTemplateDTO[]> {
@@ -195,7 +205,32 @@ export async function searchProductionCollectibles(query: unknown): Promise<Cata
 }
 
 export async function getProductionProfilePosts(userId: unknown, input?: unknown, client?: SupabaseClient): Promise<SocialPage<SocialPostDTO>> {
-  return listPosts([uuid.parse(userId)], input, client);
+  const target = uuid.parse(userId);
+  const page = pageSchema.parse(input ?? {});
+  const cursor = decodeCursor(page.cursor);
+  const { identity, supabase } = await actorClient(client);
+  const timeline = await supabase.rpc("profile_post_timeline", { p_user_id: target, p_limit: page.limit + 1, p_before: cursor?.createdAt ?? null, p_before_id: cursor?.id ?? null });
+  // Existing production remains usable until the separately approved migration rolls out.
+  if (["42883", "PGRST202"].includes(timeline.error?.code ?? "")) return listPosts([target], input, client);
+  if (timeline.error) throw new Error("social_read_failed");
+  const entries = (timeline.data ?? []) as { post_id: string; event_at: string; reposted: boolean }[];
+  const visible = entries.slice(0, page.limit);
+  if (!visible.length) return { items: [], nextCursor: null };
+  const rows = await supabase.from("posts").select("id,author_user_id,caption,location_text,visibility,created_at,post_likes(count),post_comments(count)").in("id", visible.map(entry => entry.post_id)).eq("visibility", "public");
+  if (rows.error) throw new Error("social_read_failed");
+  const hydrated = await hydratePosts((rows.data ?? []) as unknown as Row[], identity.user.id, supabase);
+  const reposterProfile = await supabase.from("profiles").select("user_id,handle,display_name").eq("user_id", target).maybeSingle();
+  if (reposterProfile.error) throw new Error("social_read_failed");
+  const byId = new Map(hydrated.map(post => [post.id, post]));
+  const items = visible.flatMap(entry => {
+    const post = byId.get(entry.post_id);
+    if (!post) return [];
+    if (!entry.reposted) return [post];
+    if (!reposterProfile.data) return [];
+    return [{ ...post, repostOf: post.id, originAuthor: post.author, reposter: profileSummary(reposterProfile.data) }];
+  });
+  const last = visible.at(-1)!;
+  return { items, nextCursor: entries.length > page.limit ? encodeCursor(last.event_at, last.post_id) : null };
 }
 
 export async function followUser(userId: unknown, client?: SupabaseClient): Promise<{ following: boolean }> {
@@ -254,7 +289,7 @@ export async function listPostComments(postId: unknown, input?: unknown, client?
 
 export async function createPost(input: { file: File; caption?: unknown; location?: unknown; taggedUserIds?: unknown; taggedTemplateIds?: unknown }, client?: SupabaseClient): Promise<SocialPostDTO> {
   const caption = z.string().trim().max(2_000).optional().parse(input.caption); const location = z.string().trim().max(160).optional().parse(input.location);
-  const taggedUserIds = z.array(uuid).max(10).default([]).parse(input.taggedUserIds); const taggedTemplateIds = z.array(uuid).max(10).default([]).parse(input.taggedTemplateIds);
+  const taggedUserIds = [...new Set(z.array(uuid).max(10).default([]).parse(input.taggedUserIds))]; const taggedTemplateIds = [...new Set(z.array(uuid).max(10).default([]).parse(input.taggedTemplateIds))];
   const file = input.file; if (!(file instanceof File) || !allowedMime.has(file.type) || file.size <= 0 || file.size > MAX_MEDIA_BYTES) throw new Error("invalid_media");
   if (!(await matchesMediaSignature(file))) throw new Error("invalid_media");
   const { identity, supabase } = await actorClient(client);
@@ -305,4 +340,25 @@ async function matchesMediaSignature(file: File): Promise<boolean> {
   if (file.type === "image/webp") return bytes.length >= 12 && String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
   if (file.type === "video/webm") return bytes.length >= 4 && bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3;
   return bytes.length >= 8 && String.fromCharCode(...bytes.slice(4, 8)) === "ftyp";
+}
+
+/** No post duplication: this only adds/removes a collector-scoped reference. */
+export async function setPostReposted(postId: unknown, reposted: boolean, client?: SupabaseClient) {
+  const id = postIdSchema.parse(postId);
+  const { identity, supabase } = await actorClient(client);
+  const original = await supabase.from("posts").select("id,author_user_id").eq("id", id).eq("visibility", "public").maybeSingle();
+  if (original.error || !original.data || original.data.author_user_id === identity.user.id) throw new Error("repost_unavailable");
+  const result = reposted
+    ? await supabase.from("post_reposts").upsert({ reposter_user_id: identity.user.id, post_id: id }, { onConflict: "reposter_user_id,post_id", ignoreDuplicates: true })
+    : await supabase.from("post_reposts").delete().eq("reposter_user_id", identity.user.id).eq("post_id", id);
+  if (result.error) throw new Error("repost_unavailable");
+  return { persisted: true, reposted };
+}
+
+export async function getProductionPost(postId: unknown, client?: SupabaseClient): Promise<SocialPostDTO | null> {
+  const id = postIdSchema.parse(postId);
+  const { identity, supabase } = await actorClient(client);
+  const result = await supabase.from("posts").select("id,author_user_id,caption,location_text,visibility,created_at,post_likes(count),post_comments(count)").eq("id", id).eq("visibility", "public").maybeSingle();
+  if (result.error) throw new Error("social_read_failed");
+  return result.data ? (await hydratePosts([result.data as unknown as Row], identity.user.id, supabase))[0] ?? null : null;
 }

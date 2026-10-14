@@ -43,7 +43,7 @@ test('auth, crop and saved-confirmation Back routes preserve existing draft and 
 test('loading cadence changes alone while helper rhythm and dialogue scheduling remain unchanged',()=>{
  const motion=load('apps/mobile/src/ui/heartMotion.ts');assert.equal(motion.heartMotion.halfCycleMs,1000);assert.equal(motion.loadingHeartHalfCycleMs,875);assert.equal(motion.heartMotion.travel,6);assert.equal(motion.heartMotion.characterMs,32);
  const scene=load('apps/mobile/src/ui/heartScene.ts');assert.equal(scene.dialogueMotionTiming.entrance,600);assert.equal(scene.dialogueMotionTiming.exit,500);assert.equal(scene.dialogueReadingMs(1),2500);assert.equal(scene.dialogueReadingMs(1000),5500);
- assert.match(read('apps/mobile/src/ui/HeartFarewell.tsx'),/Math.min\(150, Math.max\(110, height \* 0.17\)/);
+ assert.match(read('apps/mobile/src/ui/HeartFarewell.tsx'),/dialogueArcHeight\(height, insets.top, insets.bottom, originY, heartSize\)/);
 });
 
 test('explicit Back restores input stages without replaying completed heart dialogue',()=>{const source=read('apps/mobile/app/onboarding.tsx');assert.match(source,/params.back === "1" && resolved === "interest"/);assert.match(source,/new Set<OnboardingPhase>\(\[...previous, "group", "bias", "archetype", "interest", "collect"\]\)/);assert.match(source,/params.holdingId, params.back/)});

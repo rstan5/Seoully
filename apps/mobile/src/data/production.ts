@@ -27,6 +27,7 @@ import {
   sendDirectMessage as sendProductionDirectMessage,
   setCollectorFollowing,
   setPostLiked,
+  setNativePostReposted,
   setWishlistTemplate,
   updateHoldingTradeStatus,
   type NativeCollectorMatch,
@@ -34,7 +35,7 @@ import {
 } from "../api";
 import { parseAskResult } from "seoully-domain/ask-result";
 import { LIVE_CAPABILITIES } from "./capabilities";
-import { liveNoticePage, liveRepostResult, liveSaveResult, liveShareResult } from "./honesty";
+import { liveNoticePage, liveSaveResult, liveShareResult } from "./honesty";
 import type { NativeAskContext, NativeAskResult, SocialCompatibility, SocialConversation, SocialMessage, SocialNotice, SocialRepository, SocialSendMessageInput, SocialShareRecipient, SocialTradeItem } from "./types";
 
 function matchItems(items: NativeCollectorMatch["trade"]["theyOwnYourWants"], side: "they" | "you"): SocialTradeItem[] {
@@ -93,9 +94,7 @@ export const productionRepository: SocialRepository = {
   async setPostLiked(postId, liked) {
     await setPostLiked(postId, liked);
   },
-  async setPostReposted() {
-    return liveRepostResult();
-  },
+  setPostReposted: setNativePostReposted,
   async setPostSaved() {
     return liveSaveResult();
   },

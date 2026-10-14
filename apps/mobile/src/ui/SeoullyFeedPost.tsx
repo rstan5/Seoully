@@ -10,11 +10,13 @@ export function SeoullyFeedPost({
   copy,
   locale,
   onChange,
+  onRemoveRepost,
 }: {
   item: NativeFeedPost;
   copy: MobileCopy;
   locale: "en" | "ko";
   onChange: (post: NativeFeedPost) => void;
+  onRemoveRepost?: () => void;
 }) {
   const router = useRouter();
   const social = useSocialRepository();
@@ -89,9 +91,12 @@ export function SeoullyFeedPost({
     setBusy(true);
     try {
       const result = await social.setPostReposted(item.id, next);
+      if (!result.persisted) onChange(item);
+      if (result.persisted && !next && item.repostOf) onRemoveRepost?.();
       flash(result.persisted ? (next ? copy.flashReposted : copy.flashUnreposted) : copy.repostUnavailable);
     } catch {
       onChange(item);
+      flash(copy.repostUnavailable);
     } finally {
       setBusy(false);
     }
@@ -137,7 +142,7 @@ export function SeoullyFeedPost({
       commentError={commentError}
       notice={notice}
       busy={busy}
-      canRepost={social.capabilities.persistRepost && (!viewerId || item.author.userId !== viewerId || Boolean(item.repostOf))}
+      canRepost={social.capabilities.persistRepost && item.repostAvailable !== false && (!viewerId || item.author.userId !== viewerId || Boolean(item.repostOf))}
       onOpenCollector={openCollector}
       onToggleLike={() => { void toggleLike(); }}
       onToggleComments={() => { void toggleComments(); }}

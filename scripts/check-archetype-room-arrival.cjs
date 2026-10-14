@@ -78,7 +78,7 @@ test('heart waits for actual world; fade precedes Binder; one companion and no f
 test('messages run visible 5s → 5s → persistent Profile; action never repeats Holding creation', async () => {
   const h = intro(); let tree = await arrive(h); assert.ok(descendants(room(tree).props.roomGuidance).some(x => x.props.children === 'Home ♡'));
   h.tick(); tree = h.render(); assert.ok(descendants(room(tree).props.roomGuidance).some(x => x.props.children === 'Edit'));
-  h.tick(); tree = h.render(); assert.equal(h.timers, 0); const action = descendants(room(tree).props.roomGuidance).find(x => x.type === 'Pressable' && x.props.onPress?.name === 'requestDiscover'); action.props.onPress(); h.render(); await new Promise(setImmediate); h.render(); assert.equal(h.profile, 1); assert.equal(h.requests, 1); h.cleanup();
+  h.tick(); tree = h.render(); assert.equal(h.timers, 0); const action = descendants(room(tree).props.roomGuidance).find(x => x.type === 'Pressable' && x.props.onPress?.name === 'requestProfile'); action.props.onPress(); h.render(); await new Promise(setImmediate); h.render(); assert.equal(h.profile, 1); assert.equal(h.requests, 1); h.cleanup();
 });
 test('dismissal cancels future messages; background and navigation clean timers', async () => {
   const h = intro(); let tree = await arrive(h); h.background(); h.render(); assert.equal(h.timers, 0); h.foreground(); h.render(); assert.equal(h.timers, 1);
@@ -86,7 +86,7 @@ test('dismissal cancels future messages; background and navigation clean timers'
   const other = intro(); await arrive(other); other.blur(); other.render(); assert.equal(other.timers, 0); other.cleanup();
 });
 test('non-photocard waits for real placement and does not open unrelated Binder', async () => { const h = intro({ photocard: false }); const tree = await arrive(h, false); assert.equal(room(tree).props.initialHoldingId, undefined); assert.equal(h.requests, 0); assert.equal(h.timers, 1); h.cleanup(); });
-test('failed completion stays retryable and cannot enable Profile success', async () => { const h = intro({ fail: true }); await arrive(h); assert.equal(h.requests,0); h.tick(); h.render(); h.tick(); const final = h.render(); const action = descendants(room(final).props.roomGuidance).find(x => x.props.onPress?.name === 'requestDiscover'); action.props.onPress(); h.render(); assert.equal(h.profile, 0); h.cleanup(); });
+test('failed completion stays retryable and cannot enable Profile success', async () => { const h = intro({ fail: true }); await arrive(h); assert.equal(h.requests,0); h.tick(); h.render(); h.tick(); const final = h.render(); const action = descendants(room(final).props.roomGuidance).find(x => x.props.onPress?.name === 'requestProfile'); action.props.onPress(); h.render(); assert.equal(h.profile, 0); h.cleanup(); });
 test('reduced motion uses direct fade and same messages; interrupted arrival does not replay heart', async () => { const h = intro({ reduced: true }); await arrive(h); h.cleanup(); assert.equal(h.timers, 0); const resumed = intro({ playArrival: false }); assert.equal(resumed.render().props.children.some(x => x?.type === 'Heart'), false); resumed.cleanup(); });
 test('EN/KO includes archetype introduction and all three Room welcome messages', () => { const { copy } = load('apps/mobile/src/i18n.ts', {}); for (const lang of ['en', 'ko']) for (const key of ['onboardingArchetypeTitle', 'onboardingArchetypeLead', 'onboardingArchetypeGreeting', 'roomArrivalHome', 'roomArrivalEdit', 'roomArrivalFinish', 'roomArrivalProfile']) assert.ok(copy(lang)[key]); assert.notEqual(copy('en').onboardingArchetypeGreeting, copy('ko').onboardingArchetypeGreeting); });
 test('actual render readiness waits one drawn frame and observes existing Binder/camera settling only once', () => {
@@ -114,7 +114,7 @@ test('initial Binder request uses normal open path once, refuses unavailable car
 });
 test('delayed completion queues first Profile tap, communicates saving, and navigates exactly once after confirmation', async () => {
   const h = intro({ pendingCompletion: true }); await arrive(h); h.tick(); h.render(); h.tick(); let tree = h.render();
-  let action = descendants(room(tree).props.roomGuidance).find(x => x.props.onPress?.name === 'requestDiscover');
+  let action = descendants(room(tree).props.roomGuidance).find(x => x.props.onPress?.name === 'requestProfile');
   assert.equal(action.props.disabled, undefined); action.props.onPress(); action.props.onPress(); tree = h.render();
   assert.equal(h.profile, 0); assert.equal(h.requests, 1); assert.ok(descendants(room(tree).props.roomGuidance).some(x => x.props.children === 'Finishing setup'));
   h.resolveCompletion(); await new Promise(setImmediate); h.render(); h.render(); assert.equal(h.profile, 1); assert.equal(h.requests, 1); h.cleanup();
@@ -122,7 +122,7 @@ test('delayed completion queues first Profile tap, communicates saving, and navi
 test('queued Profile tap cannot navigate after dismissal or unmount, even if save completes late', async () => {
   for (const unmount of [false, true]) {
     const h = intro({ pendingCompletion: true }); await arrive(h); h.tick(); h.render(); h.tick(); let tree = h.render();
-    descendants(room(tree).props.roomGuidance).find(x => x.props.onPress?.name === 'requestDiscover').props.onPress(); h.render();
+    descendants(room(tree).props.roomGuidance).find(x => x.props.onPress?.name === 'requestProfile').props.onPress(); h.render();
     if (unmount) h.cleanup(); else { descendants(room(tree).props.roomGuidance).find(x => x.props.accessibilityLabel === 'Close').props.onPress(); h.render(); }
     h.resolveCompletion(); await new Promise(setImmediate); if (!unmount) h.render(); assert.equal(h.profile, 0); if (!unmount) h.cleanup();
   }
@@ -151,7 +151,7 @@ test('manually opened Binder acknowledges delayed loaded card membership without
 });
 test('failed completion then retry preserves the first Profile tap and navigates only after authoritative done',async()=>{
  const h=intro({fail:true});await arrive(h);h.tick();h.render();h.tick();let tree=h.render();
- const button=descendants(room(tree).props.roomGuidance).find(x=>x.props.onPress?.name==='requestDiscover');button.props.onPress();h.render();await new Promise(setImmediate);tree=h.render();assert.equal(h.profile,0);
+ const button=descendants(room(tree).props.roomGuidance).find(x=>x.props.onPress?.name==='requestProfile');button.props.onPress();h.render();await new Promise(setImmediate);tree=h.render();assert.equal(h.profile,0);
  assert.ok(descendants(room(tree).props.roomGuidance).some(x=>x.props.accessibilityRole==='alert'));
  h.allowCompletion();const retry=descendants(room(tree).props.roomGuidance).find(x=>x.type==='Pressable'&&x.props.children?.props.children===h.copy.retry);assert.ok(retry);retry.props.onPress();await new Promise(setImmediate);h.render();h.render();assert.equal(h.profile,1);h.cleanup();
 });

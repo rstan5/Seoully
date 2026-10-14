@@ -92,9 +92,9 @@ test('delayed canonical startup Profile hydrates the name atomically; no optiona
 });
 test('queued Profile handoff waits for the protected app navigator, dispatches once, and consumes its intent', () => {
   const h=harness(),file=fs.readFileSync('apps/mobile/src/startup/AuthRouteTree.tsx','utf8'),ast=ts.createSourceFile('routes.tsx',file,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
-  const fn=ast.statements.find(node=>ts.isFunctionDeclaration(node)&&node.name?.text==='ProfileEntryNavigation');let mounted=false,pending=true,calls=0,focused=false;
+  const fn=ast.statements.find(node=>ts.isFunctionDeclaration(node)&&node.name?.text==='AppEntryNavigation');let mounted=false,pending=true,calls=0,focused=false;
   const router={replace(path){assert.ok(mounted);assert.equal(path,'/(tabs)/profile');calls++}};
-  const scope={useRef:h.react.useRef,useEffect:h.react.useEffect,startupTrace(){},onboardingTrace(){},useBootstrap:()=>({profileEntryRequested:pending,consumeProfileEntry(){pending=false}}),useRouter:()=>router,useRootNavigationState:()=>({key:'root',routeNames:mounted?['(tabs)','collect']:['onboarding','collect'],routes:mounted?[{name:'(tabs)',state:{key:'tabs-ready',index:0,routes:[{name:focused?'profile':'index'}]}}]:[{name:'onboarding'}]})};
+  const scope={useRef:h.react.useRef,useEffect:h.react.useEffect,startupTrace(){},onboardingTrace(){},useBootstrap:()=>({appEntryTarget:pending?"profile":null,consumeAppEntry(){pending=false}}),useRouter:()=>router,useAppNavigationState:()=>({key:'root',routeNames:mounted?['(tabs)','collect']:['onboarding','collect'],routes:mounted?[{name:'(tabs)',state:{key:'tabs-ready',index:0,routes:[{name:focused?'profile':'index'}]}}]:[{name:'onboarding'}]})};
   const navigate=vm.runInNewContext(ts.transpileModule(`(${fn.getText(ast)})`,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,scope);
   h.render(navigate);assert.equal(calls,0);mounted=true;h.render(navigate);assert.equal(calls,1);assert.equal(pending,true);focused=true;h.render(navigate);assert.equal(pending,false);h.render(navigate);h.render(navigate);assert.equal(calls,1);h.cleanup();
 });
@@ -112,26 +112,26 @@ test('temporary blocking loader pauses the same welcome headline and its hold in
   h.show();h.render();h.advance(999);h.render();assert.equal(h.animations.length,0);h.advance(1);h.render();assert.equal(h.animations.length,1);h.cleanup();
 });
 test('Profile handoff starts the app directly on Profile and consumes readiness without replacing the same tab twice', () => {
-  const tabs=fs.readFileSync('apps/mobile/app/(tabs)/_layout.tsx','utf8');assert.match(tabs,/initialRouteName=\{boot.profileEntryRequested \? "profile" : "index"\}/);
-  const h=harness(),file=fs.readFileSync('apps/mobile/src/startup/AuthRouteTree.tsx','utf8'),ast=ts.createSourceFile('routes.tsx',file,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX),fn=ast.statements.find(node=>ts.isFunctionDeclaration(node)&&node.name?.text==='ProfileEntryNavigation');let ready=false,consumed=0;
-  const scope={useRef:h.react.useRef,useEffect:h.react.useEffect,startupTrace(){},onboardingTrace(){},useBootstrap:()=>({profileEntryRequested:true,consumeProfileEntry(){consumed++}}),useRouter:()=>({replace(){throw Error('duplicate tab replacement')}}),useRootNavigationState:()=>({key:'root',routeNames:ready?['(tabs)']:['onboarding'],routes:[{name:'(tabs)',state:ready?{key:'tabs-ready',index:0,routes:[{name:'profile'}]}:undefined}]})};
+  const tabs=fs.readFileSync('apps/mobile/app/(tabs)/_layout.tsx','utf8');assert.match(tabs,/initialRouteName=\{boot.appEntryTarget === "profile" \? "profile" : "index"\}/);
+  const h=harness(),file=fs.readFileSync('apps/mobile/src/startup/AuthRouteTree.tsx','utf8'),ast=ts.createSourceFile('routes.tsx',file,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX),fn=ast.statements.find(node=>ts.isFunctionDeclaration(node)&&node.name?.text==='AppEntryNavigation');let ready=false,consumed=0;
+  const scope={useRef:h.react.useRef,useEffect:h.react.useEffect,startupTrace(){},onboardingTrace(){},useBootstrap:()=>({appEntryTarget:"profile",consumeAppEntry(){consumed++}}),useRouter:()=>({replace(){throw Error('duplicate tab replacement')}}),useAppNavigationState:()=>({key:'root',routeNames:ready?['(tabs)']:['onboarding'],routes:[{name:'(tabs)',state:ready?{key:'tabs-ready',index:0,routes:[{name:'profile'}]}:undefined}]})};
   const navigate=vm.runInNewContext(ts.transpileModule(`(${fn.getText(ast)})`,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,scope);h.render(navigate);assert.equal(consumed,0);ready=true;h.render(navigate);h.render(navigate);assert.equal(consumed,1);h.cleanup();
 });
 test('signout or a competing deep link clears pending Profile entry rather than replaying it later',async()=>{
-  const h=await bootProvider();h.render().enterApp('profile');assert.equal(h.render().profileEntryRequested,true);h.deepLink();assert.equal(h.render().profileEntryRequested,false);h.render().enterApp('profile');h.signOut();assert.equal(h.render().profileEntryRequested,false);h.cleanup();
+  const h=await bootProvider();h.render().enterApp('profile');assert.equal(h.render().appEntryTarget,"profile");h.deepLink();assert.equal(h.render().appEntryTarget,null);h.render().enterApp('profile');h.signOut();assert.equal(h.render().appEntryTarget,null);h.cleanup();
 });
 test('completion plus delayed guards resolves to Profile and stays there after stale bootstrap and Profile hydration',async()=>{
   const provider=await bootProvider('interest',null,2500),h=harness();
   // The Room completion handler supplies this only after the authenticated server returns done.
   provider.render().enterApp('profile');assert.equal(provider.render().onboardingStep,'done');
-  const source=fs.readFileSync('apps/mobile/src/startup/AuthRouteTree.tsx','utf8'),ast=ts.createSourceFile('routes.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX),fn=ast.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='ProfileEntryNavigation');
+  const source=fs.readFileSync('apps/mobile/src/startup/AuthRouteTree.tsx','utf8'),ast=ts.createSourceFile('routes.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX),fn=ast.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='AppEntryNavigation');
   let state={key:'root',routeNames:['onboarding','collect'],index:1,routes:[{name:'(tabs)',state:{key:'new-app',index:0,routes:[{name:'index'}]}},{name:'onboarding'}]},queued=null,calls=0;
-  const scope={useRef:h.react.useRef,useEffect:h.react.useEffect,startupTrace(){},onboardingTrace(){},useBootstrap:()=>provider.render(),useRootNavigationState:()=>state,useRouter:()=>({replace(route){calls++;queued=route}})};
+  const scope={useRef:h.react.useRef,useEffect:h.react.useEffect,startupTrace(){},onboardingTrace(){},useBootstrap:()=>provider.render(),useAppNavigationState:()=>state,useRouter:()=>({replace(route){calls++;queued=route}})};
   const navigate=vm.runInNewContext(ts.transpileModule(`(${fn.getText(ast)})`,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,scope);
-  h.render(navigate);assert.equal(calls,0,'background tab state is not readiness');assert.equal(provider.render().profileEntryRequested,true);
-  state={...state,routeNames:['(tabs)','collect'],index:0,routes:[state.routes[0]]};h.render(navigate);assert.equal(queued,'/(tabs)/profile');assert.equal(provider.render().profileEntryRequested,true,'uncommitted replace must not consume intent');
+  h.render(navigate);assert.equal(calls,0,'background tab state is not readiness');assert.equal(provider.render().appEntryTarget,"profile");
+  state={...state,routeNames:['(tabs)','collect'],index:0,routes:[state.routes[0]]};h.render(navigate);assert.equal(queued,'/(tabs)/profile');assert.equal(provider.render().appEntryTarget,"profile",'uncommitted replace must not consume intent');
   h.render(navigate);assert.equal(calls,1);
-  state.routes[0].state.routes=[{name:'profile'}];h.render(navigate);assert.equal(provider.render().profileEntryRequested,false);
+  state.routes[0].state.routes=[{name:'profile'}];h.render(navigate);assert.equal(provider.render().appEntryTarget,null);
   provider.advance(2500);await new Promise(setImmediate);assert.equal(provider.render().destination,'app','late interest snapshot is rejected by generation');
   // Hydration and locale rerenders cannot restore the protected onboarding screen.
   for(let i=0;i<3;i++){h.render(navigate);assert.equal(provider.render().onboardingStep,'done');assert.equal(state.routes[state.index].state.routes[0].name,'profile')}

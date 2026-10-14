@@ -1,3 +1,4 @@
+import { onboardingTrace } from "../src/startup/onboardingTrace";
 import { View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useSocialRepository } from "../src/data";
@@ -24,7 +25,7 @@ export default function RoomScreen() {
       persistLive={social.capabilities.persistRoom}
       copy={copy}
       initialHoldingId={typeof params.holdingId === "string" ? params.holdingId : undefined}
-      onLeave={() => { if (router.canGoBack()) router.back(); else router.replace("/(tabs)/profile"); }}
+      onLeave={() => { onboardingTrace("room_home_navigation", { destination: "(tabs)/profile" }); router.replace("/(tabs)/profile"); }}
       onInspectCollectible={(holdingId) => router.push({ pathname: "/collectible", params: { holdingId } })}
     />
   </View>

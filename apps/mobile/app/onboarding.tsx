@@ -108,8 +108,7 @@ export default function OnboardingScreen() {
       if (!userId || identity?.user.id !== userId) throw new Error("unauthenticated");
       if (generation !== loadGeneration.current) return;
       if (next.step === "done" && !editingTastes) {
-        boot.enterApp();
-        router.replace("/(tabs)");
+        boot.enterApp("discover");
         return;
       }
       let confirmedHolding: NativeHolding | null = null;
@@ -134,8 +133,7 @@ export default function OnboardingScreen() {
         interestsSaved: next.collectorInterests.length > 0,
       });
       if (resolved === "app") {
-        boot.enterApp();
-        router.replace("/(tabs)");
+        boot.enterApp("discover");
         return;
       }
       const draft = !editingTastes && !confirmedHolding
@@ -158,7 +156,11 @@ export default function OnboardingScreen() {
       setGroupIds(restoredGroups);
       setBiasIds(restoredBiases);
       if (next.collectorInterests.length > 0) setInterests(next.collectorInterests);
-      if (resolved === "room" && confirmedHolding) setPlayArrival(await claimRoomArrival(userId, confirmedHolding.id));
+      if (resolved === "room" && confirmedHolding) {
+        const fresh = await claimRoomArrival(userId, confirmedHolding.id);
+        onboardingTrace("room_intro_selection", { stage: fresh ? "guided-fresh" : "guided-resume", checkpoint: next.step });
+        setPlayArrival(fresh);
+      }
       if (generation !== loadGeneration.current) return;
       setHolding(confirmedHolding);
     } catch {
@@ -263,8 +265,8 @@ export default function OnboardingScreen() {
     else if (phase === "interest") setPhase(editingTastes ? "bias" : "archetype");
   }
 
-  function finish() {
-    boot.enterApp("profile");
+  function finish(target: "profile" | "discover" = "discover") {
+    boot.enterApp(target);
   }
 
   if (loading || (phase === "collect" && greeted.has("collect"))) {
@@ -288,11 +290,8 @@ export default function OnboardingScreen() {
             holdingId={holding?.id}
             photocard={holding ? isBinderEligible(holding) : false}
             copy={t}
-            onContinue={finish}
-            onBack={() => {
-              setGreeted(previous => new Set<OnboardingPhase>([...previous, "group", "bias", "archetype", "interest", "collect"]));
-              setPhase("interest");
-            }}
+            onContinue={() => finish("discover")}
+            onHome={() => finish("profile")}
           />
         </Suspense>
       </View>

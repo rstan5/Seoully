@@ -1,3 +1,4 @@
+import { useBootstrap } from "../src/startup/BootstrapProvider";
 import { onboardingHeading, onboardingDescription } from "../src/onboarding/presentation";
 import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -24,6 +25,7 @@ type Step = "entry" | "search" | "manual";
 export default function CollectScreen() {
   const copy = useCopy();
   const router = useRouter();
+  const boot = useBootstrap();
   const social = useSocialRepository();
   const params = useLocalSearchParams<{ from?: string }>();
   const fromOnboarding = params.from === "onboarding";
@@ -116,6 +118,7 @@ export default function CollectScreen() {
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           <ScreenBack disabled={working} label={copy.back} onPress={() => {
             if (step !== "entry") { setStep("entry"); return; }
+            if (fromOnboarding && boot.onboardingStep === "done") { boot.enterApp("discover"); return; }
             if (fromOnboarding) router.replace({ pathname: "/onboarding", params: { phase: "interest", back: "1" } });
             else router.back();
           }} />

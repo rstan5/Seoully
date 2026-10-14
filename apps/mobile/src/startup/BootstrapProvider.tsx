@@ -28,11 +28,11 @@ type BootstrapContextValue = {
   companionEligible: boolean;
   returningWelcome: boolean;
   welcomeName: string;
-  profileEntryRequested: boolean;
-  consumeProfileEntry: () => void;
+  appEntryTarget: "profile" | "discover" | null;
+  consumeAppEntry: () => void;
   finishReturningWelcome: () => void;
   refresh: () => void;
-  enterApp: (target?: "profile") => void;
+  enterApp: (target?: "profile" | "discover") => void;
 };
 
 const BootstrapContext = createContext<BootstrapContextValue | null>(null);
@@ -82,8 +82,8 @@ export function BootstrapProvider({ children }: PropsWithChildren) {
   const linkInterrupted = useRef(false);
   const [returningWelcome, setReturningWelcome] = useState(false);
   const [welcomeName, setWelcomeName] = useState("");
-  const [profileEntryRequested, setProfileEntryRequested] = useState(false);
-  const consumeProfileEntry = useCallback(() => setProfileEntryRequested(false), []);
+  const [appEntryTarget, setAppEntryTarget] = useState<"profile" | "discover" | null>(null);
+  const consumeAppEntry = useCallback(() => setAppEntryTarget(null), []);
   const finishReturningWelcome = useCallback(() => setReturningWelcome(false), []);
 
   const applySnapshot = useCallback((snapshot: StartupSnapshot, token: number) => {
@@ -101,7 +101,7 @@ export function BootstrapProvider({ children }: PropsWithChildren) {
     coldLaunch.current = false;
     const initialUrl = initial ? withTimeout(Linking.getInitialURL(), 500, "initial_url_unavailable").catch(() => "unknown-deep-link") : Promise.resolve("not-cold");
     setReturningWelcome(false);
-    setProfileEntryRequested(false);
+    setAppEntryTarget(null);
     const token = ++generation.current;
     setEligibility(initialCompanionEligibility());
     setErrorKind(null);
@@ -128,11 +128,11 @@ export function BootstrapProvider({ children }: PropsWithChildren) {
       if (event !== "SIGNED_OUT") return;
       startupTrace("auth restore complete", "signed_out");
       setReturningWelcome(false);
-      setProfileEntryRequested(false);
+      setAppEntryTarget(null);
       generation.current += 1;
       applySnapshot({ destination: "welcome", authenticated: false, onboardingStep: null, errorKind: null }, generation.current);
     });
-    const links = Linking.addEventListener("url", () => { linkInterrupted.current = true; setReturningWelcome(false); setProfileEntryRequested(false); });
+    const links = Linking.addEventListener("url", () => { linkInterrupted.current = true; setReturningWelcome(false); setAppEntryTarget(null); });
     return () => {
       links.remove();
       clearTimeout(timer);
@@ -140,9 +140,9 @@ export function BootstrapProvider({ children }: PropsWithChildren) {
     };
   }, [applySnapshot, refresh]);
 
-  const enterApp = useCallback((target?: "profile") => {
+  const enterApp = useCallback((target?: "profile" | "discover") => {
     onboardingTrace("enter_app", { intent: target ?? "app", completed: true });
-    setProfileEntryRequested(previous => target === "profile" || previous);
+    setAppEntryTarget(previous => target ?? previous);
     setReturningWelcome(false);
     generation.current += 1;
     applySnapshot({ destination: "app", authenticated: true, onboardingStep: "done", errorKind: null }, generation.current);
@@ -157,12 +157,12 @@ export function BootstrapProvider({ children }: PropsWithChildren) {
     companionEligible: companionIsEligible(eligibility) && !returningWelcome,
     returningWelcome,
     welcomeName,
-    profileEntryRequested,
-    consumeProfileEntry,
+    appEntryTarget,
+    consumeAppEntry,
     finishReturningWelcome,
     refresh,
     enterApp,
-  }), [eligibility, enterApp, errorKind, refresh, returningWelcome, welcomeName, profileEntryRequested, consumeProfileEntry, finishReturningWelcome]);
+  }), [eligibility, enterApp, errorKind, refresh, returningWelcome, welcomeName, appEntryTarget, consumeAppEntry, finishReturningWelcome]);
 
   return <BootstrapContext.Provider value={value}>{children}</BootstrapContext.Provider>;
 }

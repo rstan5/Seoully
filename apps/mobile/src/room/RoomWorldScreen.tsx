@@ -1,3 +1,5 @@
+import { IconHome } from "../ui/icons";
+import { onboardingTrace } from "../startup/onboardingTrace";
 import { useLanguageControlWidth, useLanguageControlTone } from "../ui/GlobalLanguageControl";
 import { startupTrace } from "../startup/trace";
 import { PhotocardCollectorCount } from "../ui/PhotocardCollectorCount";
@@ -193,6 +195,8 @@ export function RoomWorldScreen({
   const onOwnRoomRef = useRef(onOwnRoom);
   const snapshotRef = useRef(snapshot);
   const liveSync = useRef(new LiveRoomSync()).current;
+  const leaving = useRef(false);
+  const [homeSaving, setHomeSaving] = useState(false);
   const reducedMotionRef = useRef(reducedMotion);
   const exploreRef = useRef<ExploreOffset>({ ...IDENTITY_EXPLORE });
   const homeExploreRef = useRef<ExploreOffset>({ ...IDENTITY_EXPLORE });
@@ -251,6 +255,7 @@ export function RoomWorldScreen({
     if (viewRef.current.kind === "edit") return;
     if (deferFirstRoomEdit || !shouldAutoEnterFirstRoomEdit(next, readOnlyRoom)) return;
     firstEntryRef.current = true;
+    onboardingTrace("room_intro_selection", { stage: "first-room-edit" });
     showHelper("first");
     editBaseline.current = cloneRenderables(loadedItems);
     objectBaseline.current = cloneRoomObjects(next.objects);
@@ -625,6 +630,17 @@ export function RoomWorldScreen({
   const overlayTheme = roomOverlayChrome(roomTheme);
   useEffect(() => { onRoomAppearance?.(roomStyle); }, [onRoomAppearance, roomStyle]);
   const controlSurface = roomChromeSurface(overlayTheme);
+
+  async function leaveHome() {
+    if (leaving.current) return;
+    leaving.current = true; setHomeSaving(true);
+    onboardingTrace("room_home_intent", { intent: "profile" });
+    try {
+      if (viewRef.current.kind === "edit" && !await saveEditing()) return;
+      if (!demo) await liveSync.idle();
+      onLeave();
+    } finally { leaving.current = false; setHomeSaving(false); }
+  }
 
   function goBack() {
     const current = viewRef.current;
@@ -1078,11 +1094,11 @@ export function RoomWorldScreen({
   }
 
   async function saveEditing() {
-    if (shopSaving.current) return;
+    if (shopSaving.current) return false;
     const room = snapshot?.room;
     if (!room) {
       setView({ kind: "home" });
-      return;
+      return true;
     }
     const baselineIds = new Set(editBaseline.current.map((item) => item.holding.id));
     const currentIds = new Set(items.map((item) => item.holding.id));
@@ -1099,7 +1115,7 @@ export function RoomWorldScreen({
           : removeLivePlacement(room.id, id)),
       ]);
       const completed = markFirstRoomEditComplete(layoutStateRef.current);
-      if (!await persistLayout(completed)) return;
+      if (!await persistLayout(completed)) return false;
       firstEntryRef.current = false;
       exploreRef.current = { ...homeExploreRef.current };
       setView({ kind: "home" });
@@ -1108,8 +1124,10 @@ export function RoomWorldScreen({
       setStyleOpen(false);
       setShopOpen(false);
       setHelperKind(null);
+      return true;
     } catch {
       setError(copy.roomSaveFailed);
+      return false;
     }
   }
 
@@ -1358,7 +1376,7 @@ export function RoomWorldScreen({
     if (!error) return loadingCovered ? <View style={{ flex: 1 }} /> : <SeoullyLoadingState fullScreen label={copy.enteringYourRoom} />;
     return <View style={[styles.world, immersiveRoomFill(roomTheme.void)]}>
       <Stack.Screen options={{ contentStyle: immersiveRoomFill(roomTheme.void) }} />
-      <OverlayChrome copy={copy} chrome={overlayTheme} onBack={onLeave} style={overlayPad} onLayout={measureHeader} />
+      <OverlayChrome copy={copy} chrome={overlayTheme} onBack={mode === "own" ? () => void leaveHome() : onLeave} home={mode === "own"} busy={homeSaving} style={overlayPad} onLayout={measureHeader} />
       <View style={styles.empty}><RoomMessage chrome={overlayTheme}>
         <SeoullyText accessibilityRole="alert" style={roomMessageStyles.text} color={overlayTheme.color}>{error}</SeoullyText>
         {error ? <Pressable onPress={() => void refresh()}><SeoullyText variant="button" color={overlayTheme.color}>{copy.retry}</SeoullyText></Pressable> : null}
@@ -1372,7 +1390,7 @@ export function RoomWorldScreen({
       <OverlayChrome
         copy={copy}
         chrome={overlayTheme}
-        onBack={onLeave}
+        onBack={mode === "own" ? () => void leaveHome() : onLeave} home={mode === "own"} busy={homeSaving}
         style={overlayPad} onLayout={measureHeader}
       />
       <RoomEntranceTitle key={entranceLabel} label={entranceLabel} color={entranceTone.color} shadow={entranceTone.shadow} reducedMotion={reducedMotion} />
@@ -1510,7 +1528,7 @@ export function RoomWorldScreen({
       <OverlayChrome
         copy={copy}
         chrome={overlayTheme}
-        onBack={goBack}
+        onBack={mode === "own" ? () => void leaveHome() : goBack} home={mode === "own"} busy={homeSaving}
         editing={editing}
         readOnly={readOnly}
         onEdit={beginEditing}
@@ -1690,7 +1708,11 @@ function OverlayChrome({
   showStorage,
   onStorage,
   onLayout,
+  home = false,
+  busy = false,
 }: {
+  home?: boolean;
+  busy?: boolean;
   copy: MobileCopy;
   chrome: ReturnType<typeof roomOverlayChrome>;
   onBack: () => void;
@@ -1708,8 +1730,8 @@ function OverlayChrome({
   useLanguageControlTone(chrome.color);
   const chip = [styles.overlayChip, { minHeight: header.controlHeight }, roomChromeSurface(chrome)];
   return <View pointerEvents="box-none" onLayout={onLayout} style={[styles.overlayBar, style, { paddingRight: 16 + languageWidth + 18 }]}>
-    <Pressable accessibilityRole="button" onPress={onBack} style={chip}>
-      <SeoullyText variant="button" color={chrome.color}>{copy.back}</SeoullyText>
+    <Pressable accessibilityRole="button" accessibilityLabel={home ? copy.roomHome : copy.back} accessibilityState={{ busy, disabled: busy }} disabled={busy} onPress={onBack} style={[chip, home ? { minWidth: 44 } : null]}>
+      {home && !busy ? <IconHome color={chrome.color} size={20} /> : <SeoullyText variant="button" color={chrome.color}>{busy ? copy.saving : copy.back}</SeoullyText>}
     </Pressable>
     {readOnly || !onEdit ? <View pointerEvents="none" style={styles.overlaySpacer} /> : <View pointerEvents="box-none" style={styles.overlayActions}>
       {editing ? <Pressable onPress={onCancel} style={chip}><SeoullyText variant="button" color={chrome.color}>{copy.cancelEditing}</SeoullyText></Pressable> : <Pressable onPress={onEdit} style={chip}><SeoullyText variant="button" color={chrome.color}>{copy.editRoom}</SeoullyText></Pressable>}

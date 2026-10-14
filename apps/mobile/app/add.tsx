@@ -147,7 +147,9 @@ export default function AddCollectibleScreen() {
       onboardingTrace("holding_confirmed", { holdingConfirmed: true });
       setSavedHoldingId(holding.id);
       await clearFirstCollectibleDraft(draftScope.current);
-      if (fromOnboarding) router.replace({ pathname: "/onboarding", params: { phase: "reveal", holdingId: holding.id } });
+      if (fromOnboarding) router.replace(boot.destination === "onboarding"
+        ? { pathname: "/onboarding", params: { phase: "reveal", holdingId: holding.id } }
+        : { pathname: "/room", params: { holdingId: holding.id } });
       return;
     } catch (error) {
       const diagnostic = error instanceof Error && /^(holding_read|holding_create|media_upload):[0-9]{3}:[a-z_]+$/.test(error.message) ? error.message

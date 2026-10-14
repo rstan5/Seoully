@@ -8,7 +8,7 @@ export default function TabsLayout() {
   const boot = useBootstrap();
   return (
       <Tabs
-        initialRouteName={boot.profileEntryRequested ? "profile" : "index"}
+        initialRouteName={boot.appEntryTarget === "profile" ? "profile" : "index"}
         tabBar={(props) => <SeoullyTabBar {...props} />}
         screenOptions={{ headerShown: false, tabBarShowLabel: false }}
       >

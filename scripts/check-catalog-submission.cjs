@@ -49,8 +49,8 @@ test('draft canonicalization preserves retry identity despite optional fields/or
 });
 test('native orchestration only contributes catalog metadata; no Holding/Media writes',()=>{
   const collect=fs.readFileSync('apps/mobile/app/collect.tsx','utf8');
-  assert.match(collect,/await submitManualCatalog\(/);assert.match(collect,/if \(submitting.current\) return/);
-  assert.match(collect,/openPhoto\(result.contribution.template/);
+  assert.match(collect,/await publishCommunityCatalog\(/);assert.match(collect,/if \(submitting.current\) return/);
+  assert.match(collect,/openPhoto\(template/);
   for(const file of ['apps/mobile/src/catalogSubmission.ts','apps/mobile/src/manualCatalog.ts']) {
     assert.doesNotMatch(fs.readFileSync(file,'utf8'),/createHolding|uploadHolding|createMediaAsset|\.from\(/);
   }
@@ -84,33 +84,33 @@ test('real DAL accepts keyed and legacy requests, rejects malformed/forged ident
   assert.throws(()=>dal.catalogContributionSchema.parse({...details,contributorUserId:'forged'}));
   let calls=0;
   const client={async rpc(name,args){calls++;assert.equal(name,'create_catalog_contribution');assert.equal(args.p_payload.submissionKey,key);return {data:{template:{id:'template',group_id:'group',name:'Card',kind:'photocard'},contributor_user_id:'collector',created:true}}},
-    from(){return {select(){return {in:async()=>({data:[{id:'group',name:'Group'}]})}}}}};
+    from(){return {select(){return {limit:async()=>({data:[],error:null}),in:async()=>({data:[{id:'group',name:'Group'}]})}}}}};
   const result=await dal.createSharedCatalogContribution(payload,client);assert.equal(result.template.id,'template');assert.equal(calls,1);
 });
 function manualHandler(overrides={}) {
   const source=fs.readFileSync('apps/mobile/app/collect.tsx','utf8');
   const start=source.indexOf('  async function submitManual()');
   const end=source.indexOf('\n  return (',start);
-  const scope={social:{kind:'live'},fromOnboarding:false,copy:{demoWriteBlocked:'demo',collectibleNameRequired:'name',groupNameRequired:'group',collectibleCreateFailed:'failed'},
-    name:'Card',groupName:'Group',memberName:'',releaseName:'',kind:'photocard',versionName:'',submitting:{current:false},
+  const scope={social:{kind:'live'},fromOnboarding:false,copy:{demoWriteBlocked:'demo',collectibleNameRequired:'name',groupNameRequired:'group',collectibleCreateFailed:'failed',catalogPublicationFailed:'failed'},
+    candidates:[],referenceUri:'photo',details:()=>details,saveCatalogPublication:async()=>({details,submissionKey:'stable',referenceUri:'photo'}),clearCatalogPublication:async()=>{},name:'Card',groupName:'Group',memberName:'',releaseName:'',kind:'photocard',versionName:'',submitting:{current:false},
     setWorking:()=>{},setMessage:()=>{},...overrides};
   vm.runInNewContext(source.slice(start,end)+'\nthis.submit = submitManual;',scope);
   return scope.submit;
 }
 test('actual manual screen double-tap opens existing Add flow once after catalog confirmation',async()=>{
   let resolve;const response=new Promise(r=>resolve=r);let creates=0,opened=0;
-  const submit=manualHandler({submitManualCatalog:async()=>{creates++;return response},openPhoto:()=>{opened++}});
+  const submit=manualHandler({publishCommunityCatalog:async()=>{creates++;return response},openPhoto:()=>{opened++}});
   const first=submit();await submit();assert.equal(creates,1);assert.equal(opened,0);
-  resolve({contribution:{template:{id:'template'}}});await first;assert.equal(opened,1);
+  resolve({id:'template'});await first;assert.equal(opened,1);
 });
 test('actual manual screen keeps failed catalog creation retryable without opening Holding/media flow',async()=>{
   let calls=0,opened=0;const messages=[];
-  const submit=manualHandler({submitManualCatalog:async()=>{if(++calls===1)throw Error('lost');return {contribution:{template:{id:'same'}}}},openPhoto:()=>{opened++},setMessage:m=>messages.push(m)});
+  const submit=manualHandler({publishCommunityCatalog:async()=>{if(++calls===1)throw Error('lost');return {id:'same'}},openPhoto:()=>{opened++},setMessage:m=>messages.push(m)});
   await submit();assert.equal(opened,0);assert.ok(messages.includes('failed'));
   await submit();assert.equal(opened,1);assert.equal(calls,2);
 });
 test('actual manual Demo path retains write-blocked behavior',async()=>{
   let creates=0;const messages=[];
-  await manualHandler({social:{kind:'demo'},submitManualCatalog:async()=>{creates++},setMessage:m=>messages.push(m)})();
+  await manualHandler({social:{kind:'demo'},publishCommunityCatalog:async()=>{creates++},setMessage:m=>messages.push(m)})();
   assert.equal(creates,0);assert.deepEqual(messages,['demo']);
 });

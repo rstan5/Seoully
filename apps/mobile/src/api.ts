@@ -38,6 +38,7 @@ export async function resolveNativeIdentity<T>(): Promise<T | null> {
 
 export type NativeCatalogTemplate = {
   needsReferenceImage?: boolean;
+  publicationState?: "draft" | "needs-media" | "published";
   id: string;
   groupId: string;
   memberId: string | null;
@@ -265,11 +266,11 @@ export async function uploadHoldingPhoto(holdingId: string, uri: string) {
   return response.json();
 }
 
-export async function uploadCatalogReferencePhoto(templateId: string, uri: string) {
+export async function uploadCatalogReferencePhoto(templateId: string, uri: string, sourceKey = uri.slice(-160)) {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
   if (!accessToken) throw new Error("unauthenticated");
-  const body = await photoMultipart({ templateId, sourceKey: uri.slice(-160) }, uri);
+  const body = await photoMultipart({ templateId, sourceKey }, uri);
   const response = await expoFetch(`${productApiBase()}/api/mobile/catalog/reference-images`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body });
   if (!response.ok) throw new Error("catalog_reference_upload_failed");
   return response.json();
@@ -282,7 +283,7 @@ export async function contributeCatalogItem(input: { submissionKey: string; name
   const response = await fetch(`${productApiBase()}/api/mobile/catalog/contributions`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify(input) });
   if (!response.ok) {
     const failure = await response.json().catch(() => null) as { error?: string } | null;
-    throw new Error(failure?.error === "catalog_identity_ambiguous" ? "catalog_identity_ambiguous" : "catalog_contribution_failed");
+    throw new Error(failure?.error === "catalog_identity_ambiguous" ? "catalog_identity_ambiguous" : failure?.error === "catalog_publication_unavailable" ? "catalog_publication_unavailable" : "catalog_contribution_failed");
   }
   return response.json() as Promise<{ contribution: { template: NativeCatalogTemplate; created: boolean } }>;
 }

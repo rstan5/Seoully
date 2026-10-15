@@ -42,6 +42,7 @@ export interface CatalogTemplateDTO {
   createdAt: string;
   imageUrl?: string;
   needsReferenceImage?: boolean;
+  publicationState?: "draft" | "needs-media" | "published";
 }
 
 export interface CatalogContributionDTO {
@@ -63,7 +64,7 @@ export async function searchSharedCatalog(input: unknown): Promise<CatalogTempla
     const normalized = parsed.query.replace(/[%(),]/g, " ").trim();
     if (normalized) query = query.ilike("search_text", `%${normalized}%`);
   }
-  let result = await query.eq("publication_state", "published");
+  let result = await query.in("publication_state", ["published", "needs-media"]);
   if (result.error?.code === "42703" || result.error?.code === "PGRST204") {
     // Before the approved migration, preserve legacy reads and label missing imagery honestly.
     let legacy = supabase.from("collectible_templates").select("id,group_id,member_id,release_id,kind,name,descriptor,status,created_at").neq("status", "restricted").order("created_at", { ascending: false }).range(parsed.offset, parsed.offset + parsed.limit - 1);
@@ -78,12 +79,12 @@ export async function searchSharedCatalog(input: unknown): Promise<CatalogTempla
 export async function getSharedCatalogTemplate(templateId: string): Promise<CatalogTemplateDTO | null> {
   const id = z.string().uuid().parse(templateId);
   const supabase = requestSupabaseClient() ?? await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("collectible_templates")
-    .select("id,group_id,member_id,release_id,kind,name,descriptor,status,created_at")
-    .eq("id", id)
-    .neq("status", "restricted")
-    .maybeSingle();
+  const columns = "id,group_id,member_id,release_id,kind,name,descriptor,status,created_at";
+  let result = await supabase.from("collectible_templates").select(`${columns},publication_state`).eq("id", id).neq("status", "restricted").maybeSingle();
+  if (result.error?.code === "42703" || result.error?.code === "PGRST204") {
+    result = await supabase.from("collectible_templates").select(columns).eq("id", id).neq("status", "restricted").maybeSingle();
+  }
+  const { data, error } = result;
   if (error) throw new Error("catalog_search_failed");
   if (!data) return null;
   return (await hydrateCatalogTemplates([data], supabase))[0] ?? null;
@@ -94,6 +95,9 @@ export async function createSharedCatalogContribution(input: unknown, client?: S
   const identity = client ? await getCurrentIdentityFromClient(client) : await getCurrentIdentity();
   if (!identity) throw new Error("unauthenticated");
   const supabase = client ?? await createSupabaseServerClient();
+  // Fail closed during rollout: an older database would make image-less drafts public.
+  const capability = await supabase.from("collectible_templates").select("publication_state").limit(0);
+  if (capability.error) throw new Error("catalog_publication_unavailable");
   const { data, error } = await supabase.rpc("create_catalog_contribution", { p_payload: payload });
   if (error) {
     if (error.code === "42501") throw new Error("unauthenticated");
@@ -126,6 +130,7 @@ async function hydrateCatalogTemplates(rows: Array<Record<string, unknown>>, sup
     id: String(row.id),
     imageUrl: references.get(String(row.id)),
     needsReferenceImage: !references.has(String(row.id)),
+    publicationState: row.publication_state as CatalogTemplateDTO["publicationState"],
     groupId: String(row.group_id),
     memberId: typeof row.member_id === "string" ? row.member_id : null,
     releaseId: typeof row.release_id === "string" ? row.release_id : null,

@@ -104,7 +104,7 @@ async function main(){
     }
     sql('create extension pgtap');
     let tapCount=0;
-    for(const file of ['room_persistence.test.sql','catalog_idempotency.test.sql','first_home.test.sql','user_profile_rls.test.sql','profile_appearance.test.sql','profile_identity.test.sql','profile_room_sync_default.test.sql','photocard_collector_counts.test.sql','profile_post_reposts.test.sql','catalog_image_publication.test.sql']){
+    for(const file of ['room_persistence.test.sql','catalog_idempotency.test.sql','first_home.test.sql','user_profile_rls.test.sql','profile_appearance.test.sql','profile_identity.test.sql','profile_room_sync_default.test.sql','photocard_collector_counts.test.sql','profile_post_reposts.test.sql','catalog_image_publication.test.sql','community_catalog_launch.test.sql']){
       const result=sql(fs.readFileSync(path.join('supabase/tests',file),'utf8'));
       const lines=result.split('\n');const failures=lines.filter(l=>/^not ok |^# Looks like/.test(l));
       assert.deepEqual(failures,[],`${file} pgTAP failures`);
@@ -131,6 +131,17 @@ async function main(){
     const retry=JSON.parse(sql(start+request+'commit;'));
     assert.deepEqual(retry,JSON.parse(a),'committed-but-lost-response retry resolves original');
     assert.equal(sql('select count(*) from public.catalog_contributions'),'1');
+    // Independent collectors and retry keys race on the same physical identity.
+    sql(`insert into auth.users(id,raw_user_meta_data) values('a8120000-0000-4000-8000-000000000020','{"handle":"launchsecond","display_name":"Second"}');`);
+    const sharedPayload={name:'Shared concurrent version',groupName:'Concurrent launch',kind:'photocard',descriptor:'Store A version 1'};
+    const independentA=session(), independentB=session();
+    independentA.proc.stdin.end(start+`select public.create_catalog_contribution('${JSON.stringify({...sharedPayload,submissionKey:'b8120000-0000-4000-8000-000000000001'})}');commit;`);
+    independentB.proc.stdin.end(`begin;set local role authenticated;set local request.jwt.claim.sub='a8120000-0000-4000-8000-000000000020';select public.create_catalog_contribution('${JSON.stringify({...sharedPayload,submissionKey:'b8120000-0000-4000-8000-000000000002'})}');commit;`);
+    const sharedResults=(await Promise.all([independentA.done,independentB.done])).map(JSON.parse);
+    assert.equal(sharedResults[0].template.id,sharedResults[1].template.id,'concurrent collectors reuse one physical catalog identity');
+    assert.equal(sharedResults.filter(r=>r.created).length,1,'only one concurrent collector creates the template');
+    assert.equal(sql("select count(*) from public.collectible_templates where name='Shared concurrent version'"),'1');
+    console.log('Independent collectors with distinct retry keys converge on one catalog identity PASS.');
     const identityRequest=`select public.contribute_catalog_identity('{"submissionId":"b8070000-0000-4000-8000-000000000020","kind":"group","name":"Concurrent Identity"}');`;
     const identityFirst=session(); identityFirst.proc.stdin.write(start+identityRequest+'\n');
     let identityHeld=false; for(let i=0;i<60;i++){if(Number(sql("select count(*) from pg_locks where locktype='advisory' and granted"))>0){identityHeld=true;break}await wait(50)}

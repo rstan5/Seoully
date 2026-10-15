@@ -2,10 +2,13 @@ import { useBootstrap } from "../src/startup/BootstrapProvider";
 import { onboardingHeading, onboardingDescription } from "../src/onboarding/presentation";
 import { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { type NativeCatalogTemplate } from "../src/api";
 import { queueFirstCollectible } from "../src/onboarding/firstCollectibleStorage";
-import { submitManualCatalog } from "../src/manualCatalog";
+import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
+import { PhotocardCropper, type CropRect } from "../src/media/PhotocardCropper";
+import { loadCatalogPublication, saveCatalogPublication, clearCatalogPublication, publishCommunityCatalog } from "../src/communityCatalog";
 import { useSocialRepository } from "../src/data";
 import { KeyboardScreen } from "../src/components/KeyboardScreen";
 import { ScreenBack } from "../src/components/ScreenBack";
@@ -40,9 +43,74 @@ export default function CollectScreen() {
   const [releaseName, setReleaseName] = useState("");
   const [versionName, setVersionName] = useState("");
   const [kind, setKind] = useState<(typeof COLLECTIBLE_KINDS)[number]>("photocard");
+  const [referenceUri, setReferenceUri] = useState<string | null>(null);
+  const [cropAsset, setCropAsset] = useState<{ uri: string; width: number; height: number } | null>(null);
+  const [candidates, setCandidates] = useState<NativeCatalogTemplate[] | null>(null);
   const submitting = useRef(false);
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (social.kind === "demo") return;
+    let active = true;
+    void loadCatalogPublication().then(draft => {
+      if (!active || !draft) return;
+      const d = draft.details;
+      setName(d.name); setGroupName(d.groupName); setMemberName(d.memberName ?? "");
+      setReleaseName(d.releaseName ?? ""); setVersionName(d.descriptor ?? "");
+      setKind(d.kind as (typeof COLLECTIBLE_KINDS)[number]);
+      setReferenceUri(draft.referenceUri); setStep("manual");
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [social.kind]);
+
+  function details() {
+    return { name: name.trim(), groupName: groupName.trim(),
+      memberName: memberName.trim() || undefined, releaseName: releaseName.trim() || undefined,
+      kind, ...(versionName.trim() ? { descriptor: versionName.trim() } : {}) };
+  }
+  async function chooseReference() {
+    if (social.kind === "demo") return setMessage(copy.demoWriteBlocked);
+    setMessage(null);
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) { setMessage(copy.photoAccessRequired); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.9, exif: false });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    if (kind === "photocard") setCropAsset({ uri: asset.uri, width: asset.width, height: asset.height });
+    else await retainReference(asset.uri);
+  }
+  async function retainReference(uri: string) {
+    // Normalize format/orientation; durable copy survives picker cache eviction.
+    const image = await ImageManipulator.manipulateAsync(uri, [], { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG });
+    const draft = await saveCatalogPublication(details(), image.uri);
+    setReferenceUri(draft.referenceUri); setCandidates(null);
+  }
+  async function useReferenceCrop(crop: CropRect) {
+    if (!cropAsset) return;
+    try {
+      const image = await ImageManipulator.manipulateAsync(cropAsset.uri, [{ crop }], { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG });
+      await retainReference(image.uri); setCropAsset(null);
+    } catch { setMessage(copy.photoPrepareFailed); }
+  }
+  async function reviewMatches() {
+    if (submitting.current) return;
+    if (!name.trim()) return setMessage(copy.collectibleNameRequired);
+    if (!groupName.trim()) return setMessage(copy.groupNameRequired);
+    submitting.current = true;
+    setWorking(true); setMessage(null);
+    try {
+      if (referenceUri) {
+        const draft = await saveCatalogPublication(details(), referenceUri);
+        setReferenceUri(draft.referenceUri);
+      }
+      // Separate bounded queries avoid requiring an exact concatenated phrase.
+      const terms = [...new Set([groupName, memberName, releaseName, name].map(v => v.trim().slice(0, 120)).filter(Boolean))];
+      const results = await Promise.all(terms.map(term => social.searchCatalog(term)));
+      setCandidates([...new Map(results.flat().filter(t => t.kind === kind).map(t => [t.id, t])).values()]);
+    } catch { setMessage(copy.catalogUnavailable); }
+    finally { submitting.current = false; setWorking(false); }
+  }
 
   useEffect(() => {
     if (step !== "search") return;
@@ -86,26 +154,36 @@ export default function CollectScreen() {
     });
   }
 
+  async function selectExisting(template: NativeCatalogTemplate) {
+    if (submitting.current) return;
+    submitting.current = true; setWorking(true);
+    try {
+      const draft = await loadCatalogPublication();
+      await openPhoto(template);
+      if (draft) await clearCatalogPublication(draft);
+    } catch { setMessage(copy.collectibleCreateFailed); }
+    finally { submitting.current = false; setWorking(false); }
+  }
+
   async function submitManual() {
     if (social.kind === "demo") return setMessage(copy.demoWriteBlocked);
     if (!name.trim()) return setMessage(copy.collectibleNameRequired);
     if (!groupName.trim()) return setMessage(copy.groupNameRequired);
+    if (!referenceUri) return setMessage(copy.catalogImageRequired);
+    if (candidates?.length && !versionName.trim()) return setMessage(copy.catalogDistinctVersionRequired);
     if (submitting.current) return;
     submitting.current = true;
     setWorking(true);
     setMessage(null);
     try {
-      const result = await submitManualCatalog({
-        name: name.trim(),
-        groupName: groupName.trim(),
-        memberName: memberName.trim() || undefined,
-        releaseName: releaseName.trim() || undefined,
-        kind,
-        ...(versionName.trim() ? { descriptor: versionName.trim() } : {}),
-      }, fromOnboarding ? async (accepted) => { await queueFirstCollectible(accepted.contribution.template.id, accepted.contribution.created, accepted.contribution.template); } : undefined);
-      await openPhoto(result.contribution.template, { newTemplate: String(result.contribution.created) });
+      if (!referenceUri) throw new Error("catalog_reference_required");
+      const draft = await saveCatalogPublication(details(), referenceUri);
+      const template = await publishCommunityCatalog(draft);
+      // The shared reference is already uploaded. /add only creates the private copy.
+      await openPhoto(template);
+      await clearCatalogPublication(draft);
     } catch (error) {
-      setMessage(error instanceof Error && error.message === "catalog_identity_ambiguous" ? copy.catalogIdentityAmbiguous : copy.collectibleCreateFailed);
+      setMessage(error instanceof Error && error.message === "catalog_identity_ambiguous" ? copy.catalogIdentityAmbiguous : copy.catalogPublicationFailed);
     } finally {
       submitting.current = false;
       setWorking(false);
@@ -159,7 +237,7 @@ export default function CollectScreen() {
                   key={template.id}
                   template={template}
                   title={template.name}
-                  meta={[template.groupName, template.memberName, template.releaseName, template.descriptor, collectibleKindLabel(template.kind, copy)].filter(Boolean).join(" · ")}
+                  meta={[template.groupName, template.memberName, template.releaseName, template.descriptor, template.needsReferenceImage ? copy.catalogNeedsMedia : null, collectibleKindLabel(template.kind, copy)].filter(Boolean).join(" · ")}
                   onPress={() => { void openPhoto(template).catch(() => setSearchError(copy.collectibleCreateFailed)); }}
                 />
               ))}
@@ -178,11 +256,12 @@ export default function CollectScreen() {
               <SeoullyText variant="secondary" style={[styles.lede, fromOnboarding ? onboardingDescription : null]}>{copy.catalogDescribeLede}</SeoullyText>
               <SeoullyField
                 label={copy.catalogName}
+                editable={!working}
                 value={name}
-                onChangeText={setName}
+                onChangeText={v => { setName(v); setCandidates(null); }}
                 placeholder={copy.catalogNamePlaceholder}
               />
-              <SeoullyButton label={copy.reviewCatalogMatches} variant="ghost" onPress={() => { setQuery([groupName, memberName, releaseName].filter(Boolean).join(" ") || name); setStep("search"); }} />
+
               <SeoullyText variant="caption" style={styles.kindLabel}>{copy.catalogKind}</SeoullyText>
               <View style={styles.kinds}>
                 {COLLECTIBLE_KINDS.map((item) => (
@@ -191,45 +270,65 @@ export default function CollectScreen() {
                     role="checkbox"
                     selected={kind === item}
                     label={collectibleKindLabel(item, copy)}
-                    onPress={() => setKind(item)}
+                    onPress={() => { if (working) return; setKind(item); setCandidates(null); }}
                   />
                 ))}
               </View>
               <SeoullyField
                 label={copy.catalogGroup}
+                editable={!working}
                 value={groupName}
-                onChangeText={setGroupName}
+                onChangeText={v => { setGroupName(v); setCandidates(null); }}
                 placeholder={copy.groupPlaceholder}
               />
               <SeoullyField
                 label={`${copy.catalogMember} · ${copy.catalogOptional}`}
+                editable={!working}
                 value={memberName}
-                onChangeText={setMemberName}
+                onChangeText={v => { setMemberName(v); setCandidates(null); }}
                 placeholder={copy.memberOptionalPlaceholder}
               />
               <SeoullyField
                 label={`${copy.catalogRelease} · ${copy.catalogOptional}`}
+                editable={!working}
                 value={releaseName}
-                onChangeText={setReleaseName}
+                onChangeText={v => { setReleaseName(v); setCandidates(null); }}
                 placeholder={copy.releaseOptionalPlaceholder}
               />
               <SeoullyField
                 label={`${copy.catalogVersion} · ${copy.catalogOptional}`}
+                editable={!working}
                 value={versionName}
-                onChangeText={setVersionName}
+                onChangeText={v => { setVersionName(v); setCandidates(null); }}
                 placeholder={copy.catalogVersionPlaceholder}
               />
+              <SeoullyText variant="secondary">{copy.catalogSharedConsent}</SeoullyText>
+              {referenceUri ? <Image source={{ uri: referenceUri }} resizeMode="contain" accessibilityLabel={copy.catalogSharedImage} style={{ height: 180, width: "100%", marginVertical: 16 }} /> : null}
+              <SeoullyButton label={copy.catalogSharedImage} variant="ghost" disabled={working} onPress={() => { void chooseReference().catch(() => setMessage(copy.photoPrepareFailed)); }} />
+              {candidates !== null ? <View style={{ gap: 12, marginVertical: 16 }}>
+                <SeoullyText variant="secondary">{copy.catalogMatchesLede}</SeoullyText>
+                {candidates.map(template => <View key={template.id}>
+                  <SeoullyShelfRow template={template} title={template.name}
+                    meta={[template.groupName, template.memberName, template.releaseName].filter(Boolean).join(" · ")}
+                    onPress={() => { if (working) return; void selectExisting(template); }} />
+                  {template.descriptor ? <SeoullyText variant="caption">{template.descriptor}</SeoullyText> : null}
+                  {template.needsReferenceImage ? <SeoullyText variant="caption">{copy.catalogNeedsMedia}</SeoullyText> : null}
+                </View>)}
+              </View> : null}
               {message ? <SeoullyText accessibilityRole="alert" variant="caption" color={colors.plum}>{message}</SeoullyText> : null}
               <SeoullyButton
-                label={working ? copy.saving : copy.continue}
+                label={working ? copy.saving : candidates === null ? copy.reviewCatalogMatches : candidates.length ? copy.catalogDistinct : copy.publishCatalog}
                 disabled={working}
                 block
-                onPress={() => { void submitManual(); }}
+                onPress={() => { void (candidates === null ? reviewMatches() : submitManual()); }}
               />
             </View>
           ) : null}
         </ScrollView>
       </KeyboardScreen>
+      <PhotocardCropper key={cropAsset?.uri ?? "no-crop"} asset={cropAsset} title={copy.cropPhotocard} hint={copy.cropPhotocardHint}
+        useLabel={copy.useCrop} backLabel={copy.back} zoomInLabel={copy.zoomIn} zoomOutLabel={copy.zoomOut}
+        errorLabel={copy.photoPrepareFailed} retryLabel={copy.retry} onUse={useReferenceCrop} onCancel={() => setCropAsset(null)} />
     </SeoullyScreen>
   );
 }

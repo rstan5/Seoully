@@ -1,3 +1,4 @@
+-- Valid authenticated stored reference images publish automatically: no moderator gate.
 -- Publication is separate from ownership and contribution review status.
 -- Historical identity keys, Holdings, media, placements and tags are untouched.
 alter table public.collectible_templates add column publication_state text not null default 'draft'

@@ -148,7 +148,7 @@ Use a stable approved HTTPS API origin, without `/api`, and no Vercel login wall
 Choose and verify the origin; none is invented here. Verify Storage's hosted global
 limit, egress/storage quotas and request-rate controls before beta.
 
-Deploy metadata handlers only after the migration. Smoke tests must use separately
+Deploy the compatible backend before migration 12 when any backend is already active. Keep the new direct-upload client disabled until all three migrations are verified. Smoke tests must use separately
 authorized development/beta accounts and genuine intended contributions, not mutate
 other collectors' data. Verify max-size media through Supabase, invalid/oversized
 rejection, delayed/lost responses, shared thumbnails and private-media isolation.
@@ -256,3 +256,163 @@ strings and no unused microphone permission.
 No physical iPhone verification, live authorized Storage upload, signed cloud build,
 TestFlight/App Store submission or hosted production rollout was performed. These
 remain explicit acceptance steps after the required approvals and configuration.
+
+
+## Controlled deployment preflight — 2026-10-15
+
+Baseline: clean `mobile-native` at `21c8423`. Read-only linked-project inspection
+confirms `ttmynanbwxlvcczeobgj`, migration head `20261009000000`, 20 Profiles,
+20 Rooms, 12 templates, 29 Holdings, zero shared references and zero orphan
+Holding links. No upload-jobs table exists yet. These aggregate checks establish
+metadata preservation, not a byte-level audit or exhaustive hosted schema diff.
+Only local migrations 10, 11 and 12 follow that head.
+
+Accessible Vercel inventory contains ryan-stanford, proof-ai and coursemap-ai;
+no Seoully project is present in that scope. No repository Vercel link/configuration
+establishes an existing Seoully deployment. Other accounts are not ruled out.
+
+### Configuration contract
+
+Use repository root `.`, Next.js preset, `npm ci`, `npm run build`, framework-default
+output (no static export/output override), Node.js 24.x matching local validation.
+Keep native builds separate. Choose the account/team and production branch explicitly;
+never accept an unrelated existing project or assume `main` is the approved source.
+Initially use the assigned stable production `*.vercel.app` hostname. A custom domain
+is optional only after ownership is confirmed. Preview URLs are not the mobile API origin.
+
+Production server variables: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`,
+`SUPABASE_SECRET_KEY` (or deliberate `SUPABASE_SERVICE_ROLE_KEY` alternative),
+`SITE_URL`; existing assistant requires `OPENAI_API_KEY` and `OPENAI_MODEL`.
+`OPENAI_VISION_MODEL` is optional existing identification configuration, not a launch
+requirement or authorization to enable identification features. Database passwords
+are migration/backup operator credentials, not backend runtime variables.
+Store privileged keys only in server environment configuration; no `NEXT_PUBLIC_`
+or `EXPO_PUBLIC_` privileged keys. Server privileged modules use `server-only`.
+Preview should use an isolated staging project and its own origin/credentials;
+do not run preview write tests against production. Development retains local values.
+
+Native release needs public `EXPO_PUBLIC_API_URL` (origin only),
+`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` plus approved
+EAS project/bundle configuration already described above. Public key is not a substitute
+for authenticated bearer identity. Native HTTP does not require browser CORS;
+same-origin web routes need no cross-origin allowance. No wildcard CORS is introduced.
+Future cross-origin browser clients need a deliberate allowlist. Keep API responses
+accessible without a hosting login redirect while enforcing application authentication.
+Custom-scheme callbacks require a separately approved Supabase redirect allowlist;
+password sign-in remains unchanged and does not require that callback.
+
+### Migration and operational findings
+
+10 creates authenticated profile-only repost relationships and an invoker timeline;
+original post visibility remains authoritative. 11 adds publication state and classifies
+legacy image-less templates as searchable `needs-media`; it does not remove ownership
+or merge identities. New entries remain drafts until a stored reference is present.
+12 adds private staging/jobs and service-only completion/renewal/cleanup/abandon/reference
+RPCs, and removes authenticated raw reference INSERT. Server image decoding and atomic
+permission rechecks enforce publication. Public post media remains the existing explicit
+public-post bucket; personal media is not automatically contributed.
+
+Migrations are ledger-managed one-time SQL, not scripts to rerun blindly. RPC retries
+are idempotent; a failed migration must be inspected against the ledger before retry.
+Regular index creation and ALTER TABLE acquire locks; the template UPDATE touches 12
+current rows. Expected load is small but a fresh lock/long-transaction inspection is
+mandatory in the approved quiet window. Local isolated tests cannot certify hosted
+PostgREST cache refresh, Storage service behavior, quotas or live serverless latency.
+
+Required buckets: private collectible-media (10 MiB), private catalog-reference-images
+(10 MiB), private profile-avatars (5 MiB), existing public post-media (50 MiB), and
+migration-created private media-upload-staging (50 MiB, no ordinary-user policies).
+Verify hosted global limits/MIME policies and capacity before enabling uploads. A protected
+periodic worker for `cleanupExpiredUploads` is not installed; approve and implement its
+operational invocation before sustained release traffic. Never expose it anonymously.
+
+### Ordered rollout and approval gates
+
+1. **REQUIRES USER APPROVAL — fresh recovery backup.** Reconfirm project, head,
+   committed hashes, pending list and quiet-window locks. Use the established pinned
+   Supabase CLI/Docker workflow: roles, schema, COPY data, migration-history schema/data
+   in a new ignored `.backups` directory with directory 0700/files 0600. Verify nonempty
+   files, checksums, COPY structure, ledger, aggregate counts, Auth/Storage metadata and
+   an isolated restore rehearsal. Existing helper scripts are hardcoded to older heads;
+   update their guards locally before use, never execute them unchanged. Database dumps
+   do not include Storage object bytes: separately authorize a private object backup or
+   documented provider recovery plan. No fresh backup was created in this preflight.
+2. **REQUIRES USER APPROVAL — Vercel project configuration.** Select owner/team,
+   create/link only Seoully, verify Git repository/source commit and production branch.
+   Disable unintended automatic production promotion during controlled rollout.
+3. **REQUIRES USER APPROVAL — server environment configuration.** Supply the above
+   server values in Production; isolate Preview. Set SITE_URL to the assigned HTTPS origin.
+4. **REQUIRES USER APPROVAL — HTTPS backend deployment.** Deploy this compatible
+   backend; verify unauthenticated API rejection, origin/TLS and no hosting login wall.
+   Before migration 12 new direct uploads fail closed; do not release the new native
+   client yet. If an older backend exists, replace it before grant tightening. A first
+   deployment may instead follow the migrations within the same approved quiet window,
+   but there must never be an active old reference-upload backend after migration 12.
+5. **REQUIRES USER APPROVAL — database rollout.** Re-run verified linked CLI dry-run;
+   it must list only 10 → 11 → 12. Apply exactly that approved set with the established
+   CLI workflow. Stop on extra files, drift or a changed head. Verify head 12, grants,
+   policies, buckets, RPC signatures and unchanged identity/Holding/placement rows;
+   legacy templates gain only the intended publication classification.
+6. **REQUIRES USER APPROVAL — operational storage/cleanup configuration.** Verify
+   hosted caps, retention and monitoring; install an authenticated protected cleanup
+   schedule with bounded batches, leases and alerts. Preserve completed receipts.
+7. **REQUIRES USER APPROVAL for smoke-test writes.** Use an explicitly authorized
+   signed-in collector, not synthetic production accounts or another collector's data.
+   Test photo/caption/both tag types, lost-response retry (one post), avatar save,
+   private Holding photo, new image-backed contribution/reuse from another collector,
+   legacy reference remediation without new identity, wishlist/counts and profile-only
+   repost/undo. Confirm unauthorized/cross-owner rejection and private-media isolation.
+8. **REQUIRES USER APPROVAL — native release environment.** Set the verified public
+   HTTPS origin and approved public Supabase/EAS identifiers. Do not distribute until
+   backend/schema/storage checks pass; no LAN/localhost release origin.
+9. Physical iPhone acceptance: cellular without Mac, interrupted upload/relaunch,
+   onboarding completion/Profile/Room/Home, Binder textures, language and returning welcome.
+   Record failures; automated tests do not constitute device approval.
+10. **REQUIRES USER APPROVAL — TestFlight.** Complete Apple/EAS signing, icon/privacy/
+    review requirements; approve cloud build/archive upload and submission separately.
+    Test the production candidate as well as the preview channel before public release.
+
+### Failure recovery
+
+Stop client distribution on any failed gate. Roll back to a compatible backend build
+that retains verified reference publication; do not restore an old raw-INSERT backend
+or regrant unsafe writes. Prefer additive forward fixes; keep upload receipts to prevent
+lost-response duplicates. Do not drop new tables or erase published associations as a
+rollback shortcut. A full restore requires separate approval, a write pause, verified
+DB/Storage recovery artifacts and explicit handling of writes after the recovery point.
+A backup without a restore rehearsal is not a proven recovery guarantee.
+
+### Preflight decision
+
+Vercel: **BLOCKED for launch**, locally build-ready; project/origin/env and live smoke
+verification remain. Migrations: **READY for controlled approval**, subject to a fresh
+verified recovery point, unchanged head/schema/lock checks and precisely scoped dry-run.
+No production deployment or migration is authorized by this document. First action:
+approve the fresh recovery backup and choose the Vercel owner/project; application and
+mobile distribution remain later, separate approval checkpoints.
+
+
+Verified local validation for this preflight: Next.js production build, root and mobile
+TypeScript, mobile lint, Expo iOS export; 28 media-release + 28 social integration +
+48 navigation lifecycle tests; startup checks. Isolated PostgreSQL replay passed
+28 migrations and 480 pgTAP assertions, the added exact 09 → 10 → 11 → 12 upgrade
+trial, historical preservation and real concurrent catalog/post retry tests.
+CLI `npx supabase@2.121.0 db push --linked --skip-vault --dry-run` succeeded and
+proposed only the three approved pending filenames. This was not an application.
+
+Recorded SHA-256 migration fingerprints:
+- 10: `fa7cccb6860320f385f86ce3f329b0a1c18db0dbcbf3d3a3a7b824f0f3ff5e35`
+- 11: `d1571a2707261d20b008673a165b5f9c0c37a0a00aa8fd795eab8a406b60928b`
+- 12: `9988370f1620732c619cd443cc04b37dd9c894a4a5e1809e71721e05b6f47084`
+
+Backup command family verified against the existing workflow (NOT executed here):
+`npx supabase@2.121.0 db dump --linked --role-only --file <private-directory>/roles.sql`,
+then schema dump with no mode flag, data dump with `--data-only --use-copy`, and
+separate schema/data dumps with `--schema supabase_migrations`. Substitute a newly
+created protected ignored directory, verify the target first, and retain private logs.
+Never run the old hardcoded backup/apply helpers against this new migration head.
+
+Platform references: [Vercel function constraints](https://vercel.com/docs/functions/limitations)
+and [Supabase backup scope](https://supabase.com/docs/guides/platform/backups).
+Metadata request bodies are capped at 16 KiB; legacy multipart uploads still face
+Vercel's 4.5 MB request limit. Storage bytes require a separate recovery plan.

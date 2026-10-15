@@ -28,6 +28,31 @@ async function main(){
     const migrations=fs.readdirSync('supabase/migrations').filter(f=>f.endsWith('.sql')).sort();
     for(const file of migrations){
       const body=fs.readFileSync(path.join('supabase/migrations',file),'utf8');
+      if(file==='20261010000000_profile_post_reposts.sql') {
+        // Exercise the exact hosted-head upgrade, with synthetic legacy ownership.
+        const upgrade = sql(`begin;
+          insert into auth.users(id,raw_user_meta_data) values('a8090000-0000-4000-8000-000000000099','{"handle":"rollout_history","display_name":"History"}');
+          insert into public.catalog_groups(id,slug,name) values('b8090000-0000-4000-8000-000000000099','rollout-history','History');
+          insert into public.collectible_templates(id,group_id,kind,name,normalized_name,identity_key)
+            select ('c8090000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid,'b8090000-0000-4000-8000-000000000099','photocard','Legacy '||n,'legacy '||n,'rollout-history-'||n from generate_series(1,12) n;
+          insert into public.holdings(owner_user_id,template_id)
+            select p.user_id,t.id from public.profiles p cross join public.collectible_templates t where p.handle='rollout_history';
+          create temporary table rollout_profiles as select user_id,to_jsonb(p) snapshot from public.profiles p;
+          create temporary table rollout_holdings as select id,to_jsonb(h) snapshot from public.holdings h;
+          create temporary table rollout_templates as select id,to_jsonb(t) snapshot from public.collectible_templates t;
+          ${migrations.filter(f=>f>='20261010000000').map(f=>fs.readFileSync(path.join('supabase/migrations',f),'utf8')).join('\n')}
+          select (select bool_and(to_jsonb(p)=o.snapshot) from public.profiles p join rollout_profiles o using(user_id))
+            and (select bool_and(to_jsonb(h)=o.snapshot) from public.holdings h join rollout_holdings o using(id))
+            and (select bool_and(to_jsonb(t)-'publication_state'=o.snapshot and t.publication_state='needs-media') from public.collectible_templates t join rollout_templates o using(id))
+            and not has_table_privilege('authenticated','public.catalog_reference_images','INSERT')
+            and not has_table_privilege('authenticated','public.media_upload_jobs','SELECT');
+          set local role anon;
+          select count(*)=12 from public.collectible_templates;
+          reset role;
+          rollback;`);
+        assert.deepEqual(upgrade.split('\n').slice(-2), ['t','t'], '09 → 10 → 11 → 12 preserves identity/ownership and legacy anonymous discovery, tightens grants');
+        console.log('Production-head 09 → 10 → 11 → 12 synthetic legacy preservation and visibility PASS.');
+      }
       if(file==='20261011000000_catalog_image_publication.sql'){
         const trial=sql(`begin;
           insert into auth.users(id,raw_user_meta_data) values('a8110000-0000-4000-8000-000000000090','{"handle":"history_media","display_name":"History"}');

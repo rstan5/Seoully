@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import ts from "typescript";
 import {
   parseOnboardingStep,
   resolveAuthDestination,
@@ -73,7 +74,21 @@ assert.equal(signOutHop.visitsWelcome, 1);
 assertContains(bootstrap, 'event !== "SIGNED_OUT"', "sign-out updates bootstrap");
 assertNotContains(profile, 'router.replace("/")', "profile sign-out does not replace from the tabs tree");
 assertNotContains(edit, 'router.replace("/")', "edit sign-out does not replace from the app tree");
-assertNotContains(gated, "router.replace", "gate does not replace from render");
+// The root now owns a deliberate handoff after protected routes admit tabs.
+// Reject render-time navigation, while allowing the verified effect-owned handoff.
+const routeTree = ts.createSourceFile("AuthRouteTree.tsx", gated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+function assertNoRenderReplace(node: ts.Node, inEffect = false) {
+  if (ts.isCallExpression(node) && node.expression.getText() === "router.replace") {
+    assert.ok(inEffect, "root navigation replacement must run inside an effect, never during render");
+  }
+  const effect = ts.isCallExpression(node) && node.expression.getText() === "useEffect" ? node : null;
+  ts.forEachChild(node, child => assertNoRenderReplace(child, inEffect || child === effect?.arguments[0]));
+}
+assertNoRenderReplace(routeTree);
+const renderReplace = ts.createSourceFile("invalid.tsx", "function Gate() { router.replace('/'); return null; }", ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+assert.throws(() => assertNoRenderReplace(renderReplace), /must run inside an effect/);
+const effectReplace = ts.createSourceFile("valid.tsx", "function Gate() { useEffect(() => router.replace('/'), []); return null; }", ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+assertNoRenderReplace(effectReplace);
 assertNotContains(tabs, "router.replace", "tabs do not replace from render");
 
 // B. Sign back in

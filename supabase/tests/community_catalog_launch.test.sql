@@ -14,8 +14,11 @@ select set_config('request.jwt.claim.sub','a8120000-0000-4000-8000-000000000002'
 select is((select count(*)::int from public.collectible_templates where id=current_setting('test.launch')::uuid),0,'second collector cannot discover unpublished draft');
 select set_config('request.jwt.claim.sub','a8120000-0000-4000-8000-000000000001',true);
 insert into storage.objects(bucket_id,name) values('catalog-reference-images',public.current_seoully_user_id()::text||'/launch-reference');
+reset role;
+-- Server-verified reference fixture; actual byte verification is covered by decoder tests.
 insert into public.catalog_reference_images(collectible_template_id,storage_path,contributed_by_user_id,mime_type,byte_size,source_key)
  values(current_setting('test.launch')::uuid,public.current_seoully_user_id()::text||'/launch-reference',public.current_seoully_user_id(),'image/jpeg',100,'launch-retry');
+set local role authenticated;
 select is((select publication_state from public.collectible_templates where id=current_setting('test.launch')::uuid),'published','stored authorized reference immediately publishes without moderation');
 insert into public.holdings(id,owner_user_id,template_id) values('c8120000-0000-4000-8000-000000000001',public.current_seoully_user_id(),current_setting('test.launch')::uuid);
 select is((select count(*)::int from public.own_catalog_reference_retry(current_setting('test.launch')::uuid,'launch-retry')),1,'lost upload response recovers stored reference without a second upload');

@@ -104,7 +104,7 @@ async function main(){
     }
     sql('create extension pgtap');
     let tapCount=0;
-    for(const file of ['room_persistence.test.sql','catalog_idempotency.test.sql','first_home.test.sql','user_profile_rls.test.sql','profile_appearance.test.sql','profile_identity.test.sql','profile_room_sync_default.test.sql','photocard_collector_counts.test.sql','profile_post_reposts.test.sql','catalog_image_publication.test.sql','community_catalog_launch.test.sql']){
+    for(const file of ['room_persistence.test.sql','catalog_idempotency.test.sql','first_home.test.sql','user_profile_rls.test.sql','profile_appearance.test.sql','profile_identity.test.sql','profile_room_sync_default.test.sql','photocard_collector_counts.test.sql','profile_post_reposts.test.sql','catalog_image_publication.test.sql','community_catalog_launch.test.sql','direct_media_uploads.test.sql']){
       const result=sql(fs.readFileSync(path.join('supabase/tests',file),'utf8'));
       const lines=result.split('\n');const failures=lines.filter(l=>/^not ok |^# Looks like/.test(l));
       assert.deepEqual(failures,[],`${file} pgTAP failures`);
@@ -155,6 +155,21 @@ async function main(){
     assert.deepEqual(JSON.parse(sql(start+identityRequest+'commit;')),JSON.parse(identityResults[0]));
     assert.equal(sql('select count(*) from public.catalog_identity_contributions'),'1');
     console.log('Identity contribution real concurrent retry and lost-response retry PASS.');
+    const mediaOwner=sql("select id from public.users where auth_subject='a8050000-0000-4000-8000-000000000020'");
+    const mediaJob='b8130000-0000-4000-8000-000000000020';
+    sql(`insert into public.media_upload_jobs(owner_id,id,payload) values('${mediaOwner}','${mediaJob}','{"purpose":"post","media":null,"caption":"Concurrent upload","taggedUserIds":[],"taggedTemplateIds":[]}');`);
+    const mediaRequest=`select public.complete_media_upload('${mediaOwner}','${mediaJob}');`;
+    const mediaStart='begin;set local role service_role;';
+    const mediaFirst=session();mediaFirst.proc.stdin.write(mediaStart+mediaRequest+'\n');
+    let mediaHeld=false;for(let i=0;i<60;i++){if(Number(sql("select count(*) from pg_stat_activity where state='idle in transaction' and query like '%complete_media_upload%'"))>0){mediaHeld=true;break}await wait(50)}assert.ok(mediaHeld);
+    const mediaSecond=session();mediaSecond.proc.stdin.end(mediaStart+mediaRequest+'commit;\n');
+    let mediaBlocked=false;for(let i=0;i<60;i++){if(Number(sql("select count(*) from pg_locks where locktype='transactionid' and not granted"))>0){mediaBlocked=true;break}await wait(50)}assert.ok(mediaBlocked,'concurrent completion waits on receipt row');
+    mediaFirst.proc.stdin.end('commit;\n');
+    const mediaResults=(await Promise.all([mediaFirst.done,mediaSecond.done])).map(JSON.parse);
+    assert.deepEqual(mediaResults[0],mediaResults[1]);
+    assert.equal(sql(`select count(*) from public.posts where id='${mediaJob}'`),'1');
+    assert.deepEqual(JSON.parse(sql(mediaStart+mediaRequest+'commit;')),mediaResults[0],'lost response recovers exact committed post');
+    console.log('Direct media real concurrent post completion and lost-response retry PASS.');
     console.log(`${migrations.length} migrations replayed; ${tapCount} pgTAP assertions passed; historical preservation, real two-session concurrency and lost-response retry PASS.`);
     console.log('Disposable database only; hosted Supabase untouched.');
   } finally {try{run(['rm','-f',container])}catch{}}

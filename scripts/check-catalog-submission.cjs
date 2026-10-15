@@ -65,7 +65,7 @@ function load(file,mocks={},globals={}) {
 }
 test('real native API sends the durable submission key unchanged over retries',async()=>{
   const sent=[];let calls=0;
-  const api=load('apps/mobile/src/api.ts',{'expo/fetch':{},'./postPublish':{postTrace(){},postFailureCodes:new Set()},'./media/photoUpload':{},'./apiFailure':load('apps/mobile/src/apiFailure.ts'),'./config-rules':{isProductApiConfigured:()=>true},'./startup/onboardingTrace':{onboardingTrace(){}},'./supabase':{supabase:{auth:{async getSession(){return {data:{session:{access_token:'fixture-only'}}}}}}}},
+  const api=load('apps/mobile/src/api.ts',{'expo/fetch':{},'./postPublish':{postTrace(){},postFailureCodes:new Set()},'./media/directUpload':{},'./apiFailure':load('apps/mobile/src/apiFailure.ts'),'./config-rules':{isProductApiConfigured:()=>true},'./startup/onboardingTrace':{onboardingTrace(){}},'./supabase':{supabase:{auth:{async getSession(){return {data:{session:{access_token:'fixture-only'}}}}}}}},
     {process:{env:{EXPO_PUBLIC_API_URL:'http://fixture.local'}},fetch:async(url,request)=>{sent.push(JSON.parse(request.body));if(++calls===1)throw Error('lost');return {ok:true,json:async()=>({contribution:{template:{id:'original'}}})}}});
   const s=setup((_,payload)=>api.contributeCatalogItem(payload));
   await assert.rejects(s.factory()('owner',details));const result=await s.factory()('owner',details);

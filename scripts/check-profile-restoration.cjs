@@ -37,8 +37,8 @@ test('identity operation key survives ambiguous retry and relaunch, new logical 
  await relaunch.finishIdentitySubmission('owner',first);assert.equal((await relaunch.prepareIdentitySubmission('owner',{kind:'group',name:'Different'})).submissionId,changed.submissionId);
  await relaunch.finishIdentitySubmission('owner',changed);assert.notEqual((await relaunch.prepareIdentitySubmission('owner',{kind:'group',name:'Different'})).submissionId,changed.submissionId);
 });
-test('avatar picker uses separate square crop, Expo-compatible multipart and capability gating',()=>{
- const api=fs.readFileSync('apps/mobile/src/api.ts','utf8');assert.match(edit,/allowsEditing: true, aspect: \[1, 1\]/);assert.match(edit,/SaveFormat.JPEG/);assert.match(edit,/!capabilities.profileAvatar/);assert.match(api,/photoMultipart\(\{ submissionId \}, uri\)/);assert.match(edit,/avatarDraft.uri, avatarDraft.submissionId/);assert.match(picker,/if \(!live\)/);assert.match(picker,/kind === "biases" && !manualGroup/);
+test('avatar picker preserves separate square crop, verified direct upload and capability gating',()=>{
+ const api=fs.readFileSync('apps/mobile/src/api.ts','utf8');assert.match(edit,/allowsEditing: true, aspect: \[1, 1\]/);assert.match(edit,/SaveFormat.JPEG/);assert.match(edit,/!capabilities.profileAvatar/);assert.match(api,/directUpload\(productApiBase\(\), uri, \{ purpose: "avatar" \}, submissionId\)/);assert.match(api,/avatar_upload_unconfirmed/);assert.match(edit,/avatarDraft.uri, avatarDraft.submissionId/);assert.match(picker,/if \(!live\)/);assert.match(picker,/kind === "biases" && !manualGroup/);
 });
 for(const status of ['success','existing','failed','invalid','unauthenticated'])test(`actual avatar HTTP route: ${status}`,async()=>{
  const calls=[];const key='b8070000-0000-4000-8000-000000000001';

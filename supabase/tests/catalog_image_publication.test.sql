@@ -12,16 +12,20 @@ select isnt(public.create_catalog_contribution('{"name":"Card – A","groupName"
 reset role;
 select throws_ok($$update public.collectible_templates set publication_state='published' where id=current_setting('test.template')::uuid$$,'23514','catalog_reference_required','cannot publish without valid stored media');
 set local role authenticated;
--- A reference row without a real stored object does not satisfy publication.
+-- Trusted fixture tests the trigger; unverified client inserts are denied below.
+reset role;
 insert into public.catalog_reference_images(collectible_template_id,storage_path,contributed_by_user_id,mime_type,byte_size,source_key)
 values(current_setting('test.template')::uuid,public.current_seoully_user_id()::text||'/missing',public.current_seoully_user_id(),'image/jpeg',100,'missing');
+set local role authenticated;
 select is((select publication_state from public.collectible_templates where id=current_setting('test.template')::uuid),'draft','metadata-only reference is not publication');
 insert into storage.objects(bucket_id,name) values('catalog-reference-images',public.current_seoully_user_id()::text||'/missing');
 delete from storage.objects where bucket_id='catalog-reference-images' and name=public.current_seoully_user_id()::text||'/missing';
 select is((select publication_state from public.collectible_templates where id=current_setting('test.template')::uuid),'draft','deleting an unapproved object cannot promote a draft into legacy visibility');
 insert into storage.objects(bucket_id,name) values('catalog-reference-images',public.current_seoully_user_id()::text||'/reference');
+reset role;
 insert into public.catalog_reference_images(collectible_template_id,storage_path,contributed_by_user_id,mime_type,byte_size,source_key)
 values(current_setting('test.template')::uuid,public.current_seoully_user_id()::text||'/reference',public.current_seoully_user_id(),'image/jpeg',100,'valid');
+set local role authenticated;
 select is((select publication_state from public.collectible_templates where id=current_setting('test.template')::uuid),'published','authorized active stored reference publishes item');
 select is((select count(*)::int from public.holdings),1,'publication never duplicates Holding');
 delete from storage.objects where bucket_id='catalog-reference-images' and name=public.current_seoully_user_id()::text||'/reference';
@@ -40,7 +44,7 @@ select is((select count(template_id)::int from public.catalog_contributions),0,'
 select throws_ok($$insert into public.catalog_reference_images(collectible_template_id,storage_path,contributed_by_user_id,mime_type,byte_size) values(current_setting('test.template')::uuid,public.current_seoully_user_id()::text||'/no-ownership',public.current_seoully_user_id(),'image/jpeg',100)$$,'42501',null,'non-owner/non-contributor cannot contribute to another template');
 insert into public.holdings(owner_user_id,template_id) values(public.current_seoully_user_id(),current_setting('test.template')::uuid);
 insert into storage.objects(bucket_id,name) values('catalog-reference-images',public.current_seoully_user_id()::text||'/owned-reference');
-select lives_ok($$insert into public.catalog_reference_images(collectible_template_id,storage_path,contributed_by_user_id,mime_type,byte_size) values(current_setting('test.template')::uuid,public.current_seoully_user_id()::text||'/owned-reference',public.current_seoully_user_id(),'image/jpeg',100)$$,'existing copy owner may explicitly contribute authorized shared media');
+select throws_ok($$insert into public.catalog_reference_images(collectible_template_id,storage_path,contributed_by_user_id,mime_type,byte_size) values(current_setting('test.template')::uuid,public.current_seoully_user_id()::text||'/owned-reference',public.current_seoully_user_id(),'image/jpeg',100)$$,'42501',null,'copy owners must use verified server publication, not raw inserts');
 reset role;
 select ok(not has_column_privilege('authenticated','public.catalog_reference_images','source_key','select'),'private local retry keys are not publicly readable');
 select ok(not has_function_privilege('anon','public.own_catalog_reference_retry(uuid,text)','execute'),'retry lookup is authenticated only');

@@ -1,8 +1,7 @@
 import { postFailureCodes, postTrace } from "./postPublish";
 import { onboardingTrace } from "./startup/onboardingTrace";
 import type { ProfileThemeChoice } from "seoully-domain/types";
-import { fetch as expoFetch } from "expo/fetch";
-import { personalPhotoForm, photoMultipart } from "./media/photoUpload";
+import { directUpload } from "./media/directUpload";
 import { apiFailure, apiTransportFailure } from "./apiFailure";
 import { isProductApiConfigured } from "./config-rules";
 import { supabase } from "./supabase";
@@ -257,23 +256,18 @@ export async function setWishlistTemplate(templateId: string, wanted: boolean) {
 }
 
 export async function uploadHoldingPhoto(holdingId: string, uri: string) {
-  const { data } = await supabase.auth.getSession();
-  const accessToken = data.session?.access_token;
-  if (!accessToken) throw new Error("unauthenticated");
-  const body = await personalPhotoForm(holdingId, uri);
-  const response = await expoFetch(`${productApiBase()}/api/mobile/media`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body }).catch(() => apiTransportFailure("media_upload"));
-  if (!response.ok) return apiFailure(response, "media_upload");
-  return response.json();
+  const saved = await directUpload(productApiBase(), uri, { purpose: "holding", contextId: holdingId });
+  const asset = saved.asset as { id?: string; holdingId?: string } | undefined;
+  if (!asset?.id || asset.holdingId !== holdingId) throw new Error("media_upload_unconfirmed");
+  return saved;
 }
 
 export async function uploadCatalogReferencePhoto(templateId: string, uri: string, sourceKey = uri.slice(-160)) {
-  const { data } = await supabase.auth.getSession();
-  const accessToken = data.session?.access_token;
-  if (!accessToken) throw new Error("unauthenticated");
-  const body = await photoMultipart({ templateId, sourceKey }, uri);
-  const response = await expoFetch(`${productApiBase()}/api/mobile/catalog/reference-images`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body });
-  if (!response.ok) throw new Error("catalog_reference_upload_failed");
-  return response.json();
+  void sourceKey; // Transport retry identity is account/context/file scoped, never a public local URI.
+  const saved = await directUpload(productApiBase(), uri, { purpose: "catalog", contextId: templateId });
+  const image = saved.image as { id?: string; templateId?: string; status?: string } | undefined;
+  if (!image?.id || image.templateId !== templateId || image.status !== "active") throw new Error("catalog_reference_upload_unconfirmed");
+  return saved;
 }
 
 export async function contributeCatalogItem(input: { submissionKey: string; name: string; kind: string; groupName: string; memberName?: string; releaseName?: string; descriptor?: string }) {
@@ -366,27 +360,19 @@ export async function addPostComment(postId: string, body: string): Promise<Nati
   return payload.comment;
 }
 
-export async function createNativePost(uri: string | null, caption: string, mimeType = "image/jpeg", tags: { taggedUserIds: string[]; taggedTemplateIds: string[] } = { taggedUserIds: [], taggedTemplateIds: [] }) {
-  void mimeType; // Actual file MIME is validated by the shared Expo multipart path.
-  postTrace("prepare");
-  const accessToken = await mobileAccessToken();
-  const fields = { caption, taggedUserIds: JSON.stringify([...new Set(tags.taggedUserIds)]), taggedTemplateIds: JSON.stringify([...new Set(tags.taggedTemplateIds)]) };
-  let body: FormData;
-  try { body = uri ? await photoMultipart(fields, uri, 50 * 1024 * 1024) : new FormData(); }
-  catch (error) { const code = error instanceof Error && postFailureCodes.has(error.message) ? error.message : "invalid_media"; postTrace("prepare_failed", 0, code); throw new Error(`post_publish:000:${code}`); }
-  if (!uri) for (const [key, value] of Object.entries(fields)) body.append(key, value);
+export async function createNativePost(uri: string | null, caption: string, mimeType = "image/jpeg", tags: { taggedUserIds: string[]; taggedTemplateIds: string[] } = { taggedUserIds: [], taggedTemplateIds: [] }, submissionId?: string) {
+  void mimeType;
   postTrace("request");
-  let response: Response;
-  try { response = await expoFetch(`${productApiBase()}/api/mobile/posts`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body }); }
-  catch { postTrace("transport", 0, "network_failure"); throw new Error("post_publish:000:network_failure"); }
-  const payload = await response.json().catch(() => null) as { post?: NativeFeedPost; error?: string } | null;
-  if (!response.ok || !payload?.post?.id) {
-    const code = payload?.error && postFailureCodes.has(payload.error) ? payload.error : "post_create_failed";
-    postTrace("response", response.status, code);
-    throw new Error(`post_publish:${response.status}:${code}`);
+  try {
+    const result = await directUpload(productApiBase(), uri, { purpose: "post", caption, taggedUserIds: [...new Set(tags.taggedUserIds)].sort(), taggedTemplateIds: [...new Set(tags.taggedTemplateIds)].sort() }, submissionId);
+    if (!(result.post as NativeFeedPost | undefined)?.id) throw new Error("post_read_failed");
+    return result as { post: NativeFeedPost };
+  } catch (error) {
+    const code = error instanceof Error && postFailureCodes.has(error.message) ? error.message : "post_create_failed";
+    const status = error && typeof error === "object" && "status" in error && typeof error.status === "number" ? error.status : 0;
+    postTrace("response", status, code);
+    throw new Error(`post_publish:${String(status).padStart(3, "0")}:${code}`);
   }
-  postTrace("confirmed", response.status);
-  return { post: payload.post };
 }
 
 export type NativeIdentity = {
@@ -956,11 +942,7 @@ export async function readProfileCapabilities(): Promise<ProfileCapabilities> {
   return response.json();
 }
 export async function uploadProfileAvatar(uri: string, submissionId: string): Promise<string> {
-  const token = await mobileAccessToken();
-  const body = await photoMultipart({ submissionId }, uri);
-  const response = await expoFetch(`${productApiBase()}/api/mobile/profile/avatar`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body });
-  if (!response.ok) throw new Error("avatar_upload_failed");
-  const saved = await response.json();
+  const saved = await directUpload(productApiBase(), uri, { purpose: "avatar" }, submissionId);
   if (saved.avatarSubmissionId !== submissionId) throw new Error("avatar_upload_unconfirmed");
   return submissionId;
 }

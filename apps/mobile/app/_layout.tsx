@@ -8,6 +8,7 @@ import { FontProvider } from "../src/fonts";
 import { DataModeProvider } from "../src/data";
 import { LocaleProvider } from "../src/locale";
 import { supabase } from "../src/supabase";
+import { createCallbackHandler } from "../src/auth/callback";
 import { AuthRouteTree } from "../src/startup/AuthRouteTree";
 import { BootstrapProvider } from "../src/startup/BootstrapProvider";
 import { GlobalLanguageControl, LanguageControlProvider } from "../src/ui/GlobalLanguageControl";
@@ -16,17 +17,10 @@ import { SeoullyCompanionHost } from "../src/ui/SeoullyCompanionHost";
 
 export default function RootLayout() {
   useEffect(() => {
-    async function handleUrl(url: string | null) {
-      if (!url || !url.includes("code=")) return;
-      try {
-        await supabase.auth.exchangeCodeForSession(url);
-      } catch {
-        return;
-      }
-    }
-    void Linking.getInitialURL().then(handleUrl);
-    const subscription = Linking.addEventListener("url", ({ url }) => { void handleUrl(url); });
-    return () => subscription.remove();
+    const callback = createCallbackHandler((code, options) => supabase.auth.exchangeCodeForSession(code, options));
+    void Linking.getInitialURL().then(url => callback.handle(url)).catch(() => {});
+    const subscription = Linking.addEventListener("url", ({ url }) => { void callback.handle(url); });
+    return () => { callback.dispose(); subscription.remove(); };
   }, []);
   return (
     <SafeAreaProvider>

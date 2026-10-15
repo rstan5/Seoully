@@ -37,7 +37,8 @@
     "check:mobile-messages": "node --test scripts/check-message-screen.cjs",
     "check:add-paper-recovery": "node scripts/check-add-paper-recovery.cjs",
     "check:social-integration": "tsc --project tsconfig.check-social-integration.json && node --test scripts/check-social-integration.cjs",
-    "check:photocard-collectors": "node scripts/check-photocard-collector-count.cjs"
+    "check:photocard-collectors": "node scripts/check-photocard-collector-count.cjs",
+    "check:media-release": "node --test scripts/check-media-release.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -46,6 +47,7 @@
     "next": "^16.3.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "sharp": "0.35.4",
     "zod": "^4.1.13",
     "zustand": "^5.0.15"
   },

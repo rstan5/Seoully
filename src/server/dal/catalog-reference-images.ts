@@ -1,6 +1,8 @@
 import "server-only";
 
 import { z } from "zod";
+import { createMediaStorageAdmin } from "@/server/media/storage-admin";
+import { verifyImage } from "@/server/media/verify-image";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCurrentIdentity, getCurrentIdentityFromClient } from "@/server/dal/profile";
 import { createSupabaseServerClient } from "@/server/supabase/server";
@@ -49,9 +51,13 @@ export async function createCatalogReferenceImage(input: {
     if (owned.error || !owned.data) throw new Error("catalog_reference_not_authorized");
   }
 
+  const template = await supabase.from("collectible_templates").select("id").eq("id", templateId).neq("status", "restricted").maybeSingle();
+  if (template.error || !template.data) throw new Error("catalog_reference_not_authorized");
+
   const { data: existing } = await ownReferenceRetry(supabase, templateId, identity.user.id, sourceKey);
   if (existing) return signReference(supabase, existing as Record<string, unknown>);
 
+  await verifyImage(new Uint8Array(await input.file.arrayBuffer()), input.file.type);
   const id = crypto.randomUUID();
   const path = `${identity.user.id}/${templateId}/${id}`;
   const upload = await supabase.storage.from("catalog-reference-images").upload(path, input.file, {
@@ -60,18 +66,20 @@ export async function createCatalogReferenceImage(input: {
   });
   if (upload.error) throw new Error("catalog_reference_upload_failed");
 
-  const { data: row, error } = await supabase.from("catalog_reference_images").insert({
-    id,
-    collectible_template_id: templateId,
-    storage_bucket: "catalog-reference-images",
-    storage_path: path,
-    contributed_by_user_id: identity.user.id,
-    source_type: "community_contribution",
-    status: "active",
-    mime_type: input.file.type,
-    byte_size: input.file.size,
-    source_key: sourceKey,
-  }).select("id,template_id:collectible_template_id,contributed_by_user_id,source_type,status,mime_type,byte_size,storage_bucket,storage_path,created_at").single();
+  let saved = await createMediaStorageAdmin().rpc("create_verified_catalog_reference", {
+    p_owner: identity.user.id, p_template: templateId, p_id: id, p_path: path,
+    p_mime: input.file.type, p_size: input.file.size, p_source_key: sourceKey,
+  }).single();
+  if (["42883", "PGRST202"].includes(saved.error?.code ?? "")) {
+    // Compatibility before migration 12 only. The caller's existing INSERT RLS
+    // rechecks permission atomically; do not fall back on authorization failures.
+    saved = await supabase.from("catalog_reference_images").insert({
+      id, collectible_template_id: templateId, storage_bucket: "catalog-reference-images", storage_path: path,
+      contributed_by_user_id: identity.user.id, source_type: "community_contribution", status: "active",
+      mime_type: input.file.type, byte_size: input.file.size, source_key: sourceKey,
+    }).select("id,collectible_template_id,contributed_by_user_id,source_type,status,mime_type,byte_size,storage_bucket,storage_path,created_at").single();
+  }
+  const { data: row, error } = saved;
   if (error || !row) {
     await supabase.storage.from("catalog-reference-images").remove([path]);
     if (error?.code === "23505") {
@@ -80,7 +88,8 @@ export async function createCatalogReferenceImage(input: {
     }
     throw new Error("catalog_reference_record_failed");
   }
-  return signReference(supabase, row);
+  const record = row as Record<string, unknown>;
+  return signReference(supabase, { ...record, template_id: record.collectible_template_id });
 }
 
 export async function listActiveCatalogReferenceImages(templateIds: string[], client?: SupabaseClient): Promise<CatalogReferenceImageDTO[]> {

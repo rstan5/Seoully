@@ -1,0 +1,27 @@
+{
+  "cli": {
+    "version": "24.14.0",
+    "requireCommit": true,
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "preview": {
+      "distribution": "store",
+      "environment": "preview",
+      "channel": "preview",
+      "autoIncrement": true,
+      "env": {
+        "SEOULLY_RELEASE_CONFIG": "1"
+      }
+    },
+    "production": {
+      "distribution": "store",
+      "environment": "production",
+      "channel": "production",
+      "autoIncrement": true,
+      "env": {
+        "SEOULLY_RELEASE_CONFIG": "1"
+      }
+    }
+  }
+}

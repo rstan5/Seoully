@@ -349,7 +349,7 @@ assertContains(profile, "identityPalette", "profile uses contrast palette");
 assertContains(profile, "ProfileIdentityProvider", "profile identity context");
 assertContains(profile, "usePublishProfileIdentity", "profile publishes identity to tab chrome");
 assertContains(profile, "palette.primaryDeep", "profile links use theme accent");
-assertContains(read("apps/mobile/app/(tabs)/_layout.tsx"), "ProfileIdentityScope", "tabs shell owns published identity");
+assertContains(read("apps/mobile/app/_layout.tsx"), "ProfileIdentityScope", "root shell owns published identity across Profile/Room navigation");
 assertContains(read("apps/mobile/src/ui/SeoullyTabBar.tsx"), "usePublishedProfileIdentity", "tab bar reads published identity");
 assertContains(read("apps/mobile/src/ui/SeoullyTabBar.tsx"), "profileTabChrome", "tab bar uses shared identity tokens");
 assertContains(read("apps/mobile/src/ui/ProfileIdentity.tsx"), "identityPublicationSurvives", "theme survives visible Room transition");
@@ -366,7 +366,7 @@ assertContains(read("apps/mobile/src/ui/SeoullyControls.tsx"), "identity.paper",
 assertContains(read("apps/mobile/src/data/demo/repository.ts"), "onPrimary: tokens.onPrimary", "demo maps web on-primary");
 assertContains(read("apps/mobile/src/data/demo/repository.ts"), "secondarySoft: tokens.secondarySoft", "demo maps web secondary soft");
 assertContains(read("apps/mobile/src/data/demo/repository.ts"), "resolveProfileTheme(profile.appearance, room)", "demo uses web appearance resolver");
-assertNotContains(read("apps/mobile/src/data/production.ts"), "appearance", "live identity has no appearance contract");
+assertContains(read("apps/mobile/src/data/production.ts"), "result.profile.profile.appearance", "live identity preserves persisted appearance");
 assert.equal(PROFILE_VEIL, 0.80);
 assertContains(read("apps/mobile/src/theme.ts"), "export const PROFILE_VEIL = 0.80", "native room veil is 0.80");
 assertNotContains(read("apps/mobile/src/theme.ts"), "PROFILE_SURFACE_ALPHA", "no section-surface alpha token");

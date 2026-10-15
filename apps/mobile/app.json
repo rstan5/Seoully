@@ -24,7 +24,15 @@
     "plugins": [
       "expo-secure-store",
       "expo-router",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Seoully to choose photos for your collection, posts, and profile.",
+          "cameraPermission": "Allow Seoully to photograph your collection and profile photo.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "scheme": "seoully"
   }

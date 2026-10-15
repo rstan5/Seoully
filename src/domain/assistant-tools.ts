@@ -163,32 +163,6 @@ function matchingOwnedTemplate(query: string, viewerId: UserId, currentTemplateI
   return viewer.find(({ template }) => terms.every((term) => metadata(template).metadata.toLowerCase().includes(term)))?.template;
 }
 
-function identifiedPriceTemplate(query: string, viewerId: UserId, currentTemplateId?: string, requiresOwned = false): CollectibleTemplate | undefined {
-  if (currentTemplateId) {
-    const contextual = repository.getTemplate(currentTemplateId as TemplateId);
-    if (contextual && (!requiresOwned || repository.listHoldings(viewerId).some((holding) => holding.templateId === contextual.id))) return contextual;
-    if (requiresOwned) return undefined;
-  }
-  const terms = words(query);
-  if (terms.length === 0) return undefined;
-  const candidates = catalogByTerms(query).filter((template) =>
-    terms.every((term) => metadata(template).metadata.toLowerCase().includes(term)),
-  );
-  if (candidates.length !== 1) return undefined;
-  const template = candidates[0]!;
-  const release = template.releaseId ? repository.getRelease(template.releaseId)?.title.toLowerCase() : "";
-  const era = template.eraId ? repository.getEra(template.eraId)?.name.toLowerCase() : "";
-  const version = template.releaseVersionId ? repository.getReleaseVersion(template.releaseVersionId)?.name.toLowerCase() : "";
-  const specificTerms = [template.name.toLowerCase(), release, era, version].filter((value): value is string => !!value);
-  const identified = terms.some((term) => specificTerms.some((value) => value.includes(term)));
-  if (!identified) return undefined;
-  // If the person says "my ...", make sure that identified catalog entry is actually theirs.
-  if ((requiresOwned || /\b(my|mine|내)\b/i.test(query)) && !repository.listHoldings(viewerId).some((holding) => holding.templateId === template.id)) {
-    return undefined;
-  }
-  return template;
-}
-
 function userCard(userId: UserId, detail?: string): AssistantCard | undefined {
   const user = repository.getUser(userId);
   const profile = repository.getProfile(userId);
